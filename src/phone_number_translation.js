@@ -1,4 +1,4 @@
-// 電話番号フォーマット修正プログラム（2025年6月1日現在版）
+// 電話番号フォーマット修正プログラム（2025年7月1日現在版）
 // 作成者：一色
 'use strict';
 const phone_number_formatting = (telephone_number) => {
