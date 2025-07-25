@@ -1,5 +1,6 @@
 // 電話番号フォーマット修正プログラム（2025年7月1日現在版）
 // 作成者：一色
+// 2025-07-25　phone_number_formatting関数の内部処理の効率化を図りました。
 'use strict';
 const phone_number_formatting = (telephone_number) => {
 
