@@ -31,7 +31,8 @@ const phone_number_formatting = (telephone_number) => {
         });
         return result;
     };
-    const area_code_list = { // 市外局番桁数.市外局番.市内局番桁数が格納されている
+    const area_code_list = {
+        // 固定電話の市外局番の桁数、桁数に該当する市外局番、市内局番の桁数、もしくは携帯電話号等の電気通信番号の指定通信番号の桁数、桁数に該当する電気通信番号の指定通信番号、局番の桁数が格納されている
         5: {
             // 固定電話
             '01267': 1,
@@ -460,7 +461,10 @@ const phone_number_formatting = (telephone_number) => {
             '06': 4
         }
     };
-    const local_area_code_range = { // 市外局番に所属する市内局番の範囲が格納されている
+    const local_area_code_range = {
+        // 固定電話の市外局番に所属する市内局番の範囲、もしくは携帯電話号等の電気通信番号の範囲が格納されている
+        // 固定電話の場合[市外局番].[市内局番の範囲の下限, 市内局番の範囲の上限]（※範囲が複数の場合あり）
+        // 携帯電話号等の電気通信番号の場合[電気通信番号].[局番の範囲の下限, 局番の範囲の上限]（※範囲が複数の場合あり）
         // 固定電話
         // 01で始まる市外局番
         '011': [[200, 899]],
@@ -938,15 +942,15 @@ const phone_number_formatting = (telephone_number) => {
                     }
                 } else { // 固定電話以外の場合
                     const local_area_code_flag = local_area_code_range[telephone_number_area_code];
-                    if (!local_area_code_flag) { // 指定した電気通信番号指定が範囲指定が定められていない場合
+                    if (!local_area_code_flag) { // 指定した電気通信番号が範囲指定が定められていない場合
                         return telephone_number_sbn;
-                    } else { // 指定した電気通信番号指定が存在する場合
-                        if (!local_area_code_flag.some(([min, max]) => local_code >= min && local_code <= max)) { // 気通信番号指定の局番として存在しない場合
+                    } else { // 指定した電気通信番号が存在する場合
+                        if (!local_area_code_flag.some(([min, max]) => local_code >= min && local_code <= max)) { // 電気通信番号の局番として存在しない場合
                             return telephone_number_sbn;
                         };
                     }
                 }
-                if (!reject_flag) { // ハイフン位置を修正できる条件の場合
+                if (!reject_flag) { // ハイフン位置が確定できる条件の場合
                     return telephone_number_area_code + "-" + local_code + (telephone_number_sbn.substring(area_code_len + local_area_code_len) !== "" ? "-" + telephone_number_sbn.substring(area_code_len + local_area_code_len) : "");
                 }
             }   
