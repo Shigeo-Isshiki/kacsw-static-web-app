@@ -71,7 +71,7 @@
                     if (success.addresses.length === 1) { // 結果が1件のみの時
                         const zip_code = success.addresses[0].zip_code;
                         if (zip_code.length === 7) { // 郵便番号が7桁の場合
-                            address.zip_code = zip_code.slice(0, 3) + '-' + zip_code.slice(3);
+                            address.zip_code = $.zipcode_formatting(zip_code);
                             const zipcode_sep = $.zipcode_separation(address.zip_code);
                             zipcode_sep.forEach((row, c) => {
                                 const zipcode_c = c + 1;
