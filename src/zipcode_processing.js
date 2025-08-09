@@ -93,7 +93,6 @@
                         address.pref = success.addresses[0].pref_name.replace(/[\u3000\u0020]/g, '');
                         address.city = success.addresses[0].city_name.replace(/[\u3000\u0020]/g, '');
                         address.town = success.addresses[0].town_name.replace(/[\u3000\u0020]/g, '');
-
                     }
                 }
             });
