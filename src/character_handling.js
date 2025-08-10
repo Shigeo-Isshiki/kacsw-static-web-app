@@ -90,17 +90,24 @@ const convert_to_full_width_kana = (char, hiragana_sw = true) => {
     return null;
 };
 
-const convert_to_hiragana = (char) => {
+const convert_to_hiragana = (char, check = false) => {
 
     // 入力された文字から可能な限りひらがなに変換する関数
     // （入力値）
     // char = 入力文字
-    // （出力値）=ひらがな（可能な限り）
+    // check = ひらがな以外が含まれる場合はエラーを返すか選択するスイッチ（trueでエラーを返す、falseでエラーを返さない）※無指定はエラーを返さない
+    // （出力値）=ひらがな　※checkがtrueの場合、ひらがな以外の文字が含まれる場合はERRORを返す
     if (char) { // 文字がある場合
         const full_width_kana = convert_to_full_width_kana(char);
         const hiragana = String(full_width_kana).replace(/[\u30A2-\u30F3]/g, (char) => {
             return String.fromCharCode(char.charCodeAt(0) - 96);
         });
+        if (check) { // ひらがなエラーチェックを行う場合
+            const hiragana_check = /^[\u3041-\u3096]+$/.test(hiragana);
+            if (!hiragana_check) { // ひらがな以外の文字が含まれている場合
+                return 'ERROR'
+            }
+        }
         return hiragana;
     }
     return null;
