@@ -104,9 +104,12 @@ const convert_to_hiragana = (char, check = false) => {
             return String.fromCharCode(char.charCodeAt(0) - 96);
         });
         if (check) { // ひらがなエラーチェックを行う場合
-            const hiragana_check = /^[\u3041-\u3096]+$/.test(hiragana);
+            const allow_symbol = ['ー', '・', 'ゝ', 'ゞ', '゛', '゜', '　'];
+            const hiragana_check = [...hiragana].every(char => 
+                (char >= 'ぁ' && char <= 'ん') || allow_symbol.includes(char)
+            );
             if (!hiragana_check) { // ひらがな以外の文字が含まれている場合
-                return 'ERROR'
+                return 'ERROR';
             }
         }
         return hiragana;
