@@ -269,7 +269,7 @@ const convert_to_year = (datechar) => {
                         break;
                 }
             } else { // 日付形式の文字列が年月形式の場合
-                const jacsw_split = cdatechar_cym.jacsw.split('/');
+                const jacsw_split = datechar_cym.jacsw.split('/');
                 daychar = jacsw_split[0] + '-01-01';
             }
         } else { // 日付形式の文字列が年月日形式の場合
@@ -447,4 +447,5 @@ const convert_to_era_year = (datechar) => {
     } else { // 日付形式の文字列がない場合
         return null;
     }
+
 };
