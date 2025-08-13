@@ -238,13 +238,13 @@ const convert_to_year_month = (datechar) => {
     // （出力値）
     // .char = 「YYYY年MM月」形式の年月表記
     // .jacsw = 「YYYY/MM」形式の年月表記
+    const datachar_char = {
+        'char': '',
+        'jacsw': ''
+    }
     if (datechar) { // 日付形式の文字列がある場合
         const datechar_split = date_string_split(datechar);
         if (datechar_split.year && datechar_split.month) { // 年、月の文字列がある場合
-            const datachar_char = {
-                'char': datechar_split.year + '年' + datechar_split.month + '月',
-                'jacsw': datechar_split.year + '/' + datechar_split.month
-            }
             return datachar_char;
         }
     }
