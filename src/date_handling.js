@@ -13,13 +13,21 @@ const convert_to_single_byte_numbers = (char) => {
     return result;
 };
 
-const convert_to_anno_domini = (datechar) => {
+const date_string_split = (datechar) => {
 
-    // 入力された西暦又は和暦の文字からISO 8601拡張形式の西暦表記（YYYY-MM-DD）に変換する関数
+    // 入力された日付文字列を、年月日の配列形式に分割する関数
     // （入力値）
-    // datechar = 西暦もしくは和暦の日付形式の文字列
-    // （出力値）= ISO 8601拡張形式の西暦表記（YYYY-MM-DD）の文字列
-    if (datechar) { // 日付形式の文字列がある場合
+    // datechar = 日付形式の文字列
+    // （出力値）
+    //　.year = 年の文字列
+    // .month = 月の文字列
+    // .day = 日の文字列
+    let datechar_split = {
+        'year': '',
+        'month': '',
+        'day': ''
+    };
+    if (datechar) { // 日付形式の文字列がある場合}        
         const datechar_sbn = convert_to_single_byte_numbers(datechar);
         let date_type = 0;
         if ((datechar_sbn.match(/^\d{4}年\d{1,2}月\d{1,2}日$/)) || 
@@ -34,18 +42,49 @@ const convert_to_anno_domini = (datechar) => {
         (datechar_sbn.match(/^\D{1,2}元\d{4}$/)) ||
         (datechar_sbn.match(/^\D{1,2}\d{5,6}$/))){ // 日付形式の文字列が西暦又は和暦の「YYYYMMDD」のような表現の場合
             date_type = 3;
+        } else if ((datechar_sbn.match(/^\d{4}年\d{1,2}月$/)) || 
+        (datechar_sbn.match(/^\D{1,2}元年\d{1,2}月$/)) || 
+        (datechar_sbn.match(/^\D{1,2}\d{1,2}年\d{1,2}月$/))) { // 日付形式の文字列が西暦又は和暦の「YYYY年MM月」のような表現の場合
+            date_type = 4;
+        } else if ((datechar_sbn.match(/^\d{4}[\/\-\.／‐．]\d{1,2}$/)) || 
+        (datechar_sbn.match(/^\D{1,2}元[\/\-\.／‐．]\d{1,2}$/)) ||
+        (datechar_sbn.match(/^\D{1,2}\d{1,2}[\/\-\.／‐．]\d{1,2}$/))) { // 日付形式の文字列が西暦又は和暦の「YYYY/MM」のような表現の場合
+            date_type = 5;
+        } else if ((datechar_sbn.match(/^\d{6}$/)) || 
+        (datechar_sbn.match(/^\D{1,2}元\d{2}$/)) ||
+        (datechar_sbn.match(/^\D{1,2}\d{3,4}$/))) { // 日付形式の文字列が西暦又は和暦の「YYYYMM」のような表現の場合
+            date_type = 6;
+        } else if ((datechar_sbn.match(/^\d{4}年$/)) || 
+        (datechar_sbn.match(/^\D{1,2}元年$/)) || 
+        (datechar_sbn.match(/^\D{1,2}\d{1,2}年$/))) { // 日付形式の文字列が西暦又は和暦の「YYYY年」のような表現の場合
+            date_type = 7;
+        } else if ((datechar_sbn.match(/^\d{4}$/)) || 
+        (datechar_sbn.match(/^\D{1,2}元$/)) ||
+        (datechar_sbn.match(/^\D{1,2}\d{1,2}$/))) { // 日付形式の文字列が西暦又は和暦の「YYYY」のような表現の場合
+            date_type = 8;
         }
         let datechar_sbn_split = [];
         switch (date_type) {
             case 1: // 日付形式の文字列が西暦又は和暦の「YYYY年MM月DD日」のような表現の場合
-                datechar_sbn_split = datechar_sbn.split(/[年月]/);
-                datechar_sbn_split[2] = datechar_sbn_split[2].replace(/日/g,'');
+            case 4: // 日付形式の文字列が西暦又は和暦の「YYYY年MM月」のような表現の場合
+            case 7: // 日付形式の文字列が西暦又は和暦の「YYYY年」のような表現の場合
+                datechar_sbn_split = datechar_sbn.split(/[年月日]/).filter(Boolean);
                 break;
             case 2: // 日付形式の文字列が西暦又は和暦の「YYYY/MM/DD」のような表現の場合
+            case 5: // 日付形式の文字列が西暦又は和暦の「YYYY/MM」のような表現の場合
+            case 8: // 日付形式の文字列が西暦又は和暦の「YYYY」のような表現の場合
                 datechar_sbn_split = datechar_sbn.split(/[\/\-\.／‐．]/);
                 break;
             case 3: // 日付形式の文字列が西暦又は和暦の「YYYYMMDD」のような表現の場合
-                const year_length = datechar_sbn.length - 4;
+            case 6: // 日付形式の文字列が西暦又は和暦の「YYYYMM」のような表現の場合
+                let year_length = 0;
+                let month_day_length = 0;
+                if (date_type === 3) { // 日付形式の文字列が西暦又は和暦の「YYYYMMDD」のような表現の場合
+                    month_day_length = 4;
+                } else if (date_type === 6) { // 日付形式の文字列が西暦又は和暦の「YYYYMM」のような表現の場合
+                    month_day_length = 2;
+                }
+                year_length = datechar_sbn.length - month_day_length;
                 datechar_sbn_split = [
                     datechar_sbn.substring(0, year_length),
                     datechar_sbn.substring(year_length, year_length + 2),
@@ -53,8 +92,7 @@ const convert_to_anno_domini = (datechar) => {
                 ];
                 break;
         }
-        let conv_flag = true;
-        if (datechar_sbn_split.length === 3) { // 日付形式の文字列である場合
+        if (datechar_sbn_split.length >= 1 && datechar_sbn_split[0]) { // 年の文字列がある場合
             let era_type = 0;
             if ((datechar_sbn_split[0] === '明治元') || (datechar_sbn_split[0].match(/明治\d{1,2}$/)) || 
             (datechar_sbn_split[0].match(/[mMｍＭ]元$/)) || (datechar_sbn_split[0].match(/[mMｍＭ]\d{1,2}$/))) { // 元号が明治の場合
@@ -81,89 +119,115 @@ const convert_to_anno_domini = (datechar) => {
                 .replace(/令和/g,'').replace(/[rRｒＲ]/g,'');
             } else { // 日付形式の文字列が西暦表記の場合
                 yearchar = datechar_sbn_split[0];
-            }            
+            }
             if (yearchar === '元') { // 和暦の元年表記の場合
                 yearchar = '1';
             }
-            let yearnumber = '';
+            let yearnumber = Number(yearchar);
             switch (era_type) {
                 case 1: // 元号が明治の場合
-                    yearnumber = Number(yearchar) + 1867;
+                    if (yearnumber >= 1 && yearnumber <= 45) { // 明治元年～45年までの範囲
+                        yearnumber += 1867;
+                    } else { // 明治の範囲外の場合
+                        yearnumber = 0;
+                    }
                     break;
                 case 2: // 元号が大正の場合
-                    yearnumber = Number(yearchar) + 1911;
+                    if (yearnumber >= 1 && yearnumber <= 15) { // 大正元年～15年までの範囲
+                        yearnumber += 1911;
+                    } else { // 大正の範囲外の場合
+                        yearnumber = 0;
+                    }
                     break;
                 case 3: // 元号が昭和の場合
-                    yearnumber = Number(yearchar) + 1925;
+                    if (yearnumber >= 1 && yearnumber <= 64) { // 昭和元年～昭和64年までの範囲
+                        yearnumber += 1925;
+                    } else { // 昭和の範囲外の場合
+                        yearnumber = 0;
+                    }
                     break;
                 case 4: // 元号が平成の場合
-                    yearnumber = Number(yearchar) + 1988;
+                    if (yearnumber >= 1 && yearnumber <= 31) { // 平成元年～平成31年までの範囲
+                        yearnumber += 1988;
+                    } else { // 平成の範囲外の場合
+                        yearnumber = 0;
+                    }
                     break;
                 case 5: // 元号が令和の場合
-                    yearnumber = Number(yearchar) + 2018;
+                    if (yearnumber >= 1) { // 令和元年以降の範囲
+                        yearnumber += 2018;
+                    } else { // 令和の範囲外の場合
+                        yearnumber = 0;
+                    }
                     break;
-                default: // 西暦の場合
-                    yearnumber = Number(yearchar);
             }
-            datechar_sbn_split[0] = String(yearnumber);
-            for (let c = 1; c <= 2; c++) {
-                datechar_sbn_split[c] = ('0' + datechar_sbn_split[c]).slice(-2);
+            if (yearnumber >= 1) { // 年の数値が1以上の場合
+                datechar_split.year = String(yearnumber);
             }
+        }
+        if (datechar_sbn_split.length >= 2 && datechar_sbn_split[1]) { // 月の文字列がある場合
             if ((Number(datechar_sbn_split[1]) >= 1) && (Number(datechar_sbn_split[1]) <= 12)) { // 月表記が1月～12月になっている場合
-                switch (Number(datechar_sbn_split[1])) {
-                    case 1:
-                    case 3:
-                    case 5:
-                    case 7:
-                    case 8:
-                    case 10:
-                    case 12: // 月日数が31日ある月の場合
-                        if ((Number(datechar_sbn_split[2]) < 1) || (Number(datechar_sbn_split[2]) > 31)) { // 日表記が1未満もしくは31を超える場合
-                            conv_flag = false;
-                        }
-                        break;
-                    case 4:
-                    case 6:
-                    case 9:
-                    case 11: // 月日数が30日ある月の場合
-                        if ((Number(datechar_sbn_split[2]) < 1) || (Number(datechar_sbn_split[2]) > 30)) { // 日表記が1未満もしくは30を超える場合
-                            conv_flag = false;
-                        }
-                        break;
-                    case 2: // 2月の場合
-                        if (Number(datechar_sbn_split[2]) < 1) { // 日表記が1未満の場合
-                            conv_flag = false;
-                        } else { // 日表記が1以上の場合
+                datechar_split.month = ('0' + datechar_sbn_split[1]).slice(-2);
+            } else { // 月表記が1月～12月になっていない場合
+                datechar_split.month = '';
+            }
+        }
+        if (datechar_sbn_split.length >= 3 && datechar_sbn_split[2]) { // 日の文字列がある場合
+            let conv_flag = true;
+            const daynumber = Number(datechar_sbn_split[2]);
+            if ((daynumber >= 1) && (daynumber <= 31)) { // 日表記が1日～31日になっている場合
+                const yearnumber = Number(datechar_split.year);
+                const monthnumber = Number(datechar_split.month);
+                if (yearnumber > 0 && monthnumber >= 1 && monthnumber <= 12) { // 年の文字列があり、月の文字列が1月～12月になっている場合
+                    switch (monthnumber) {
+                        case 4:
+                        case 6:
+                        case 9:
+                        case 11: // 月日数が30日ある月の場合
+                            if (daynumber > 30) { // 日表記が30を超える場合
+                                conv_flag = false;
+                            }
+                            break;
+                        case 2: // 2月の場合
                             if (((yearnumber % 4) === 0) && (((yearnumber % 100) !== 0) || ((yearnumber % 400) === 0))) { // うるう年の場合
-                                if (Number(datechar_sbn_split[2]) > 29) { // 日表記が29を超える場合
+                                if (daynumber > 29) { // 日表記が29を超える場合
                                     conv_flag = false;
                                 }
                             } else { // 平年の場合
-                                if (Number(datechar_sbn_split[2]) > 28) { // 日表記が28を超える場合
+                                if (daynumber > 28) { // 日表記が28を超える場合
                                     conv_flag = false;
                                 }
                             }
-                        }
-                        break;
-                    default :
-                        conv_flag = false;
-                        break;
+                            break;
+                    }
+                } else { // 年の文字列がない、もしくは月の文字列が1月～12月になっていない場合
+                    conv_flag = false;
                 }
-            } else { // 月表記が1月～12月になっていない場合
+            } else { // 日表記が1日～31日になっていない場合
                 conv_flag = false;
             }
-        } else { // 日付形式の文字列ではない場合
-            conv_flag = false;
+            if (conv_flag) { // 日の数値が1以上で、月日数の範囲内の場合
+                datechar_split.day = ('0' + datechar_sbn_split[2]).slice(-2);
+            }
         }
-        if (conv_flag) { // 日付形式をISO 8601拡張形式に変換できた場合
-            const datechar_iso = datechar_sbn_split[0] + '-' + datechar_sbn_split[1] + '-' + datechar_sbn_split[2];
-            return datechar_iso;
-        } else { // 日付形式をISO 8601拡張形式に変換できなかった場合
-            return null;
-        }
-    } else {
-        return null;
     }
+    return datechar_split;
+};
+
+const convert_to_anno_domini = (datechar) => {
+
+    // 入力された西暦又は和暦の文字からISO 8601拡張形式の西暦表記（YYYY-MM-DD）に変換する関数
+    // （入力値）
+    // datechar = 西暦もしくは和暦の日付形式の文字列
+    // （出力値）= ISO 8601拡張形式の西暦表記（YYYY-MM-DD）の文字列
+    if (datechar) { // 日付形式の文字列がある場合
+        const datechar_split = date_string_split(datechar);
+        if (datechar_split.year && datechar_split.month && datechar_split.day) { // 年、月、日の文字列がある場合
+            const datechar_iso = datechar_split.year + '-' + datechar_split.month + '-' + datechar_split.day;
+            return datechar_iso;
+        }
+    }
+    return null;
 };
 
 const convert_to_year_month = (datechar) => {
@@ -175,66 +239,16 @@ const convert_to_year_month = (datechar) => {
     // .char = 「YYYY年MM月」形式の年月表記
     // .jacsw = 「YYYY/MM」形式の年月表記
     if (datechar) { // 日付形式の文字列がある場合
-        let daychar = '';
-        const date_char_cad = convert_to_anno_domini(datechar);
-        if (!date_char_cad) { // 日付形式の文字列が年月日が入っている形式ではない場合
-            const datechar_sbn = convert_to_single_byte_numbers(datechar);
-            let date_type = 0;
-            if ((datechar_sbn.match(/^\d{4}年\d{1,2}月$/)) || 
-            (datechar_sbn.match(/^\D{1,2}元年\d{1,2}月$/)) || 
-            (datechar_sbn.match(/^\D{1,2}\d{1,2}年\d{1,2}月$/))) { // 日付形式の文字列が西暦又は和暦の「YYYY年MM月」のような表現の場合
-                date_type = 1;
-            } else if ((datechar_sbn.match(/^\d{4}[\/\-\.／‐．]\d{1,2}$/)) || 
-            (datechar_sbn.match(/^\D{1,2}元[\/\-\.／‐．]\d{1,2}$/)) ||
-            (datechar_sbn.match(/^\D{1,2}\d{1,2}[\/\-\.／‐．]\d{1,2}$/))) { // 日付形式の文字列が西暦又は和暦の「YYYY/MM」のような表現の場合
-                date_type = 2;
-            } else if ((datechar_sbn.match(/^\d{6}$/)) || 
-            (datechar_sbn.match(/^\D{1,2}元\d{2}$/)) ||
-            (datechar_sbn.match(/^\D{1,2}\d{3,4}$/))) { // 日付形式の文字列が西暦又は和暦の「YYYYMM」のような表現の場合
-                date_type = 3;
+        const datechar_split = date_string_split(datechar);
+        if (datechar_split.year && datechar_split.month) { // 年、月の文字列がある場合
+            const datachar_char = {
+                'char': datechar_split.year + '年' + datechar_split.month + '月',
+                'jacsw': datechar_split.year + '/' + datechar_split.month
             }
-            switch (date_type) {
-                case 1: // 日付形式の文字列が西暦又は和暦の「YYYY年MM月」のような表現の場合
-                    daychar = '1日';
-                    break;
-                case 2: // 日付形式の文字列が西暦又は和暦の「YYYY/MM」のような表現の場合
-                    daychar = '-01';
-                    break;
-                case 3: // 日付形式の文字列が西暦又は和暦の「YYYYMM」のような表現の場合
-                    daychar = '01';
-                    break;
-            }
+            return datachar_char;
         }
-        let datechar_ad = convert_to_anno_domini(datechar + daychar);
-        if (datechar_ad) { // 日付形式の文字列の形式になっている場合
-            const datechar_ad_split = datechar_ad.split('-');
-            if (datechar_ad_split.length === 3) { // 日付形式の文字列が年月日に分けられる場合
-                const datechar_year_month = {
-                    'char': datechar_ad_split[0] + '年' + datechar_ad_split[1] + '月',
-                    'jacsw': datechar_ad_split[0] + '/' + datechar_ad_split[1]
-                };
-                return datechar_year_month;
-            } else { // 日付形式の文字列が年月日に分けられなかった場合
-                const datechar_year_month = {
-                    'char': datechar,
-                    'jacsw': ''
-                };
-                return datechar_year_month;
-            }
-        } else { // 日付形式の文字列の形式になっていない場合
-            const datechar_year_month = {
-                'char': datechar,
-                'jacsw': ''
-            };
-            return datechar_year_month;
-        }
-    } else { // 日付形式の文字列ではない場合
-        const datechar_year_month = {
-            'char': datechar,
-            'jacsw': ''
-        };
-        return datechar_year_month;
     }
+    return null;
 };
 
 const convert_to_year = (datechar) => {
@@ -244,51 +258,12 @@ const convert_to_year = (datechar) => {
     // datechar = 西暦もしくは和暦の日付形式の文字列
     // （出力値） = 西暦の年形式の文字列
     if (datechar) { // 日付形式の文字列がある場合
-        let daychar = '';
-        const date_char_cad = convert_to_anno_domini(datechar);
-        if (!date_char_cad) { // 日付形式の文字列が年月日形式ではない場合
-            const datechar_cym = convert_to_year_month(datechar);
-            if (!datechar_cym.jacsw) { // 日付形式の文字列が年月形式ではない場合
-                const datechar_sbn = convert_to_single_byte_numbers(datechar);
-                let date_type = 0;
-                if ((datechar_sbn.match(/^\d{4}年$/)) || 
-                (datechar_sbn.match(/^\D{1,2}元年$/)) || 
-                (datechar_sbn.match(/^\D{1,2}\d{1,2}年$/))) { // 日付形式の文字列が西暦又は和暦の「YYYY年」のような表現の場合
-                    date_type = 1;
-                } else if ((datechar_sbn.match(/^\d{4}$/)) || 
-                (datechar_sbn.match(/^\D{1,2}元$/)) ||
-                (datechar_sbn.match(/^\D{1,2}\d{1,2}$/))) { // 日付形式の文字列が西暦又は和暦の「YYYY」のような表現の場合
-                    date_type = 2;
-                }
-                switch (date_type) {
-                    case 1: // 日付形式の文字列が西暦又は和暦の「YYYY年」のような表現の場合
-                        daychar = datechar_sbn + '1月1日';
-                        break;
-                    case 2: // 日付形式の文字列が西暦又は和暦の「YYYY」のような表現の場合
-                        daychar = datechar_sbn + '-01-01';
-                        break;
-                }
-            } else { // 日付形式の文字列が年月形式の場合
-                const jacsw_split = datechar_cym.jacsw.split('/');
-                daychar = jacsw_split[0] + '-01-01';
-            }
-        } else { // 日付形式の文字列が年月日形式の場合
-            daychar = datechar;
+        const datechar_split = date_string_split(datechar);
+        if (datechar_split.year) { // 年の文字列がある場合
+            return datechar_split.year;
         }
-        let datechar_ad = convert_to_anno_domini(daychar);
-        if (datechar_ad) { // 日付形式の文字列の形式になっている場合
-            const datechar_ad_split = datechar_ad.split('-');
-            if (datechar_ad_split.length === 3) { // 日付形式の文字列が年月日に分けられる場合
-                return datechar_ad_split[0];
-            } else { // 日付形式の文字列が年月日に分けられなかった場合
-                return null;
-            }
-        } else { // 日付形式の文字列の形式になっていない場合
-            return null;
-        }
-    } else { // 日付形式の文字列がない場合
-        return null;
     }
+    return null;
 };
 
 const convert_to_era_year = (datechar) => {
@@ -447,5 +422,4 @@ const convert_to_era_year = (datechar) => {
     } else { // 日付形式の文字列がない場合
         return null;
     }
-
 };
