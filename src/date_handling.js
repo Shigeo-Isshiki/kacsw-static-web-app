@@ -248,7 +248,7 @@ const convert_to_year_month = (datechar) => {
             return datachar_char;
         }
     }
-    return null;
+    return datachar_char;
 };
 
 const convert_to_year = (datechar) => {
