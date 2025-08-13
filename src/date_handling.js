@@ -246,7 +246,7 @@ const convert_to_year_month = (datechar) => {
         const datechar_split = date_string_split(datechar);
         if (datechar_split.year && datechar_split.month) { // 年、月の文字列がある場合
             datachar_char.char = datechar_split.year + '年' + datechar_split.month + '月';
-            datachar_char.jacsw = datechar_split.year + '/' + datechar_split.month
+            datachar_char.jacsw = datechar_split.year + '/' + datechar_split.month;
         }
     }
     return datachar_char;
