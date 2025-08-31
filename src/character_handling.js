@@ -62,7 +62,7 @@ const build_pattern = (keys) => {
     // （入力値）
     // keys = 複数のマップキー
     // （出力値） = 正規表現のパターン
-    return new RegExp([...keys()].map(char_one => char_one.replace(/[.*+?^${}()|[$\$\]]/g, '\\$&')).join('|'), 'g');
+    return new RegExp([...keys].map(char_one => char_one.replace(/[.*+?^${}()|[$\$\]]/g, '\\$&')).join('|'), 'g');
 }
 const half_width_kana_map = new Map(Object.entries(convert_string_list.half_width_kana));
 const full_width_kana_map = new Map(Object.entries(convert_string_list.full_width_kana));
