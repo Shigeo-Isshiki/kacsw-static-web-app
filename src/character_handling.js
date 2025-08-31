@@ -80,15 +80,14 @@ const replace_with_map = (char, pattern, map) => {
     // （出力値） = 置き換え後の文字列
     return char.replace(pattern, char_one => map.get(char_one) ?? char_one);
 };
-const convert_to_half_width_kana = () => {
+const convert_to_half_width_kana = (char) => {
 
     // 入力された文字から可能な限り半角カナ文字に変換する関数
-    // （入力値） = 文字
+    // （入力値）
+    // char = 入力文字
     // （出力値） = 半角カナ文字（可能な限り）
-    return (char) => {
-        if (typeof char !== 'string' || char.length === 0) return ''; // 入力文字がないか、文字列ではない場合
-        return replace_with_map(char, half_width_kana_pattern, half_width_kana_map);
-    };
+    if (typeof char !== 'string' || char.length === 0) return ''; // 入力文字がないか、文字列ではない場合
+    return replace_with_map(char, half_width_kana_pattern, half_width_kana_map);
 };
 
 const convert_to_full_width_kana = (char, hiragana_sw = true) => {
