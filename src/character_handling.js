@@ -57,7 +57,7 @@ const convert_string_list = {
     }
 };
 
-export const convert_to_half_width_kana = (char) => {
+const convert_to_half_width_kana = (char) => {
 
     // 入力された文字から可能な限り半角カナ文字に変換する関数
     // （入力値）
@@ -69,7 +69,7 @@ export const convert_to_half_width_kana = (char) => {
         result += convert_string_list.half_width_kana[char_one] || char_one;
     }
     return result;
-    
+
     const half_width_kana_list = { // 全角カナと半角カナの対応を定義
         'ア': 'ｱ', 'イ': 'ｲ', 'ウ': 'ｳ', 'エ': 'ｴ', 'オ': 'ｵ',
         'カ': 'ｶ', 'キ': 'ｷ', 'ク': 'ｸ', 'ケ': 'ｹ', 'コ': 'ｺ',
