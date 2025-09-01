@@ -226,8 +226,8 @@ const convert_to_double_byte_characters = (str = '') => {
     const hyphen_processed = str.replace(/[‐‑–—−ー―]/g, '－');
     const full_width_kana = convert_to_full_width_kana(hyphen_processed, false);
     const double_byte_characters = [...full_width_kana].map((char) => {
-        if (char === '\\') return '￥';
-        if (char === ' ') return '\u3000';
+        if (char === '\\') return '￥'; // 半角円（バックスラッシュ）マークを全角円マークに
+        if (char === ' ') return '\u3000'; // 半角スペースを全角に
         const code = char.charCodeAt(0);
         if (
             (code >= 0x21 && code <= 0x7E) || // 半角記号・英数字
