@@ -1,5 +1,6 @@
 /** 文字列処理をまとめたJavaScriptの関数群です。
- * 2025-09-01 Version 1.0
+ * @author Shigeo Isshiki <issiki@kacsw.or.jp>
+ * @version 1.0.0
  */
 'use strict';
 /**
@@ -7,9 +8,9 @@
  * 各種文字の変換ルールを定義します。
  * ひらがな、カタカナ、濁点・半濁点の変換をサポートします。
  * @typedef {object} convert_charactor_list
- * @property {object} half_width_kana - 全角カタカナから半角カタカナへの変換マップ
- * @property {object} full_width_kana - 半角カタカナから全角カタカナへの変換マップ
- * @property {object} turbidity_kana - 濁点・半濁点の変換マップ
+ * @property {object} half_width_kana 全角カタカナから半角カタカナへの変換マップ
+ * @property {object} full_width_kana 半角カタカナから全角カタカナへの変換マップ
+ * @property {object} turbidity_kana 濁点・半濁点の変換マップ
  */
 /** @type {convert_charactor_list} */
 const convert_charactor_list = {
@@ -127,9 +128,9 @@ const replace_with_map = (str, pattern, map) => {
  * @returns {string} カタカナに変換した文字列
  */
 const hiraganaToKatakana = (str) => {
-  return str.replace(/[\u3041-\u3096]/g, char => 
-    String.fromCodePoint(char.charCodeAt(0) + 0x60)
-  );
+    return str.replace(/[\u3041-\u3096]/g, char => 
+        String.fromCodePoint(char.charCodeAt(0) + 0x60)
+    );
 };
 
 /**
@@ -138,9 +139,9 @@ const hiraganaToKatakana = (str) => {
  * @returns {string} ひらがなに変換した文字列
  */
 const katakanaToHiragana = (str) => {
-  return str.replace(/[\u30A1-\u30F6]/g, char => 
-    String.fromCodePoint(char.charCodeAt(0) - 0x60)
-  );
+    return str.replace(/[\u30A1-\u30F6]/g, char => 
+        String.fromCodePoint(char.charCodeAt(0) - 0x60)
+    );
 };
 
 /**
