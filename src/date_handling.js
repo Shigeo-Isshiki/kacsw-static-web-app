@@ -3,13 +3,19 @@
  * @version 1.0.0
  */
 'use strict';
+/** 文字列が文字列型であることを確認する関数
+ * @param {*} str - 確認する文字列
+ */
+const assertString = (str) => {
+    if (typeof str !== 'string') throw new Error(`[${str}] must be a string`);
+};
 /**
  * 漢数字をアラビア数字に変換する関数
  * @param {string} str - 漢数字を含む日付文字列
  * @returns {string} - アラビア数字に変換された日付文字列
  */
 const convert_kanji_numerals = (str = '') => {
-    if (typeof str !== 'string') return '';
+    assertString(str);
     const kanjiDigits = {
         '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4,
         '五': 5, '六': 6, '七': 7, '八': 8, '九': 9
@@ -18,6 +24,7 @@ const convert_kanji_numerals = (str = '') => {
         '十': 10, '百': 100, '千': 1000
     };
     const parseKanjiNumber = (kanji) => {
+        assertString(kanji);
         let total = 0;
         let current = 0;
         for (let c = 0; c < kanji.length; c++) {
@@ -49,10 +56,10 @@ const eraInitials = ['M', 'T', 'S', 'H', 'R', 'm', 't', 's', 'h', 'r', 'Ｍ', '�
  * 日付形式の正規表現テンプレート
  */
 const regexTemplates = {
-    seirekiKanji: '{year}年{month}月{day}日',
-    seirekiSymbol: '{year}{sep}{month}{sep}{day}',
-    warekiKanji: '{era}{year}年{month}月{day}日',
-    warekiSymbol: '{era}{year}{sep}{month}{sep}{day}',
+    seirekiKanji: '{{year}}年{{month}}月{{day}}日',
+    seirekiSymbol: '{{year}}{{sep}}{{month}}{{sep}}{{day}}',
+    warekiKanji: '{{era}}{{year}}年{{month}}月{{day}}日',
+    warekiSymbol: '{{era}}{{year}}{{sep}}{{month}}{{sep}}{{day}}'
 };
 /**　
  * 特殊文字をエスケープする関数
@@ -61,28 +68,29 @@ const regexTemplates = {
  */
 const escapeRegExp = (s) => s.replace(/[.*+?^=!:${}()|[\]\\]/g, '\\$&');
 /**
+ * テンプレートに値を適用する関数
+ * @param {string} template - テンプレート文字列
+ * @param {Object} values - 適用する値のオブジェクト
+ * @returns {string} - 値が適用されたテンプレート文字列
+ */
+const applyTemplate = (template, values) => {
+    assertString(template);
+    if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
+    return template.replace(/{{(.*?)}}/g, (_, key) => values[key] ?? '');
+};
+/**
  * 正規表現を生成する関数
  * @param {string} template - 正規表現テンプレート
- * @param {Object} options - オプション
- * @param {string} options.year - 年
- * @param {string} options.month - 月
- * @param {string} options.day - 日
- * @param {string} options.sep - 区切り文字
- * @param {string} options.era - 元号
+ * @param {Object} values - 適用する値のオブジェクト
  * @returns {RegExp} - 生成された正規表現
  */
-const buildRegex = (template, { year, month, day, sep, era }) => {    
-    const replacements = {
-        year,
-        month,
-        day,
-        sep: sep ? escapeRegExp(sep) : '',
-        era: era ?? ''
-    };
-    let regexStr = '^' + template + '$';
-    for (const [key, value] of Object.entries(replacements)) {
-        regexStr = regexStr.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
-    }
+const buildRegex = (template, values) => {
+    assertString(template);
+    if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
+    const escapedValues = Object.fromEntries(
+        Object.entries(values).map(([k, v]) => [k, escapeRegExp(v)])
+    );
+    const regexStr = '^' + applyTemplate(template, escapedValues) + '$';
     return new RegExp(regexStr);
 };
 /**
@@ -95,6 +103,7 @@ const warekiYearPattern = '(元|\\d{1,2})';
  * @returns {string} - 正規化された元号略語
  */
 const normalizeEraInitial = (initial) => {
+    assertString(initial);
     const map = {
         'Ｍ': 'M', 'ｍ': 'M', 'M': 'M',
         'Ｔ': 'T', 'ｔ': 'T', 'T': 'T',
@@ -102,7 +111,7 @@ const normalizeEraInitial = (initial) => {
         'Ｈ': 'H', 'ｈ': 'H', 'H': 'H',
         'Ｒ': 'R', 'ｒ': 'R', 'R': 'R'
     };
-    return map[initial] || initial;
+    return map[initial] ?? initial;
 };
 /**
  * 日付形式の正規表現パターンを生成する関数
@@ -111,6 +120,9 @@ const normalizeEraInitial = (initial) => {
  * @returns {Array<RegExp>} - 正規表現の配列
  */
 const createDatePattern = (separators = [''], includeDay = true) => {
+    if (!Array.isArray(separators)) throw new Error('separators must be an array');
+    separators.forEach(sep => { assertString(sep); });
+    if (typeof includeDay !== 'boolean') throw new Error('includeDay must be a boolean');
     const year = '\\d{4}';
     const month = '\\d{1,2}';
     const day = includeDay ? '\\d{1,2}' : null;
@@ -211,7 +223,7 @@ const patterns = {
  * @returns {string} - 判別結果の文字列（該当する形式がない場合は空白を返す）
  */
 const detectDateType = (str) => {
-    if (typeof str !== 'string') throw new Error('str must be a string');
+    assertString(str);
     for (const [type, regexList] of Object.entries(patterns)) {
         if (regexList.some((regex) => regex.test(str))) {
             return type;
@@ -226,8 +238,8 @@ const detectDateType = (str) => {
  * @returns {Array} - 分割結果の配列
  */
 const splitDateString = (type, str) => {
-    if (typeof type !== 'string') throw new Error('type must be a string');
-    if (typeof str !== 'string') throw new Error('str must be a string');
+    assertString(type);
+    assertString(str);
     switch (type) {
         case 'ymdKanji':
         case 'ymKanji':
@@ -251,7 +263,7 @@ const splitDateString = (type, str) => {
  * @returns {string} 半角数字に変換した文字列
  */
 const convert_to_single_byte_numbers = (str = '') => {
-    if (typeof str !== 'string') throw new Error('str must be a string');
+    assertString(str);
     if (!str) return '';
     str = convert_kanji_numerals(str);
     return str.replace(/[０１２３４５６７８９]/g, (char_conv) => {
@@ -267,7 +279,7 @@ const convert_to_single_byte_numbers = (str = '') => {
  * @property {string} day - 日の文字列（分割できなかった場合は空白を返す）
  */
 const date_string_split = (date_str) => {
-    if (typeof date_str !== 'string') throw new Error('date_str must be a string');
+    assertString(date_str);
     if (!date_str) return { year: '', month: '', day: '' };
     const eraPatterns = {
         '明治': [/^明治元$/, /^明治\d{1,2}$/, /^[mMｍＭ]元$/, /^[mMｍＭ]\d{1,2}$/],
@@ -408,7 +420,7 @@ const date_string_split = (date_str) => {
  * @returns {string} ISO 8601拡張形式の西暦表記（YYYY-MM-DD）の文字列（変換できなかった場合は空白を返す）
  */
 const convert_to_anno_domini = (date_str) => {
-    if (typeof date_str !== 'string') throw new Error('date_str must be a string');
+    assertString(date_str);
     if (!date_str) return '';
     const date_str_split = date_string_split(date_str);
     if (date_str_split.year && date_str_split.month && date_str_split.day) { // 年、月、日の文字列がある場合
@@ -425,7 +437,7 @@ const convert_to_anno_domini = (date_str) => {
  * @property {string} jacsw - 「YYYY/MM」形式の年月表記（分割できなかった場合は空白を返す）
  */
 const convert_to_year_month = (date_str) => {
-    if (typeof date_str !== 'string') throw new Error('date_str must be a string');
+    assertString(date_str);
     if (!date_str) return { char: '', jacsw: '' };
     if (date_str) { // 日付形式の文字列がある場合
         const date_str_split = date_string_split(date_str);
@@ -445,7 +457,7 @@ const convert_to_year_month = (date_str) => {
  * @returns {string} 西暦の年形式の文字列（変換できなかった場合は空白を返す）
  */
 const convert_to_year = (date_str) => {
-    if (typeof date_str !== 'string') throw new Error('date_str must be a string');
+    assertString(date_str);
     if (!date_str) return '';
     const date_str_split = date_string_split(date_str);
     if (date_str_split.year) return date_str_split.year;
@@ -461,7 +473,7 @@ const convert_to_year = (date_str) => {
  * @property {string} era_year_number - 「EE」形式の和暦年のみ表記の文字列（分割できなかった場合は空白を返す）
  */
 const convert_to_era_year = (date_str) => {
-    if (typeof date_str !== 'string') throw new Error('date_str must be a string');
+    assertString(date_str);
     if (!date_str) return { full_era_year: '', initial_era_year: '', era_year_number: '' };
     const datachar_char = {
         'full_era_year': '',
