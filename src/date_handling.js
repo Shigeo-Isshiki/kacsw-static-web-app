@@ -54,6 +54,12 @@ const regexTemplates = {
     warekiKanji: '{era}{year}年{month}月{day}日',
     warekiSymbol: '{era}{year}{sep}{month}{sep}{day}',
 };
+/**　
+ * 特殊文字をエスケープする関数
+ * @param {string} s - エスケープ対象の文字列
+ * @returns {string} - エスケープされた文字列
+ */
+const escapeRegExp = (s) => s.replace(/[.*+?^=!:${}()|[\]\\]/g, '\\$&');
 /**
  * 正規表現を生成する関数
  * @param {string} template - 正規表現テンプレート
@@ -65,17 +71,38 @@ const regexTemplates = {
  * @param {string} options.era - 元号
  * @returns {RegExp} - 生成された正規表現
  */
-const buildRegex = (template, { year, month, day, sep, era }) => {
-    const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');    
-    const regexStr = '^' + 
-    template    
-        .replace('{year}', year)
-        .replace('{month}', month)
-        .replace('{day}', day)
-        .replace(/\{sep\}/g, sep ? escapeRegExp(sep) : '')
-        .replace('{era}', era || '') +
-    '$';
+const buildRegex = (template, { year, month, day, sep, era }) => {    
+    const replacements = {
+        year,
+        month,
+        day,
+        sep: sep ? escapeRegExp(sep) : '',
+        era: era ?? ''
+    };
+    let regexStr = '^' + template + '$';
+    for (const [key, value] of Object.entries(replacements)) {
+        regexStr = regexStr.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    }
     return new RegExp(regexStr);
+};
+/**
+ * 和暦の年を表す正規表現パターン
+ */
+const warekiYearPattern = '(元|\\d{1,2})';
+/**
+ * 元号略語を正規化する関数
+ * @param {string} initial - 元号略語の1文字
+ * @returns {string} - 正規化された元号略語
+ */
+const normalizeEraInitial = (initial) => {
+    const map = {
+        'Ｍ': 'M', 'ｍ': 'M', 'M': 'M',
+        'Ｔ': 'T', 'ｔ': 'T', 'T': 'T',
+        'Ｓ': 'S', 'ｓ': 'S', 'S': 'S',
+        'Ｈ': 'H', 'ｈ': 'H', 'H': 'H',
+        'Ｒ': 'R', 'ｒ': 'R', 'R': 'R'
+    };
+    return map[initial] || initial;
 };
 /**
  * 日付形式の正規表現パターンを生成する関数
@@ -93,12 +120,13 @@ const createDatePattern = (separators = [''], includeDay = true) => {
         patterns.push(buildRegex(regexTemplates.seirekiKanji, { year, month, day }));
         patterns.push(buildRegex(regexTemplates.seirekiSymbol, { year, month, day, sep }));
         eraNames.forEach(era => {
-            patterns.push(buildRegex(regexTemplates.warekiKanji, { era, year: '(元|\\d{1,2})', month, day }));
-            patterns.push(buildRegex(regexTemplates.warekiSymbol, { era, year: '(元|\\d{1,2})', month, day, sep }));
+            patterns.push(buildRegex(regexTemplates.warekiKanji, { era, year: warekiYearPattern, month, day }));
+            patterns.push(buildRegex(regexTemplates.warekiSymbol, { era, year: warekiYearPattern, month, day, sep }));
         });
         eraInitials.forEach(initial => {
-            patterns.push(buildRegex(regexTemplates.warekiKanji, { era: initial, year: '(元|\\d{1,2})', month, day }));
-            patterns.push(buildRegex(regexTemplates.warekiSymbol, { era: initial, year: '(元|\\d{1,2})', month, day, sep }));
+            const normalized = normalizeEraInitial(initial);
+            patterns.push(buildRegex(regexTemplates.warekiKanji, { era: normalized, year: warekiYearPattern, month, day }));
+            patterns.push(buildRegex(regexTemplates.warekiSymbol, { era: normalized, year: warekiYearPattern, month, day, sep }));
         });
     });
     return patterns;
@@ -226,7 +254,7 @@ const convert_to_single_byte_numbers = (str = '') => {
     if (typeof str !== 'string') throw new Error('str must be a string');
     if (!str) return '';
     str = convert_kanji_numerals(str);
-    return str.replace(/[０-９]/g, (char_conv) => {
+    return str.replace(/[０１２３４５６７８９]/g, (char_conv) => {
         return String.fromCodePoint(char_conv.charCodeAt(0) - 0xFEE0);
     });
 };
