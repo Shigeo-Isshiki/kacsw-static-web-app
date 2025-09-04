@@ -20,7 +20,6 @@ const convert_kanji_numerals = (str = '') => {
     const parseKanjiNumber = (kanji) => {
         let total = 0;
         let current = 0;
-        let lastMultiplier = 1;
         for (let c = 0; c < kanji.length; c++) {
             const char = kanji[c];
             if (char in kanjiDigits) {
@@ -29,7 +28,6 @@ const convert_kanji_numerals = (str = '') => {
                 if (current === 0) current = 1;
                 total += current * kanjiMultipliers[char];
                 current = 0;
-                lastMultiplier = kanjiMultipliers[char];
             } else if (char === '元') {
                 total += 1;
             }
@@ -81,7 +79,7 @@ const buildRegex = (template, { year, month, day, sep, era }) => {
 };
 /**
  * 日付形式の正規表現パターンを生成する関数
- * @param {Array<string>} separators - 区切り文字の配列（例: ['/', '-', '.', '／', '‐', '．']）
+ * @param {Array<string>} separators - 区切り文字の配列（例: ['/', '-', '.', '／', '‐', '．', '−', 'ー', '－']）
  * @param {boolean} includeDay - 日付を含めるかどうか
  * @returns {Array<RegExp>} - 正規表現の配列
  */
@@ -128,6 +126,18 @@ const commonSeparators = [
     '−',    // マイナス記号（U+2212）
     '．'    // 全角ドット（U+FF0E）
 ];
+/**
+ * 日付形式の正規表現パターンをまとめたオブジェクト
+ * @constant {object} patterns - 日付形式の正規表現パターン
+ * @property {Array} ymdKanji - 「YYYY年MM月DD日」形式の正規表現
+ * @property {Array} ymdSlash - 「YYYY/MM/DD」形式の正規表現
+ * @property {Array} ymdCompact - 「YYYYMMDD」形式の正規表現
+ * @property {Array} ymKanji - 「YYYY年MM月」形式の正規表現
+ * @property {Array} ymSlash - 「YYYY/MM」形式の正規表現
+ * @property {Array} ymCompact - 「YYYYMM」形式の正規表現
+ * @property {Array} yKanji - 「YYYY年」形式の正規表現
+ * @property {Array} yOnly - 「YYYY」形式の正規表現
+ */
 const patterns = {
     ymdKanji: createDatePattern('', true),
     ymdSlash: [
