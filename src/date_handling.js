@@ -7,7 +7,6 @@
  * @returns {string} - アラビア数字に変換された日付文字列
  */
 const convert_kanji_numerals = (str = '') => {
-    assertString(str);
     const kanjiDigits = {
         '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4,
         '五': 5, '六': 6, '七': 7, '八': 8, '九': 9
@@ -480,3 +479,4 @@ const convert_to_era_year = (datechar) => {
     }
 
 };
+
