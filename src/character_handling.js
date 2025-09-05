@@ -65,7 +65,6 @@ const convert_charactor_list = {
  * @param {string} str エスケープ対象の文字列
  * @returns {string} エスケープ後の文字列
  */
-const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * イテラブルな文字列集合から正規表現パターンを構築する関数
@@ -73,9 +72,10 @@ const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * @returns {RegExp} 正規表現のパターン
  */
 const buildPattern = (keys) => {
-  if (!(keys && typeof keys[Symbol.iterator] === 'function')) throw new Error('keys must be an Iterable');
-  const escapedKeys = [...keys].map(escapeRegExp);
-  return new RegExp(escapedKeys.join('|'), 'g');
+    const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!(keys && typeof keys[Symbol.iterator] === 'function')) throw new Error('keys must be an Iterable');
+    const escapedKeys = [...keys].map(escapeRegExp);
+    return new RegExp(escapedKeys.join('|'), 'g');
 };
 
 /**

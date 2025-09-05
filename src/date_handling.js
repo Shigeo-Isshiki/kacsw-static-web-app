@@ -61,12 +61,6 @@ const regexTemplates = {
     warekiKanji: '{{era}}{{year}}年{{month}}月{{day}}日',
     warekiSymbol: '{{era}}{{year}}{{sep}}{{month}}{{sep}}{{day}}'
 };
-/**　
- * 特殊文字をエスケープする関数
- * @param {string} s - エスケープ対象の文字列
- * @returns {string} - エスケープされた文字列
- */
-const escapeRegExp = (s) => s.replace(/[.*+?^=!:${}()|[\]\\]/g, '\\$&');
 /**
  * テンプレートに値を適用する関数
  * @param {string} template - テンプレート文字列
@@ -85,6 +79,7 @@ const applyTemplate = (template, values) => {
  * @returns {RegExp} - 生成された正規表現
  */
 const buildRegex = (template, values) => {
+    const escapeRegExp = (s) => s.replace(/[.*+?^=!:${}()|[\]\\]/g, '\\$&');
     assertString(template);
     if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
     const escapedValues = Object.fromEntries(
