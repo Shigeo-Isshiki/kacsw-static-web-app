@@ -32,17 +32,10 @@ const _dh_regexTemplates = {
 const _dh_buildRegex = (template, values) => {
     _dh_assertString(template);
     if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
-    const escapeRegExp = (s) => {
-        if(!s) return '';
-        s.replace(/[.*+?^=!:${}()|[\]\\]/g, '\\$&');
-    };
     const applyTemplate = (template, values) => {
         return template.replace(/{{(.*?)}}/g, (_, key) => values[key] ?? '');
     };
-    const escapedValues = Object.fromEntries(
-        Object.entries(values).map(([k, v]) => [k, escapeRegExp(v)])
-    );
-    const regexStr = '^' + applyTemplate(template, escapedValues) + '$';
+    const regexStr = '^' + applyTemplate(template, values) + '$';
     return new RegExp(regexStr);
 };
 /**
@@ -250,7 +243,7 @@ const _dh_date_string_split = (date_str) => {
             day: date_str_sbn.slice(6, 8)
         };
     }
-    const date_str_sbn_split = splitDateString(date_type, date_str_sbn);
+    const date_str_sbn_split = _dh_splitDateString(date_type, date_str_sbn);
     if (date_str_sbn_split.length >= 1 && date_str_sbn_split[0]) { // 年の文字列がある場合
         let era_type = 0;
         for (const [eraName, patterns] of Object.entries(eraPatterns)) {
@@ -423,111 +416,37 @@ const convert_to_year = (date_str) => {
 const convert_to_era_year = (date_str) => {
     _dh_assertString(date_str);
     if (!date_str) return { full_era_year: '', initial_era_year: '', era_year_number: '' };
-    const datachar_char = {
-        'full_era_year': '',
-        'initial_era_year': '',
-        'era_year_number': ''
-    }
-    const date_str_split = _dh_date_string_split(date_str);
+    const newDateMonth = (month) => month - 1;
+    const eraTransitions = [
+        { name: '明治', initial: 'M', start: new Date(1868, newDateMonth(10), 23) },
+        { name: '大正', initial: 'T', start: new Date(1912, newDateMonth(7), 30) },
+        { name: '昭和', initial: 'S', start: new Date(1926, newDateMonth(12), 25) },
+        { name: '平成', initial: 'H', start: new Date(1989, newDateMonth(1), 8) },
+        { name: '令和', initial: 'R', start: new Date(2019, newDateMonth(5), 1) }
+    ];
+    const date_str_split = _dh_date_string_split(date_str);    
     if (date_str_split.year && date_str_split.month && date_str_split.day) { // 年、月、日の文字列がある場合
-        let era_type = 0;
-        const ad_number = Number(date_str_split.year);
-        const month_number = Number(date_str_split.month);
-        const day_number = Number(date_str_split.day);
-        if (ad_number === 1868) { // 西暦が1868年の場合
-            if (month_number === 10) { // 月が10月の場合
-                if (day_number >= 23) { // 日が23日から先の場合
-                    era_type = 1;
-                }
-            } else if (month_number >= 11) { // 月が11月から先の場合
-                era_type = 1;
+        const dateObj = new Date(date_str_split.year, newDateMonth(date_str_split.month), date_str_split.day);
+        if (isNaN(dateObj.getTime())) return { full_era_year: '', initial_era_year: '', era_year_number: '' };
+        if (isNaN(dateObj)) return {
+            full_era_year: '',
+            initial_era_year: '',
+            era_year_number: ''
+        };
+        let selectedEra = null;
+        for (let c = eraTransitions.length - 1; c >= 0; c--) {
+            if (dateObj >= eraTransitions[c].start) {
+                selectedEra = eraTransitions[c];
+                break;
             }
-        } else if (ad_number >= 1869 && ad_number <= 1911) { // 西暦が1869年から1911年の場合
-            era_type = 1;
-        } else if (ad_number === 1912) { // 西暦が1912年の場合
-            if (month_number <= 6) { // 月が6月までの場合
-                era_type = 1;
-            } else if (month_number === 7) { // 月が7月の場合
-                if (day_number <= 29) { // 日が29日までの場合
-                    era_type = 1;
-                } else if (day_number >= 30) { // 日が30日から先の場合
-                    era_type = 2;
-                }
-            } else if (month_number >= 8) { // 月が8月から先の場合
-                era_type = 2;
-            }
-        } else if (ad_number >= 1913 && ad_number <= 1925) { // 西暦が1913年から1925年の場合
-            era_type = 2;
-        } else if (ad_number === 1926) { // 西暦が1926年の場合
-            if (month_number <= 11) { // 月が11月までの場合
-                era_type = 2;
-            } else if (month_number === 12) { // 月が12月の場合
-                if (day_number <= 24) { // 日が24日までの場合
-                    era_type = 2;
-                } else if (day_number >= 25) { // 日が25日から先の場合
-                    era_type = 3;
-                }
-            }
-        } else if (ad_number >= 1927 && ad_number <= 1988) { // 西暦が1927年から1988年の場合
-            era_type = 3;
-        } else if (ad_number === 1989) { // 西暦が1989年の場合
-            if (month_number === 1) { // 月が1月の場合
-                if (day_number <= 7) { // 日が7日までの場合
-                    era_type = 3;
-                } else if (day_number >= 8) { // 日が8日から先の場合
-                    era_type = 4;
-                }
-            } else if (month_number >= 2) { // 月が2月から先の場合
-                era_type = 4;
-            }
-        } else if (ad_number >= 1990 && ad_number <= 2018) { // 西暦が1990年から2018年の場合
-            era_type = 4;
-        } else if (ad_number === 2019) { // 西暦が2019年の場合
-            if (month_number <= 4) { // 月が4月までの場合
-                era_type = 4;
-            } else if (month_number >= 5) { // 月が5月から先の場合
-                era_type = 5;
-            }
-        } else if (ad_number >= 2020) { // 西暦が2020年以降の場合
-            era_type = 5;
         }
-        let full_era_name = '';
-        let initial_era_year = '';
-        let era_year_number = ad_number;
-        switch (era_type) {
-            case 1: // 元号が明治の場合
-                full_era_name = '明治';
-                initial_era_year = 'M';
-                era_year_number -= 1867;
-                break;
-            case 2: // 元号が大正の場合
-                full_era_name = '大正';
-                initial_era_year = 'T';
-                era_year_number -= 1911;
-                break;
-            case 3: // 元号が昭和の場合
-                full_era_name = '昭和';
-                initial_era_year = 'S';
-                era_year_number -= 1925;
-                break;
-            case 4: // 元号が平成の場合
-                full_era_name = '平成';
-                initial_era_year = 'H';
-                era_year_number -= 1988;
-                break;
-            case 5: // 元号が令和の場合
-                full_era_name = '令和';
-                initial_era_year = 'R';
-                era_year_number -= 2018;
-                break;
-        }
-        if (era_type > 0 && era_year_number > 0) { // 和暦表記の計算にエラーがない場合
-            return {
-                full_era_year: full_era_name + String(era_year_number) + '年',
-                initial_era_year: initial_era_year + String(era_year_number) + '年',
-                era_year_number: era_year_number
-            };
-        }
+        if (!selectedEra) return { full_era_year: '', initial_era_year: '', era_year_number: '' };
+        const eraYear = dateObj.getFullYear() - selectedEra.start.getFullYear() + 1;
+        return {
+            full_era_year: `${selectedEra.name}${eraYear}年`,
+            initial_era_year: `${selectedEra.initial}${eraYear}年`,
+            era_year_number: eraYear
+        };
     }
     return { full_era_year: '', initial_era_year: '', era_year_number: '' };
 };
