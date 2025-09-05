@@ -32,7 +32,10 @@ const _dh_regexTemplates = {
 const _dh_buildRegex = (template, values) => {
     _dh_assertString(template);
     if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
-    const escapeRegExp = (s) => s.replace(/[.*+?^=!:${}()|[\]\\]/g, '\\$&');
+    const escapeRegExp = (s) => {
+        if(!s) return '';
+        s.replace(/[.*+?^=!:${}()|[\]\\]/g, '\\$&');
+    };
     const applyTemplate = (template, values) => {
         return template.replace(/{{(.*?)}}/g, (_, key) => values[key] ?? '');
     };
