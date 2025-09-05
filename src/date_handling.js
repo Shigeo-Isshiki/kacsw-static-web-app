@@ -115,7 +115,7 @@ const normalizeEraInitial = (initial) => {
  * @returns {Array<RegExp>} - 正規表現の配列
  */
 const createDatePattern = (separators = [''], includeDay = true) => {
-    if (!Array.isArray(separators)) throw new Error('separators must be an array');
+    if (separators !== '' && !Array.isArray(separators)) throw new Error('separators must be an array');
     separators.forEach(sep => { assertString(sep); });
     if (typeof includeDay !== 'boolean') throw new Error('includeDay must be a boolean');
     const year = '\\d{4}';
