@@ -53,7 +53,7 @@ const _dh_warekiYearPattern = '(元|\\d{1,2})';
  * @returns {Array<RegExp>} - 正規表現の配列
  */
 const _dh_createDatePattern = (separators = [''], includeDay = true) => {
-    if (separators === null || separators === undefined) separators = [''];
+    if (separators === null || separators === undefined || separators.length === 0) separators = [''];
     if (!Array.isArray(separators)) throw new Error('separators must be an array');
     separators.forEach(sep => { _dh_assertString(sep); });
     if (typeof includeDay !== 'boolean') throw new Error('includeDay must be a boolean');
