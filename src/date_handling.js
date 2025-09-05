@@ -115,7 +115,7 @@ const normalizeEraInitial = (initial) => {
  * @returns {Array<RegExp>} - 正規表現の配列
  */
 const createDatePattern = (separators = [''], includeDay = true) => {
-    if (separators == null) {
+    if (separators = '') {
         separators = [''];
     }
     if (!Array.isArray(separators)) throw new Error('separators must be an array');
