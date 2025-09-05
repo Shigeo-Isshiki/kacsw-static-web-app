@@ -2,18 +2,19 @@
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
  * @version 1.0.0
  */
+// 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_ch_)で始める
 'use strict';
 /**
  * 変換用の文字リスト
  * 各種文字の変換ルールを定義します。
  * ひらがな、カタカナ、濁点・半濁点の変換をサポートします。
- * @typedef {object} convert_charactor_list
+ * @typedef {object} _ch_convert_charactor_list
  * @property {object} half_width_kana 全角カタカナから半角カタカナへの変換マップ
  * @property {object} full_width_kana 半角カタカナから全角カタカナへの変換マップ
  * @property {object} turbidity_kana 濁点・半濁点の変換マップ
  */
-/** @type {convert_charactor_list} */
-const convert_charactor_list = {
+/** @type {_ch_convert_charactor_list} */
+const _ch_convert_charactor_list = {
     'half_width_kana': {
         'ア': 'ｱ', 'イ': 'ｲ', 'ウ': 'ｳ', 'エ': 'ｴ', 'オ': 'ｵ',
         'カ': 'ｶ', 'キ': 'ｷ', 'ク': 'ｸ', 'ケ': 'ｹ', 'コ': 'ｺ',
@@ -59,55 +60,30 @@ const convert_charactor_list = {
         'ウ゛': 'ヴ', 'ワ゛': 'ヷ', 'ヲ゛': 'ヺ'
     }
 };
-
-/**
- * 正規表現用に文字列をエスケープする関数
- * @param {string} str エスケープ対象の文字列
- * @returns {string} エスケープ後の文字列
- */
-
 /**
  * イテラブルな文字列集合から正規表現パターンを構築する関数
  * @param {Iterable<string>} keys イテラブルな文字列集合
  * @returns {RegExp} 正規表現のパターン
  */
-const buildPattern = (keys) => {
+const _ch_buildPattern = (keys) => {
+    if (!keys) throw new Error('keys is required');
     const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     if (!(keys && typeof keys[Symbol.iterator] === 'function')) throw new Error('keys must be an Iterable');
     const escapedKeys = [...keys].map(escapeRegExp);
     return new RegExp(escapedKeys.join('|'), 'g');
 };
-
 /**
  * 半角カナ変換用のマップを作成する
  */
-const half_width_kana_map = new Map(Object.entries(convert_charactor_list.half_width_kana));
-
+const _ch_half_width_kana_map = new Map(Object.entries(_ch_convert_charactor_list.half_width_kana));
 /**
  * 全角カナ変換用のマップを作成する
  */
-const full_width_kana_map = new Map(Object.entries(convert_charactor_list.full_width_kana));
-
+const _ch_full_width_kana_map = new Map(Object.entries(_ch_convert_charactor_list.full_width_kana));
 /**
  * 濁点・半濁点変換用のマップを作成する
  */
-const turbidity_kana_map = new Map(Object.entries(convert_charactor_list.turbidity_kana));
-
-/**
- * 半角カナ変換用の正規表現のパターンを作成する
- */
-const half_width_kana_pattern = buildPattern(half_width_kana_map.keys());
-
-/**
- * 全角カナ変換用の正規表現のパターンを作成する
- */
-const full_width_kana_pattern = buildPattern(full_width_kana_map.keys());
-
-/**
- * 濁点・半濁点変換用の正規表現のパターンを作成する
- */
-const turbidity_kana_pattern = buildPattern(turbidity_kana_map.keys());
-
+const _ch_turbidity_kana_map = new Map(Object.entries(_ch_convert_charactor_list.turbidity_kana));
 /**
  * 文字列を正規表現で表記されたパターンに一致した場合、マップにある文字列に置き換える処理をする関数
  * @param {string} str 変換対象の文字列
@@ -115,33 +91,11 @@ const turbidity_kana_pattern = buildPattern(turbidity_kana_map.keys());
  * @param {Map} map 置き換えマップ
  * @returns {string} 置き換え後の文字列
  */
-const replace_with_map = (str, pattern, map) => {
+const _ch_replace_with_map = (str, pattern, map) => {
     if (typeof str !== 'string') throw new Error('str must be a string');
     if (!(pattern instanceof RegExp)) throw new Error('pattern must be a RegExp');
     if (!(map instanceof Map)) throw new Error('map must be a Map');
     return str.replace(pattern, char => map.get(char) ?? char);
-};
-
-/**
- * ひらがな文字をカタカナに変換する
- * @param {string} str 変換対象の文字列
- * @returns {string} カタカナに変換した文字列
- */
-const hiraganaToKatakana = (str) => {
-    return str.replace(/[\u3041-\u3096]/g, char => 
-        String.fromCodePoint(char.charCodeAt(0) + 0x60)
-    );
-};
-
-/**
- * カタカナ文字をひらがなに変換する
- * @param {string} str 変換対象の文字列
- * @returns {string} ひらがなに変換した文字列
- */
-const katakanaToHiragana = (str) => {
-    return str.replace(/[\u30A1-\u30F6]/g, char => 
-        String.fromCodePoint(char.charCodeAt(0) - 0x60)
-    );
 };
 
 /**
@@ -151,7 +105,8 @@ const katakanaToHiragana = (str) => {
  */
 const convert_to_half_width_kana = (str = '') => {
     if (typeof str !== 'string') throw new Error('str must be a string');
-    return replace_with_map(str, half_width_kana_pattern, half_width_kana_map);
+    const half_width_kana_pattern = _ch_buildPattern(_ch_half_width_kana_map.keys());
+    return _ch_replace_with_map(str, half_width_kana_pattern, _ch_half_width_kana_map);
 };
 
 /**
@@ -163,9 +118,16 @@ const convert_to_half_width_kana = (str = '') => {
 const convert_to_full_width_kana = (str = '', hiragana_sw = true) => {
     if (typeof str !== 'string') throw new Error('str must be a string');
     if (typeof hiragana_sw !== 'boolean') throw new Error('hiragana_sw must be a boolean');
+    const hiraganaToKatakana = (str) => {
+        return str.replace(/[\u3041-\u3096]/g, char => 
+            String.fromCodePoint(char.charCodeAt(0) + 0x60)
+        );
+    };
+    const full_width_kana_pattern = _ch_buildPattern(_ch_full_width_kana_map.keys());
+    const turbidity_kana_pattern = _ch_buildPattern(_ch_turbidity_kana_map.keys());
     let result = hiragana_sw ? hiraganaToKatakana(str) : str;
-    result = replace_with_map(result, full_width_kana_pattern, full_width_kana_map);
-    result = replace_with_map(result, turbidity_kana_pattern, turbidity_kana_map);
+    result = _ch_replace_with_map(result, full_width_kana_pattern, _ch_full_width_kana_map);
+    result = _ch_replace_with_map(result, turbidity_kana_pattern, _ch_turbidity_kana_map);
     return result;
 };
 
@@ -179,6 +141,11 @@ const convert_to_hiragana = (str = '', check = false) => {
     if (typeof str !== 'string') throw new Error('str must be a string');
     if (typeof check !== 'boolean') throw new Error('check must be a boolean');
     if (!str) return '';
+    const katakanaToHiragana = (str) => {
+        return str.replace(/[\u30A1-\u30F6]/g, char => 
+            String.fromCodePoint(char.charCodeAt(0) - 0x60)
+        );
+    };
     const full_width_kana = convert_to_full_width_kana(str);
     const hiragana = katakanaToHiragana(full_width_kana);
     if (check) {
