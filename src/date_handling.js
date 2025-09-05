@@ -79,7 +79,7 @@ const applyTemplate = (template, values) => {
  * @returns {RegExp} - 生成された正規表現
  */
 const buildRegex = (template, values) => {
-    const escapeRegExp = (s) => s.replace(/[.*+?^=!:${}()|[\]\\]/g, '\\$&');
+    const escapeRegExp = (s) => {s.replace(/[.*+?^=!:${}()|[\]\\]/g, '\\$&')};
     assertString(template);
     if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
     const escapedValues = Object.fromEntries(
