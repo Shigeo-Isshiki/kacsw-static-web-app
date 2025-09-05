@@ -42,9 +42,9 @@ const convert_to_single_byte_numbers = (char) => {
     // （入力値）
     // char = 文字列
     // （出力値） = 半角数字
-    if (!str) return '';
-    str = convert_kanji_numerals(str);
-    return str.replace(/[０１２３４５６７８９]/g, (char_conv) => {
+    if (!char) return '';
+    char = convert_kanji_numerals(char);
+    return char.replace(/[０１２３４５６７８９]/g, (char_conv) => {
         return String.fromCodePoint(char_conv.charCodeAt(0) - 0xFEE0);
     });
 };
@@ -478,4 +478,5 @@ const convert_to_era_year = (datechar) => {
     } else { // 日付形式の文字列がない場合
         return null;
     }
+
 };
