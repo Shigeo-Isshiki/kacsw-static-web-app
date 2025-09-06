@@ -415,9 +415,11 @@ const convert_to_era_year = (date_str) => {
         return null;
     };
     const date_str_split = _dh_date_string_split(date_str);
-    if (!(date_str_split.year && date_str_split.month && date_str_split.day)) return nullReturn;
-    const date = new Date(date_str_split.year, _dh_newDateMonth(date_str_split.month), date_str_split.day);
-    if (isNaN(date.getTime())) return nullReturn;
+    const year = Number(date_str_split.year);
+    const month = Number(date_str_split.month);
+    const day = Number(date_str_split.day);
+    if (!(year && month && day && _dh_isValidDate(year, month, day))) return nullReturn;
+    const date = new Date(year, _dh_newDateMonth(month), day);
     const era = getEraFromDate(date);
     if (!era) return nullReturn;
     const eraYear = date.getFullYear() - era.start.getFullYear() + 1;
