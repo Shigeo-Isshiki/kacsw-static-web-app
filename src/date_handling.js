@@ -57,17 +57,16 @@ const _dh_createDatePattern = (separators = [''], includeDay = true, includeInit
         _dh_assertString(template);
         if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
         const applyTemplate = (template, values) => {
-            return template.replace(/\{\{(.*?)\}\}/g, (_, key) => {
-                const val = values[key] ?? '';
-                if (key === 'day' && val === '') {
-                    return '';
-                }
-                return val ?? '';
-            });
+            return template.replace(/{{(.*?)}}/g, (_, key) => values[key] || '');
         };
-        const regexStr = '^' + applyTemplate(template, values) + '$';
+        const filteredValues = { ...values };
+        if (!includeDay) {
+            delete filteredValues.day;
+        }
+        const regexStr = '^' + applyTemplate(template, filteredValues) + '$';
         return new RegExp(regexStr);
     };
+    const withSep = (defaultValues, sep) => ({ ...defaultValues, sep });
     const eraInitials = ['M', 'T', 'S', 'H', 'R'];
     const year = '\\d{4}';
     const month = '\\d{1,2}';
@@ -84,21 +83,23 @@ const _dh_createDatePattern = (separators = [''], includeDay = true, includeInit
     : '{{era}}{{year}}年{{month}}月';
     const warekiSymbolTemplate = includeDay
     ? regexTemplates.seirekiSymbol
-    : '{{era}}{{year}}{{sep}}{{month}}';
-
+    : '{{era}}{{year}}{{sep}}{{month}}';    
     const patterns = [];
     sepList.forEach(sep => {
-        patterns.push(buildRegex(seirekiKanjiTemplate, { year, month, day }));
-        patterns.push(buildRegex(seirekiSymbolTemplate, { year, month, day, sep }));
+        const seirekiDefaultValues = { year, month, day };
+        patterns.push(buildRegex(seirekiKanjiTemplate, seirekiDefaultValues));
+        patterns.push(buildRegex(seirekiSymbolTemplate, withSep(seirekiDefaultValues, sep)));
         _dh_eraNames.forEach(era => {
-            patterns.push(buildRegex(warekiKanjiTemplate, { era, year: _dh_warekiYearPattern, month, day }));
-            patterns.push(buildRegex(warekiSymbolTemplate, { era, year: _dh_warekiYearPattern, month, day, sep }));
+            const eraNamesDefaultValues = { era, year: _dh_warekiYearPattern, month, day };
+            patterns.push(buildRegex(warekiKanjiTemplate,  eraNamesDefaultValues));
+            patterns.push(buildRegex(warekiSymbolTemplate, withSep(eraNamesDefaultValues, sep)));
         });
         if (includeInitials) {
             eraInitials.forEach(initial => {
                 const normalized = _dh_normalizeString(initial);
-                patterns.push(buildRegex(warekiKanjiTemplate, { era: normalized, year: _dh_warekiYearPattern, month, day }));
-                patterns.push(buildRegex(warekiSymbolTemplate, { era: normalized, year: _dh_warekiYearPattern, month, day, sep }));
+                const eraInitialsDefaultValues = { era: normalized, year: _dh_warekiYearPattern, month, day }
+                patterns.push(buildRegex(warekiKanjiTemplate, eraInitialsDefaultValues));
+                patterns.push(buildRegex(warekiSymbolTemplate, withSep(eraInitialsDefaultValues, sep)));
             });
         }
     });
@@ -128,26 +129,26 @@ const _dh_commonSeparators = [
  * @property {Array} yOnly - 「YYYY」形式の正規表現
  */
 const _dh_patterns = {
-    ymdKanji: _dh_createDatePattern('', true),
-    ymdSlash: _dh_createDatePattern(_dh_commonSeparators, true),
-    ymdCompact: [
+    ymdKanji: _dh_createDatePattern('', true), // 「YYYY年MM月DD日」形式の正規表現
+    ymdSlash: _dh_createDatePattern(_dh_commonSeparators, true), // 「YYYY/MM/DD」形式の正規表現
+    ymdCompact: [ // 「YYYYMMDD」形式の正規表現
         /^\d{8}$/,
         /^.{1,2}元\d{4}$/,
         /^.{1,2}\d{5,6}$/
     ],
-    ymKanji: _dh_createDatePattern('', false),
-    ymSlash: _dh_createDatePattern(_dh_commonSeparators, false),
-    ymCompact: [
+    ymKanji: _dh_createDatePattern('', false), // 「YYYY年MM月」形式の正規表現
+    ymSlash: _dh_createDatePattern(_dh_commonSeparators, false), // 「YYYY/MM」形式の正規表現
+    ymCompact: [ // 「YYYYMM」形式の正規表現
         /^\d{6}$/,
         /^.{1,2}元\d{2}$/,
         /^.{1,2}\d{3,4}$/
     ],
-    yKanji: [
+    yKanji: [ // 「YYYY年」形式の正規表現
         /^\d{4}年$/,
         /^.{1,2}元年$/,
         /^.{1,2}\d{1,2}年$/
     ],
-    yOnly: [
+    yOnly: [ // 「YYYY」形式の正規表現
         /^\d{4}$/,
         /^.{1,2}元$/,
         /^.{1,2}\d{1,2}$/
@@ -247,6 +248,7 @@ const _dh_date_string_split = (date_str) => {
         };
     }
     const date_str_sbn_split = _dh_splitDateString(date_type, date_str_sbn);
+    let yearnumber = 0;
     if (date_str_sbn_split.length >= 1 && date_str_sbn_split[0]) { // 年の文字列がある場合
         let era_type = 0;
         for (const [eraName, patterns] of Object.entries(eraPatterns)) {
@@ -268,7 +270,7 @@ const _dh_date_string_split = (date_str) => {
         if (yearchar === '元') { // 和暦の元年表記の場合
             yearchar = '1';
         }
-        let yearnumber = Number(yearchar);
+        yearnumber = Number(yearchar);
         switch (era_type) {
             case 1: // 元号が明治の場合
                 if (yearnumber >= 1 && yearnumber <= 45) { // 明治元年～45年までの範囲
@@ -318,7 +320,7 @@ const _dh_date_string_split = (date_str) => {
         }
     }
     if (date_str_sbn_split.length >= 3 && date_str_sbn_split[2]) { // 日の文字列がある場合
-        if (isValidDate(Number(date_str_sbn_split[0]), Number(date_str_sbn_split[1]), Number(date_str_sbn_split[2]))) {
+        if (isValidDate(Number(yearnumber), Number(date_str_sbn_split[1]), Number(date_str_sbn_split[2]))) {
             date_str_split.day = ('0' + date_str_sbn_split[2]).slice(-2);
         }
     }
