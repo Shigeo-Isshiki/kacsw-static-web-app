@@ -11,33 +11,18 @@ const _dh_assertString = (str) => {
     if (typeof str !== 'string') throw new Error(`[${str}] must be a string`);
 };
 /**
+ * 文字列が文字列型であることを確認する関数
+ * @param {*} str - 確認する文字列
+ * @returns {boolean} - 文字列である = true、文字でない = false
+ */
+const _dh_checkString = (str) => {
+    if (typeof str !== 'string') return false;
+    return true;
+};
+/**
  * 元号を表す配列
  */
 const _dh_eraNames = ['明治', '大正', '昭和', '平成', '令和'];
-/**
- * 日付形式の正規表現テンプレート
- */
-const _dh_regexTemplates = {
-    seirekiKanji: '{{year}}年{{month}}月{{day}}日',
-    seirekiSymbol: '{{year}}{{sep}}{{month}}{{sep}}{{day}}',
-    warekiKanji: '{{era}}{{year}}年{{month}}月{{day}}日',
-    warekiSymbol: '{{era}}{{year}}{{sep}}{{month}}{{sep}}{{day}}'
-};
-/**
- * 正規表現を生成する関数
- * @param {string} template - 正規表現テンプレート
- * @param {Object} values - 適用する値のオブジェクト
- * @returns {RegExp} - 生成された正規表現
- */
-const _dh_buildRegex = (template, values) => {
-    _dh_assertString(template);
-    if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
-    const applyTemplate = (template, values) => {
-        return template.replace(/{{(.*?)}}/g, (_, key) => values[key] ?? '');
-    };
-    const regexStr = '^' + applyTemplate(template, values) + '$';
-    return new RegExp(regexStr);
-};
 /**
  * 和暦の年を表す正規表現パターン
  */
@@ -57,29 +42,75 @@ const _dh_normalizeString = (str) => {
  * @param {boolean} includeDay - 日付を含めるかどうか
  * @returns {Array<RegExp>} - 正規表現の配列
  */
-const _dh_createDatePattern = (separators = [''], includeDay = true) => {
+const _dh_createDatePattern = (separators = [''], includeDay = true, includeInitials = true) => {
     if (separators === null || separators === undefined || separators.length === 0) separators = [''];
     if (!Array.isArray(separators)) throw new Error('separators must be an array');
     separators.forEach(sep => { _dh_assertString(sep); });
     if (typeof includeDay !== 'boolean') throw new Error('includeDay must be a boolean');
-    const eraInitials = ['M', 'T', 'S', 'H', 'R', 'm', 't', 's', 'h', 'r', 'Ｍ', 'Ｔ', 'Ｓ', 'Ｈ', 'Ｒ', 'ｍ', 'ｔ', 'ｓ', 'ｈ', 'ｒ'];
+    const regexTemplates = {
+        seirekiKanji: '{{year}}年{{month}}月{{day}}日',
+        seirekiSymbol: '{{year}}{{sep}}{{month}}{{sep}}{{day}}',
+        warekiKanji: '{{era}}{{year}}年{{month}}月{{day}}日',
+        warekiSymbol: '{{era}}{{year}}{{sep}}{{month}}{{sep}}{{day}}'
+    };
+    const buildRegex = (template, values) => {
+        _dh_assertString(template);
+        if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
+        const applyTemplate = (template, values) => {
+            return template.replace(/\{\{(.*?)\}\}/g, (_, key) => {
+                const val = values[key] ?? '';
+                if (key === 'day' && val === '') {
+                    return '';
+                }
+                return val ?? '';
+            });
+        };
+        const regexStr = '^' + applyTemplate(template, values) + '$';
+        return new RegExp(regexStr);
+    };
+    const eraInitials = ['M', 'T', 'S', 'H', 'R'];
     const year = '\\d{4}';
     const month = '\\d{1,2}';
     const day = includeDay ? '\\d{1,2}' : null;
     const sepList = separators.length > 0 ? separators : [''];
+    seirekiKanji: '{{year}}年{{month}}月{{day}}日',
+    seirekiSymbol: '{{year}}{{sep}}{{month}}{{sep}}{{day}}',
+    warekiKanji: '{{era}}{{year}}年{{month}}月{{day}}日',
+    warekiSymbol: '{{era}}{{year}}{{sep}}{{month}}{{sep}}{{day}}'
+    const seirekiKanjiTemplate = includeDay
+    ? regexTemplates.seirekiKanji
+    : '{{year}}年{{month}}月';
+    const seirekiSymbolTemplate = includeDay
+    ? regexTemplates.seirekiSymbol
+    : '{{year}}{{sep}}{{month}}';
+    const warekiKanjiTemplate = includeDay
+    ? regexTemplates.warekiKanji
+    : '{{era}}{{year}}年{{month}}月';
+    const warekiSymbolTemplate = includeDay
+    ? regexTemplates.seirekiSymbol
+    : '{{era}}{{year}}{{sep}}{{month}}';
+
     const patterns = [];
     sepList.forEach(sep => {
-        patterns.push(_dh_buildRegex(_dh_regexTemplates.seirekiKanji, { year, month, day }));
-        patterns.push(_dh_buildRegex(_dh_regexTemplates.seirekiSymbol, { year, month, day, sep }));
+        if (!includeDay) console.log(buildRegex(seirekiKanjiTemplate, { year, month, day }));
+        patterns.push(buildRegex(seirekiKanjiTemplate, { year, month, day }));
+        if (!includeDay) console.log(buildRegex(seirekiSymbolTemplate, { year, month, day, sep }));
+        patterns.push(buildRegex(seirekiSymbolTemplate, { year, month, day, sep }));
         _dh_eraNames.forEach(era => {
-            patterns.push(_dh_buildRegex(_dh_regexTemplates.warekiKanji, { era, year: _dh_warekiYearPattern, month, day }));
-            patterns.push(_dh_buildRegex(_dh_regexTemplates.warekiSymbol, { era, year: _dh_warekiYearPattern, month, day, sep }));
+            if (!includeDay) console.log(buildRegex(warekiKanjiTemplate, { era, year: _dh_warekiYearPattern, month, day }));
+            patterns.push(buildRegex(warekiKanjiTemplate, { era, year: _dh_warekiYearPattern, month, day }));
+            if (!includeDay) console.log(buildRegex(warekiSymbolTemplate, { era, year: _dh_warekiYearPattern, month, day, sep }));
+            patterns.push(buildRegex(warekiSymbolTemplate, { era, year: _dh_warekiYearPattern, month, day, sep }));
         });
-        eraInitials.forEach(initial => {
-            const normalized = _dh_normalizeString(initial);
-            patterns.push(_dh_buildRegex(_dh_regexTemplates.warekiKanji, { era: normalized, year: _dh_warekiYearPattern, month, day }));
-            patterns.push(_dh_buildRegex(_dh_regexTemplates.warekiSymbol, { era: normalized, year: _dh_warekiYearPattern, month, day, sep }));
-        });
+        if (includeInitials) {
+            eraInitials.forEach(initial => {
+                const normalized = _dh_normalizeString(initial);
+                if (!includeDay) console.log(buildRegex(warekiKanjiTemplate, { era: normalized, year: _dh_warekiYearPattern, month, day }));
+                patterns.push(buildRegex(warekiKanjiTemplate, { era: normalized, year: _dh_warekiYearPattern, month, day }));
+                if (!includeDay) console.log(buildRegex(warekiSymbolTemplate, { era: normalized, year: _dh_warekiYearPattern, month, day, sep }));
+                patterns.push(buildRegex(warekiSymbolTemplate, { era: normalized, year: _dh_warekiYearPattern, month, day, sep }));
+            });
+        }
     });
     return patterns;
 };
@@ -108,20 +139,7 @@ const _dh_commonSeparators = [
  */
 const _dh_patterns = {
     ymdKanji: _dh_createDatePattern('', true),
-    ymdSlash: [
-        ..._dh_createDatePattern(_dh_commonSeparators, true),
-        ..._dh_eraNames.flatMap(era =>
-            _dh_commonSeparators.map(sep =>
-                _dh_buildRegex(_dh_regexTemplates.warekiSymbol, {
-                    era,
-                    year: '(元|\\d{1,2})',
-                    month: '\\d{1,2}',
-                    day: '\\d{1,2}',
-                    sep
-                })
-            )
-        )
-    ],
+    ymdSlash: _dh_createDatePattern(_dh_commonSeparators, true),
     ymdCompact: [
         /^\d{8}$/,
         /^.{1,2}元\d{4}$/,
@@ -169,7 +187,6 @@ const _dh_date_string_split = (date_str) => {
         'day': ''
     };
     const detectDateType = (str) => {
-        _dh_assertString(str);
         for (const [type, regexList] of Object.entries(_dh_patterns)) {
             if (regexList.some((regex) => regex.test(str))) {
                 return type;
@@ -196,42 +213,30 @@ const _dh_date_string_split = (date_str) => {
         }
     };
     const convert_to_single_byte_numbers = (str = '') => {
-        _dh_assertString(str);
         if (!str) return '';
-        const convert_kanji_numerals = (str = '') => {
-            _dh_assertString(str);
-            const kanjiDigits = {
-                '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4,
-                '五': 5, '六': 6, '七': 7, '八': 8, '九': 9
-            };
-            const kanjiMultipliers = {
-                '十': 10, '百': 100, '千': 1000
-            };
+        const convertKanjiNumerals = (str = '') => {
+            const kanjiDigits = { '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+            const kanjiMultipliers = { '十': 10, '百': 100, '千': 1000 };
             const parseKanjiNumber = (kanji) => {
-                _dh_assertString(kanji);
-                let total = 0;
-                let current = 0;
-                for (let c = 0; c < kanji.length; c++) {
-                    const char = kanji[c];
-                    if (char in kanjiDigits) {
-                        current = kanjiDigits[char];
-                    } else if (char in kanjiMultipliers) {
+                let total = 0, current = 0;
+                for (const char of kanji) {
+                    if (char in kanjiDigits) current = kanjiDigits[char];
+                    else if (char in kanjiMultipliers) {
                         if (current === 0) current = 1;
                         total += current * kanjiMultipliers[char];
                         current = 0;
-                    } else if (char === '元') {
-                        total += 1;
-                    }
+                    } else if (char === '元') total += 1;
                 }
-                total += current;
-                return String(total);
+                return current === 0 ? total : current;
             };
             return str.replace(/[〇一二三四五六七八九十百千元]+/g, parseKanjiNumber);
         };
-        str = convert_kanji_numerals(str);
-        return str.replace(/[０１２３４５６７８９]/g, (char_conv) => {
-            return String.fromCodePoint(char_conv.charCodeAt(0) - 0xFEE0);
-        });
+        const convertFullWidthDigits = (str = '') => {
+            return str.replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xFEE0));
+        };
+        str = convertKanjiNumerals(str);
+        str = convertFullWidthDigits(str);
+        return str
     };
     const date_str_ns = _dh_normalizeString(date_str);
     const date_str_sbn = convert_to_single_byte_numbers(date_str_ns);    
@@ -331,7 +336,7 @@ const _dh_date_string_split = (date_str) => {
                         }
                         break;
                     case 2: // 2月の場合
-                        if (((yearnumber % 4) === 0) && (((yearnumber % 100) !== 0) || ((yearnumber % 400) === 0))) { // うるう年の場合
+                        if ((yearnumber % 4 === 0 && yearnumber % 100 !== 0) || yearnumber % 400 === 0) { // うるう年の場合
                             if (daynumber > 29) { // 日表記が29を超える場合
                                 conv_flag = false;
                             }
@@ -361,7 +366,7 @@ const _dh_date_string_split = (date_str) => {
  * @returns {string} ISO 8601拡張形式の西暦表記（YYYY-MM-DD）の文字列（変換できなかった場合は空白を返す）
  */
 const convert_to_anno_domini = (date_str) => {
-    _dh_assertString(date_str);
+    if (!_dh_checkString(date_str)) return '';
     if (!date_str) return '';
     const date_str_split = _dh_date_string_split(date_str);
     if (date_str_split.year && date_str_split.month && date_str_split.day) { // 年、月、日の文字列がある場合
@@ -378,8 +383,9 @@ const convert_to_anno_domini = (date_str) => {
  * @property {string} jacsw - 「YYYY/MM」形式の年月表記（分割できなかった場合は空白を返す）
  */
 const convert_to_year_month = (date_str) => {
-    _dh_assertString(date_str);
-    if (!date_str) return { char: '', jacsw: '' };
+    const nullReturn = { char: '', jacsw: '' }
+    if (!_dh_checkString(date_str)) return nullReturn;
+    if (!date_str) return nullReturn;
     if (date_str) { // 日付形式の文字列がある場合
         const date_str_split = _dh_date_string_split(date_str);
         if (date_str_split.year && date_str_split.month) { // 年、月の文字列がある場合
@@ -389,7 +395,7 @@ const convert_to_year_month = (date_str) => {
             };
         }
     }
-    return { char: '', jacsw: '' };
+    return nullReturn;
 };
 
 /**
@@ -398,7 +404,7 @@ const convert_to_year_month = (date_str) => {
  * @returns {string} 西暦の年形式の文字列（変換できなかった場合は空白を返す）
  */
 const convert_to_year = (date_str) => {
-    _dh_assertString(date_str);
+    if (!_dh_checkString(date_str)) return '';
     if (!date_str) return '';
     const date_str_split = _dh_date_string_split(date_str);
     if (date_str_split.year) return date_str_split.year;
@@ -414,8 +420,9 @@ const convert_to_year = (date_str) => {
  * @property {string} era_year_number - 「EE」形式の和暦年のみ表記の文字列（分割できなかった場合は空白を返す）
  */
 const convert_to_era_year = (date_str) => {
-    _dh_assertString(date_str);
-    if (!date_str) return { full_era_year: '', initial_era_year: '', era_year_number: '' };
+    const nullReturn = { full_era_year: '', initial_era_year: '', era_year_number: '' }
+    if (!_dh_checkString(date_str)) return nullReturn;
+    if (!date_str) return nullReturn;
     const newDateMonth = (month) => month - 1;
     const eraTransitions = [
         { name: '明治', initial: 'M', start: new Date(1868, newDateMonth(10), 23) },
@@ -427,12 +434,7 @@ const convert_to_era_year = (date_str) => {
     const date_str_split = _dh_date_string_split(date_str);    
     if (date_str_split.year && date_str_split.month && date_str_split.day) { // 年、月、日の文字列がある場合
         const dateObj = new Date(date_str_split.year, newDateMonth(date_str_split.month), date_str_split.day);
-        if (isNaN(dateObj.getTime())) return { full_era_year: '', initial_era_year: '', era_year_number: '' };
-        if (isNaN(dateObj)) return {
-            full_era_year: '',
-            initial_era_year: '',
-            era_year_number: ''
-        };
+        if (isNaN(dateObj.getTime())) return nullReturn;
         let selectedEra = null;
         for (let c = eraTransitions.length - 1; c >= 0; c--) {
             if (dateObj >= eraTransitions[c].start) {
@@ -440,7 +442,7 @@ const convert_to_era_year = (date_str) => {
                 break;
             }
         }
-        if (!selectedEra) return { full_era_year: '', initial_era_year: '', era_year_number: '' };
+        if (!selectedEra) return nullReturn;
         const eraYear = dateObj.getFullYear() - selectedEra.start.getFullYear() + 1;
         return {
             full_era_year: `${selectedEra.name}${eraYear}年`,
@@ -448,5 +450,5 @@ const convert_to_era_year = (date_str) => {
             era_year_number: eraYear
         };
     }
-    return { full_era_year: '', initial_era_year: '', era_year_number: '' };
+    return nullReturn;
 };
