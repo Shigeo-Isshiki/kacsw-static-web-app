@@ -6,6 +6,7 @@
 'use strict';
 /** 文字列が文字列型であることを確認する関数
  * @param {*} str - 確認する文字列
+ * @returns {*} 特に何も返さない
  */
 const _dh_assertString = (str) => {
     if (typeof str !== 'string') throw new Error(`[${str}] must be a string`);
@@ -13,7 +14,7 @@ const _dh_assertString = (str) => {
 /**
  * 文字列が文字列型であることを確認する関数
  * @param {*} str - 確認する文字列
- * @returns {boolean} - 文字列である = true、文字でない = false
+ * @returns {boolean} 文字列である = true、文字でない = false
  */
 const _dh_checkString = (str) => {
     if (typeof str !== 'string') return false;
@@ -21,16 +22,18 @@ const _dh_checkString = (str) => {
 };
 /**
  * 元号を表す配列
+ * @constant {array} _dh_eraNames - 元号を表す配列
  */
 const _dh_eraNames = ['明治', '大正', '昭和', '平成', '令和'];
 /**
  * 和暦の年を表す正規表現パターン
+ * @constant {string} _dh_warekiYearPattern - 和暦の年を表す正規表現パターン
  */
 const _dh_warekiYearPattern = '(元|\\d{1,2})';
 /**
  * 入力文字を全て大文字半角文字に変換する関数
  * @param {string} str 
- * @returns 
+ * @returns {string} 大文字半角文字に変換後の文字列
  */
 const _dh_normalizeString = (str) => {
     if (typeof str !== 'string') return '';
@@ -105,6 +108,10 @@ const _dh_createDatePattern = (separators = [''], includeDay = true, includeInit
     });
     return patterns;
 };
+/**
+ * 日付の区分けに使う記号をまとめた配列
+ * @constant {array} _dh_commonSeparators - 日付の区分けに使う記号を表す配列
+ */
 const _dh_commonSeparators = [
     '/',    // 半角スラッシュ
     '-',    // 半角ハイフン（U+002D）
