@@ -73,10 +73,6 @@ const _dh_createDatePattern = (separators = [''], includeDay = true, includeInit
     const month = '\\d{1,2}';
     const day = includeDay ? '\\d{1,2}' : null;
     const sepList = separators.length > 0 ? separators : [''];
-    seirekiKanji: '{{year}}年{{month}}月{{day}}日',
-    seirekiSymbol: '{{year}}{{sep}}{{month}}{{sep}}{{day}}',
-    warekiKanji: '{{era}}{{year}}年{{month}}月{{day}}日',
-    warekiSymbol: '{{era}}{{year}}{{sep}}{{month}}{{sep}}{{day}}'
     const seirekiKanjiTemplate = includeDay
     ? regexTemplates.seirekiKanji
     : '{{year}}年{{month}}月';
