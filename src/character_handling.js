@@ -4,11 +4,14 @@
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_ch_)で始める
 'use strict';
-/** 文字列が文字列型であることを確認する関数
+/**
+ * 文字列が文字列型であることを確認する関数
  * @param {*} str - 確認する文字列
+ * @returns {boolean} - 文字列である = true、文字でない = false
  */
-const _ch_assertString = (str) => {
-    if (typeof str !== 'string') throw new Error(`[${str}] must be a string`);
+const _ch_checkString = (str) => {
+    if (typeof str !== 'string') return false;
+    return true;
 };
 /**
  * 変換用の文字リスト
@@ -98,7 +101,7 @@ const _ch_turbidity_kana_map = new Map(Object.entries(_ch_convert_charactor_list
  * @returns {string} 置き換え後の文字列
  */
 const _ch_replace_with_map = (str, pattern, map) => {
-    _ch_assertString(str);
+    if (typeof str !== 'string') throw new Error(`_ch_replace_with_mapの[${str}]は文字である必要があります`);
     if (!(pattern instanceof RegExp)) throw new Error('pattern must be a RegExp');
     if (!(map instanceof Map)) throw new Error('map must be a Map');
     return str.replace(pattern, char => map.get(char) ?? char);
@@ -110,7 +113,7 @@ const _ch_replace_with_map = (str, pattern, map) => {
  * @returns {string} 可能な限り半角カナ文字に変換した文字列
  */
 const convert_to_half_width_kana = (str = '') => {
-    _ch_assertString(str);
+    if (!_ch_checkString(str)) return '';
     const half_width_kana_pattern = _ch_buildPattern(_ch_half_width_kana_map.keys());
     return _ch_replace_with_map(str, half_width_kana_pattern, _ch_half_width_kana_map);
 };
@@ -122,8 +125,8 @@ const convert_to_half_width_kana = (str = '') => {
  * @returns {string} 可能な限り全角カナ文字に変換した文字列
  */
 const convert_to_full_width_kana = (str = '', hiragana_sw = true) => {
-    _ch_assertString(str);
-    if (typeof hiragana_sw !== 'boolean') throw new Error('hiragana_sw must be a boolean');
+    if (!_ch_checkString(str)) return '';
+    if (typeof hiragana_sw !== 'boolean') return '';
     const hiraganaToKatakana = (str) => {
         return str.replace(/[\u3041-\u3096]/g, char => 
             String.fromCodePoint(char.charCodeAt(0) + 0x60)
@@ -144,8 +147,8 @@ const convert_to_full_width_kana = (str = '', hiragana_sw = true) => {
  * @returns {string} ひらがなに変換した文字列、またはエラー（エラーの場合はERRORを返す）
  */
 const convert_to_hiragana = (str = '', check = false) => {
-    _ch_assertString(str);
-    if (typeof check !== 'boolean') throw new Error('check must be a boolean');
+    if (!_ch_checkString(str)) return '';
+    if (typeof check !== 'boolean') return '';
     if (!str) return '';
     const katakanaToHiragana = (str) => {
         return str.replace(/[\u30A1-\u30F6]/g, char => 
@@ -172,7 +175,7 @@ const convert_to_hiragana = (str = '', check = false) => {
  * @returns {string} 半角文字に変換した文字列
  */
 const convert_to_single_byte_characters = (str = '') => {
-    _ch_assertString(str);
+    if (!_ch_checkString(str)) return '';
     if (!str) return '';
     const hyphen_processed = str.replace(/[－‐‑–—−ー―]/g, '-');
     const half_width_kana = convert_to_half_width_kana(hyphen_processed);
@@ -195,7 +198,7 @@ const convert_to_single_byte_characters = (str = '') => {
  * @returns {string} 全角文字に変換した文字列
  */
 const convert_to_double_byte_characters = (str = '') => {
-    _ch_assertString(str);
+    if (!_ch_checkString(str)) return '';
     if (!str) return '';
     const hyphen_processed = str.replace(/[‐‑–—−ー―]/g, '－');
     const full_width_kana = convert_to_full_width_kana(hyphen_processed, false);
@@ -222,7 +225,7 @@ const convert_to_double_byte_characters = (str = '') => {
  * @returns {string} メールアドレス文字（メールアドレスとして正しくない場合は空白を返す）
  */
 const convert_to_email_address = (email_address = '') => {
-    _ch_assertString(email_address);
+    if (!_ch_checkString(email_address)) return '';
     const email_pattern = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
     if (!email_address) return '';
     const single_byte_characters = convert_to_single_byte_characters(email_address);
@@ -235,7 +238,7 @@ const convert_to_email_address = (email_address = '') => {
  * @returns {boolean} 半角数字のみ含まれる場合はtrue、それ以外はfalse
  */
 const check_single_byte_numbers = (str = '') => {
-    if (typeof str !== 'string' && typeof str !== 'number') throw new Error('str must be a string or number');
+    if (typeof str !== 'string' && typeof str !== 'number') return false;
     const number_pattern = /^[0-9]+$/;
     return number_pattern.test(String(str));
 };
@@ -246,7 +249,7 @@ const check_single_byte_numbers = (str = '') => {
  * @returns {boolean} 半角カナ文字のみ含まれる場合はtrue、それ以外はfalse
  */
 const check_single_byte_kana = (str = '') => {
-    _ch_assertString(str);
+    if (!_ch_checkString(str)) return false;
     const kana_pattern = /^[\uFF61-\uFF9F]+$/;
     return kana_pattern.test(str);
 };
