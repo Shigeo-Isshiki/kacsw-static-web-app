@@ -43,6 +43,15 @@ const _dh_buildRegex = (template, values) => {
  */
 const _dh_warekiYearPattern = '(元|\\d{1,2})';
 /**
+ * 入力文字を全て大文字半角文字に変換する関数
+ * @param {string} str 
+ * @returns 
+ */
+const _dh_normalizeString = (str) => {
+    if (typeof str !== 'string') return '';
+    return str.normalize('NFKC').toUpperCase();
+};
+/**
  * 日付形式の正規表現パターンを生成する関数
  * @param {Array<string>} separators - 区切り文字の配列（例: ['/', '-', '.', '／', '‐', '．', '−', 'ー', '－']）
  * @param {boolean} includeDay - 日付を含めるかどうか
@@ -54,16 +63,6 @@ const _dh_createDatePattern = (separators = [''], includeDay = true) => {
     separators.forEach(sep => { _dh_assertString(sep); });
     if (typeof includeDay !== 'boolean') throw new Error('includeDay must be a boolean');
     const eraInitials = ['M', 'T', 'S', 'H', 'R', 'm', 't', 's', 'h', 'r', 'Ｍ', 'Ｔ', 'Ｓ', 'Ｈ', 'Ｒ', 'ｍ', 'ｔ', 'ｓ', 'ｈ', 'ｒ'];
-    const normalizeEraInitial = (initial) => {
-        const map = {
-            'Ｍ': 'M', 'ｍ': 'M', 'M': 'M',
-            'Ｔ': 'T', 'ｔ': 'T', 'T': 'T',
-            'Ｓ': 'S', 'ｓ': 'S', 'S': 'S',
-            'Ｈ': 'H', 'ｈ': 'H', 'H': 'H',
-            'Ｒ': 'R', 'ｒ': 'R', 'R': 'R'
-        };
-        return map[initial] ?? initial;
-    };
     const year = '\\d{4}';
     const month = '\\d{1,2}';
     const day = includeDay ? '\\d{1,2}' : null;
@@ -77,7 +76,7 @@ const _dh_createDatePattern = (separators = [''], includeDay = true) => {
             patterns.push(_dh_buildRegex(_dh_regexTemplates.warekiSymbol, { era, year: _dh_warekiYearPattern, month, day, sep }));
         });
         eraInitials.forEach(initial => {
-            const normalized = normalizeEraInitial(initial);
+            const normalized = _dh_normalizeString(initial);
             patterns.push(_dh_buildRegex(_dh_regexTemplates.warekiKanji, { era: normalized, year: _dh_warekiYearPattern, month, day }));
             patterns.push(_dh_buildRegex(_dh_regexTemplates.warekiSymbol, { era: normalized, year: _dh_warekiYearPattern, month, day, sep }));
         });
@@ -234,7 +233,8 @@ const _dh_date_string_split = (date_str) => {
             return String.fromCodePoint(char_conv.charCodeAt(0) - 0xFEE0);
         });
     };
-    const date_str_sbn = convert_to_single_byte_numbers(date_str);
+    const date_str_ns = _dh_normalizeString(date_str);
+    const date_str_sbn = convert_to_single_byte_numbers(date_str_ns);    
     const date_type = detectDateType(date_str_sbn);
     if (/^\d{8}$/.test(date_str_sbn)) { // YYYYMMDD形式
         return {
