@@ -88,22 +88,16 @@ const _dh_createDatePattern = (separators = [''], includeDay = true, includeInit
 
     const patterns = [];
     sepList.forEach(sep => {
-        if (!includeDay) console.log(buildRegex(seirekiKanjiTemplate, { year, month, day }));
         patterns.push(buildRegex(seirekiKanjiTemplate, { year, month, day }));
-        if (!includeDay) console.log(buildRegex(seirekiSymbolTemplate, { year, month, day, sep }));
         patterns.push(buildRegex(seirekiSymbolTemplate, { year, month, day, sep }));
         _dh_eraNames.forEach(era => {
-            if (!includeDay) console.log(buildRegex(warekiKanjiTemplate, { era, year: _dh_warekiYearPattern, month, day }));
             patterns.push(buildRegex(warekiKanjiTemplate, { era, year: _dh_warekiYearPattern, month, day }));
-            if (!includeDay) console.log(buildRegex(warekiSymbolTemplate, { era, year: _dh_warekiYearPattern, month, day, sep }));
             patterns.push(buildRegex(warekiSymbolTemplate, { era, year: _dh_warekiYearPattern, month, day, sep }));
         });
         if (includeInitials) {
             eraInitials.forEach(initial => {
                 const normalized = _dh_normalizeString(initial);
-                if (!includeDay) console.log(buildRegex(warekiKanjiTemplate, { era: normalized, year: _dh_warekiYearPattern, month, day }));
                 patterns.push(buildRegex(warekiKanjiTemplate, { era: normalized, year: _dh_warekiYearPattern, month, day }));
-                if (!includeDay) console.log(buildRegex(warekiSymbolTemplate, { era: normalized, year: _dh_warekiYearPattern, month, day, sep }));
                 patterns.push(buildRegex(warekiSymbolTemplate, { era: normalized, year: _dh_warekiYearPattern, month, day, sep }));
             });
         }
@@ -234,6 +228,14 @@ const _dh_date_string_split = (date_str) => {
         str = convertFullWidthDigits(str);
         return str
     };
+    const isValidDate = (year, month, day) => {        
+        const date = new Date(year, month - 1, day);
+        return (
+            date.getFullYear() === year &&
+            date.getMonth() === month - 1 &&
+            date.getDate() === day
+        );
+    };    
     const date_str_ns = _dh_normalizeString(date_str);
     const date_str_sbn = convert_to_single_byte_numbers(date_str_ns);    
     const date_type = detectDateType(date_str_sbn);
@@ -316,40 +318,7 @@ const _dh_date_string_split = (date_str) => {
         }
     }
     if (date_str_sbn_split.length >= 3 && date_str_sbn_split[2]) { // 日の文字列がある場合
-        let conv_flag = true;
-        const daynumber = Number(date_str_sbn_split[2]);
-        if ((daynumber >= 1) && (daynumber <= 31)) { // 日表記が1日～31日になっている場合
-            const yearnumber = Number(date_str_split.year);
-            const monthnumber = Number(date_str_split.month);
-            if (yearnumber > 0 && monthnumber >= 1 && monthnumber <= 12) { // 年の文字列があり、月の文字列が1月～12月になっている場合
-                switch (monthnumber) {
-                    case 4:
-                    case 6:
-                    case 9:
-                    case 11: // 月日数が30日ある月の場合
-                        if (daynumber > 30) { // 日表記が30を超える場合
-                            conv_flag = false;
-                        }
-                        break;
-                    case 2: // 2月の場合
-                        if ((yearnumber % 4 === 0 && yearnumber % 100 !== 0) || yearnumber % 400 === 0) { // うるう年の場合
-                            if (daynumber > 29) { // 日表記が29を超える場合
-                                conv_flag = false;
-                            }
-                        } else { // 平年の場合
-                            if (daynumber > 28) { // 日表記が28を超える場合
-                                conv_flag = false;
-                            }
-                        }
-                        break;
-                }
-            } else { // 年の文字列がない、もしくは月の文字列が1月～12月になっていない場合
-                conv_flag = false;
-            }
-        } else { // 日表記が1日～31日になっていない場合
-            conv_flag = false;
-        }
-        if (conv_flag) { // 日の数値が1以上で、月日数の範囲内の場合
+        if (isValidDate(Number(date_str_sbn_split[0]), Number(date_str_sbn_split[1]), Number(date_str_sbn_split[2]))) {
             date_str_split.day = ('0' + date_str_sbn_split[2]).slice(-2);
         }
     }
