@@ -155,6 +155,17 @@ const _dh_patterns = {
     ]
 };
 /**
+ * 月をDate関数にあわせて減算する（1月〜12月が0〜11で表されるため）
+ * @param {number} month - 月を表す数字
+ * @returns {number} Date関数にあわせた月の数値
+ */
+const _dh_newDateMonth = (month) => month - 1;
+const _dh_isValidDate = (year, month, day) => {
+    const newDateMonth = _dh_newDateMonth(month)
+    const date = new Date(year, newDateMonth, day);
+    return date.getFullYear() === year && date.getMonth() === newDateMonth && date.getDate() === day;
+};
+/**
  * 日付文字列を年月日の配列形式に分割する関数
  * @param {string} date_str 分割対象の日付文字列
  * @returns {object} 年月日の配列形式に分割したオブジェクト
@@ -211,16 +222,17 @@ const _dh_date_string_split = (date_str) => {
             const parseKanjiNumber = (kanji) => {
                 let total = 0, current = 0;
                 for (const char of kanji) {
-                    if (char in kanjiDigits) current = kanjiDigits[char];
-                    else if (char in kanjiMultipliers) {
+                    if (char in kanjiDigits) {
+                        current = kanjiDigits[char];
+                    } else if (char in kanjiMultipliers) {
                         if (current === 0) current = 1;
                         total += current * kanjiMultipliers[char];
                         current = 0;
-                    } else if (char === '元') total += 1;
+                    }
                 }
-                return current === 0 ? total : current;
+                return total + current;
             };
-            return str.replace(/[〇一二三四五六七八九十百千元]+/g, parseKanjiNumber);
+            return str.replace(/[〇一二三四五六七八九十百千]+/g, (match) => parseKanjiNumber(match));
         };
         const convertFullWidthDigits = (str = '') => {
             return str.replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xFEE0));
@@ -229,14 +241,29 @@ const _dh_date_string_split = (date_str) => {
         str = convertFullWidthDigits(str);
         return str
     };
-    const isValidDate = (year, month, day) => {        
-        const date = new Date(year, month - 1, day);
-        return (
-            date.getFullYear() === year &&
-            date.getMonth() === month - 1 &&
-            date.getDate() === day
-        );
-    };    
+    const convertWarekiToSeireki = (eraName, eraYear, month, day) => {
+        const eraStartDates = {
+            '明治': new Date(1868, _dh_newDateMonth(10), 23),
+            '大正': new Date(1912, _dh_newDateMonth(7), 30),
+            '昭和': new Date(1926, _dh_newDateMonth(12), 25),
+            '平成': new Date(1989, _dh_newDateMonth(1), 8),
+            '令和': new Date(2019, _dh_newDateMonth(5), 1)
+        };
+        const maxYears = {
+            '明治': 45,
+            '大正': 15,
+            '昭和': 64,
+            '平成': 31,
+            '令和': 99 // 仮の上限
+        };
+        const eraStart = eraStartDates[eraName];
+        const maxYear = maxYears[eraName];
+        if (!eraStart || !Number.isInteger(eraYear) || eraYear < 1 || eraYear > maxYear) return 0;
+        const convertedYear = eraStart.getFullYear() + (eraYear - 1);
+        if (!_dh_isValidDate(convertedYear, month, day)) return 0;
+        const convertedDate = new Date(convertedYear, _dh_newDateMonth(month), day);
+        return convertedDate >= eraStart ? convertedYear : 0;
+    };
     const date_str_ns = _dh_normalizeString(date_str);
     const date_str_sbn = convert_to_single_byte_numbers(date_str_ns);    
     const date_type = detectDateType(date_str_sbn);
@@ -271,42 +298,14 @@ const _dh_date_string_split = (date_str) => {
             yearchar = '1';
         }
         yearnumber = Number(yearchar);
-        switch (era_type) {
-            case 1: // 元号が明治の場合
-                if (yearnumber >= 1 && yearnumber <= 45) { // 明治元年～45年までの範囲
-                    yearnumber += 1867;
-                } else { // 明治の範囲外の場合
-                    yearnumber = 0;
-                }
-                break;
-            case 2: // 元号が大正の場合
-                if (yearnumber >= 1 && yearnumber <= 15) { // 大正元年～15年までの範囲
-                    yearnumber += 1911;
-                } else { // 大正の範囲外の場合
-                    yearnumber = 0;
-                }
-                break;
-            case 3: // 元号が昭和の場合
-                if (yearnumber >= 1 && yearnumber <= 64) { // 昭和元年～昭和64年までの範囲
-                    yearnumber += 1925;
-                } else { // 昭和の範囲外の場合
-                    yearnumber = 0;
-                }
-                break;
-            case 4: // 元号が平成の場合
-                if (yearnumber >= 1 && yearnumber <= 31) { // 平成元年～平成31年までの範囲
-                    yearnumber += 1988;
-                } else { // 平成の範囲外の場合
-                    yearnumber = 0;
-                }
-                break;
-            case 5: // 元号が令和の場合
-                if (yearnumber >= 1) { // 令和元年以降の範囲
-                    yearnumber += 2018;
-                } else { // 令和の範囲外の場合
-                    yearnumber = 0;
-                }
-                break;
+        if (era_type > 0) {
+            const eraName = _dh_eraNames[era_type - 1];
+            const convertedYear = convertWarekiToSeireki(eraName, yearnumber, month, day);
+            if (convertedYear > 0) {
+                yearnumber = convertedYear;
+            } else {
+                yearnumber = 0;
+            }
         }
         if (yearnumber >= 1) { // 年の数値が1以上の場合
             date_str_split.year = String(yearnumber);
@@ -320,7 +319,7 @@ const _dh_date_string_split = (date_str) => {
         }
     }
     if (date_str_sbn_split.length >= 3 && date_str_sbn_split[2]) { // 日の文字列がある場合
-        if (isValidDate(Number(yearnumber), Number(date_str_sbn_split[1]), Number(date_str_sbn_split[2]))) {
+        if (_dh_isValidDate(Number(yearnumber), Number(date_str_sbn_split[1]), Number(date_str_sbn_split[2]))) {
             date_str_split.day = ('0' + date_str_sbn_split[2]).slice(-2);
         }
     }
@@ -336,7 +335,10 @@ const convert_to_anno_domini = (date_str) => {
     if (!_dh_checkString(date_str)) return '';
     if (!date_str) return '';
     const date_str_split = _dh_date_string_split(date_str);
-    if (date_str_split.year && date_str_split.month && date_str_split.day) { // 年、月、日の文字列がある場合
+    const year = Number(date_str_split.year);
+    const month = Number(date_str_split.month);
+    const day = Number(date_str_split.day);
+    if (year && month && day && _dh_isValidDate(year, month, day)) {
         return date_str_split.year + '-' + date_str_split.month + '-' + date_str_split.day;
     }
     return '';
@@ -353,14 +355,14 @@ const convert_to_year_month = (date_str) => {
     const nullReturn = { char: '', jacsw: '' }
     if (!_dh_checkString(date_str)) return nullReturn;
     if (!date_str) return nullReturn;
-    if (date_str) { // 日付形式の文字列がある場合
-        const date_str_split = _dh_date_string_split(date_str);
-        if (date_str_split.year && date_str_split.month) { // 年、月の文字列がある場合
-            return {
-                char: date_str_split.year + '年' + date_str_split.month + '月',
-                jacsw: date_str_split.year + '/' + date_str_split.month
-            };
-        }
+    const date_str_split = _dh_date_string_split(date_str);
+    const year = Number(date_str_split.year);
+    const month = Number(date_str_split.month);
+    if (year && month && _dh_isValidDate(year, month, 1)) {
+        return {
+            char: date_str_split.year + '年' + date_str_split.month + '月',
+            jacsw: date_str_split.year + '/' + date_str_split.month
+        };
     }
     return nullReturn;
 };
@@ -374,7 +376,8 @@ const convert_to_year = (date_str) => {
     if (!_dh_checkString(date_str)) return '';
     if (!date_str) return '';
     const date_str_split = _dh_date_string_split(date_str);
-    if (date_str_split.year) return date_str_split.year;
+    const year = Number(date_str_split.year);
+    if (year && _dh_isValidDate(year, 1, 1)) return date_str_split.year;
     return '';
 };
 
@@ -386,36 +389,34 @@ const convert_to_year = (date_str) => {
  * @property {string} initial_era_year - 「英字1文字EE」形式の和暦年表記の文字列（分割できなかった場合は空白を返す）
  * @property {string} era_year_number - 「EE」形式の和暦年のみ表記の文字列（分割できなかった場合は空白を返す）
  */
+
 const convert_to_era_year = (date_str) => {
-    const nullReturn = { full_era_year: '', initial_era_year: '', era_year_number: '' }
+    const nullReturn = { full_era_year: '', initial_era_year: '', era_year_number: '' };
     if (!_dh_checkString(date_str)) return nullReturn;
     if (!date_str) return nullReturn;
-    const newDateMonth = (month) => month - 1;
     const eraTransitions = [
-        { name: '明治', initial: 'M', start: new Date(1868, newDateMonth(10), 23) },
-        { name: '大正', initial: 'T', start: new Date(1912, newDateMonth(7), 30) },
-        { name: '昭和', initial: 'S', start: new Date(1926, newDateMonth(12), 25) },
-        { name: '平成', initial: 'H', start: new Date(1989, newDateMonth(1), 8) },
-        { name: '令和', initial: 'R', start: new Date(2019, newDateMonth(5), 1) }
+        { name: '明治', initial: 'M', start: new Date(1868, _dh_newDateMonth(10), 23) },
+        { name: '大正', initial: 'T', start: new Date(1912, _dh_newDateMonth(7), 30) },
+        { name: '昭和', initial: 'S', start: new Date(1926, _dh_newDateMonth(12), 25) },
+        { name: '平成', initial: 'H', start: new Date(1989, _dh_newDateMonth(1), 8) },
+        { name: '令和', initial: 'R', start: new Date(2019, _dh_newDateMonth(5), 1) }
     ];
-    const date_str_split = _dh_date_string_split(date_str);    
-    if (date_str_split.year && date_str_split.month && date_str_split.day) { // 年、月、日の文字列がある場合
-        const dateObj = new Date(date_str_split.year, newDateMonth(date_str_split.month), date_str_split.day);
-        if (isNaN(dateObj.getTime())) return nullReturn;
-        let selectedEra = null;
+    const getEraFromDate = (date) => {
         for (let c = eraTransitions.length - 1; c >= 0; c--) {
-            if (dateObj >= eraTransitions[c].start) {
-                selectedEra = eraTransitions[c];
-                break;
-            }
+            if (date >= eraTransitions[c].start) return eraTransitions[c];
         }
-        if (!selectedEra) return nullReturn;
-        const eraYear = dateObj.getFullYear() - selectedEra.start.getFullYear() + 1;
-        return {
-            full_era_year: `${selectedEra.name}${eraYear}年`,
-            initial_era_year: `${selectedEra.initial}${eraYear}年`,
-            era_year_number: eraYear
-        };
-    }
-    return nullReturn;
+        return null;
+    };
+    const date_str_split = _dh_date_string_split(date_str);
+    if (!(date_str_split.year && date_str_split.month && date_str_split.day)) return nullReturn;
+    const date = new Date(date_str_split.year, _dh_newDateMonth(date_str_split.month), date_str_split.day);
+    if (isNaN(date.getTime())) return nullReturn;
+    const era = getEraFromDate(date);
+    if (!era) return nullReturn;
+    const eraYear = date.getFullYear() - era.start.getFullYear() + 1;
+    return {
+        full_era_year: `${era.name}${eraYear}年`,
+        initial_era_year: `${era.initial}${eraYear}年`,
+        era_year_number: `${eraYear}`
+    };
 };
