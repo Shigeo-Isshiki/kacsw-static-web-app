@@ -82,7 +82,7 @@ const _dh_createDatePattern = (separators = [''], includeDay = true, includeInit
     ? regexTemplates.warekiKanji
     : '{{era}}{{year}}年{{month}}月';
     const warekiSymbolTemplate = includeDay
-    ? regexTemplates.seirekiSymbol
+    ? regexTemplates.warekiSymbol
     : '{{era}}{{year}}{{sep}}{{month}}';    
     const patterns = [];
     sepList.forEach(sep => {
