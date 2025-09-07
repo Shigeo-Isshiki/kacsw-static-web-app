@@ -40,8 +40,9 @@ const _dh_normalizeString = (str) => {
 };
 /**
  * 日付形式の正規表現パターンを生成する関数
- * @param {Array<string>} separators - 区切り文字の配列（例: ['/', '-', '.', '／', '‐', '．', '−', 'ー', '－']）
+ * @param {Array<string>} separators - 区切り文字の配列
  * @param {boolean} includeDay - 日付を含めるかどうか
+ * @param {boolean} includeInitials - 和暦イニシャルを含めるか
  * @returns {Array<RegExp>} - 正規表現の配列
  */
 const _dh_createDatePattern = (separators = [''], includeDay = true, includeInitials = true) => {
@@ -52,19 +53,21 @@ const _dh_createDatePattern = (separators = [''], includeDay = true, includeInit
         : separators[0] ? separators[0].replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') : '';
     const year = '\\d{4}';
     const month = '\\d{1,2}';
-    const day = includeDay ? '\\d{1,2}' : null;
+    const day = includeDay ? '\\d{1,2}' : '';
     const warekiYear = _dh_warekiYearPattern;
     const eraInitials = ['M', 'T', 'S', 'H', 'R'];
     const patterns = [];
-    // 西暦（漢字・記号）
+    // 西暦
     patterns.push(new RegExp(`^${year}年${month}月${includeDay ? `${day}日` : ''}$`));
-    patterns.push(new RegExp(`^${year}${sepClass}${month}${includeDay ? `${sepClass}${day}` : ''}$`));
-    // 和暦（漢字・記号、イニシャル含む）
+    if (sepClass) {
+        patterns.push(new RegExp(`^${year}${sepClass}${month}${includeDay ? `${sepClass}${day}` : ''}$`));
+    }
+    // 和暦
     [..._dh_eraNames, ...(includeInitials ? eraInitials : [])].forEach(era => {
-        // 和暦（漢字）
         patterns.push(new RegExp(`^${era}${warekiYear}年${month}月${includeDay ? `${day}日` : ''}$`));
-        // 和暦（記号）
-        patterns.push(new RegExp(`^${era}${warekiYear}${sepClass}${month}${includeDay ? `${sepClass}${day}` : ''}$`));
+        if (sepClass) {
+            patterns.push(new RegExp(`^${era}${warekiYear}${sepClass}${month}${includeDay ? `${sepClass}${day}` : ''}$`));
+        }
     });
     return patterns;
 };
@@ -127,10 +130,20 @@ const _dh_patterns = {
  * @returns {number} Date関数にあわせた月の数値
  */
 const _dh_newDateMonth = (month) => month - 1;
+/**
+ * 年月日が有効な日付かどうかを厳密に判定する関数（うるう年対応）
+ * @param {number} year
+ * @param {number} month
+ * @param {number} day
+ * @returns {boolean}
+ */
 const _dh_isValidDate = (year, month, day) => {
-    const newDateMonth = _dh_newDateMonth(month);
-    const date = new Date(year, newDateMonth, day);
-    return date.getFullYear() === year && date.getMonth() === newDateMonth && date.getDate() === day;
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+    if (month < 1 || month > 12) return false;
+    if (day < 1) return false;
+    const daysInMonth = [31, (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (day > daysInMonth[_dh_newDateMonth(month)]) return false;
+    return true;
 };
 /**
  * 日付文字列を年月日の配列形式に分割する関数
@@ -229,13 +242,14 @@ const _dh_date_string_split = (date_str) => {
         };
         const eraStart = eraStartDates[eraName];
         const maxYear = maxYears[eraName];
-        if (!eraStart || !Number.isInteger(eraYear) || eraYear < 1 || eraYear > maxYear) return 0;
-        if (month < 1 || month > 12) return 0;
-        if (day < 1 || day > 31) return 0;
+        if (!eraStart || !Number.isInteger(eraYear) || eraYear < 1 || eraYear > maxYear) throw new Error('和暦年の値が不正です');
+        if (month < 1 || month > 12) throw new Error('月の値が不正です');
+        if (day < 1 || day > 31) throw new Error('日の値が不正です');
         const convertedYear = eraStart.getFullYear() + (eraYear - 1);
-        if (!_dh_isValidDate(convertedYear, month, day)) return 0;
+        if (!_dh_isValidDate(convertedYear, month, day)) throw new Error('日付が不正です');
         const convertedDate = new Date(convertedYear, _dh_newDateMonth(month), day);
-        return convertedDate >= eraStart ? convertedYear : 0;
+        if (convertedDate < eraStart) throw new Error('和暦の開始日より前の日付です');
+        return convertedYear;
     };
     const date_str_ns = _dh_normalizeString(date_str);
     const date_str_sbn = convert_to_single_byte_numbers(date_str_ns);    
@@ -305,7 +319,8 @@ const _dh_date_string_split = (date_str) => {
 /**
  * 西暦和暦を問わず日付文字列をISO 8601拡張形式の西暦表記（YYYY-MM-DD）に変換する関数
  * @param {string} date_str 変換対象の日付文字列
- * @returns {string} ISO 8601拡張形式の西暦表記（YYYY-MM-DD）の文字列（変換できなかった場合は空白を返す）
+ * @returns {string} ISO 8601拡張形式の西暦表記（YYYY-MM-DD）の文字列
+ * @throws 変換できなかった場合は例外を投げる
  */
 const convert_to_anno_domini = (date_str) => {
     if (!_dh_checkString(date_str)) throw new Error('日付文字列が不正です');
@@ -324,8 +339,9 @@ const convert_to_anno_domini = (date_str) => {
  * 西暦和暦を問わず日付文字列を、西暦の「YYYY年MM月」と「YYYY/MM」の２形式に変換する関数
  * @param {string} date_str 変換対象の日付文字列
  * @returns {object} 西暦の２形式に変換したオブジェクト
- * @property {string} char - 「YYYY年MM月」形式の年月表記（分割できなかった場合は空白を返す）
- * @property {string} jacsw - 「YYYY/MM」形式の年月表記（分割できなかった場合は空白を返す）
+ * @property {string} char - 「YYYY年MM月」形式の年月表記
+ * @property {string} jacsw - 「YYYY/MM」形式の年月表記
+ * @throws 変換できなかった場合は例外を投げる
  */
 const convert_to_year_month = (date_str) => {
     if (!_dh_checkString(date_str)) throw new Error('日付文字列が不正です');
@@ -345,7 +361,8 @@ const convert_to_year_month = (date_str) => {
 /**
  * 西暦和暦を問わず日付文字列を西暦の年形式に変換する関数
  * @param {string} date_str 変換対象の日付文字列
- * @returns {string} 西暦の年形式の文字列（変換できなかった場合は空白を返す）
+ * @returns {string} 西暦の年形式の文字列
+ * @throws 変換できなかった場合は例外を投げる
  */
 const convert_to_year = (date_str) => {
     if (!_dh_checkString(date_str)) throw new Error('日付文字列が不正です');
@@ -360,9 +377,10 @@ const convert_to_year = (date_str) => {
  * 西暦和暦を問わず日付文字列を、和暦の「漢字表記年号EE年」、「英字1文字EE」、「EE」の３形式に変換する関数
  * @param {string} date_str 変換対象の日付文字列
  * @returns {object} 和暦の３形式に変換したオブジェクト
- * @property {string} full_era_year - 「漢字表記年号EE年」形式の和暦表記の文字列（分割できなかった場合は空白を返す）
- * @property {string} initial_era_year - 「英字1文字EE」形式の和暦年表記の文字列（分割できなかった場合は空白を返す）
- * @property {string} era_year_number - 「EE」形式の和暦年のみ表記の文字列（分割できなかった場合は空白を返す）
+ * @property {string} full_era_year - 「漢字表記年号EE年」形式の和暦表記の文字列
+ * @property {string} initial_era_year - 「英字1文字EE」形式の和暦年表記の文字列
+ * @property {string} era_year_number - 「EE」形式の和暦年のみ表記の文字列
+ * @throws 変換できなかった場合は例外を投げる
  */
 
 const convert_to_era_year = (date_str) => {
