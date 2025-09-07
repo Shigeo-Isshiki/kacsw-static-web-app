@@ -45,65 +45,26 @@ const _dh_normalizeString = (str) => {
  * @returns {Array<RegExp>} - 正規表現の配列
  */
 const _dh_createDatePattern = (separators = [''], includeDay = true, includeInitials = true) => {
-    if (separators === null || separators === undefined || separators.length === 0) separators = [''];
-    if (!Array.isArray(separators)) throw new Error('separators must be an array');
-    separators.forEach(sep => { _dh_assertString(sep); });
-    if (typeof includeDay !== 'boolean') throw new Error('includeDay must be a boolean');
-    const regexTemplates = {
-        seirekiKanji: '{{year}}年{{month}}月{{day}}日',
-        seirekiSymbol: '{{year}}{{sep}}{{month}}{{sep}}{{day}}',
-        warekiKanji: '{{era}}{{year}}年{{month}}月{{day}}日',
-        warekiSymbol: '{{era}}{{year}}{{sep}}{{month}}{{sep}}{{day}}'
-    };
-    const buildRegex = (template, values) => {
-        _dh_assertString(template);
-        if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
-        const applyTemplate = (template, values) => {
-            return template.replace(/{{(.*?)}}/g, (_, key) => values[key] ?? '');
-        };
-        const filteredValues = { ...values };
-        if (!includeDay) {
-            delete filteredValues.day;
-        }
-        const regexStr = '^' + applyTemplate(template, filteredValues) + '$';
-        return new RegExp(regexStr);
-    };
-    const withSep = (defaultValues, sep) => ({ ...defaultValues, sep });
-    const eraInitials = ['M', 'T', 'S', 'H', 'R'];
+    if (!Array.isArray(separators) || separators.length === 0) separators = [''];
+    // 区切り文字を正規表現クラスにまとめる
+    const sepClass = separators.length > 1
+        ? `[${separators.map(s => s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')).join('')}]`
+        : separators[0] ? separators[0].replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') : '';
     const year = '\\d{4}';
     const month = '\\d{1,2}';
     const day = includeDay ? '\\d{1,2}' : null;
-    const sepList = separators.length > 0 ? separators : [''];
-    const seirekiKanjiTemplate = includeDay
-    ? regexTemplates.seirekiKanji
-    : '{{year}}年{{month}}月';
-    const seirekiSymbolTemplate = includeDay
-    ? regexTemplates.seirekiSymbol
-    : '{{year}}{{sep}}{{month}}';
-    const warekiKanjiTemplate = includeDay
-    ? regexTemplates.warekiKanji
-    : '{{era}}{{year}}年{{month}}月';
-    const warekiSymbolTemplate = includeDay
-    ? regexTemplates.warekiSymbol
-    : '{{era}}{{year}}{{sep}}{{month}}';    
+    const warekiYear = _dh_warekiYearPattern;
+    const eraInitials = ['M', 'T', 'S', 'H', 'R'];
     const patterns = [];
-    sepList.forEach(sep => {
-        const seirekiDefaultValues = { year, month, day };
-        patterns.push(buildRegex(seirekiKanjiTemplate, seirekiDefaultValues));
-        patterns.push(buildRegex(seirekiSymbolTemplate, withSep(seirekiDefaultValues, sep)));
-        _dh_eraNames.forEach(era => {
-            const eraNamesDefaultValues = { era, year: _dh_warekiYearPattern, month, day };
-            patterns.push(buildRegex(warekiKanjiTemplate,  eraNamesDefaultValues));
-            patterns.push(buildRegex(warekiSymbolTemplate, withSep(eraNamesDefaultValues, sep)));
-        });
-        if (includeInitials) {
-            eraInitials.forEach(initial => {
-                const normalized = _dh_normalizeString(initial);
-                const eraInitialsDefaultValues = { era: normalized, year: _dh_warekiYearPattern, month, day }
-                patterns.push(buildRegex(warekiKanjiTemplate, eraInitialsDefaultValues));
-                patterns.push(buildRegex(warekiSymbolTemplate, withSep(eraInitialsDefaultValues, sep)));
-            });
-        }
+    // 西暦（漢字・記号）
+    patterns.push(new RegExp(`^${year}年${month}月${includeDay ? `${day}日` : ''}$`));
+    patterns.push(new RegExp(`^${year}${sepClass}${month}${includeDay ? `${sepClass}${day}` : ''}$`));
+    // 和暦（漢字・記号、イニシャル含む）
+    [..._dh_eraNames, ...(includeInitials ? eraInitials : [])].forEach(era => {
+        // 和暦（漢字）
+        patterns.push(new RegExp(`^${era}${warekiYear}年${month}月${includeDay ? `${day}日` : ''}$`));
+        // 和暦（記号）
+        patterns.push(new RegExp(`^${era}${warekiYear}${sepClass}${month}${includeDay ? `${sepClass}${day}` : ''}$`));
     });
     return patterns;
 };
