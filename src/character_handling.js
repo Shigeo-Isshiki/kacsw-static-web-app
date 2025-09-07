@@ -81,11 +81,11 @@ const _ch_buildPattern = (keys) => {
     return new RegExp(escapedKeys.join('|'), 'g');
 };
 /**
- * 半角カナ変換用のマップを作成する
+ * 半角カタカナ変換用のマップを作成する
  */
 const _ch_half_width_kana_map = new Map(Object.entries(_ch_convert_character_list.half_width_kana));
 /**
- * 全角カナ変換用のマップを作成する
+ * 全角カタカナ変換用のマップを作成する
  */
 const _ch_full_width_kana_map = new Map(Object.entries(_ch_convert_character_list.full_width_kana));
 /**
@@ -107,9 +107,9 @@ const _ch_replace_with_map = (str, pattern, map) => {
 };
 
 /**
- * 文字列の中の各文字を半角カナ文字に変換する関数
+ * 文字列の中の各文字を半角カタカナに変換する関数
  * @param {string} str 変換対象の文字列 
- * @returns {string} 可能な限り半角カナ文字に変換した文字列
+ * @returns {string} 可能な限り半角カタカナに変換した文字列
  */
 const convert_to_half_width_kana = (str = '') => {
     if (!_ch_checkString(str)) return '';
@@ -118,10 +118,10 @@ const convert_to_half_width_kana = (str = '') => {
 };
 
 /**
- * 文字列の中の各文字を全角カナ文字に変換する関数
+ * 文字列の中の各文字を全角カタカナに変換する関数
  * @param {string} str 変換対象の文字列
  * @param {boolean} hiragana_sw ひらがな変換の可否を選択するスイッチ（trueで変換、falseで不変換）
- * @returns {string} 可能な限り全角カナ文字に変換した文字列
+ * @returns {string} 可能な限り全角カタカナに変換した文字列
  */
 const convert_to_full_width_kana = (str = '', hiragana_sw = true) => {
     if (!_ch_checkString(str)) return '';
@@ -169,7 +169,7 @@ const convert_to_hiragana = (str = '', check = false) => {
 };
 
 /**
- * 文字列の中の各文字を半角文字に変換する関数
+ * 文字列の中の各文字を半角文字（英数字・記号・スペース含む）に変換する関数
  * @param {string} str 変換対象の文字列
  * @returns {string} 半角文字に変換した文字列
  */
@@ -185,14 +185,14 @@ const convert_to_single_byte_characters = (str = '') => {
         ) {
             return String.fromCodePoint(code - 0xFEE0);
         }
-        if (char === '\u3000') return ' '; // 全角スペースを半角に
+    if (char === '\u3000') return ' '; // 全角スペースを半角に
         return char;
     }).join('');
     return single_byte_characters;
 };
 
 /**
- * 文字列の中の各文字を全角文字に変換する関数
+ * 文字列の中の各文字を全角文字（英数字・記号・スペース含む）に変換する関数
  * @param {string} str 変換対象の文字列
  * @returns {string} 全角文字に変換した文字列
  */
@@ -202,8 +202,8 @@ const convert_to_double_byte_characters = (str = '') => {
     const hyphen_processed = str.replace(/[‐‑–—−ー―]/g, '－');
     const full_width_kana = convert_to_full_width_kana(hyphen_processed, false);
     const double_byte_characters = [...full_width_kana].map((char) => {
-        if (char === '\\') return '￥'; // 半角円（バックスラッシュ）マークを全角円マークに
-        if (char === ' ') return '\u3000'; // 半角スペースを全角に
+    if (char === '\\') return '￥'; // 半角バックスラッシュを全角円マークに
+    if (char === ' ') return '\u3000'; // 半角スペースを全角に
         const code = char.charCodeAt(0);
         if (
             (code >= 0x21 && code <= 0x7E) || // 半角記号・英数字
@@ -225,9 +225,13 @@ const convert_to_double_byte_characters = (str = '') => {
  */
 const convert_to_email_address = (email_address = '') => {
     if (!_ch_checkString(email_address)) return '';
-    const email_pattern = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
     if (!email_address) return '';
-    const single_byte_characters = convert_to_single_byte_characters(email_address);
+    // 前後空白除去
+    const trimmed = email_address.trim();
+    const single_byte_characters = convert_to_single_byte_characters(trimmed);
+    // 連続ドットや@直前・直後のドット禁止
+    if (/\.\.|^\.|\.@|@\.|\.$/.test(single_byte_characters)) return '';
+    const email_pattern = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
     return email_pattern.test(single_byte_characters) ? single_byte_characters : '';
 };
 
