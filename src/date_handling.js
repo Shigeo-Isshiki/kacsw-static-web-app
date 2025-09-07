@@ -3,6 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_dh_)で始める
+// 元号改元時の対応: ERAS関数を定義しているところに新元号を追加してください。maxは終了する年がわからないため99と設定します
 'use strict';
 /** 文字列が文字列型であることを確認する関数
  * @param {*} str - 確認する文字列
@@ -20,10 +21,39 @@ const _dh_checkString = (str) => {
     return typeof str === 'string' && str !== null && str !== undefined;
 };
 /**
- * 元号を表す配列
- * @constant {array} _dh_eraNames - 元号を表す配列
+ * 月をDate関数にあわせて減算する（1月〜12月が0〜11で表されるため）
+ * @param {number} month - 月を表す数字
+ * @returns {number} Date関数にあわせた月の数値
  */
-const _dh_eraNames = ['明治', '大正', '昭和', '平成', '令和'];
+const _dh_newDateMonth = (month) => month - 1;
+/**
+ * 元号データを一元管理する配列
+ * 新元号追加時はこの配列に1行追加するだけでOK
+ * ERAS配列のstartの月は「1始まり」で記述してください（例: 10月→10）。内部で0始まりに変換します。
+ * @constant {Array} ERAS - 元号データを一元管理する配列
+ * @property {string} name - 元号名
+ * @property {string} initial - 元号イニシャル（大文字の半角英字1文字）
+ * @property {Date} start - 元号の開始日を表すDateオブジェクト
+ * @property {number} max - その元号で表せる和暦年の最大値
+ */
+const ERAS = [
+    { name: '明治', initial: 'M', start: new Date(1868, _dh_newDateMonth(10), 23), max: 45 },
+    { name: '大正', initial: 'T', start: new Date(1912, _dh_newDateMonth(7), 30), max: 15 },
+    { name: '昭和', initial: 'S', start: new Date(1926, _dh_newDateMonth(12), 25), max: 64 },
+    { name: '平成', initial: 'H', start: new Date(1989, _dh_newDateMonth(1), 8), max: 31 },
+    { name: '令和', initial: 'R', start: new Date(2019, _dh_newDateMonth(5), 1), max: 99 } // 令和は仮に99年まで対応
+];
+// 元号名・イニシャルのリストを自動生成
+/**
+ * 元号名のリストを表す配列
+ * @constant {Array} _dh_eraNames - 元号名のリストを表す配列
+ */
+const _dh_eraNames = ERAS.map(e => e.name);
+/**
+ * 元号イニシャルのリストを表す配列
+ * @constant {Array} _dh_eraInitials - 元号イニシャルのリストを表す配列
+ */
+const _dh_eraInitials = ERAS.map(e => e.initial);
 /**
  * 和暦の年を表す正規表現パターン
  * @constant {string} _dh_warekiYearPattern - 和暦の年を表す正規表現パターン
@@ -63,7 +93,7 @@ const _dh_createDatePattern = (separators = [''], includeDay = true, includeInit
         patterns.push(new RegExp(`^${year}${sepClass}${month}${includeDay ? `${sepClass}${day}` : ''}$`));
     }
     // 和暦
-    [..._dh_eraNames, ...(includeInitials ? eraInitials : [])].forEach(era => {
+    [..._dh_eraNames, ...(includeInitials ? _dh_eraInitials : [])].forEach(era => {
         patterns.push(new RegExp(`^${era}${warekiYear}年${month}月${includeDay ? `${day}日` : ''}$`));
         if (sepClass) {
             patterns.push(new RegExp(`^${era}${warekiYear}${sepClass}${month}${includeDay ? `${sepClass}${day}` : ''}$`));
@@ -125,12 +155,6 @@ const _dh_patterns = {
     ]
 };
 /**
- * 月をDate関数にあわせて減算する（1月〜12月が0〜11で表されるため）
- * @param {number} month - 月を表す数字
- * @returns {number} Date関数にあわせた月の数値
- */
-const _dh_newDateMonth = (month) => month - 1;
-/**
  * 年月日が有効な日付かどうかを厳密に判定する関数（うるう年対応）
  * @param {number} year
  * @param {number} month
@@ -156,13 +180,26 @@ const _dh_isValidDate = (year, month, day) => {
 const _dh_date_string_split = (date_str) => {
     _dh_assertString(date_str);
     if (!date_str) throw new Error('日付文字列が空です');
-    const eraPatterns = {
-        '明治': [/^明治元$/, /^明治\d{1,2}$/, /^[mMｍＭ]元$/, /^[mMｍＭ]\d{1,2}$/],
-        '大正': [/^大正元$/, /^大正\d{1,2}$/, /^[tTｔＴ]元$/, /^[tTｔＴ]\d{1,2}$/],
-        '昭和': [/^昭和元$/, /^昭和\d{1,2}$/, /^[sSｓＳ]元$/, /^[sSｓＳ]\d{1,2}$/],
-        '平成': [/^平成元$/, /^平成\d{1,2}$/, /^[hHｈＨ]元$/, /^[hHｈＨ]\d{1,2}$/],
-        '令和': [/^令和元$/, /^令和\d{1,2}$/, /^[rRｒＲ]元$/, /^[rRｒＲ]\d{1,2}$/]
+    // ERAS配列からeraPatternsを自動生成
+    const _dh_generateEraPatterns = () => {
+        const patterns = {};
+        ERAS.forEach(e => {
+            // 全角・半角イニシャルも考慮
+            const ascii = e.initial;
+            const lower = ascii.toLowerCase();
+            const zenkaku = String.fromCharCode(ascii.charCodeAt(0) + 0xFEE0);
+            const zenkakuLower = String.fromCharCode(lower.charCodeAt(0) + 0xFEE0);
+            const initials = [ascii, lower, zenkaku, zenkakuLower].join('');
+            patterns[e.name] = [
+                new RegExp(`^${e.name}元$`),
+                new RegExp(`^${e.name}\\d{1,2}$`),
+                new RegExp(`^[${initials}]元$`),
+                new RegExp(`^[${initials}]\\d{1,2}$`)
+            ];
+        });
+        return patterns;
     };
+    const eraPatterns = _dh_generateEraPatterns();
     let date_str_split = {
         'year': '',
         'month': '',
@@ -226,29 +263,16 @@ const _dh_date_string_split = (date_str) => {
         return str
     };
     const convertWarekiToSeireki = (eraName, eraYear, month, day) => {
-        const eraStartDates = {
-            '明治': new Date(1868, _dh_newDateMonth(10), 23),
-            '大正': new Date(1912, _dh_newDateMonth(7), 30),
-            '昭和': new Date(1926, _dh_newDateMonth(12), 25),
-            '平成': new Date(1989, _dh_newDateMonth(1), 8),
-            '令和': new Date(2019, _dh_newDateMonth(5), 1)
-        };
-        const maxYears = {
-            '明治': 45,
-            '大正': 15,
-            '昭和': 64,
-            '平成': 31,
-            '令和': 99 // 仮の上限
-        };
-        const eraStart = eraStartDates[eraName];
-        const maxYear = maxYears[eraName];
-        if (!eraStart || !Number.isInteger(eraYear) || eraYear < 1 || eraYear > maxYear) throw new Error('和暦年の値が不正です');
+        // eraNameは元号名またはイニシャルどちらでもOK
+        const era = ERAS.find(e => e.name === eraName || e.initial === eraName);
+        if (!era) throw new Error('不明な元号です');
+        if (!Number.isInteger(eraYear) || eraYear < 1 || eraYear > era.max) throw new Error('和暦年の値が不正です');
         if (month < 1 || month > 12) throw new Error('月の値が不正です');
         if (day < 1 || day > 31) throw new Error('日の値が不正です');
-        const convertedYear = eraStart.getFullYear() + (eraYear - 1);
+        const convertedYear = era.start.getFullYear() + (eraYear - 1);
         if (!_dh_isValidDate(convertedYear, month, day)) throw new Error('日付が不正です');
         const convertedDate = new Date(convertedYear, _dh_newDateMonth(month), day);
-        if (convertedDate < eraStart) throw new Error('和暦の開始日より前の日付です');
+        if (convertedDate < era.start) throw new Error('和暦の開始日より前の日付です');
         return convertedYear;
     };
     const date_str_ns = _dh_normalizeString(date_str);
@@ -273,11 +297,21 @@ const _dh_date_string_split = (date_str) => {
         }
         let yearchar = '';
         if (era_type > 0) { // 日付形式の文字列が和暦表記の場合
-            yearchar = date_str_sbn_split[0].replace(/明治/g,'').replace(/[mMｍＭ]/g,'')
-            .replace(/大正/g,'').replace(/[tTｔＴ]/g,'')
-            .replace(/昭和/g,'').replace(/[sSｓＳ]/g,'')
-            .replace(/平成/g,'').replace(/[hHｈＨ]/g,'')
-            .replace(/令和/g,'').replace(/[rRｒＲ]/g,'');
+            // ERAS配列から元号名・イニシャル（全角・半角）をすべて削除
+            let tmp = date_str_sbn_split[0];
+            ERAS.forEach(e => {
+                // 元号名
+                tmp = tmp.replace(new RegExp(e.name, 'g'), '');
+                // イニシャル（半角大・小、全角大・小）
+                const ascii = e.initial;
+                const lower = ascii.toLowerCase();
+                const zenkaku = String.fromCharCode(ascii.charCodeAt(0) + 0xFEE0);
+                const zenkakuLower = String.fromCharCode(lower.charCodeAt(0) + 0xFEE0);
+                [ascii, lower, zenkaku, zenkakuLower].forEach(init => {
+                    tmp = tmp.replace(new RegExp(init, 'g'), '');
+                });
+            });
+            yearchar = tmp;
         } else { // 日付形式の文字列が西暦表記の場合
             yearchar = date_str_sbn_split[0];
         }
@@ -382,20 +416,13 @@ const convert_to_year = (date_str) => {
  * @property {string} era_year_number - 「EE」形式の和暦年のみ表記の文字列
  * @throws 変換できなかった場合は例外を投げる
  */
-
 const convert_to_era_year = (date_str) => {
     if (!_dh_checkString(date_str)) throw new Error('日付文字列が不正です');
     if (!date_str) throw new Error('日付文字列が空です');
-    const eraTransitions = [
-        { name: '明治', initial: 'M', start: new Date(1868, _dh_newDateMonth(10), 23) },
-        { name: '大正', initial: 'T', start: new Date(1912, _dh_newDateMonth(7), 30) },
-        { name: '昭和', initial: 'S', start: new Date(1926, _dh_newDateMonth(12), 25) },
-        { name: '平成', initial: 'H', start: new Date(1989, _dh_newDateMonth(1), 8) },
-        { name: '令和', initial: 'R', start: new Date(2019, _dh_newDateMonth(5), 1) }
-    ];
+    // ERAS配列を利用
     const getEraFromDate = (date) => {
-        for (let c = eraTransitions.length - 1; c >= 0; c--) {
-            if (date >= eraTransitions[c].start) return eraTransitions[c];
+        for (let c = ERAS.length - 1; c >= 0; c--) {
+            if (date >= ERAS[c].start) return ERAS[c];
         }
         return null;
     };
