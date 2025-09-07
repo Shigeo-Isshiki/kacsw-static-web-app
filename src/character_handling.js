@@ -10,20 +10,19 @@
  * @returns {boolean} - 文字列である = true、文字でない = false
  */
 const _ch_checkString = (str) => {
-    if (typeof str !== 'string') return false;
-    return true;
+    return typeof str === 'string' && str !== null && str !== undefined;
 };
 /**
  * 変換用の文字リスト
  * 各種文字の変換ルールを定義します。
  * ひらがな、カタカナ、濁点・半濁点の変換をサポートします。
- * @typedef {object} _ch_convert_charactor_list
+ * @typedef {object} _ch_convert_character_list
  * @property {object} half_width_kana 全角カタカナから半角カタカナへの変換マップ
  * @property {object} full_width_kana 半角カタカナから全角カタカナへの変換マップ
  * @property {object} turbidity_kana 濁点・半濁点の変換マップ
  */
-/** @type {_ch_convert_charactor_list} */
-const _ch_convert_charactor_list = {
+/** @type {_ch_convert_character_list} */
+const _ch_convert_character_list = {
     'half_width_kana': {
         'ア': 'ｱ', 'イ': 'ｲ', 'ウ': 'ｳ', 'エ': 'ｴ', 'オ': 'ｵ',
         'カ': 'ｶ', 'キ': 'ｷ', 'ク': 'ｸ', 'ケ': 'ｹ', 'コ': 'ｺ',
@@ -84,15 +83,15 @@ const _ch_buildPattern = (keys) => {
 /**
  * 半角カナ変換用のマップを作成する
  */
-const _ch_half_width_kana_map = new Map(Object.entries(_ch_convert_charactor_list.half_width_kana));
+const _ch_half_width_kana_map = new Map(Object.entries(_ch_convert_character_list.half_width_kana));
 /**
  * 全角カナ変換用のマップを作成する
  */
-const _ch_full_width_kana_map = new Map(Object.entries(_ch_convert_charactor_list.full_width_kana));
+const _ch_full_width_kana_map = new Map(Object.entries(_ch_convert_character_list.full_width_kana));
 /**
  * 濁点・半濁点変換用のマップを作成する
  */
-const _ch_turbidity_kana_map = new Map(Object.entries(_ch_convert_charactor_list.turbidity_kana));
+const _ch_turbidity_kana_map = new Map(Object.entries(_ch_convert_character_list.turbidity_kana));
 /**
  * 文字列を正規表現で表記されたパターンに一致した場合、マップにある文字列に置き換える処理をする関数
  * @param {string} str 変換対象の文字列
@@ -101,7 +100,7 @@ const _ch_turbidity_kana_map = new Map(Object.entries(_ch_convert_charactor_list
  * @returns {string} 置き換え後の文字列
  */
 const _ch_replace_with_map = (str, pattern, map) => {
-    if (typeof str !== 'string') throw new Error(`_ch_replace_with_mapの[${str}]は文字である必要があります`);
+    if (!_ch_checkString(str)) throw new Error(`_ch_replace_with_mapの[${str}]は文字である必要があります`);
     if (!(pattern instanceof RegExp)) throw new Error('pattern must be a RegExp');
     if (!(map instanceof Map)) throw new Error('map must be a Map');
     return str.replace(pattern, char => map.get(char) ?? char);
@@ -144,7 +143,7 @@ const convert_to_full_width_kana = (str = '', hiragana_sw = true) => {
  * 文字列の中の各文字をひらがなに変換する関数
  * @param {string} str 変換対象の文字列
  * @param {boolean} check ひらがな以外が含まれる場合はエラーを返すか選択するスイッチ（trueでエラーを返す、falseでエラーを返さない）
- * @returns {string} ひらがなに変換した文字列、またはエラー（エラーの場合はERRORを返す）
+ * @returns {string} ひらがなに変換した文字列。エラー時は例外をスローします。
  */
 const convert_to_hiragana = (str = '', check = false) => {
     if (!_ch_checkString(str)) return '';
@@ -163,7 +162,7 @@ const convert_to_hiragana = (str = '', check = false) => {
             (char >= 'ぁ' && char <= 'ん') || allow_symbol.includes(char)
         );
         if (!hiragana_check) {
-            return 'ERROR';// TODO: 将来的に 'ERROR' ではなく null または例外に変更する
+            throw new Error('ひらがな以外の文字が含まれています');
         }
     }
     return hiragana;
@@ -238,7 +237,7 @@ const convert_to_email_address = (email_address = '') => {
  * @returns {boolean} 半角数字のみ含まれる場合はtrue、それ以外はfalse
  */
 const check_single_byte_numbers = (str = '') => {
-    if (typeof str !== 'string' && typeof str !== 'number') return false;
+    if ((typeof str !== 'string' && typeof str !== 'number') || str === null || str === undefined) return false;
     const number_pattern = /^[0-9]+$/;
     return number_pattern.test(String(str));
 };
