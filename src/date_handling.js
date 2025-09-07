@@ -29,7 +29,7 @@ const _dh_eraNames = ['明治', '大正', '昭和', '平成', '令和'];
  * 和暦の年を表す正規表現パターン
  * @constant {string} _dh_warekiYearPattern - 和暦の年を表す正規表現パターン
  */
-const _dh_warekiYearPattern = '(元|\\d{1,2})';
+const _dh_warekiYearPattern = '(元\\d{1,2}|\\d{1,2})';
 /**
  * 入力文字を全て大文字半角文字に変換する関数
  * @param {string} str 
@@ -60,7 +60,7 @@ const _dh_createDatePattern = (separators = [''], includeDay = true, includeInit
         _dh_assertString(template);
         if (typeof values !== 'object' || values === null) throw new Error('values must be an object');
         const applyTemplate = (template, values) => {
-            return template.replace(/{{(.*?)}}/g, (_, key) => values[key] || '');
+            return template.replace(/{{(.*?)}}/g, (_, key) => values[key] ?? '');
         };
         const filteredValues = { ...values };
         if (!includeDay) {
@@ -168,7 +168,7 @@ const _dh_patterns = {
  */
 const _dh_newDateMonth = (month) => month - 1;
 const _dh_isValidDate = (year, month, day) => {
-    const newDateMonth = _dh_newDateMonth(month)
+    const newDateMonth = _dh_newDateMonth(month);
     const date = new Date(year, newDateMonth, day);
     return date.getFullYear() === year && date.getMonth() === newDateMonth && date.getDate() === day;
 };
@@ -224,20 +224,24 @@ const _dh_date_string_split = (date_str) => {
     const convert_to_single_byte_numbers = (str = '') => {
         if (!str) return '';
         const convertKanjiNumerals = (str = '') => {
-            const kanjiDigits = { '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
-            const kanjiMultipliers = { '十': 10, '百': 100, '千': 1000 };
             const parseKanjiNumber = (kanji) => {
-                let total = 0, current = 0;
-                for (const char of kanji) {
-                    if (char in kanjiDigits) {
-                        current = kanjiDigits[char];
-                    } else if (char in kanjiMultipliers) {
+                const digits = { '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+                const multipliers = { '十': 10, '百': 100, '千': 1000, '万': 10000 };
+                let total = 0;
+                let current = 0;
+                let temp = 0;
+                for (let c = 0; c < kanji.length; c++) {
+                    const char = kanji[c];
+                    if (char in digits) {
+                        current = digits[char];
+                    } else if (char in multipliers) {
                         if (current === 0) current = 1;
-                        total += current * kanjiMultipliers[char];
+                        temp += current * multipliers[char];
                         current = 0;
                     }
                 }
-                return total + current;
+                total = temp + current;
+                return total;
             };
             return str.replace(/[〇一二三四五六七八九十百千]+/g, (match) => parseKanjiNumber(match));
         };
@@ -266,6 +270,8 @@ const _dh_date_string_split = (date_str) => {
         const eraStart = eraStartDates[eraName];
         const maxYear = maxYears[eraName];
         if (!eraStart || !Number.isInteger(eraYear) || eraYear < 1 || eraYear > maxYear) return 0;
+        if (month < 1 || month > 12) return 0;
+        if (day < 1 || day > 31) return 0;
         const convertedYear = eraStart.getFullYear() + (eraYear - 1);
         if (!_dh_isValidDate(convertedYear, month, day)) return 0;
         const convertedDate = new Date(convertedYear, _dh_newDateMonth(month), day);
@@ -346,7 +352,7 @@ const convert_to_anno_domini = (date_str) => {
     const month = Number(date_str_split.month);
     const day = Number(date_str_split.day);
     if (year && month && day && _dh_isValidDate(year, month, day)) {
-        return date_str_split.year + '-' + date_str_split.month + '-' + date_str_split.day;
+        return `${year}-${('0' + month).slice(-2)}-${('0' + day).slice(-2)}`;
     }
     return '';
 };
@@ -367,8 +373,8 @@ const convert_to_year_month = (date_str) => {
     const month = Number(date_str_split.month);
     if (year && month && _dh_isValidDate(year, month, 1)) {
         return {
-            char: date_str_split.year + '年' + date_str_split.month + '月',
-            jacsw: date_str_split.year + '/' + date_str_split.month
+            char: `${year}年${('0' + month).slice(-2)}月`,
+            jacsw: `${year}/${('0' + month).slice(-2)}`
         };
     }
     return nullReturn;
