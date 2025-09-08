@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_dh_)で始める
-// 元号改元時の対応: ERAS関数を定義しているところに新元号を追加してください。maxは終了する年がわからないため99と設定します
+// 元号改元時の対応: ERAS関数を定義しているところに新元号を追加してください。maxは終了する年がわからないため99と設定します。
 'use strict';
 /** 文字列が文字列型であることを確認する関数
  * @param {*} str - 確認する文字列
@@ -156,9 +156,9 @@ const _dh_patterns = {
 };
 /**
  * 年月日が有効な日付かどうかを厳密に判定する関数（うるう年対応）
- * @param {number} year
- * @param {number} month
- * @param {number} day
+ * @param {number} year 年
+ * @param {number} month 月
+ * @param {number} day 日
  * @returns {boolean}
  */
 const _dh_isValidDate = (year, month, day) => {
@@ -260,7 +260,7 @@ const _dh_date_string_split = (date_str) => {
         };
         str = convertKanjiNumerals(str);
         str = convertFullWidthDigits(str);
-        return str
+        return str;
     };
     const convertWarekiToSeireki = (eraName, eraYear, month, day) => {
         // eraNameは元号名またはイニシャルどちらでもOK
