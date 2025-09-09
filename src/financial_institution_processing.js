@@ -242,53 +242,51 @@
      * @property {string|null} bank_name - 銀行名またはnull
      * @property {string|null} bank_name_kana - 銀行名（カナ）またはnull
      */
-    const _fi_get_bank_info = (bank_char) => {
+    const _fi_get_bank_info = (bank_char, callback) => {
         const bank_info_null = {
             'bank_number': null,
             'bank_name': null,
             'bank_name_kana': null
         };
-        if (typeof bank_char !== 'string' || bank_char.length === 0) return bank_info_null;
+        if (typeof bank_char !== 'string' || bank_char.length === 0) return callback(bank_info_null);
         const bank_char_sbn = Number(_fi_convert_to_single_byte_numbers(bank_char));
-        let bank_info = bank_info_null;
-        try {
-            if (bank_char_sbn >= 0 && bank_char_sbn <= 9999) {
-                const bank_number_temp = '0000' + String(bank_char_sbn);
-                const bank_number = bank_number_temp.slice(-4);
-                $.ajax({
-                    'url': 'https://bank.teraren.com/banks/' + bank_number + '.json',
-                    'dataType': 'json',
-                    'async': false,
-                    'success': (success) =>{
-                        bank_info.bank_number = success.code;
-                        bank_info.bank_name = success.normalize.name;
-                        bank_info.bank_name_kana = _fi_convert_to_account_holder(success.kana, false);
-                    },
-                    'error': () => {
-                        bank_info = bank_info_null;
-                    }
-                });
-                return bank_info;
-            }
+        if (bank_char_sbn >= 0 && bank_char_sbn <= 9999) {
+            const bank_number_temp = '0000' + String(bank_char_sbn);
+            const bank_number = bank_number_temp.slice(-4);
             $.ajax({
-                'url': 'https://bank.teraren.com/banks/search.json?name=' + bank_char,
+                'url': 'https://bank.teraren.com/banks/' + bank_number + '.json',
                 'dataType': 'json',
-                'async': false,
                 'success': (success) => {
-                    if (success.length === 1) {
-                        bank_info.bank_number = success[0].code;
-                        bank_info.bank_name = success[0].normalize.name;
-                        bank_info.bank_name_kana = _fi_convert_to_account_holder(success[0].kana, false);
-                    }
+                    callback({
+                        bank_number: success.code,
+                        bank_name: success.normalize.name,
+                        bank_name_kana: _fi_convert_to_account_holder(success.kana, false)
+                    });
                 },
                 'error': () => {
-                    bank_info = bank_info_null;
+                    callback(bank_info_null);
                 }
             });
-        } catch (e) {
-            bank_info = bank_info_null;
+            return;
         }
-        return bank_info;
+        $.ajax({
+            'url': 'https://bank.teraren.com/banks/search.json?name=' + bank_char,
+            'dataType': 'json',
+            'success': (success) => {
+                if (success.length === 1) {
+                    callback({
+                        bank_number: success[0].code,
+                        bank_name: success[0].normalize.name,
+                        bank_name_kana: _fi_convert_to_account_holder(success[0].kana, false)
+                    });
+                } else {
+                    callback(bank_info_null);
+                }
+            },
+            'error': () => {
+                callback(bank_info_null);
+            }
+        });
     };
     $.bank_find = _fi_get_bank_info;
 
@@ -301,56 +299,55 @@
      * @property {string|null} bank_branch_name - 支店名またはnull
      * @property {string|null} bank_branch_name_kana - 支店名（カナ）またはnull
      */
-    const _fi_get_bank_branch_info = (bank_char, bank_branch_char) => {
+    const _fi_get_bank_branch_info = (bank_char, bank_branch_char, callback) => {
         const branch_info_null = {
             'bank_branch_number': null,
             'bank_branch_name': null,
             'bank_branch_name_kana': null
         };
-        if (typeof bank_char !== 'string' || bank_char.length === 0 || typeof bank_branch_char !== 'string' || bank_branch_char.length === 0) return branch_info_null;
+        if (typeof bank_char !== 'string' || bank_char.length === 0 || typeof bank_branch_char !== 'string' || bank_branch_char.length === 0) return callback(branch_info_null);
         const bank_char_sbn = _fi_convert_to_single_byte_numbers(bank_char);
-        const bank_info = _fi_get_bank_info(bank_char_sbn);
-        const bank_number = bank_info.bank_number;
-        const bank_branch_char_sbn = Number(_fi_convert_to_single_byte_numbers(bank_branch_char));
-        let branch_info = branch_info_null;
-        try {
+        _fi_get_bank_info(bank_char_sbn, function(bank_info) {
+            const bank_number = bank_info.bank_number;
+            const bank_branch_char_sbn = Number(_fi_convert_to_single_byte_numbers(bank_branch_char));
             if ((bank_branch_char_sbn >= 0) && (bank_branch_char_sbn <= 999)) {
                 const bank_branch_number_temp = '000' + String(bank_branch_char_sbn);
                 const bank_branch_number = bank_branch_number_temp.slice(-3);
                 $.ajax({
                     'url': 'https://bank.teraren.com/banks/' + bank_number + '/branches/' + bank_branch_number + '.json',
                     'dataType': 'json',
-                    'async': false,
                     'success': (success) => {
-                        branch_info.bank_branch_number = success.code;
-                        branch_info.bank_branch_name = success.normalize.name;
-                        branch_info.bank_branch_name_kana = _fi_convert_to_account_holder(success.kana, false);
+                        callback({
+                            bank_branch_number: success.code,
+                            bank_branch_name: success.normalize.name,
+                            bank_branch_name_kana: _fi_convert_to_account_holder(success.kana, false)
+                        });
                     },
                     'error': () => {
-                        branch_info = branch_info_null;
+                        callback(branch_info_null);
                     }
                 });
-                return branch_info;
+                return;
             }
             $.ajax({
                 'url': 'https://bank.teraren.com/banks/' + bank_number + '/branches/search.json?name=' + bank_branch_char,
                 'dataType': 'json',
-                'async': false,
                 'success': (success) => {
                     if (success.length === 1) {
-                        branch_info.bank_branch_number = success[0].code;
-                        branch_info.bank_branch_name = success[0].normalize.name;
-                        branch_info.bank_branch_name_kana = _fi_convert_to_account_holder(success[0].kana, false);
+                        callback({
+                            bank_branch_number: success[0].code,
+                            bank_branch_name: success[0].normalize.name,
+                            bank_branch_name_kana: _fi_convert_to_account_holder(success[0].kana, false)
+                        });
+                    } else {
+                        callback(branch_info_null);
                     }
                 },
                 'error': () => {
-                    branch_info = branch_info_null;
+                    callback(branch_info_null);
                 }
             });
-        } catch (e) {
-            branch_info = branch_info_null;
-        }
-        return branch_info;
+        });
     };
     $.bank_branch_find = _fi_get_bank_branch_info;
 
@@ -383,7 +380,7 @@
      * @property {string|null} deposit_type - 預金種目（当座・普通）またはnull
      * @property {string|null} bank_account_number - 銀行口座番号（7桁）またはnull
      */
-    const _fi_convert_japan_post_account_to_bank_account = (symbol_char, number_char) => {
+    const _fi_convert_japan_post_account_to_bank_account = (symbol_char, number_char, callback) => {
         const convert_info_null = {
             'symbol': null,
             'number': null,
@@ -397,8 +394,8 @@
             'bank_account_number': null
         };
         if (typeof symbol_char !== 'string' || symbol_char.length === 0 || typeof number_char !== 'string' || number_char.length === 0) {
-            return convert_info_null;
-        }        
+            return callback(convert_info_null);
+        }
         const symbol_char_sbn = _fi_convert_to_single_byte_numbers(symbol_char);
         const symbol_temp = '00000' + symbol_char_sbn;
         const symbol = symbol_temp.slice(-5);
@@ -427,23 +424,28 @@
                 bank_account_number = number.substring(0, 7);
                 break;
         }
-        let convert_info = convert_info_null;
         if (number && bank_branch_number && deposit_type && bank_account_number) {
-            const branch_info = _fi_get_bank_branch_info('9900', bank_branch_number);
-            if (branch_info.bank_branch_number) {
-                convert_info.symbol = symbol;
-                convert_info.number = number;
-                convert_info.bank_number = '9900';
-                convert_info.bank_name = 'ゆうちょ銀行';
-                convert_info.bank_name_kana = 'ﾕｳﾁﾖ';
-                convert_info.bank_branch_number = branch_info.bank_branch_number;
-                convert_info.bank_branch_name = branch_info.bank_branch_name;
-                convert_info.bank_branch_name_kana = branch_info.bank_branch_name_kana;
-                convert_info.deposit_type = deposit_type;
-                convert_info.bank_account_number = bank_account_number;
-            }
+            _fi_get_bank_branch_info('9900', bank_branch_number, function(branch_info) {
+                if (branch_info.bank_branch_number) {
+                    callback({
+                        symbol: symbol,
+                        number: number,
+                        bank_number: '9900',
+                        bank_name: 'ゆうちょ銀行',
+                        bank_name_kana: 'ﾕｳﾁﾖ',
+                        bank_branch_number: branch_info.bank_branch_number,
+                        bank_branch_name: branch_info.bank_branch_name,
+                        bank_branch_name_kana: branch_info.bank_branch_name_kana,
+                        deposit_type: deposit_type,
+                        bank_account_number: bank_account_number
+                    });
+                } else {
+                    callback(convert_info_null);
+                }
+            });
+        } else {
+            callback(convert_info_null);
         }
-        return convert_info;
     };
     $.convert_japan_post_account_to_bank_account = _fi_convert_japan_post_account_to_bank_account;
 
