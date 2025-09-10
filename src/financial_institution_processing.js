@@ -463,35 +463,31 @@
                 bank_account_number = number.substring(0, 7);
                 break;
         }
-        if (number && bank_branch_number && deposit_type && bank_account_number) {
-            _fi_get_bank_branch_info('9900', bank_branch_number, (branch_info) => {
-                const bank_branch_number = branch_info.bank_branch_number;
-                if (!bank_branch_number) {
-                    if (failureCallback) failureCallback(new Error('ゆうちょ記号が未入力です'));
-                    return;
-                }
-                if (branch_info.bank_branch_number) {
-                    successCallback({
-                        symbol: symbol,
-                        number: number,
-                        bank_number: '9900',
-                        bank_name: 'ゆうちょ銀行',
-                        bank_name_kana: 'ﾕｳﾁﾖ',
-                        bank_branch_number: branch_info.bank_branch_number,
-                        bank_branch_name: branch_info.bank_branch_name,
-                        bank_branch_name_kana: branch_info.bank_branch_name_kana,
-                        deposit_type: deposit_type,
-                        bank_account_number: bank_account_number
-                    });
-                } else {
-                    if (failureCallback) failureCallback(new Error('ゆうちょ記号からゆうちょ支店情報に変換できませんでした'));
-                }
-            }, (error) => {
-                if (failureCallback) failureCallback(error || new Error(error.message));
-            });
-        } else {
-            if (failureCallback) failureCallback(new Error('ゆうちょ記号・番号の変換ができませんでした'));
-        }
+        _fi_get_bank_branch_info('9900', bank_branch_number, (branch_info) => {
+            const bank_branch_number = branch_info.bank_branch_number;
+            if (!bank_branch_number) {
+                if (failureCallback) failureCallback(new Error('ゆうちょ記号が未入力です'));
+                return;
+            }
+            if (branch_info.bank_branch_number) {
+                successCallback({
+                    symbol: symbol,
+                    number: number,
+                    bank_number: '9900',
+                    bank_name: 'ゆうちょ銀行',
+                    bank_name_kana: 'ﾕｳﾁﾖ',
+                    bank_branch_number: branch_info.bank_branch_number,
+                    bank_branch_name: branch_info.bank_branch_name,
+                    bank_branch_name_kana: branch_info.bank_branch_name_kana,
+                    deposit_type: deposit_type,
+                    bank_account_number: bank_account_number
+                });
+            } else {
+                if (failureCallback) failureCallback(new Error('ゆうちょ記号からゆうちょ支店情報に変換できませんでした'));
+            }
+        }, (error) => {
+            if (failureCallback) failureCallback(error || new Error(error.message));
+        });
     };
     $.convert_japan_post_account_to_bank_account = _fi_convert_japan_post_account_to_bank_account;
 
