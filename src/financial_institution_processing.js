@@ -271,15 +271,11 @@
                 'url': 'https://bank.teraren.com/banks/' + bank_number + '.json',
                 'dataType': 'json',
                 'success': (success) => {
-                    if (success.length === 1) {
-                        successCallback({
-                            bank_number: success.code,
-                            bank_name: success.normalize.name,
-                            bank_name_kana: _fi_convert_to_account_holder(success.kana, false)
-                        });
-                    } else {
-                        if (failureCallback) failureCallback(new Error('銀行を特定できません'));
-                    }
+                    successCallback({
+                        bank_number: success.code,
+                        bank_name: success.normalize.name,
+                        bank_name_kana: _fi_convert_to_account_holder(success.kana, false)
+                    });
                 },
                 'error': (xhr, status, err) => {
                     if (failureCallback) failureCallback(new Error('銀行が見つかりません'));
@@ -353,15 +349,11 @@
                     'url': 'https://bank.teraren.com/banks/' + bank_number + '/branches/' + bank_branch_number + '.json',
                     'dataType': 'json',
                     'success': (success) => {
-                        if (success.length === 1) {
-                            successCallback({
-                                bank_branch_number: success.code,
-                                bank_branch_name: success.normalize.name,
-                                bank_branch_name_kana: _fi_convert_to_account_holder(success.kana, false)
-                            });
-                        } else {
-                            if (failureCallback) failureCallback(new Error('支店を特定できません'));
-                        }
+                        successCallback({
+                            bank_branch_number: success.code,
+                            bank_branch_name: success.normalize.name,
+                            bank_branch_name_kana: _fi_convert_to_account_holder(success.kana, false)
+                        });
                     },
                     'error': (xhr, status, err) => {
                         if (failureCallback) failureCallback(new Error('支店番号での取得に失敗しました'));
