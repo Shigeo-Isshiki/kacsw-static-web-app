@@ -235,20 +235,34 @@
     };
 
     /**
-     * 銀行番号または銀行名から銀行情報（銀行番号・銀行名・銀行名（カナ））を取得する関数
-     * @param {string} bank_char - 銀行番号または銀行名
-     * @returns {Object} 銀行情報オブジェクト
-     * @property {string|null} bank_number - 銀行番号（4桁）またはnull
-     * @property {string|null} bank_name - 銀行名またはnull
-     * @property {string|null} bank_name_kana - 銀行名（カナ）またはnull
+     * 銀行番号または銀行名から銀行情報を取得します。
+     * kintone API風のコールバック構文（成功・失敗分離）です。
+     *
+     * @param {string} bank_char - 銀行番号（4桁）または銀行名（部分一致可）
+     * @param {function(Object)} successCallback - 正常時に呼ばれるコールバック。
+     *   result: {
+     *     bank_number: string,   // 銀行番号（4桁）
+     *     bank_name: string,     // 銀行名
+     *     bank_name_kana: string // 銀行名（カナ・半角）
+     *   }
+     * @param {function(Error)} failureCallback - エラー時に呼ばれるコールバック。
+     *   error: Errorオブジェクト（messageにエラー内容）
+     *
+     * @example
+     * $.bank_find('0001',
+     *   (result) => {
+     *     // 正常時処理 result.bank_name など
+     *   },
+     *   (error) => {
+     *     // エラー時処理 error.message など
+     *   }
+     * );
      */
-    const _fi_get_bank_info = (bank_char, callback) => {
-        const bank_info_null = {
-            'bank_number': null,
-            'bank_name': null,
-            'bank_name_kana': null
-        };
-        if (typeof bank_char !== 'string' || bank_char.length === 0) return callback(bank_info_null);
+    const _fi_get_bank_info = (bank_char, successCallback, failureCallback) => {
+        if (typeof bank_char !== 'string' || bank_char.length === 0) {
+            if (failureCallback) failureCallback(new Error('銀行番号または銀行名が未入力です'));
+            return;
+        }
         const bank_char_sbn = Number(_fi_convert_to_single_byte_numbers(bank_char));
         if (bank_char_sbn >= 0 && bank_char_sbn <= 9999) {
             const bank_number_temp = '0000' + String(bank_char_sbn);
@@ -257,14 +271,18 @@
                 'url': 'https://bank.teraren.com/banks/' + bank_number + '.json',
                 'dataType': 'json',
                 'success': (success) => {
-                    callback({
-                        bank_number: success.code,
-                        bank_name: success.normalize.name,
-                        bank_name_kana: _fi_convert_to_account_holder(success.kana, false)
-                    });
+                    if (success.length === 1) {
+                        successCallback({
+                            bank_number: success.code,
+                            bank_name: success.normalize.name,
+                            bank_name_kana: _fi_convert_to_account_holder(success.kana, false)
+                        });
+                    } else {
+                        if (failureCallback) failureCallback(new Error('銀行を特定できません'));
+                    }
                 },
-                'error': () => {
-                    callback(bank_info_null);
+                'error': (xhr, status, err) => {
+                    if (failureCallback) failureCallback(new Error('銀行が見つかりません'));
                 }
             });
             return;
@@ -274,41 +292,59 @@
             'dataType': 'json',
             'success': (success) => {
                 if (success.length === 1) {
-                    callback({
+                    successCallback({
                         bank_number: success[0].code,
                         bank_name: success[0].normalize.name,
                         bank_name_kana: _fi_convert_to_account_holder(success[0].kana, false)
                     });
                 } else {
-                    callback(bank_info_null);
+                    if (failureCallback) failureCallback(new Error('銀行を特定できません'));
                 }
             },
-            'error': () => {
-                callback(bank_info_null);
+            'error': (xhr, status, err) => {
+                if (failureCallback) failureCallback(new Error('銀行が見つかりません'));
             }
         });
     };
     $.bank_find = _fi_get_bank_info;
 
     /**
-     * 銀行番号、支店番号または支店名から銀行支店情報（支店番号・支店名・支店名（カナ））を取得する関数
-     * @param {string} bank_char - 銀行番号または銀行名
-     * @param {string} bank_branch_char - 支店番号または支店名
-     * @returns {Object} 銀行支店情報オブジェクト
-     * @property {string|null} bank_branch_number - 支店番号（3桁）またはnull
-     * @property {string|null} bank_branch_name - 支店名またはnull
-     * @property {string|null} bank_branch_name_kana - 支店名（カナ）またはnull
+     * 銀行番号・銀行名と支店番号・支店名から支店情報を取得します。
+     * kintone API風のコールバック構文（成功・失敗分離）です。
+     *
+     * @param {string} bank_char - 銀行番号（4桁）または銀行名
+     * @param {string} bank_branch_char - 支店番号（3桁）または支店名
+     * @param {function(Object)} successCallback - 正常時に呼ばれるコールバック。
+     *   result: {
+     *     bank_branch_number: string,   // 支店番号（3桁）
+     *     bank_branch_name: string,     // 支店名
+     *     bank_branch_name_kana: string // 支店名（カナ・半角）
+     *   }
+     * @param {function(Error)} failureCallback - エラー時に呼ばれるコールバック。
+     *   error: Errorオブジェクト（messageにエラー内容）
+     *
+     * @example
+     * $.bank_branch_find('0001', '001',
+     *   (result) => {
+     *     // 正常時処理 result.bank_branch_name など
+     *   },
+     *   (error) => {
+     *     // エラー時処理 error.message など
+     *   }
+     * );
      */
-    const _fi_get_bank_branch_info = (bank_char, bank_branch_char, callback) => {
-        const branch_info_null = {
-            'bank_branch_number': null,
-            'bank_branch_name': null,
-            'bank_branch_name_kana': null
-        };
-        if (typeof bank_char !== 'string' || bank_char.length === 0 || typeof bank_branch_char !== 'string' || bank_branch_char.length === 0) return callback(branch_info_null);
+    const _fi_get_bank_branch_info = (bank_char, bank_branch_char, successCallback, failureCallback) => {
+        if (typeof bank_char !== 'string' || bank_char.length === 0 || typeof bank_branch_char !== 'string' || bank_branch_char.length === 0) {
+            if (failureCallback) failureCallback(new Error('銀行番号、支店番号、支店名のいずれかが未入力です'));
+            return;
+        }
         const bank_char_sbn = _fi_convert_to_single_byte_numbers(bank_char);
-        _fi_get_bank_info(bank_char_sbn, function(bank_info) {
+        _fi_get_bank_info(bank_char_sbn, (bank_info) => {
             const bank_number = bank_info.bank_number;
+            if (!bank_number) {
+                if (failureCallback) failureCallback(new Error('銀行番号が未入力です'));
+                return;
+            }
             const bank_branch_char_sbn = Number(_fi_convert_to_single_byte_numbers(bank_branch_char));
             if ((bank_branch_char_sbn >= 0) && (bank_branch_char_sbn <= 999)) {
                 const bank_branch_number_temp = '000' + String(bank_branch_char_sbn);
@@ -317,14 +353,18 @@
                     'url': 'https://bank.teraren.com/banks/' + bank_number + '/branches/' + bank_branch_number + '.json',
                     'dataType': 'json',
                     'success': (success) => {
-                        callback({
-                            bank_branch_number: success.code,
-                            bank_branch_name: success.normalize.name,
-                            bank_branch_name_kana: _fi_convert_to_account_holder(success.kana, false)
-                        });
+                        if (success.length === 1) {
+                            successCallback({
+                                bank_branch_number: success.code,
+                                bank_branch_name: success.normalize.name,
+                                bank_branch_name_kana: _fi_convert_to_account_holder(success.kana, false)
+                            });
+                        } else {
+                            if (failureCallback) failureCallback(new Error('支店を特定できません'));
+                        }
                     },
-                    'error': () => {
-                        callback(branch_info_null);
+                    'error': (xhr, status, err) => {
+                        if (failureCallback) failureCallback(new Error('支店番号での取得に失敗しました'));
                     }
                 });
                 return;
@@ -334,19 +374,21 @@
                 'dataType': 'json',
                 'success': (success) => {
                     if (success.length === 1) {
-                        callback({
+                        successCallback({
                             bank_branch_number: success[0].code,
                             bank_branch_name: success[0].normalize.name,
                             bank_branch_name_kana: _fi_convert_to_account_holder(success[0].kana, false)
                         });
                     } else {
-                        callback(branch_info_null);
+                        if (failureCallback) failureCallback(new Error('該当する支店が見つかりません'));
                     }
                 },
-                'error': () => {
-                    callback(branch_info_null);
+                'error': (xhr, status, err) => {
+                    if (failureCallback) failureCallback(new Error('支店名での取得に失敗しました'));
                 }
             });
+        }, (error) => {
+            if (failureCallback) failureCallback(error || new Error('銀行が見つかりません'));
         });
     };
     $.bank_branch_find = _fi_get_bank_branch_info;
@@ -365,36 +407,41 @@
     $.bank_account_number = _fi_get_bank_account_number;
 
     /**
-     * ゆうちょ口座の記号番号から銀行名・支店名等に変換する関数
-     * @param {string} symbol_char - ゆうちょ口座記号
-     * @param {string} number_char - ゆうちょ口座番号
-     * @returns {Promise<Object>} ゆうちょ口座情報・銀行口座情報オブジェクト
-     * @property {string|null} symbol - ゆうちょ口座記号（5桁）またはnull
-     * @property {string|null} number - ゆうちょ口座番号（8桁以内）またはnull
-     * @property {string|null} bank_number - 銀行番号（4桁）またはnull
-     * @property {string|null} bank_name - 銀行名またはnull
-     * @property {string|null} bank_name_kana - 銀行名（カナ）またはnull
-     * @property {string|null} bank_branch_number - 支店番号（3桁）またはnull
-     * @property {string|null} bank_branch_name - 支店名またはnull
-     * @property {string|null} bank_branch_name_kana - 支店名（カナ）またはnull
-     * @property {string|null} deposit_type - 預金種目（当座・普通）またはnull
-     * @property {string|null} bank_account_number - 銀行口座番号（7桁）またはnull
+     * ゆうちょ口座の記号番号から銀行名・支店名・口座番号等に変換します。
+     * kintone API風のコールバック構文（成功・失敗分離）です。
+     *
+     * @param {string} symbol_char - ゆうちょ口座記号（5桁）
+     * @param {string} number_char - ゆうちょ口座番号（最大8桁）
+     * @param {function(Object)} successCallback - 正常時に呼ばれるコールバック。
+     *   result: {
+     *     symbol: string,                // ゆうちょ記号（5桁）
+     *     number: string,                // ゆうちょ番号（6～8桁）
+     *     bank_number: string,           // 銀行番号（4桁, ゆうちょは9900）
+     *     bank_name: string,             // 銀行名
+     *     bank_name_kana: string,        // 銀行名（カナ・半角）
+     *     bank_branch_number: string,    // 支店番号（3桁）
+     *     bank_branch_name: string,      // 支店名
+     *     bank_branch_name_kana: string, // 支店名（カナ・半角）
+     *     deposit_type: string,          // 預金種目（普通/当座）
+     *     bank_account_number: string    // 銀行口座番号（7桁）
+     *   }
+     * @param {function(Error)} failureCallback - エラー時に呼ばれるコールバック。
+     *   error: Errorオブジェクト（messageにエラー内容）
+     *
+     * @example
+     * $.convert_japan_post_account_to_bank_account('12345', '6789012',
+     *   (result) => {
+     *     // 正常時処理 result.bank_account_number など
+     *   },
+     *   (error) => {
+     *     // エラー時処理 error.message など
+     *   }
+     * );
      */
-    const _fi_convert_japan_post_account_to_bank_account = (symbol_char, number_char, callback) => {
-        const convert_info_null = {
-            'symbol': null,
-            'number': null,
-            'bank_number': null,
-            'bank_name': null,
-            'bank_name_kana': null,
-            'bank_branch_number': null,
-            'bank_branch_name': null,
-            'bank_branch_name_kana': null,
-            'deposit_type': null,
-            'bank_account_number': null
-        };
+    const _fi_convert_japan_post_account_to_bank_account = (symbol_char, number_char, successCallback, failureCallback) => {
         if (typeof symbol_char !== 'string' || symbol_char.length === 0 || typeof number_char !== 'string' || number_char.length === 0) {
-            return callback(convert_info_null);
+            if (failureCallback) failureCallback(new Error('ゆうちょ記号、ゆうちょ番号が未入力です'));
+            return;
         }
         const symbol_char_sbn = _fi_convert_to_single_byte_numbers(symbol_char);
         const symbol_temp = '00000' + symbol_char_sbn;
@@ -425,9 +472,14 @@
                 break;
         }
         if (number && bank_branch_number && deposit_type && bank_account_number) {
-            _fi_get_bank_branch_info('9900', bank_branch_number, function(branch_info) {
+            _fi_get_bank_branch_info('9900', bank_branch_number, (branch_info) => {
+                const bank_branch_number = branch_info.bank_branch_number;
+                if (!bank_branch_number) {
+                    if (failureCallback) failureCallback(new Error('ゆうちょ記号が未入力です'));
+                    return;
+                }
                 if (branch_info.bank_branch_number) {
-                    callback({
+                    successCallback({
                         symbol: symbol,
                         number: number,
                         bank_number: '9900',
@@ -440,11 +492,13 @@
                         bank_account_number: bank_account_number
                     });
                 } else {
-                    callback(convert_info_null);
+                    if (failureCallback) failureCallback(new Error('ゆうちょ記号からゆうちょ支店情報に変換できませんでした'));
                 }
+            }, (error) => {
+                if (failureCallback) failureCallback(error || new Error(error.message));
             });
         } else {
-            callback(convert_info_null);
+            if (failureCallback) failureCallback(new Error('ゆうちょ記号・番号の変換ができませんでした'));
         }
     };
     $.convert_japan_post_account_to_bank_account = _fi_convert_japan_post_account_to_bank_account;
