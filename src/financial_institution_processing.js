@@ -246,7 +246,7 @@
      *     bank_name_kana: string // 銀行名（カナ・半角）
      *   }
      * @param {function(Error)} failureCallback - エラー時に呼ばれるコールバック。
-     *   error: Errorオブジェクト（messageにエラー内容）
+     *   error: Errorオブジェクト（messageにエラー内容, typeプロパティでエラー種別を判別: 'logic'（ロジックエラー）または 'ajax'（通信エラー））
      *
      * @example
      * $.bank_find('0001',
@@ -254,13 +254,22 @@
      *     // 正常時処理 result.bank_name など
      *   },
      *   (error) => {
-     *     // エラー時処理 error.message など
+     *     // エラー時処理 error.message, error.type など
+     *     if (error.type === 'ajax') {
+     *       // 通信エラー時の処理
+     *     } else if (error.type === 'logic') {
+     *       // 入力値や該当なし等のロジックエラー時の処理
+     *     }
      *   }
      * );
      */
     const _fi_get_bank_info = (bank_char, successCallback, failureCallback) => {
         if (typeof bank_char !== 'string' || bank_char.length === 0) {
-            if (failureCallback) failureCallback(new Error('銀行番号または銀行名が未入力です'));
+            if (failureCallback) {
+                const err = new Error('銀行番号または銀行名が未入力です');
+                err.type = 'logic';
+                failureCallback(err);
+            }
             return;
         }
         const bank_char_sbn = Number(_fi_convert_to_single_byte_numbers(bank_char));
@@ -278,7 +287,12 @@
                     });
                 },
                 'error': (xhr, status, err) => {
-                    if (failureCallback) failureCallback(new Error('銀行が見つかりません'));
+                    if (failureCallback) {
+                        const error = new Error('銀行が見つかりません');
+                        error.type = 'ajax';
+                        failureCallback(error);
+                    }
+                    return;
                 }
             });
             return;
@@ -294,11 +308,21 @@
                         bank_name_kana: _fi_convert_to_account_holder(success[0].kana, false)
                     });
                 } else {
-                    if (failureCallback) failureCallback(new Error('銀行を特定できません'));
+                    if (failureCallback) {
+                        const err = new Error('銀行を特定できません');
+                        err.type = 'ajax';
+                        failureCallback(err);
+                    }
+                    return;
                 }
             },
             'error': (xhr, status, err) => {
-                if (failureCallback) failureCallback(new Error('銀行が見つかりません'));
+                if (failureCallback) {
+                    const error = new Error('銀行が見つかりません');
+                    error.type = 'ajax';
+                    failureCallback(error);
+                }
+                return;
             }
         });
     };
@@ -317,7 +341,7 @@
      *     bank_branch_name_kana: string // 支店名（カナ・半角）
      *   }
      * @param {function(Error)} failureCallback - エラー時に呼ばれるコールバック。
-     *   error: Errorオブジェクト（messageにエラー内容）
+     *   error: Errorオブジェクト（messageにエラー内容, typeプロパティでエラー種別を判別: 'logic'（ロジックエラー）または 'ajax'（通信エラー））
      *
      * @example
      * $.bank_branch_find('0001', '001',
@@ -325,20 +349,33 @@
      *     // 正常時処理 result.bank_branch_name など
      *   },
      *   (error) => {
-     *     // エラー時処理 error.message など
+     *     // エラー時処理 error.message, error.type など
+     *     if (error.type === 'ajax') {
+     *       // 通信エラー時の処理
+     *     } else if (error.type === 'logic') {
+     *       // 入力値や該当なし等のロジックエラー時の処理
+     *     }
      *   }
      * );
      */
     const _fi_get_bank_branch_info = (bank_char, bank_branch_char, successCallback, failureCallback) => {
         if (typeof bank_char !== 'string' || bank_char.length === 0 || typeof bank_branch_char !== 'string' || bank_branch_char.length === 0) {
-            if (failureCallback) failureCallback(new Error('銀行番号、支店番号、支店名のいずれかが未入力です'));
+            if (failureCallback) {
+                const err = new Error('銀行番号、支店番号、支店名のいずれかが未入力です');
+                err.type = 'logic';
+                failureCallback(err);
+            }
             return;
         }
         const bank_char_sbn = _fi_convert_to_single_byte_numbers(bank_char);
         _fi_get_bank_info(bank_char_sbn, (bank_info) => {
             const bank_number = bank_info.bank_number;
             if (!bank_number) {
-                if (failureCallback) failureCallback(new Error('銀行番号が未入力です'));
+                if (failureCallback) {
+                    const err = new Error('銀行番号が未入力です');
+                    err.type = 'ajax';
+                    failureCallback(err);
+                }
                 return;
             }
             const bank_branch_char_sbn = Number(_fi_convert_to_single_byte_numbers(bank_branch_char));
@@ -356,7 +393,12 @@
                         });
                     },
                     'error': (xhr, status, err) => {
-                        if (failureCallback) failureCallback(new Error('支店番号での取得に失敗しました'));
+                        if (failureCallback) {
+                            const error = new Error('支店番号での取得に失敗しました');
+                            error.type = 'ajax';
+                            failureCallback(error);
+                        }
+                        return;
                     }
                 });
                 return;
@@ -372,15 +414,29 @@
                             bank_branch_name_kana: _fi_convert_to_account_holder(success[0].kana, false)
                         });
                     } else {
-                        if (failureCallback) failureCallback(new Error('該当する支店が見つかりません'));
+                        if (failureCallback) {
+                            const err = new Error('該当する支店が見つかりません');
+                            err.type = 'ajax';
+                            failureCallback(err);
+                        }
+                        return;
                     }
                 },
                 'error': (xhr, status, err) => {
-                    if (failureCallback) failureCallback(new Error('支店名での取得に失敗しました'));
+                    if (failureCallback) {
+                        const error = new Error('支店名での取得に失敗しました');
+                        error.type = 'ajax';
+                        failureCallback(error);
+                    }
+                    return;
                 }
             });
         }, (error) => {
-            if (failureCallback) failureCallback(error || new Error('銀行が見つかりません'));
+            if (failureCallback) {
+                if (error && !error.type) error.type = 'ajax';
+                failureCallback(error || (() => { const err = new Error('銀行が見つかりません'); err.type = 'ajax'; return err; })());
+            }
+            return;
         });
     };
     $.bank_branch_find = _fi_get_bank_branch_info;
@@ -418,7 +474,7 @@
      *     bank_account_number: string    // 銀行口座番号（7桁）
      *   }
      * @param {function(Error)} failureCallback - エラー時に呼ばれるコールバック。
-     *   error: Errorオブジェクト（messageにエラー内容）
+     *   error: Errorオブジェクト（messageにエラー内容, typeプロパティでエラー種別を判別: 'logic'（ロジックエラー）または 'ajax'（通信エラー））
      *
      * @example
      * $.convert_japan_post_account_to_bank_account('12345', '6789012',
@@ -426,13 +482,22 @@
      *     // 正常時処理 result.bank_account_number など
      *   },
      *   (error) => {
-     *     // エラー時処理 error.message など
+     *     // エラー時処理 error.message, error.type など
+     *     if (error.type === 'ajax') {
+     *       // 通信エラー時の処理
+     *     } else if (error.type === 'logic') {
+     *       // 入力値や該当なし等のロジックエラー時の処理
+     *     }
      *   }
      * );
      */
     const _fi_convert_japan_post_account_to_bank_account = (symbol_char, number_char, successCallback, failureCallback) => {
         if (typeof symbol_char !== 'string' || symbol_char.length === 0 || typeof number_char !== 'string' || number_char.length === 0) {
-            if (failureCallback) failureCallback(new Error('ゆうちょ記号、ゆうちょ番号が未入力です'));
+            if (failureCallback) {
+                const err = new Error('ゆうちょ記号、ゆうちょ番号が未入力です');
+                err.type = 'logic';
+                failureCallback(err);
+            }
             return;
         }
         const symbol_char_sbn = _fi_convert_to_single_byte_numbers(symbol_char);
@@ -467,7 +532,11 @@
             _fi_get_bank_branch_info('9900', bank_branch_number, (branch_info) => {
                 const bank_branch_number = branch_info.bank_branch_number;
                 if (!bank_branch_number) {
-                    if (failureCallback) failureCallback(new Error('ゆうちょ記号が未入力です'));
+                    if (failureCallback) {
+                        const err = new Error('ゆうちょ記号が未入力です');
+                        err.type = 'ajax';
+                        failureCallback(err);
+                    }
                     return;
                 }
                 if (branch_info.bank_branch_number) {
@@ -484,13 +553,28 @@
                         bank_account_number: bank_account_number
                     });
                 } else {
-                    if (failureCallback) failureCallback(new Error('ゆうちょ記号からゆうちょ支店情報に変換できませんでした'));
+                    if (failureCallback) {
+                        const err = new Error('ゆうちょ記号からゆうちょ支店情報に変換できませんでした');
+                        err.type = 'ajax';
+                        failureCallback(err);
+                    }
+                    return;
                 }
             }, (error) => {
-                if (failureCallback) failureCallback(error || new Error(error.message));
+                if (failureCallback) {
+                    // error.typeがなければajaxとみなす
+                    if (error && !error.type) error.type = 'ajax';
+                    failureCallback(error || (() => { const err = new Error('支店情報取得時に不明なエラー'); err.type = 'ajax'; return err; })());
+                }
+                return;
             });
         } else {
-            if (failureCallback) failureCallback(new Error('ゆうちょ記号・番号の変換ができませんでした'));
+            if (failureCallback) {
+                const err = new Error('ゆうちょ記号・番号の変換ができませんでした');
+                err.type = 'logic';
+                failureCallback(err);
+            }
+            return;
         }
     };
     $.convert_japan_post_account_to_bank_account = _fi_convert_japan_post_account_to_bank_account;
