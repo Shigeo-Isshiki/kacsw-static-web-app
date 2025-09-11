@@ -3,8 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_fi_)で始める
-// この処理プログラムを使用する場合は、luxon、national_holiday_handling.jsを合わせて読み込む必要があります
-// リソースの読み込み制限を行っている場合は、fetch通信のhttps://bank.teraren.com/を許可する必要があります
+// リソースの読み込み制限を行っている場合は、fetch通信のhttps://bank.teraren.com/とhttps://api.national-holidays.jp/を許可する必要があります
 'use strict';
 // --- 変換用定数・マッピング ---
 /** 全角カナ変換マッピング @type {Object} */
@@ -232,6 +231,30 @@ const _fi_is_zengin_allowed_chars = (char) => {
     const zenginReg = /^[0-9A-Z !"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~｡｢｣､･\uFF61-\uFF9F]+$/;
     return zenginReg.test(char);
 };
+/**
+ * 国民の祝日・休日を取得する関数（コールバック型・非同期）
+ * @param {string} date_char - ISO 8601拡張形式の西暦表記（YYYY-MM-DD）の文字列
+ * @param {function(string|null):void} callback - 祝日名（なければnull）を返すコールバック
+ */
+const _fi_is_national_holiday = (date_char, callback) => {
+    if (!date_char) return callback(null);
+    const year_char = date_char.slice(0, 4);
+    if (date_char < '1948-07-20') return callback(null);
+    fetch('https://api.national-holidays.jp/' + year_char)
+        .then(res => res.ok ? res.json() : [])
+        .then(holidays => {
+            if (Array.isArray(holidays)) {
+                for (const row of holidays) {
+                    if (date_char === row.date) {
+                        callback(row.name);
+                        return;
+                    }
+                }
+            }
+            callback(null);
+        })
+        .catch(() => callback(null));
+};
 
 /**
  * 銀行番号または銀行名から銀行情報を取得します。
@@ -262,7 +285,7 @@ const _fi_is_zengin_allowed_chars = (char) => {
  *   }
  * );
  */
-const findBank = function(bank_char, successCallback, failureCallback) {
+const findBank = (bank_char, successCallback, failureCallback) => {
     if (typeof bank_char !== 'string' || bank_char.length === 0) {
         if (failureCallback) {
             const err = new Error('銀行番号または銀行名が未入力です');
@@ -359,7 +382,7 @@ const findBank = function(bank_char, successCallback, failureCallback) {
  *   }
  * );
  */
-const findBankBranch = function(bank_char, bank_branch_char, successCallback, failureCallback) {
+const findBankBranch = (bank_char, bank_branch_char, successCallback, failureCallback) => {
     if (typeof bank_char !== 'string' || bank_char.length === 0 || typeof bank_branch_char !== 'string' || bank_branch_char.length === 0) {
         if (failureCallback) {
             const err = new Error('銀行番号、支店番号、支店名のいずれかが未入力です');
@@ -398,7 +421,7 @@ const findBankBranch = function(bank_char, bank_branch_char, successCallback, fa
                 .catch(err => {
                     if (failureCallback) {
                         if (err.message === 'Failed to fetch') {
-                            err.message = '支店情報サーバーに接続できません。インターネット接続やファイアウォール、プロキシ設定、またはサーバー側の障害をご確認ください。';
+                            err.message = '支店が見つかりません';
                         }
                         err.type = 'ajax';
                         failureCallback(err);
@@ -448,7 +471,7 @@ const findBankBranch = function(bank_char, bank_branch_char, successCallback, fa
  * @param {string} bank_account_char - 銀行口座番号
  * @returns {string|null} 銀行口座番号（7桁）またはnull
  */
-const formatBankAccountNumber = function(bank_account_char) {
+const formatBankAccountNumber = (bank_account_char) => {
     if (typeof bank_account_char !== 'string' || bank_account_char.length === 0) return null;
     const bank_account_number_temp = '0000000' + _fi_convert_to_single_byte_numbers(bank_account_char);
     const bank_account_number = bank_account_number_temp.slice(-7);
@@ -492,7 +515,7 @@ const formatBankAccountNumber = function(bank_account_char) {
  *   }
  * );
  */
-const convertJapanPostAccount = function(symbol_char, number_char, successCallback, failureCallback) {
+const convertJapanPostAccount = (symbol_char, number_char, successCallback, failureCallback) => {
     if (typeof symbol_char !== 'string' || symbol_char.length === 0 || typeof number_char !== 'string' || number_char.length === 0) {
         if (failureCallback) {
             const err = new Error('ゆうちょ記号、ゆうちょ番号が未入力です');
@@ -588,7 +611,7 @@ const convertJapanPostAccount = function(symbol_char, number_char, successCallba
  * @param {boolean} [acronym_sw=true] - 口座名義人を略語にする処理の有無（trueがあり、falseがなし）
  * @returns {string} 半角カナに変換した口座名義人
  */
-const convertAccountHolderKana = function(char, acronym_sw = true) {
+const convertAccountHolderKana = (char, acronym_sw = true) => {
     if (typeof char !== 'string' || char.length === 0) return null;
     const acronym_replace = (char, list, regexp_char, position_sw) => {
         if (char) {
@@ -658,51 +681,74 @@ const convertAccountHolderKana = function(char, acronym_sw = true) {
 };
 
 /**
- * 振込指定日を確認する関数
- * @param {string} Designate_transfer_date - 振込指定日（kintoneの日付形式）
- * @param {boolean} today_sw - 今日との比較で振込指定日が問題ないか確認したい場合 = true
- * @returns {boolean} - 振込指定日として指定できる日 = true、 振込指定日として指定できない日 = false
+ * 振込指定日が有効かどうかを判定する関数（コールバック型・非同期）
+ * @param {string} Designate_transfer_date - 振込指定日（ISO形式: 'YYYY-MM-DD' など）
+ * @param {boolean} today_sw - trueの場合、今日以降14日以内かつ平日・営業日かを判定
+ * @param {function(boolean):void} callback - 判定結果（有効:true/無効:false）を返すコールバック
  */
-const isValidTransferDate = function(Designate_transfer_date, today_sw = false) {
-    if (typeof Designate_transfer_date !== 'string' || Designate_transfer_date.length === 0) return false;
+const isValidTransferDate = (Designate_transfer_date, today_sw = false, callback) => {
+    if (typeof Designate_transfer_date !== 'string' || Designate_transfer_date.length === 0) return callback(false);
     let check_flag = true;
-    const check_date = luxon.DateTime.fromISO(Designate_transfer_date);
-    if (check_date) {
+    // ISO日付文字列をDateに変換
+    const check_date = new Date(Designate_transfer_date);
+    if (isNaN(check_date.getTime())) return callback(false);
+
+    // 今日の判定
+    const process = (skipHolidayCb) => {
         if (today_sw) {
-            let today = luxon.DateTime.local();
-            if (today.hour >= 18) {
-                today = today.plus({'days': 1}).startOf('day');
-            } else {
-                today = today.startOf('day');
+            let now = new Date();
+            let today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            // 18時以降は翌日扱い
+            if (now.getHours() >= 18) {
+                today.setDate(today.getDate() + 1);
             }
-            let reject_flag = false;
-            while (!reject_flag) {
-                reject_flag = $.national_holiday(today.toFormat('yyyy-MM-dd'));
-                if (!reject_flag) {
-                    today = today.plus({'days': 1}).startOf('day');
+            // 祝日をスキップ
+            const skipHoliday = (date, cb) => {
+                const ymd = date.toISOString().slice(0, 10);
+                _fi_is_national_holiday(ymd, (name) => {
+                    if (name) {
+                        date.setDate(date.getDate() + 1);
+                        skipHoliday(date, cb);
+                    } else {
+                        cb(date);
+                    }
+                });
+            };
+            skipHoliday(today, (validToday) => {
+                // check_dateとtodayの差（日数）
+                const diffDays = Math.floor((check_date - validToday) / (1000 * 60 * 60 * 24));
+                if (diffDays < 1 || diffDays >= 14) {
+                    check_flag = false;
                 }
-            }
-            const check_date_diff = check_date.diff(today, 'days').days;
-            if (check_date_diff < 1 || check_date_diff >= 14) {
+                skipHolidayCb();
+            });
+        } else {
+            skipHolidayCb();
+        }
+    };
+
+    // 曜日・祝日・年末年始判定
+    process(() => {
+        const weekday = check_date.getDay();
+        if (weekday === 0 || weekday === 6) {
+            check_flag = false;
+        }
+        const ymd = check_date.toISOString().slice(0, 10);
+        _fi_is_national_holiday(ymd, (name) => {
+            if (name) {
                 check_flag = false;
             }
-        }
-        switch (check_date.weekdayShort) {
-            case '土':
-            case '日':
+            // 1/1～1/3は不可
+            if (check_date.getMonth() === 0 && check_date.getDate() <= 3) {
                 check_flag = false;
-                break;
-        }
-        if ($.national_holiday(check_date.toFormat('yyyy-MM-dd'))) {
-            check_flag = false;
-        } else if (Number(check_date.toFormat('MM')) === 1 && Number(check_date.toFormat('dd')) <= 3) {
-            check_flag = false;
-        } else if (Number(check_date.toFormat('MM')) === 12 && Number(check_date.toFormat('dd')) === 31) {
-            check_flag = false;
-        }
-        return check_flag;
-    }
-    return false;
+            }
+            // 12/31は不可
+            if (check_date.getMonth() === 11 && check_date.getDate() === 31) {
+                check_flag = false;
+            }
+            callback(check_flag);
+        });
+    });
 };
 
 /**
@@ -710,7 +756,7 @@ const isValidTransferDate = function(Designate_transfer_date, today_sw = false) 
  * @param {string} char - 文字列
  * @returns {number|null} - バイト数、文字列がない場合はnull
  */
-const getByteLength = function(char) {
+const getByteLength = (char) => {
     if (typeof char !== 'string' || char.length === 0) return null;
     if (!_fi_is_zengin_allowed_chars(char)) return null;
     let bytes = 0;
@@ -736,7 +782,7 @@ const getByteLength = function(char) {
  * @param {number} byte_length - 切り取りたいバイト数
  * @returns {string|null} - 切り取った文字列、失敗した場合はnull
  */
-const sliceByByteLength = function(char, byte_length) {
+const sliceByByteLength = (char, byte_length) => {
     if (typeof char !== 'string' || char.length === 0 || typeof byte_length !== 'number' || byte_length < 1) return null;
     let result = '';
     let length = 0;
