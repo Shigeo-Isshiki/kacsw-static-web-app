@@ -3,8 +3,47 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_fi_)で始める
-// リソースの読み込み制限を行っている場合は、fetch通信のhttps://bank.teraren.com/とhttps://api.national-holidays.jp/を許可する必要があります
+// リソースの読み込み制限を行っている場合は、fetch通信を下記のURLに対して許可する必要があります
+// https://bank.teraren.com
+// https://api.national-holidays.jp
 'use strict';
+// --- 外部APIエンドポイント定数 ---
+/** 銀行APIベースURL @type {string} */
+const _fi_BANK_API_BASE_URL = 'https://bank.teraren.com';
+/** 祝日APIベースURL @type {string} */
+const _fi_HOLIDAY_API_BASE_URL = 'https://api.national-holidays.jp';
+/**
+ * 金融機関処理用の統一エラークラス
+ * @extends {Error}
+ */
+class _fi_FinancialInstitutionError extends Error {
+    /**
+     * @param {string} message エラーメッセージ
+     * @param {'logic'|'ajax'|'validation'|'unknown'} type エラー種別
+     */
+    constructor(message, type = 'unknown') {
+        super(message);
+        this.name = 'FinancialInstitutionError';
+        this.type = type;
+    }
+}
+// --- Magic Number 定数 ---
+const _fi_BANK_CODE_LENGTH = 4;
+const _fi_BRANCH_CODE_LENGTH = 3;
+const _fi_ACCOUNT_NUMBER_LENGTH = 7;
+const _fi_JAPAN_POST_SYMBOL_LENGTH = 5;
+const _fi_JAPAN_POST_NUMBER_MAX_LENGTH = 8;
+const _fi_TRANSFER_DATE_MIN_DAYS = 1;
+const _fi_TRANSFER_DATE_MAX_DAYS = 14;
+const _fi_DEPOSIT_TYPE_TOZA = '0';
+const _fi_DEPOSIT_TYPE_FUTSU = '1';
+const _fi_CUTOFF_HOUR_FOR_NEXT_DAY = 18;
+const _fi_SUNDAY = 0;
+const _fi_SATURDAY = 6;
+const _fi_JANUARY = 0;
+const _fi_DECEMBER = 11;
+const _fi_NEW_YEAR_EVE = 31;
+const _fi_NEW_YEAR_DAYS = [1, 2, 3];
 // --- 変換用定数・マッピング ---
 /** 全角カナ変換マッピング @type {Object} */
 const _fi_FULL_WIDTH_KANA_LIST = {
@@ -148,52 +187,73 @@ const _fi_BUSINESS_LIST = {
 /** 事業用正規表現 @type {RegExp} */
 const _fi_BUSINESS_LIST_REG = new RegExp('(' + Object.keys(_fi_BUSINESS_LIST).join('|') + ')', '');
 /**
- * 全角カナ、濁点・半濁点付きカナ、半角カナ、全角英数字を変換する関数
- * @param {string} char - 変換する文字列
- * @param {boolean} [hiragana_sw=true] - ひらがなをカタカナに変換するかどうかのフラグ（デフォルトはtrue）
- * @returns {string|null} - 変換後の文字列、または入力が無効な場合はnull
+ * 文字列を全角カナ（濁点・半濁点付き含む）に変換します。
+ * @function
+ * @param {string} inputStr 変換する文字列
+ * @param {boolean} [hiraganaSw=true] ひらがなをカタカナに変換するか（true:変換する/false:変換しない）
+ * @returns {string} 全角カナに変換された文字列
+ * @throws {Error} 変換対象が文字列でない場合
+ * @private
+ * @example
+ *   _fi_convert_to_full_width_kana('ﾀﾛｳ'); // => 'タロウ'
  */
-const _fi_convert_to_full_width_kana = (char, hiragana_sw = true) => {
-    if (!char) return null;
-    let full_width_kana = char;
-    if (hiragana_sw) {
-        full_width_kana = String(full_width_kana).replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 96));
+const _fi_convert_to_full_width_kana = (inputStr, hiraganaSw = true) => {
+    if (typeof inputStr !== 'string') throw new _fi_FinancialInstitutionError('変換する文字列は文字列である必要があります', 'logic');
+    let fullWidthKana = inputStr;
+    if (hiraganaSw) {
+        fullWidthKana = String(fullWidthKana).replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 96));
     }
-    full_width_kana = full_width_kana.replace(_fi_FULL_WIDTH_KANA_LIST_REG, (c) => _fi_FULL_WIDTH_KANA_LIST[c]);
-    full_width_kana = full_width_kana.replace(_fi_TURBIDITY_KANA_LIST_REG, (c) => _fi_TURBIDITY_KANA_LIST[c]);
-    return full_width_kana;
+    fullWidthKana = fullWidthKana.replace(_fi_FULL_WIDTH_KANA_LIST_REG, (c) => _fi_FULL_WIDTH_KANA_LIST[c]);
+    fullWidthKana = fullWidthKana.replace(_fi_TURBIDITY_KANA_LIST_REG, (c) => _fi_TURBIDITY_KANA_LIST[c]);
+    return fullWidthKana;
 };
 /**
- * 全角カナ、濁点・半濁点付きカナ、半角カナを変換する関数
- * @param {string} char - 変換する文字列
- * @returns {string|null} - 変換後の文字列、または入力が無効な場合はnull
+ * 文字列を半角カナに変換します。
+ * @function
+ * @param {string} inputStr 変換する文字列
+ * @returns {string} 半角カナに変換された文字列
+ * @throws {Error} 変換対象が文字列でない場合
+ * @private
+ * @example
+ *   _fi_convert_to_half_width_kana('タロウ'); // => 'ﾀﾛｳ'
  */
-const _fi_convert_to_half_width_kana = (char) => {
-    if (!char) return null;
-    const full_width_kana = _fi_convert_to_full_width_kana(char);
-    return full_width_kana.replace(_fi_HALF_WIDTH_KANA_LIST_REG, (c) => _fi_HALF_WIDTH_KANA_LIST[c]);
+const _fi_convert_to_half_width_kana = (inputStr) => {
+    if (typeof inputStr !== 'string') throw new _fi_FinancialInstitutionError('変換する文字列は文字列である必要があります', 'logic');
+    const fullWidthKana = _fi_convert_to_full_width_kana(inputStr);
+    return fullWidthKana.replace(_fi_HALF_WIDTH_KANA_LIST_REG, (c) => _fi_HALF_WIDTH_KANA_LIST[c]);
 };
 /**
- * 全角英数字、全角カナ、濁点・半濁点付きカナ、半角カナを変換する関数
- * @param {string} char - 変換する文字列
- * @returns {string|null} - 変換後の文字列、または入力が無効な場合はnull
+ * 文字列を半角英数字・半角カナ・記号に変換します。
+ * @function
+ * @param {string} inputStr 変換する文字列
+ * @returns {string} 半角英数字・半角カナ・記号に変換された文字列（大文字化）
+ * @throws {Error} 変換対象が文字列でない場合
+ * @private
+ * @example
+ *   _fi_convert_to_single_byte_characters('ＡＢＣ１２３'); // => 'ABC123'
  */
-const _fi_convert_to_single_byte_characters = (char) => {
-    if (!char) return null;
-    const hyphen_process = char.replace(/[\uFF0D\u2010\u2011\u2013\u2014\u2212\u30FC\u2015\uFF70]/g, '-');
-    const half_width_kana = _fi_convert_to_half_width_kana(hyphen_process);
-    const single_byte_characters = half_width_kana.replace(/[Ａ-Ｚａ-ｚ０-９！-～]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).toUpperCase();
-    return single_byte_characters;
+const _fi_convert_to_single_byte_characters = (inputStr) => {
+    if (typeof inputStr !== 'string') throw new _fi_FinancialInstitutionError('変換する文字列は文字列である必要があります', 'logic');
+    const hyphenProcess = inputStr.replace(/[\uFF0D\u2010\u2011\u2013\u2014\u2212\u30FC\u2015\uFF70]/g, '-');
+    const halfWidthKana = _fi_convert_to_half_width_kana(hyphenProcess);
+    const singleByteCharacters = halfWidthKana.replace(/[Ａ-Ｚａ-ｚ０-９！-～]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).toUpperCase();
+    return singleByteCharacters;
 };
 /**
- * 全角数字を半角数字に変換する関数
- * @param {string} str - 変換する文字列
- * @returns {string} - 変換後の文字列
+ * 全角数字や漢数字を半角数字に変換します。
+ * @function
+ * @param {string} inputStr 変換する文字列
+ * @returns {string} 半角数字に変換された文字列
+ * @throws {Error} 変換対象が文字列でない場合、または未入力の場合
+ * @private
+ * @example
+ *   _fi_convert_to_single_byte_numbers('１２３四五'); // => '12345'
  */
-const _fi_convert_to_single_byte_numbers = (str = '') => {
-    if (typeof str !== 'string' || str.length === 0) return '';
-    const convertKanjiNumerals = (str = '') => {
-        const parseKanjiNumber = (kanji) => {
+const _fi_convert_to_single_byte_numbers = (inputStr = '') => {
+    if (typeof inputStr !== 'string') throw new _fi_FinancialInstitutionError('変換する文字列は文字列である必要があります', 'logic');
+    if (inputStr.length === 0) throw new _fi_FinancialInstitutionError('変換対象の文字列が未入力です', 'logic');
+    const _fi_convertKanjiNumerals = (kanjiStr = '') => {
+        const _fi_parseKanjiNumber = (kanji) => {
             const digits = { '〇': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
             const multipliers = { '十': 10, '百': 100, '千': 1000, '万': 10000 };
             let current = 0;
@@ -210,428 +270,594 @@ const _fi_convert_to_single_byte_numbers = (str = '') => {
             }
             return temp + current;
         };
-        return str.replace(/[〇一二三四五六七八九十百千]+/g, (match) => parseKanjiNumber(match));
+        return kanjiStr.replace(/[〇一二三四五六七八九十百千]+/g, (match) => _fi_parseKanjiNumber(match));
     };
-    const convertFullWidthDigits = (str = '') => {
-        return str.replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xFEE0));
+    const _fi_convertFullWidthDigits = (numStr = '') => {
+        return numStr.replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xFEE0));
     };
-    str = convertKanjiNumerals(str);
-    str = convertFullWidthDigits(str);
-    return str;
+    let result = _fi_convertKanjiNumerals(inputStr);
+    result = _fi_convertFullWidthDigits(result);
+    return result;
+};
+// --- APIレスポンスバリデーション ---
+/**
+ * 銀行APIレスポンスのバリデーション（内部関数）
+ * @function
+ * @param {object} result APIレスポンス
+ * @throws {Error} 不正なレスポンスの場合
+ * @private
+ */
+const _fi_validateBankResponse = (result) => {
+    if (!result || typeof result.code !== 'string' || typeof result.normalize !== 'object' || typeof result.normalize.name !== 'string' || typeof result.kana !== 'string') {
+        throw new _fi_FinancialInstitutionError('APIレスポンスが不正です（銀行情報）', 'ajax');
+    }
 };
 /**
- * 全銀手順で許可される文字種のみ許可するバリデーション関数
- * @param {string} char - 入力文字列
- * @returns {boolean} - 許可される場合true、許可されない文字が含まれる場合false
+ * 銀行APIレスポンス（配列）のバリデーション（内部関数）
+ * @function
+ * @param {object[]} result APIレスポンス配列
+ * @throws {Error} 不正なレスポンスの場合
+ * @private
  */
-const _fi_is_zengin_allowed_chars = (char) => {
-    if (typeof char !== 'string') return false;
+const _fi_validateBankArrayResponse = (result) => {
+    if (!Array.isArray(result) || result.length === 0 || !result.every(row => typeof row.code === 'string' && typeof row.normalize === 'object' && typeof row.normalize.name === 'string' && typeof row.kana === 'string')) {
+        throw new _fi_FinancialInstitutionError('APIレスポンスが不正です（銀行情報リスト）', 'ajax');
+    }
+
+};
+/**
+ * 支店APIレスポンスのバリデーション（内部関数）
+ * @function
+ * @param {object} result APIレスポンス
+ * @throws {Error} 不正なレスポンスの場合
+ * @private
+ */
+const _fi_validateBranchResponse = (result) => {
+    if (!result || typeof result.code !== 'string' || typeof result.normalize !== 'object' || typeof result.normalize.name !== 'string' || typeof result.kana !== 'string') {
+        throw new _fi_FinancialInstitutionError('APIレスポンスが不正です（支店情報）', 'ajax');
+    }
+};
+/**
+ * 支店APIレスポンス（配列）のバリデーション（内部関数）
+ * @function
+ * @param {object[]} result APIレスポンス配列
+ * @throws {Error} 不正なレスポンスの場合
+ * @private
+ */
+const _fi_validateBranchArrayResponse = (result) => {
+    if (!Array.isArray(result) || result.length === 0 || !result.every(row => typeof row.code === 'string' && typeof row.normalize === 'object' && typeof row.normalize.name === 'string' && typeof row.kana === 'string')) {
+        throw new _fi_FinancialInstitutionError('APIレスポンスが不正です（支店情報リスト）', 'ajax');
+    }
+};
+/**
+ * 全銀手順で許可される文字種のみ許可するバリデーション関数。
+ * @function
+ * @param {string} str 入力文字列
+ * @returns {boolean} 許可される場合true、許可されない文字が含まれる場合false
+ * @throws {Error} 入力が文字列でない場合
+ * @private
+ * @example
+ *   _fi_is_zengin_allowed_chars('ﾀﾛｳ123'); // => true
+ */
+const _fi_is_zengin_allowed_chars = (str) => {
+    if (typeof str !== 'string') throw new _fi_FinancialInstitutionError('入力文字列は文字列である必要があります', 'logic');
     // 半角英数字・半角カナ・許可記号のみ
     // 許可記号は用途に応じて調整可能
     const zenginReg = /^[0-9A-Z !"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~｡｢｣､･\uFF61-\uFF9F]+$/;
-    return zenginReg.test(char);
+    return zenginReg.test(str);
 };
 /**
  * 国民の祝日・休日を取得する関数（コールバック型・非同期）
- * @param {string} date_char - ISO 8601拡張形式の西暦表記（YYYY-MM-DD）の文字列
- * @param {function(string|null):void} callback - 祝日名（なければnull）を返すコールバック
+ * @function
+ * @param {string} date_str ISO 8601拡張形式の西暦表記（YYYY-MM-DD）の文字列
+ * @param {(holidayName: string|null) => void} callback 祝日名（なければnull）を返すコールバック
+ * @returns {void}
+ * @private
  */
-const _fi_is_national_holiday = (date_char, callback) => {
-    if (!date_char) return callback(null);
-    const year_char = date_char.slice(0, 4);
-    if (date_char < '1948-07-20') return callback(null);
-    fetch('https://api.national-holidays.jp/' + year_char)
+const _fi_is_national_holiday = (date_str, callback) => {
+    if (typeof date_str !== 'string') throw new _fi_FinancialInstitutionError('検索対象の日付は文字列である必要があります', 'logic');
+    if (typeof callback !== 'function') throw new _fi_FinancialInstitutionError('コールバックは関数である必要があります', 'logic');
+    if (!date_str) return callback(null);
+    const yearChar = date_str.slice(0, 4);
+    if (date_str < '1948-07-20') return callback(null);
+    fetch(_fi_HOLIDAY_API_BASE_URL + '/' + yearChar)
         .then(res => res.ok ? res.json() : [])
         .then(holidays => {
-            if (Array.isArray(holidays)) {
+            if (Array.isArray(holidays) && holidays.length > 0) {
                 for (const row of holidays) {
-                    if (date_char === row.date) {
+                    if (date_str === row.date) {
                         callback(row.name);
                         return;
                     }
                 }
             }
+            // holidaysが空配列、または該当日がなければ必ずnullを返す
             callback(null);
         })
-        .catch(() => callback(null));
+        .catch(err => {
+            // 通信エラーやAPI異常時も必ずnullで抜ける
+            callback(null);
+        });
 };
 
 /**
- * 銀行番号または銀行名から銀行情報を取得します。
- * kintone API風のコールバック構文（成功・失敗分離）です。
- *
- * @param {string} bank_char - 銀行番号（4桁）または銀行名（部分一致可）
- * @param {function(Object)} successCallback - 正常時に呼ばれるコールバック。
- *   result: {
- *     bank_number: string,   // 銀行番号（4桁）
- *     bank_name: string,     // 銀行名
- *     bank_name_kana: string // 銀行名（カナ・半角）
- *   }
- * @param {function(Error)} failureCallback - エラー時に呼ばれるコールバック。
- *   error: Errorオブジェクト（messageにエラー内容, typeプロパティでエラー種別を判別: 'logic'（ロジックエラー）または 'ajax'（通信エラー））
- *
- * @example
- * $.bank_find('0001',
+ * 銀行番号（4桁）または銀行名（部分一致可）から銀行情報を取得します。
+ * @function
+ * @param {string} bankChar - 銀行番号（4桁の数字文字列）または銀行名（部分一致可）。
+ * @param {(result: {bank_number: string, bank_name: string, bank_name_kana: string}) => void} successCallback - 正常時に呼ばれるコールバック。引数 result の内容:
+ *   - bank_number: 銀行番号（4桁）
+ *   - bank_name: 銀行名（正規化済み）
+ *   - bank_name_kana: 銀行名カナ（半角カナ）
+ * @param {(err: Error & {type?: 'logic'|'ajax'}) => void} failureCallback - エラー時に呼ばれるコールバック。err.type でエラー種別（logic:入力不備/ajax:API通信・データ不備）を判別。
+ * @returns {void}
+ * @throws {Error} 引数の型が不正な場合
+ * @public
+ * @example <caption>銀行番号で取得</caption>
+ * findBank('0005',
  *   (result) => {
- *     // 正常時処理 result.bank_name など
+ *     console.log(result.bank_number); // '0005'
+ *     console.log(result.bank_name);   // '三菱ＵＦＪ銀行'
+ *     console.log(result.bank_name_kana); // 'ﾐﾂﾋﾞｼﾕｰｴﾌｼﾞｪｲｷﾞﾝｺｳ'
  *   },
- *   (error) => {
- *     // エラー時処理 error.message, error.type など
- *     if (error.type === 'ajax') {
- *       // 通信エラー時の処理
- *     } else if (error.type === 'logic') {
- *       // 入力値や該当なし等のロジックエラー時の処理
+ *   (err) => {
+ *     alert(err.message);
+ *   }
+ * );
+ *
+ * @example <caption>銀行名で取得（部分一致）</caption>
+ * findBank('みずほ',
+ *   (result) => {
+ *     // ...
+ *   },
+ *   (err) => {
+ *     // ...
+ *   }
+ * );
+ *
+ * @example <caption>エラー時のコールバック</caption>
+ * findBank('',
+ *   (result) => {},
+ *   (err) => {
+ *     if (err.type === 'logic') {
+ *       alert('入力エラー: ' + err.message);
+ *     } else {
+ *       alert('APIエラー: ' + err.message);
  *     }
  *   }
  * );
  */
-const findBank = (bank_char, successCallback, failureCallback) => {
-    if (typeof bank_char !== 'string' || bank_char.length === 0) {
+const findBank = (bankChar, successCallback, failureCallback) => {
+    if (typeof bankChar !== 'string') throw new _fi_FinancialInstitutionError('銀行番号（4桁）または銀行名（部分一致可）は文字列である必要があります', 'logic');
+    if (typeof successCallback !== 'function') throw new _fi_FinancialInstitutionError('正常時に呼ばれるコールバックは関数である必要があります', 'logic');
+    if (typeof failureCallback !== 'function') throw new _fi_FinancialInstitutionError('エラー時に呼ばれるコールバックは関数である必要があります', 'logic');
+    if (bankChar.length === 0) {
         if (failureCallback) {
-            const err = new Error('銀行番号または銀行名が未入力です');
-            err.type = 'logic';
-            failureCallback(err);
+            failureCallback(new _fi_FinancialInstitutionError('銀行番号または銀行名が未入力です', 'logic'));
         }
         return;
     }
-    const bank_char_sbn = Number(_fi_convert_to_single_byte_numbers(bank_char));
-    if (bank_char_sbn >= 0 && bank_char_sbn <= 9999) {
-        const bank_number_temp = '0000' + String(bank_char_sbn);
-        const bank_number = bank_number_temp.slice(-4);
-        fetch('https://bank.teraren.com/banks/' + bank_number + '.json')
+    const bankCharSbn = Number(_fi_convert_to_single_byte_numbers(bankChar));
+    // 銀行番号で検索
+    if (bankCharSbn >= 0 && bankCharSbn <= Number('9'.repeat(_fi_BANK_CODE_LENGTH))) {
+        const bankNumberTemp = '0'.repeat(_fi_BANK_CODE_LENGTH) + String(bankCharSbn);
+        const bankNumber = bankNumberTemp.slice(-_fi_BANK_CODE_LENGTH);
+        fetch(_fi_BANK_API_BASE_URL + '/banks/' + bankNumber + '.json')
             .then(response => {
-                if (!response.ok) throw new Error('銀行が見つかりません');
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new _fi_FinancialInstitutionError(`銀行番号「${bankNumber}」に該当する銀行が見つかりません`, 'ajax');
+                    } else if (response.status >= 500) {
+                        throw new _fi_FinancialInstitutionError('サーバーエラーが発生しました', 'ajax');
+                    } else {
+                        throw new _fi_FinancialInstitutionError(`通信エラー（${response.status}）`, 'ajax');
+                    }
+                }
                 return response.json();
             })
-            .then(success => {
+            .then(result => {
+                _fi_validateBankResponse(result);
                 successCallback({
-                    bank_number: success.code,
-                    bank_name: success.normalize.name,
-                    bank_name_kana: convertAccountHolderKana(success.kana, false)
+                    bank_number: result.code,
+                    bank_name: result.normalize.name,
+                    bank_name_kana: convertAccountHolderKana(result.kana, false)
                 });
             })
             .catch(err => {
                 if (failureCallback) {
-                    if (err.message === 'Failed to fetch') {
-                        err.message = '銀行が見つかりません';
+                    if (!(err instanceof _fi_FinancialInstitutionError)) {
+                        err = new _fi_FinancialInstitutionError(err && err.message ? err.message : 'ネットワークエラーまたは不明なエラー', 'ajax');
                     }
-                    err.type = 'ajax';
                     failureCallback(err);
                 }
             });
         return;
     }
-    fetch('https://bank.teraren.com/banks/search.json?name=' + encodeURIComponent(bank_char))
+    // 銀行名で検索
+    fetch(_fi_BANK_API_BASE_URL + '/banks/search.json?name=' + encodeURIComponent(bankChar))
         .then(response => {
-            if (!response.ok) throw new Error('銀行が見つかりません');
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new _fi_FinancialInstitutionError(`銀行名「${bankChar}」に該当する銀行が見つかりません`, 'ajax');
+                } else if (response.status >= 500) {
+                    throw new _fi_FinancialInstitutionError('サーバーエラーが発生しました', 'ajax');
+                } else {
+                    throw new _fi_FinancialInstitutionError(`通信エラー（${response.status}）`, 'ajax');
+                }
+            }
             return response.json();
         })
-        .then(success => {
-            if (success.length === 1) {
+        .then(result => {
+            try {
+                _fi_validateBankArrayResponse(result);
+            } catch (e) {
+                if (failureCallback) return failureCallback(e);
+                return;
+            }
+            if (result.length === 1) {
                 successCallback({
-                    bank_number: success[0].code,
-                    bank_name: success[0].normalize.name,
-                    bank_name_kana: convertAccountHolderKana(success[0].kana, false)
+                    bank_number: result[0].code,
+                    bank_name: result[0].normalize.name,
+                    bank_name_kana: convertAccountHolderKana(result[0].kana, false)
                 });
             } else {
                 if (failureCallback) {
-                    const err = new Error('銀行を特定できません');
-                    err.type = 'ajax';
-                    failureCallback(err);
+                    failureCallback(new _fi_FinancialInstitutionError(`銀行名「${bankChar}」に該当する銀行が複数見つかりました。より詳細な名称で再検索してください。`, 'ajax'));
                 }
             }
         })
         .catch(err => {
             if (failureCallback) {
-                if (err.message === 'Failed to fetch') {
-                    err.message = '銀行が見つかりません';
+                if (!(err instanceof _fi_FinancialInstitutionError)) {
+                    err = new _fi_FinancialInstitutionError(err && err.message ? err.message : 'ネットワークエラーまたは不明なエラー', 'ajax');
                 }
-                err.type = 'ajax';
                 failureCallback(err);
             }
         });
 };
 
 /**
- * 銀行番号・銀行名と支店番号・支店名から支店情報を取得します。
- * kintone API風のコールバック構文（成功・失敗分離）です。
- *
- * @param {string} bank_char - 銀行番号（4桁）または銀行名
- * @param {string} bank_branch_char - 支店番号（3桁）または支店名
- * @param {function(Object)} successCallback - 正常時に呼ばれるコールバック。
- *   result: {
- *     bank_branch_number: string,   // 支店番号（3桁）
- *     bank_branch_name: string,     // 支店名
- *     bank_branch_name_kana: string // 支店名（カナ・半角）
- *   }
- * @param {function(Error)} failureCallback - エラー時に呼ばれるコールバック。
- *   error: Errorオブジェクト（messageにエラー内容, typeプロパティでエラー種別を判別: 'logic'（ロジックエラー）または 'ajax'（通信エラー））
- *
- * @example
- * $.bank_branch_find('0001', '001',
+ * 銀行番号（4桁）または銀行名、および支店番号（3桁）または支店名から支店情報を取得します。
+ * @function
+ * @param {string} bankChar - 銀行番号（4桁の数字文字列）または銀行名（部分一致可）。
+ * @param {string} bankBranchChar - 支店番号（3桁の数字文字列）または支店名（部分一致可）。
+ * @param {(result: {bank_branch_number: string, bank_branch_name: string, bank_branch_name_kana: string}) => void} successCallback - 正常時に呼ばれるコールバック。引数 result の内容:
+ *   - bank_branch_number: 支店番号（3桁）
+ *   - bank_branch_name: 支店名（正規化済み）
+ *   - bank_branch_name_kana: 支店名カナ（半角カナ）
+ * @param {(err: Error & {type?: 'logic'|'ajax'}) => void} failureCallback - エラー時に呼ばれるコールバック。err.type でエラー種別（logic:入力不備/ajax:API通信・データ不備）を判別。
+ * @returns {void}
+ * @throws {Error} 引数の型が不正な場合
+ * @public
+ * @example <caption>支店番号で取得</caption>
+ * findBankBranch('0005', '123',
  *   (result) => {
- *     // 正常時処理 result.bank_branch_name など
+ *     console.log(result.bank_branch_number); // '123'
+ *     console.log(result.bank_branch_name);   // '本店'
+ *     console.log(result.bank_branch_name_kana); // 'ﾎﾝﾃﾝ'
  *   },
- *   (error) => {
- *     // エラー時処理 error.message, error.type など
- *     if (error.type === 'ajax') {
- *       // 通信エラー時の処理
- *     } else if (error.type === 'logic') {
- *       // 入力値や該当なし等のロジックエラー時の処理
+ *   (err) => {
+ *     alert(err.message);
+ *   }
+ * );
+ *
+ * @example <caption>支店名で取得（部分一致）</caption>
+ * findBankBranch('みずほ', '渋谷',
+ *   (result) => {
+ *     // ...
+ *   },
+ *   (err) => {
+ *     // ...
+ *   }
+ * );
+ *
+ * @example <caption>エラー時のコールバック</caption>
+ * findBankBranch('', '',
+ *   (result) => {},
+ *   (err) => {
+ *     if (err.type === 'logic') {
+ *       alert('入力エラー: ' + err.message);
+ *     } else {
+ *       alert('APIエラー: ' + err.message);
  *     }
  *   }
  * );
  */
-const findBankBranch = (bank_char, bank_branch_char, successCallback, failureCallback) => {
-    if (typeof bank_char !== 'string' || bank_char.length === 0 || typeof bank_branch_char !== 'string' || bank_branch_char.length === 0) {
-        if (failureCallback) {
-            const err = new Error('銀行番号、支店番号、支店名のいずれかが未入力です');
-            err.type = 'logic';
-            failureCallback(err);
-        }
+const findBankBranch = (bankChar, bankBranchChar, successCallback, failureCallback) => {
+    if (typeof bankChar !== 'string') throw new _fi_FinancialInstitutionError('銀行番号（4桁）または銀行名（部分一致可）は文字列である必要があります', 'logic');
+    if (typeof bankBranchChar !== 'string') throw new _fi_FinancialInstitutionError('支店番号（3桁）または支店名（部分一致可）は文字列である必要があります', 'logic');
+    if (typeof successCallback !== 'function') throw new _fi_FinancialInstitutionError('正常時に呼ばれるコールバックは関数である必要があります', 'logic');
+    if (typeof failureCallback !== 'function') throw new _fi_FinancialInstitutionError('エラー時に呼ばれるコールバックは関数である必要があります', 'logic');
+    if (bankChar.length === 0 || bankBranchChar.length === 0) {
+        if (failureCallback) failureCallback(new _fi_FinancialInstitutionError('銀行番号、支店番号、支店名のいずれかが未入力です', 'logic'));
         return;
     }
-    const bank_char_sbn = _fi_convert_to_single_byte_numbers(bank_char);
-    findBank(bank_char_sbn, (bank_info) => {
-        const bank_number = bank_info.bank_number;
-        if (!bank_number) {
-            if (failureCallback) {
-                const err = new Error('銀行番号が未入力です');
-                err.type = 'ajax';
-                failureCallback(err);
-            }
+    const bankCharSbn = _fi_convert_to_single_byte_numbers(bankChar);
+    findBank(bankCharSbn, (bankInfo) => {
+        const bankNumber = bankInfo.bank_number;
+        if (!bankNumber) {
+            if (failureCallback) failureCallback(new _fi_FinancialInstitutionError('銀行番号が未入力です', 'ajax'));
             return;
         }
-        const bank_branch_char_sbn = Number(_fi_convert_to_single_byte_numbers(bank_branch_char));
-        if ((bank_branch_char_sbn >= 0) && (bank_branch_char_sbn <= 999)) {
-            const bank_branch_number_temp = '000' + String(bank_branch_char_sbn);
-            const bank_branch_number = bank_branch_number_temp.slice(-3);
-            fetch('https://bank.teraren.com/banks/' + bank_number + '/branches/' + bank_branch_number + '.json')
+        const bankBranchCharSbn = Number(_fi_convert_to_single_byte_numbers(bankBranchChar));
+        // 支店番号で検索
+        if ((bankBranchCharSbn >= 0) && (bankBranchCharSbn <= Number('9'.repeat(_fi_BRANCH_CODE_LENGTH)))) {
+            const bankBranchNumberTemp = '0'.repeat(_fi_BRANCH_CODE_LENGTH) + String(bankBranchCharSbn);
+            const bankBranchNumber = bankBranchNumberTemp.slice(-_fi_BRANCH_CODE_LENGTH);
+            fetch(_fi_BANK_API_BASE_URL + '/banks/' + bankNumber + '/branches/' + bankBranchNumber + '.json')
                 .then(response => {
-                    if (!response.ok) throw new Error('支店が見つかりません');
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            throw new _fi_FinancialInstitutionError(`銀行番号「${bankNumber}」支店番号「${bankBranchNumber}」に該当する支店が見つかりません`, 'ajax');
+                        } else if (response.status >= 500) {
+                            throw new _fi_FinancialInstitutionError('サーバーエラーが発生しました', 'ajax');
+                        } else {
+                            throw new _fi_FinancialInstitutionError(`通信エラー（${response.status}）`, 'ajax');
+                        }
+                    }
                     return response.json();
                 })
-                .then(success => {
+                .then(result => {
+                    _fi_validateBranchResponse(result);
                     successCallback({
-                        bank_branch_number: success.code,
-                        bank_branch_name: success.normalize.name,
-                        bank_branch_name_kana: convertAccountHolderKana(success.kana, false)
+                        bank_branch_number: result.code,
+                        bank_branch_name: result.normalize.name,
+                        bank_branch_name_kana: convertAccountHolderKana(result.kana, false)
                     });
                 })
                 .catch(err => {
                     if (failureCallback) {
-                        if (err.message === 'Failed to fetch') {
-                            err.message = '支店が見つかりません';
-                        }
-                        err.type = 'ajax';
+                        if (!(err instanceof _fi_FinancialInstitutionError)) err = new _fi_FinancialInstitutionError(err && err.message ? err.message : 'ネットワークエラーまたは不明なエラー', 'ajax');
                         failureCallback(err);
                     }
                 });
             return;
         }
-        fetch('https://bank.teraren.com/banks/' + bank_number + '/branches/search.json?name=' + encodeURIComponent(bank_branch_char))
+        // 支店名で検索
+        fetch(_fi_BANK_API_BASE_URL + '/banks/' + bankNumber + '/branches/search.json?name=' + encodeURIComponent(bankBranchChar))
             .then(response => {
-                if (!response.ok) throw new Error('支店が見つかりません');
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new _fi_FinancialInstitutionError(`銀行番号「${bankNumber}」支店名「${bankBranchChar}」に該当する支店が見つかりません`, 'ajax');
+                    } else if (response.status >= 500) {
+                        throw new _fi_FinancialInstitutionError('サーバーエラーが発生しました', 'ajax');
+                    } else {
+                        throw new _fi_FinancialInstitutionError(`通信エラー（${response.status}）`, 'ajax');
+                    }
+                }
                 return response.json();
             })
-            .then(success => {
-                if (success.length === 1) {
+            .then(result => {
+                try {
+                    _fi_validateBranchArrayResponse(result);
+                } catch (e) {
+                    if (failureCallback) return failureCallback(e);
+                    return;
+                }
+                if (result.length === 1) {
                     successCallback({
-                        bank_branch_number: success[0].code,
-                        bank_branch_name: success[0].normalize.name,
-                        bank_branch_name_kana: convertAccountHolderKana(success[0].kana, false)
+                        bank_branch_number: result[0].code,
+                        bank_branch_name: result[0].normalize.name,
+                        bank_branch_name_kana: convertAccountHolderKana(result[0].kana, false)
                     });
                 } else {
-                    if (failureCallback) {
-                        const err = new Error('支店を特定できません');
-                        err.type = 'ajax';
-                        failureCallback(err);
-                    }
+                    if (failureCallback) failureCallback(new _fi_FinancialInstitutionError(`銀行番号「${bankNumber}」支店名「${bankBranchChar}」に該当する支店が複数見つかりました。より詳細な名称で再検索してください。`, 'ajax'));
                 }
             })
             .catch(err => {
                 if (failureCallback) {
-                    if (err.message === 'Failed to fetch') {
-                        err.message = '支店が見つかりません';
-                    }
-                    err.type = 'ajax';
+                    if (!(err instanceof _fi_FinancialInstitutionError)) err = new _fi_FinancialInstitutionError(err && err.message ? err.message : 'ネットワークエラーまたは不明なエラー', 'ajax');
                     failureCallback(err);
                 }
             });
-    }, (error) => {
+    }, (err) => {
         if (failureCallback) {
-            if (error && !error.type) error.type = 'ajax';
-            failureCallback(error || (() => { const err = new Error('銀行が見つかりません'); err.type = 'ajax'; return err; })());
+            if (!(err instanceof _fi_FinancialInstitutionError)) err = new _fi_FinancialInstitutionError(err && err.message ? err.message : 'ネットワークエラーまたは不明なエラー', 'ajax');
+            failureCallback(err);
         }
     });
 };
 
 /**
- * 銀行口座番号の書式を整える関数
- * @param {string} bank_account_char - 銀行口座番号
- * @returns {string|null} 銀行口座番号（7桁）またはnull
+ * 銀行口座番号の書式を7桁の半角数字に整形します。
+ * @function
+ * @param {string} bankAccountChar - 銀行口座番号（全角・漢数字・半角混在可）
+ * @returns {string} 7桁の銀行口座番号（先頭ゼロ埋め、半角数字）
+ * @throws {Error} 引数が文字列でない場合、未入力の場合、数字以外が含まれる場合
+ * @public
+ * @example
+ *   formatBankAccountNumber('１２３４５'); // => '0001234'
+ *   formatBankAccountNumber('五六七八九'); // => '0005678'
+ *   formatBankAccountNumber('1234567'); // => '1234567'
  */
-const formatBankAccountNumber = (bank_account_char) => {
-    if (typeof bank_account_char !== 'string' || bank_account_char.length === 0) return null;
-    const bank_account_number_temp = '0000000' + _fi_convert_to_single_byte_numbers(bank_account_char);
-    const bank_account_number = bank_account_number_temp.slice(-7);
-    return bank_account_number;
+const formatBankAccountNumber = (bankAccountChar) => {
+    if (typeof bankAccountChar !== 'string') throw new _fi_FinancialInstitutionError('銀行口座番号は文字列である必要があります', 'logic');
+    if (bankAccountChar.length === 0) throw new _fi_FinancialInstitutionError('銀行口座番号が未入力です', 'logic');
+    const singleByte = _fi_convert_to_single_byte_numbers(bankAccountChar);
+    if (!/^[0-9]+$/.test(singleByte)) {
+        throw new _fi_FinancialInstitutionError('口座番号に数字以外の文字が含まれています', 'validation');
+    }
+    const bankAccountNumberTemp = '0'.repeat(_fi_ACCOUNT_NUMBER_LENGTH) + singleByte;
+    const bankAccountNumber = bankAccountNumberTemp.slice(-_fi_ACCOUNT_NUMBER_LENGTH);
+    return bankAccountNumber;
 };
 
 /**
- * ゆうちょ口座の記号番号から銀行名・支店名・口座番号等に変換します。
+ * ゆうちょ口座の記号番号・番号から、銀行名・支店名・口座番号等の情報を変換・取得します。
+ *
  * kintone API風のコールバック構文（成功・失敗分離）です。
- *
- * @param {string} symbol_char - ゆうちょ口座記号（5桁）
- * @param {string} number_char - ゆうちょ口座番号（最大8桁）
- * @param {function(Object)} successCallback - 正常時に呼ばれるコールバック。
- *   result: {
- *     symbol: string,                // ゆうちょ記号（5桁）
- *     number: string,                // ゆうちょ番号（6～8桁）
- *     bank_number: string,           // 銀行番号（4桁, ゆうちょは9900）
- *     bank_name: string,             // 銀行名
- *     bank_name_kana: string,        // 銀行名（カナ・半角）
- *     bank_branch_number: string,    // 支店番号（3桁）
- *     bank_branch_name: string,      // 支店名
- *     bank_branch_name_kana: string, // 支店名（カナ・半角）
- *     deposit_type: string,          // 預金種目（普通/当座）
- *     bank_account_number: string    // 銀行口座番号（7桁）
- *   }
- * @param {function(Error)} failureCallback - エラー時に呼ばれるコールバック。
- *   error: Errorオブジェクト（messageにエラー内容, typeプロパティでエラー種別を判別: 'logic'（ロジックエラー）または 'ajax'（通信エラー））
- *
- * @example
- * $.convert_japan_post_account_to_bank_account('12345', '6789012',
+ * @function
+ * @param {string} symbolChar - ゆうちょ口座記号（5桁、全角・半角・漢数字混在可）。
+ * @param {string} numberChar - ゆうちょ口座番号（最大8桁、全角・半角・漢数字混在可）。
+ * @param {(result: {
+ *   symbol: string,                  // 変換後の記号（5桁、半角数字）
+ *   number: string,                  // 変換後の番号（6～8桁、半角数字）
+ *   bank_number: string,             // 銀行番号（ゆうちょは'9900'固定）
+ *   bank_name: string,               // 銀行名（'ゆうちょ銀行'固定）
+ *   bank_name_kana: string,          // 銀行名カナ（'ﾕｳﾁﾖ'固定）
+ *   bank_branch_number: string,      // 支店番号（3桁、半角数字）
+ *   bank_branch_name: string,        // 支店名
+ *   bank_branch_name_kana: string,   // 支店名カナ
+ *   deposit_type: string,            // 預金種別（'普通'または'当座'）
+ *   bank_account_number: string      // 7桁の銀行口座番号（半角数字）
+ * }) => void} successCallback - 正常時に呼ばれるコールバック。変換結果オブジェクトを受け取る。
+ * @param {(err: Error & {type?: 'logic'|'ajax'}) => void} failureCallback - エラー時に呼ばれるコールバック。err.typeでエラー種別（logic:入力不備/ajax:API通信・データ不備）を判別。
+ * @returns {void}
+ * @throws {Error} 引数の型が不正な場合
+ * @public
+ * @example <caption>ゆうちょ記号・番号から銀行情報を取得</caption>
+ * convertJapanPostAccount('12345', '6789012',
  *   (result) => {
- *     // 正常時処理 result.bank_account_number など
+ *     console.log(result.bank_number); // '9900'
+ *     console.log(result.bank_name);   // 'ゆうちょ銀行'
+ *     console.log(result.bank_branch_number); // '239'または'238'など
+ *     console.log(result.bank_account_number); // '6789012'など
  *   },
- *   (error) => {
- *     // エラー時処理 error.message, error.type など
- *     if (error.type === 'ajax') {
- *       // 通信エラー時の処理
- *     } else if (error.type === 'logic') {
- *       // 入力値や該当なし等のロジックエラー時の処理
+ *   (err) => {
+ *     alert(err.message);
+ *   }
+ * );
+ *
+ * @example <caption>入力不備時のエラー</caption>
+ * convertJapanPostAccount('', '',
+ *   (result) => {},
+ *   (err) => {
+ *     if (err.type === 'logic') {
+ *       alert('入力エラー: ' + err.message);
+ *     } else {
+ *       alert('APIエラー: ' + err.message);
+ *     }
+ *   }
+ * );
+ *
+ * @example <caption>API通信エラー時</caption>
+ * convertJapanPostAccount('12345', '6789012',
+ *   (result) => {},
+ *   (err) => {
+ *     if (err.type === 'ajax') {
+ *       alert('APIエラー: ' + err.message);
  *     }
  *   }
  * );
  */
-const convertJapanPostAccount = (symbol_char, number_char, successCallback, failureCallback) => {
-    if (typeof symbol_char !== 'string' || symbol_char.length === 0 || typeof number_char !== 'string' || number_char.length === 0) {
-        if (failureCallback) {
-            const err = new Error('ゆうちょ記号、ゆうちょ番号が未入力です');
-            err.type = 'logic';
-            failureCallback(err);
-        }
+const convertJapanPostAccount = (symbolChar, numberChar, successCallback, failureCallback) => {
+    if (typeof symbolChar !== 'string') throw new _fi_FinancialInstitutionError('ゆうちょ口座記号（5桁）は文字列である必要があります', 'logic');
+    if (typeof numberChar !== 'string') throw new _fi_FinancialInstitutionError('ゆうちょ口座番号（最大8桁）は文字列である必要があります', 'logic');
+    if (typeof successCallback !== 'function') throw new _fi_FinancialInstitutionError('正常時に呼ばれるコールバックは関数である必要があります', 'logic');
+    if (typeof failureCallback !== 'function') throw new _fi_FinancialInstitutionError('エラー時に呼ばれるコールバックは関数である必要があります', 'logic');
+    if (symbolChar.length === 0 || numberChar.length === 0) {
+        if (failureCallback) failureCallback(new _fi_FinancialInstitutionError('ゆうちょ記号、ゆうちょ番号が未入力です', 'logic'));
         return;
     }
-    const symbol_char_sbn = _fi_convert_to_single_byte_numbers(symbol_char);
-    const symbol_temp = '00000' + symbol_char_sbn;
-    const symbol = symbol_temp.slice(-5);
-    const number_char_sbn = _fi_convert_to_single_byte_numbers(number_char);
-    const bank_branch_number_temp = symbol.substring(1, 3);
-    const deposit_type_temp = symbol.substring(0, 1);
+    const symbolCharSbn = _fi_convert_to_single_byte_numbers(symbolChar);
+    if (!/^[0-9]+$/.test(symbolCharSbn)) {
+        if (failureCallback) failureCallback(new _fi_FinancialInstitutionError('ゆうちょ口座記号に数字以外の文字が含まれています', 'validation'));
+        return;
+    }
+    const symbol = symbolCharSbn.slice(-_fi_JAPAN_POST_SYMBOL_LENGTH);
+    const numberCharSbn = _fi_convert_to_single_byte_numbers(numberChar);
+    if (!/^[0-9]+$/.test(numberCharSbn)) {
+        if (failureCallback) failureCallback(new _fi_FinancialInstitutionError('ゆうちょ口座番号に数字以外の文字が含まれています', 'validation'));
+        return;
+    }
+    const bankBranchNumberTemp = symbol.substring(1, 3);
+    const depositTypeTemp = symbol.substring(0, 1);
     let number = null;
-    let bank_branch_number =  null;
-    let deposit_type = null;
-    let bank_account_number = null;
-    switch (deposit_type_temp) {
+    let bankBranchNumber =  null;
+    let depositType = null;
+    let bankAccountNumber = null;
+    switch (depositTypeTemp) {
         case '0':
-            bank_branch_number = bank_branch_number_temp + '9';
-            deposit_type = '当座';
-            if (number_char_sbn.length <= 6) {
-                const number_temp = '000000' + number_char_sbn;
-                number = number_temp.slice(-6);
-                bank_account_number = formatBankAccountNumber(number);
+            bankBranchNumber = bankBranchNumberTemp + '9';
+            depositType = '当座';
+            if (numberCharSbn.length <= 6) {
+                const numberTemp = '0'.repeat(6) + numberCharSbn;
+                number = numberTemp.slice(-6);
+                bankAccountNumber = formatBankAccountNumber(number);
             }
             break;
         case '1':
-            bank_branch_number = bank_branch_number_temp + '8';
-            deposit_type = '普通';
-            const number_temp = '00000000' + number_char_sbn;
-            number = number_temp.slice(-8);
-            bank_account_number = number.substring(0, 7);
+            bankBranchNumber = bankBranchNumberTemp + '8';
+            depositType = '普通';
+            const numberTemp = '0'.repeat(_fi_JAPAN_POST_NUMBER_MAX_LENGTH) + numberCharSbn;
+            number = numberTemp.slice(-_fi_JAPAN_POST_NUMBER_MAX_LENGTH);
+            bankAccountNumber = number.substring(0, _fi_ACCOUNT_NUMBER_LENGTH);
             break;
     }
-    if (number && bank_branch_number && deposit_type && bank_account_number) {
-        findBankBranch('9900', bank_branch_number, (branch_info) => {
-            const bank_branch_number = branch_info.bank_branch_number;
-            if (!bank_branch_number) {
-                if (failureCallback) {
-                    const err = new Error('ゆうちょ記号が未入力です');
-                    err.type = 'ajax';
-                    failureCallback(err);
-                }
-                return;
-            }
-            if (branch_info.bank_branch_number) {
+    if (number && bankBranchNumber && depositType && bankAccountNumber) {
+        findBankBranch('9900', bankBranchNumber, (branchInfo) => {
+            if (branchInfo.bank_branch_number) {
                 successCallback({
                     symbol: symbol,
                     number: number,
                     bank_number: '9900',
                     bank_name: 'ゆうちょ銀行',
                     bank_name_kana: 'ﾕｳﾁﾖ',
-                    bank_branch_number: branch_info.bank_branch_number,
-                    bank_branch_name: branch_info.bank_branch_name,
-                    bank_branch_name_kana: branch_info.bank_branch_name_kana,
-                    deposit_type: deposit_type,
-                    bank_account_number: bank_account_number
+                    bank_branch_number: branchInfo.bank_branch_number,
+                    bank_branch_name: branchInfo.bank_branch_name,
+                    bank_branch_name_kana: branchInfo.bank_branch_name_kana,
+                    deposit_type: depositType,
+                    bank_account_number: bankAccountNumber
                 });
             } else {
-                if (failureCallback) {
-                    const err = new Error('ゆうちょ記号からゆうちょ支店情報に変換できませんでした');
-                    err.type = 'ajax';
-                    failureCallback(err);
-                }
+                if (failureCallback) failureCallback(new _fi_FinancialInstitutionError('ゆうちょ記号からゆうちょ支店情報に変換できませんでした', 'ajax'));
                 return;
             }
-        }, (error) => {
+        }, (err) => {
             if (failureCallback) {
-                // error.typeがなければajaxとみなす
-                if (error && !error.type) error.type = 'ajax';
-                if (error && error.message === 'Failed to fetch') {
-                    error.message = 'ゆうちょ記号・番号の変換ができませんでした';
-                }
-                failureCallback(error || (() => { const err = new Error('支店情報取得時に不明なエラー'); err.type = 'ajax'; return err; })());
+                if (!(err instanceof _fi_FinancialInstitutionError)) err = new _fi_FinancialInstitutionError(err && err.message ? err.message : 'ゆうちょ記号・番号の変換ができませんでした', 'ajax');
+                failureCallback(err);
             }
             return;
         });
     } else {
-        if (failureCallback) {
-            const err = new Error('ゆうちょ記号・番号の変換ができませんでした');
-            err.type = 'logic';
-            failureCallback(err);
-        }
+        if (failureCallback) failureCallback(new _fi_FinancialInstitutionError('ゆうちょ記号・番号の変換ができませんでした', 'logic'));
         return;
     }
 };
 
 /**
- * 口座名義人を半角カナに変換する関数
- * @param {string} char - 口座名義人
- * @param {boolean} [acronym_sw=true] - 口座名義人を略語にする処理の有無（trueがあり、falseがなし）
- * @returns {string} 半角カナに変換した口座名義人
+ * 口座名義人を全銀手順に準拠した半角カナ（および略語）に変換します。
+ * @function
+ * @param {string} inputStr - 変換対象の口座名義人（全角・半角・記号・漢字混在可）。
+ * @param {boolean} [acronymSw=true] - 法人・営業所・事業名の略語変換を行うか（true:略語化あり/false:略語化なし）。
+ * @returns {string} 半角カナ・略語化済みの口座名義人（全銀手順で許可される文字のみ）。
+ * @throws {Error} 引数が文字列でない場合、未入力の場合、全銀手順で許可されない文字が含まれる場合。
+ * @public
+ * @example <caption>通常の変換</caption>
+ * convertAccountHolderKana('株式会社山田太郎'); // => 'ｶ)ﾔﾏﾀﾞﾀﾛｳ'
+ *
+ * @example <caption>略語化なし</caption>
+ * convertAccountHolderKana('株式会社山田太郎', false); // => 'ｶﾌﾞｼｷｶﾞｲｼﾔﾔﾏﾀﾞﾀﾛｳ'
+ *
+ * @example <caption>全銀手順で許可されない文字が含まれる場合</caption>
+ * try {
+ *   convertAccountHolderKana('山田太郎😊');
+ * } catch (e) {
+ *   alert(e.message); // => '全銀手順の口座名義人として利用できない文字が含まれています'
+ * }
  */
-const convertAccountHolderKana = (char, acronym_sw = true) => {
-    if (typeof char !== 'string' || char.length === 0) return null;
-    const acronym_replace = (char, list, regexp_char, position_sw) => {
-        if (char) {
-            const char_search = char.search(regexp_char);
-            if (char_search !== -1) {
-                let parenthesis_position = 0;
-                if (position_sw) {
-                    if (char_search === 0) {
-                        parenthesis_position = 1;
+const convertAccountHolderKana = (inputStr, acronymSw = true) => {
+    if (typeof inputStr !== 'string') throw new _fi_FinancialInstitutionError('口座名義人は文字列である必要があります', 'logic');
+    if (inputStr.length === 0) throw new _fi_FinancialInstitutionError('口座名義人が未入力です', 'logic');
+    const _fi_acronym_replace = (targetStr, list, regexpChar, positionSw) => {
+        if (targetStr) {
+            const charSearch = targetStr.search(regexpChar);
+            if (charSearch !== -1) {
+                let parenthesisPosition = 0;
+                if (positionSw) {
+                    if (charSearch === 0) {
+                        parenthesisPosition = 1;
                     } else {
-                        const char_match = char.match(regexp_char);
-                        if (char.length === (char_search + char_match[0].length)) {
-                            parenthesis_position = 2;
+                        const charMatch = targetStr.match(regexpChar);
+                        if (targetStr.length === (charSearch + charMatch[0].length)) {
+                            parenthesisPosition = 2;
                         } else {
-                            parenthesis_position = 3;
+                            parenthesisPosition = 3;
                         }
                     }
                 }
-                return char.replace(regexp_char, (char) => {
-                    switch (parenthesis_position) {
+                return targetStr.replace(regexpChar, (char) => {
+                    switch (parenthesisPosition) {
                         case 1:
                             return list[char] + ')';
                         case 2:
@@ -643,82 +869,108 @@ const convertAccountHolderKana = (char, acronym_sw = true) => {
                     }
                 });
             } else {
-                return char;
+                return targetStr;
             }
         }
     };
-    const char_sbc = _fi_convert_to_single_byte_characters(char);
-    const char_bank_kana = char_sbc.replace(_fi_BANK_KANA_LIST_REG, (c) => _fi_BANK_KANA_LIST[c]);
-    let char_acronym = char_bank_kana;
-    if (acronym_sw) {
+    const inputSbc = _fi_convert_to_single_byte_characters(inputStr);
+    const bankKana = inputSbc.replace(_fi_BANK_KANA_LIST_REG, (c) => _fi_BANK_KANA_LIST[c]);
+    let acronym = bankKana;
+    if (acronymSw) {
         for (let c = 0; c < 3; c++) {
             let list = {};
-            let regexp_char = '';
-            let position_sw = true;
+            let regexpChar = '';
+            let positionSw = true;
             switch (c) {
                 case 0:
                     list = _fi_CORPORATE_ABBREVIATIONS_LIST;
-                    regexp_char = _fi_CORPORATE_ABBREVIATIONS_LIST_REG;
+                    regexpChar = _fi_CORPORATE_ABBREVIATIONS_LIST_REG;
                     break;
                 case 1:
                     list = _fi_SALES_OFFICES_LIST;
-                    regexp_char = _fi_SALES_OFFICES_LIST_REG;
+                    regexpChar = _fi_SALES_OFFICES_LIST_REG;
                     break;
                 case 2:
                     list = _fi_BUSINESS_LIST;
-                    regexp_char = _fi_BUSINESS_LIST_REG;
-                    position_sw = false;
+                    regexpChar = _fi_BUSINESS_LIST_REG;
+                    positionSw = false;
                     break;
             }
-            char_acronym = acronym_replace(char_acronym, list, regexp_char, position_sw);
+            acronym = _fi_acronym_replace(acronym, list, regexpChar, positionSw);
         }
     }
-    const char_regexp = /^[()\-,./0-9A-Zｦ-ﾟ\s]+$/;
-    if (char_regexp.test(char_acronym)) {
-        return char_acronym;
+    const acronymRegexp = /^[()\-,./0-9A-Zｦ-ﾟ\s]+$/;
+    if (!acronymRegexp.test(acronym)) {
+        throw new _fi_FinancialInstitutionError('全銀手順の口座名義人として利用できない文字が含まれています', 'validation');
     }
-    return null;
+    return acronym;
 };
 
 /**
- * 振込指定日が有効かどうかを判定する関数（コールバック型・非同期）
- * @param {string} Designate_transfer_date - 振込指定日（ISO形式: 'YYYY-MM-DD' など）
- * @param {boolean} today_sw - trueの場合、今日以降14日以内かつ平日・営業日かを判定
- * @param {function(boolean):void} callback - 判定結果（有効:true/無効:false）を返すコールバック
+ * 振込指定日が有効かどうかを判定する非同期関数（コールバック型）。
+ * @function
+ * @param {string} designateTransferDate - 振込指定日（ISO形式: 'YYYY-MM-DD' など）。
+ * @param {boolean} todaySw - 日付限定スイッチ（true:今日以降14日以内かつ平日・営業日かを判定/false:日付範囲判定なし）。
+ * @param {(isValid: boolean) => void} callback - 判定結果（有効:true/無効:false）を返すコールバック関数。
+ * @returns {void}
+ * @throws {Error} 引数の型が不正な場合。
+ * @public
+ * @description
+ * - todaySw=trueの場合、今日（18時以降は翌日扱い）から14日以内かつ平日・営業日（祝日・年末年始（12/31～1/3）除く）かを判定します。
+ * - todaySw=falseの場合は、曜日・祝日・年末年始（12/31～1/3）のみ判定します。
+ *
+ * @example <caption>通常の利用例</caption>
+ * isValidTransferDate('2025-09-15', true, (isValid) => {
+ *   if (isValid) {
+ *     alert('指定日は有効です');
+ *   } else {
+ *     alert('指定日は無効です');
+ *   }
+ * });
+ *
+ * @example <caption>型不正時の例外</caption>
+ * try {
+ *   isValidTransferDate(20250915, true, () => {});
+ * } catch (e) {
+ *   alert(e.message); // => '振込指定日は文字列である必要があります'
+ * }
  */
-const isValidTransferDate = (Designate_transfer_date, today_sw = false, callback) => {
-    if (typeof Designate_transfer_date !== 'string' || Designate_transfer_date.length === 0) return callback(false);
-    let check_flag = true;
+const isValidTransferDate = (designateTransferDate, todaySw = false, callback) => {
+    if (typeof designateTransferDate !== 'string') throw new _fi_FinancialInstitutionError('振込指定日は文字列である必要があります', 'logic');
+    if (typeof todaySw !== 'boolean') throw new _fi_FinancialInstitutionError('日付限定スイッチはboolean型である必要があります', 'logic');
+    if (typeof callback !== 'function') throw new _fi_FinancialInstitutionError('コールバックは関数である必要があります', 'logic');
+    if (designateTransferDate.length === 0) return callback(false);
+    let now = new Date();
+    let checkFlag = true;
     // ISO日付文字列をDateに変換
-    const check_date = new Date(Designate_transfer_date);
-    if (isNaN(check_date.getTime())) return callback(false);
+    const checkDate = new Date(designateTransferDate);
+    if (isNaN(checkDate.getTime())) return callback(false);
 
     // 今日の判定
-    const process = (skipHolidayCb) => {
-        if (today_sw) {
-            let now = new Date();
+    const _fi_process = (skipHolidayCb) => {
+        if (todaySw) {
             let today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             // 18時以降は翌日扱い
-            if (now.getHours() >= 18) {
+            if (now.getHours() >= _fi_CUTOFF_HOUR_FOR_NEXT_DAY) {
                 today.setDate(today.getDate() + 1);
             }
             // 祝日をスキップ
-            const skipHoliday = (date, cb) => {
+            const _fi_skipHoliday = (date, cb) => {
                 const ymd = date.toISOString().slice(0, 10);
                 _fi_is_national_holiday(ymd, (name) => {
                     if (name) {
                         date.setDate(date.getDate() + 1);
-                        skipHoliday(date, cb);
+                        _fi_skipHoliday(date, cb);
                     } else {
                         cb(date);
                     }
                 });
             };
-            skipHoliday(today, (validToday) => {
-                // check_dateとtodayの差（日数）
-                const diffDays = Math.floor((check_date - validToday) / (1000 * 60 * 60 * 24));
-                if (diffDays < 1 || diffDays >= 14) {
-                    check_flag = false;
+            _fi_skipHoliday(today, (validToday) => {
+                // checkDateとtodayの差（日数）
+                const diffDays = Math.floor((checkDate - validToday) / (1000 * 60 * 60 * 24));
+                if (diffDays < _fi_TRANSFER_DATE_MIN_DAYS || diffDays >= _fi_TRANSFER_DATE_MAX_DAYS) {
+                    checkFlag = false;
                 }
                 skipHolidayCb();
             });
@@ -728,40 +980,55 @@ const isValidTransferDate = (Designate_transfer_date, today_sw = false, callback
     };
 
     // 曜日・祝日・年末年始判定
-    process(() => {
-        const weekday = check_date.getDay();
-        if (weekday === 0 || weekday === 6) {
-            check_flag = false;
+    _fi_process(() => {
+        const weekday = checkDate.getDay();
+        if (now.getHours() >= _fi_CUTOFF_HOUR_FOR_NEXT_DAY || (weekday === _fi_SUNDAY || weekday === _fi_SATURDAY)) {
+            checkFlag = false;
         }
-        const ymd = check_date.toISOString().slice(0, 10);
+        const ymd = checkDate.toISOString().slice(0, 10);
         _fi_is_national_holiday(ymd, (name) => {
             if (name) {
-                check_flag = false;
+                checkFlag = false;
             }
             // 1/1～1/3は不可
-            if (check_date.getMonth() === 0 && check_date.getDate() <= 3) {
-                check_flag = false;
+            if (checkDate.getMonth() === _fi_JANUARY && _fi_NEW_YEAR_DAYS.includes(checkDate.getDate())) {
+                checkFlag = false;
             }
             // 12/31は不可
-            if (check_date.getMonth() === 11 && check_date.getDate() === 31) {
-                check_flag = false;
+            if (checkDate.getMonth() === _fi_DECEMBER && checkDate.getDate() === _fi_NEW_YEAR_EVE) {
+                checkFlag = false;
             }
-            callback(check_flag);
+            callback(checkFlag);
         });
     });
 };
 
 /**
- * 文字列のバイト数を確認する関数
- * @param {string} char - 文字列
- * @returns {number|null} - バイト数、文字列がない場合はnull
+ * 文字列のバイト数（全銀手順基準）を計算します。
+ * @function
+ * @param {string} inputStr - バイト数計算対象の文字列（全角・半角・記号・漢字混在可）。
+ * @returns {number} バイト数（ASCII・半角カナは1バイト、全角カナ・漢字等は2バイト）。
+ * @throws {Error} 引数が文字列でない場合、未入力の場合、全銀手順で許可されない文字が含まれる場合。
+ * @public
+ * @example <caption>通常の利用例</caption>
+ * getByteLength('ﾀﾛｳ'); // => 3
+ * getByteLength('タロウ'); // => 6
+ * getByteLength('山田太郎'); // => 8
+ *
+ * @example <caption>全銀手順で許可されない文字が含まれる場合</caption>
+ * try {
+ *   getByteLength('山田😊');
+ * } catch (e) {
+ *   alert(e.message); // => '全銀手順で許可されない文字が含まれています'
+ * }
  */
-const getByteLength = (char) => {
-    if (typeof char !== 'string' || char.length === 0) return null;
-    if (!_fi_is_zengin_allowed_chars(char)) return null;
+const getByteLength = (inputStr) => {
+    if (typeof inputStr !== 'string') throw new _fi_FinancialInstitutionError('バイト数計算対象の文字列は文字列である必要があります', 'logic');
+    if (inputStr.length === 0) throw new _fi_FinancialInstitutionError('バイト数計算対象の文字列が未入力です', 'logic');
+    if (!_fi_is_zengin_allowed_chars(inputStr)) throw new _fi_FinancialInstitutionError('全銀手順で許可されない文字が含まれています', 'validation');
     let bytes = 0;
-    for (let c = 0; c < char.length; c++) {
-        const code = char.charCodeAt(c);
+    for (let c = 0; c < inputStr.length; c++) {
+        const code = inputStr.charCodeAt(c);
         // ASCII・半角カナは1バイト
         if (
             (code >= 0x00 && code <= 0x7F) || // ASCII
@@ -777,20 +1044,37 @@ const getByteLength = (char) => {
 };
 
 /**
- * 文字列を指定したバイト数で切り取る関数（マルチバイト文字対応）
- * @param {string} char - 文字列
- * @param {number} byte_length - 切り取りたいバイト数
- * @returns {string|null} - 切り取った文字列、失敗した場合はnull
+ * 文字列を指定したバイト数で切り取る関数（マルチバイト・全銀手順対応）。
+ * @function
+ * @param {string} inputStr - 切り取り対象の文字列（全角・半角・記号・漢字混在可）。
+ * @param {number} byteLength - 切り取りたいバイト数（1以上の整数）。
+ * @returns {string} 指定バイト数で切り取った文字列（バイト数超過部分は切り捨て）。
+ * @throws {Error} 引数が不正な場合（文字列でない、未入力、バイト数が1未満など）。
+ * @public
+ * @example <caption>通常の利用例</caption>
+ * sliceByByteLength('山田太郎', 6); // => '山田太'
+ * sliceByByteLength('ﾀﾛｳ', 2); // => 'ﾀﾛ'
+ * sliceByByteLength('タロウ', 4); // => 'タロ'
+ *
+ * @example <caption>バイト数が1未満の場合</caption>
+ * try {
+ *   sliceByByteLength('山田太郎', 0);
+ * } catch (e) {
+ *   alert(e.message); // => '切り取りバイト数が不正です'
+ * }
  */
-const sliceByByteLength = (char, byte_length) => {
-    if (typeof char !== 'string' || char.length === 0 || typeof byte_length !== 'number' || byte_length < 1) return null;
+const sliceByByteLength = (inputStr, byteLength) => {
+    if (typeof inputStr !== 'string') throw new _fi_FinancialInstitutionError('バイト数で切り取りたい文字列は文字列である必要があります', 'logic');
+    if (typeof byteLength !== 'number') throw new _fi_FinancialInstitutionError('切り取りたいバイト数は数値である必要があります', 'logic');
+    if (inputStr.length === 0) throw new _fi_FinancialInstitutionError('バイト数で切り取りたい文字列が未入力です', 'logic');
+    if (byteLength < 1) throw new _fi_FinancialInstitutionError('切り取りバイト数が不正です', 'logic');
     let result = '';
     let length = 0;
-    for (let char_slice of char) {
-    const char_slice_byte = getByteLength(char_slice);
-        if (length + char_slice_byte > byte_length) break;
-        result += char_slice;
-        length += char_slice_byte;
+    for (let charSlice of inputStr) {
+        const charSliceByte = getByteLength(charSlice);
+        if (length + charSliceByte > byteLength) break;
+        result += charSlice;
+        length += charSliceByte;
     }
     return result;
 };
