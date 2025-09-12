@@ -464,10 +464,12 @@ const findBank = (bankChar, successCallback, failureCallback) => {
             })
             .catch(err => {
                 if (failureCallback) {
-                    if (!(err instanceof _fi_FinancialInstitutionError)) {
-                        err = new _fi_FinancialInstitutionError(err && err.message ? err.message : 'ネットワークエラーまたは不明なエラー', 'ajax');
+                    // fetch失敗時も「銀行が見つかりません」と返す
+                    let message = '銀行が見つかりません';
+                    if (err instanceof _fi_FinancialInstitutionError) {
+                        message = err.message;
                     }
-                    failureCallback(err);
+                    failureCallback(new _fi_FinancialInstitutionError(message, 'ajax'));
                 }
             });
         return;
@@ -606,8 +608,12 @@ const findBankBranch = (bankChar, bankBranchChar, successCallback, failureCallba
                 })
                 .catch(err => {
                     if (failureCallback) {
-                        if (!(err instanceof _fi_FinancialInstitutionError)) err = new _fi_FinancialInstitutionError(err && err.message ? err.message : 'ネットワークエラーまたは不明なエラー', 'ajax');
-                        failureCallback(err);
+                        // fetch失敗時も「支店が見つかりません」と返す
+                        let message = '支店が見つかりません';
+                        if (err instanceof _fi_FinancialInstitutionError) {
+                            message = err.message;
+                        }
+                        failureCallback(new _fi_FinancialInstitutionError(message, 'ajax'));
                     }
                 });
             return;
