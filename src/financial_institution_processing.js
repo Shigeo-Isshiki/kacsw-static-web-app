@@ -14,13 +14,16 @@ const _fi_BANK_API_BASE_URL = 'https://bank.teraren.com';
 const _fi_HOLIDAY_API_BASE_URL = 'https://api.national-holidays.jp';
 /**
  * 金融機関処理用の統一エラークラス
+ * @class
  * @extends {Error}
+ * @param {string} message エラーメッセージ
+ * @param {'logic'|'ajax'|'validation'|'unknown'} [type='unknown'] エラー種別
+ * @property {string} name エラー名（NationalHolidayError）
+ * @property {'logic'|'ajax'|'validation'|'unknown'} type エラー種別
+ * @throws {Error} 継承元Errorの例外
+ * @private
  */
 class _fi_FinancialInstitutionError extends Error {
-    /**
-     * @param {string} message エラーメッセージ
-     * @param {'logic'|'ajax'|'validation'|'unknown'} type エラー種別
-     */
     constructor(message, type = 'unknown') {
         super(message);
         this.name = 'FinancialInstitutionError';
@@ -347,31 +350,53 @@ const _fi_is_zengin_allowed_chars = (str) => {
     return zenginReg.test(str);
 };
 /**
- * 国民の祝日・休日を取得する関数（コールバック型・非同期）
- * @function
- * @param {string} date_str ISO 8601拡張形式の西暦表記（YYYY-MM-DD）の文字列
- * @param {(holidayName: string|null) => void} callback 祝日名（なければnull）を返すコールバック
+ * 指定した日付が国民の祝日かどうかを判定し、祝日名またはnullをコールバックで返す（非同期）
+ *
+ * @function _fi_getNationalHolidayName
+ * @param {string} date_str - ISO 8601拡張形式（YYYY-MM-DD）の日付文字列
+ * @param {(holidayName: string|null) => void} callback - 祝日名（該当しなければnull）を返すコールバック関数
  * @returns {void}
+ * @throws {_nh_FinancialInstitutionError} date_strやcallbackの型が不正な場合
  * @private
+ * @example
+ * _fi_getNationalHolidayName('2025-09-15', (name) => {
+ *   if (name) {
+ *     console.log('祝日:', name);
+ *   } else {
+ *     console.log('祝日ではありません');
+ *   }
+ * });
+ *
+ * @remarks
+ * - 1948-07-20以前の日付は祝日判定対象外です。
+ * - APIレスポンスの型チェックを行い、不正なデータは無視します。
+ * - fetch通信エラーやAPI異常時は必ずnullを返します。
  */
-const _fi_is_national_holiday = (date_str, callback) => {
+const _fi_getNationalHolidayName = (date_str, callback) => {
     if (typeof date_str !== 'string') throw new _fi_FinancialInstitutionError('検索対象の日付は文字列である必要があります', 'logic');
     if (typeof callback !== 'function') throw new _fi_FinancialInstitutionError('コールバックは関数である必要があります', 'logic');
     if (!date_str) return callback(null);
-    const yearChar = date_str.slice(0, 4);
     if (date_str < '1948-07-20') return callback(null);
-    fetch(_fi_HOLIDAY_API_BASE_URL + '/' + yearChar)
-        .then(res => res.ok ? res.json() : [])
-        .then(holidays => {
-            if (Array.isArray(holidays) && holidays.length > 0) {
-                for (const row of holidays) {
-                    if (date_str === row.date) {
-                        callback(row.name);
-                        return;
-                    }
+    fetch(_fi_HOLIDAY_API_BASE_URL + '/' + date_str)
+        .then(res => {
+            if (!res.ok) {
+                throw new Error('祝日APIのレスポンスが不正です: ' + res.status);
+            }
+            return res.json();
+        })
+        .then(result => {
+            // 祝日でない場合 { error: "not_found" }
+            if (result && typeof result === 'object') {
+                if (result.error === 'not_found') {
+                    callback(null);
+                    return;
+                }
+                if (typeof result.date === 'string' && typeof result.name === 'string') {
+                    callback(result.name);
+                    return;
                 }
             }
-            // holidaysが空配列、または該当日がなければ必ずnullを返す
+            // それ以外はnull
             callback(null);
         })
         .catch(err => {
@@ -963,7 +988,7 @@ const isValidTransferDate = (designateTransferDate, todaySw = false, callback) =
             // 祝日をスキップ
             const _fi_skipHoliday = (date, cb) => {
                 const ymd = date.toISOString().slice(0, 10);
-                _fi_is_national_holiday(ymd, (name) => {
+                _fi_getNationalHolidayName(ymd, (name) => {
                     if (name) {
                         date.setDate(date.getDate() + 1);
                         _fi_skipHoliday(date, cb);
@@ -992,7 +1017,7 @@ const isValidTransferDate = (designateTransferDate, todaySw = false, callback) =
             checkFlag = false;
         }
         const ymd = checkDate.toISOString().slice(0, 10);
-        _fi_is_national_holiday(ymd, (name) => {
+        _fi_getNationalHolidayName(ymd, (name) => {
             if (name) {
                 checkFlag = false;
             }
