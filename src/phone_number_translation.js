@@ -931,6 +931,11 @@ const _pn_getPhoneNumberOnly = (str) => {
 const _pn_getPhoneType = (number) => {
     const num = _pn_getPhoneNumberOnly(number); // この時点でエラーが投げられる可能性あり
     
+    // 14桁番号のtype判定
+    if (num.length === 14) {
+        const prefix4 = num.substring(0, 4);
+        if (prefix4 === '0200') return 'm2m'; // 0200はM2M専用
+    }
     // 11桁番号のtype判定（digit11PhoneNumberRangeの各typeに対応）
     if (num.length === 11) {
         // 4桁prefix優先
@@ -1200,9 +1205,34 @@ const phone_number_formatting = (telephoneNumber) => {
     if (!_pn_isValidJapanesePhoneNumber(telephoneNumber)) {
         throw new Error(`無効な日本国内電話番号です（桁数・形式が不正です）: ${telephoneNumber}`);
     }
+    // 正規化
+    const num = _pn_getPhoneNumberOnly(telephoneNumber);
+    // 市外局番リスト取得
+    const areaCodeList = _pn_getAreaCodeList();
+    let found = false;
+    for (let c = 0, l = areaCodeList.length; c < l; c++) {
+        let areaCodeLen = areaCodeList[c];
+        let areaCode = num.substring(0, areaCodeLen);
+        let localLen = _pn_getAreaCodeInfo(areaCodeLen, areaCode);
+        if (localLen) {
+            found = true;
+            // areaCodeRangesに範囲が定義されている場合は必ず範囲チェック
+            const range = _pn_getLocalAreaCodeRange(areaCode);
+            if (range) {
+                const local_code = Number(num.substring(areaCodeLen, areaCodeLen + localLen));
+                if (!range.some(([min, max]) => local_code >= min && local_code <= max)) {
+                    throw new Error(`無効な日本国内電話番号です（桁数・形式が不正です）: ${telephoneNumber}`);
+                }
+            }
+            break;
+        }
+    }
+    if (!found) {
+        throw new Error(`無効な日本国内電話番号です（桁数・形式が不正です）: ${telephoneNumber}`);
+    }
     // まず新しい汎用ロジックで判定・フォーマット
     const formatted = _pn_formatPhoneNumber(telephoneNumber);
-    if (formatted && formatted !== _pn_getPhoneNumberOnly(telephoneNumber)) {
+    if (formatted && formatted !== num) {
         return formatted;
     }
     // フォールバックとして従来の詳細ロジックを分離関数で適用
