@@ -1130,8 +1130,9 @@ const _pn_isValidJapanesePhoneNumber = (str) => {
     // 11桁は携帯・PHS等のprefixのみ許可
     if (num.length === 11) {
         const prefix4 = num.substring(0, 4);
+        const prefix3 = num.substring(0, 3);
         const digit11Prefixes = Object.values(_pn_phoneNumberData.digit11PhoneNumberRange).flat();
-        if (digit11Prefixes.includes(prefix4)) {
+        if (digit11Prefixes.includes(prefix4) || digit11Prefixes.includes(prefix3)) {
             return true;
         }
         return false;
