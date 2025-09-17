@@ -1207,28 +1207,35 @@ const phone_number_formatting = (telephoneNumber) => {
     }
     // 正規化
     const num = _pn_getPhoneNumberOnly(telephoneNumber);
-    // 市外局番リスト取得
+    // 市外局番リスト取得（最長一致優先）
     const areaCodeList = _pn_getAreaCodeList();
     let found = false;
+    let matchedAreaCodeLen = null;
+    let matchedAreaCode = null;
+    let matchedLocalLen = null;
     for (let c = 0, l = areaCodeList.length; c < l; c++) {
         let areaCodeLen = areaCodeList[c];
         let areaCode = num.substring(0, areaCodeLen);
         let localLen = _pn_getAreaCodeInfo(areaCodeLen, areaCode);
         if (localLen) {
+            // 最初に見つかった最長一致を記録
+            matchedAreaCodeLen = areaCodeLen;
+            matchedAreaCode = areaCode;
+            matchedLocalLen = localLen;
             found = true;
-            // areaCodeRangesに範囲が定義されている場合は必ず範囲チェック
-            const range = _pn_getLocalAreaCodeRange(areaCode);
-            if (range) {
-                const local_code = Number(num.substring(areaCodeLen, areaCodeLen + localLen));
-                if (!range.some(([min, max]) => local_code >= min && local_code <= max)) {
-                    throw new Error(`無効な日本国内電話番号です（桁数・形式が不正です）: ${telephoneNumber}`);
-                }
-            }
             break;
         }
     }
     if (!found) {
         throw new Error(`無効な日本国内電話番号です（桁数・形式が不正です）: ${telephoneNumber}`);
+    }
+    // areaCodeRangesに範囲が定義されている場合は必ず範囲チェック
+    const range = _pn_getLocalAreaCodeRange(matchedAreaCode);
+    if (range) {
+        const local_code = Number(num.substring(matchedAreaCodeLen, matchedAreaCodeLen + matchedLocalLen));
+        if (!range.some(([min, max]) => local_code >= min && local_code <= max)) {
+            throw new Error(`無効な日本国内電話番号です（桁数・形式が不正です）: ${telephoneNumber}`);
+        }
     }
     // まず新しい汎用ロジックで判定・フォーマット
     const formatted = _pn_formatPhoneNumber(telephoneNumber);
