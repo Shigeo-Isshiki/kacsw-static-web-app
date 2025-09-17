@@ -1127,8 +1127,21 @@ const _pn_isValidJapanesePhoneNumber = (str) => {
     }
     // 091で始まる6～13桁の特殊番号を許可
     if (num.startsWith('091') && num.length >= 6 && num.length <= 13) return true;
-    // 桁数チェック
-    if (num.length === 10 || num.length === 11) return true;
+    // 10桁/11桁の場合は市外局番リストに該当しなければfalse
+    if (num.length === 10 || num.length === 11) {
+        const areaCodeList = _pn_getAreaCodeList();
+        let found = false;
+        for (let c = 0, l = areaCodeList.length; c < l; c++) {
+            let areaCodeLen = areaCodeList[c];
+            let areaCode = num.substring(0, areaCodeLen);
+            if (_pn_getAreaCodeInfo(areaCodeLen, areaCode)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) return false;
+        return true;
+    }
     // 14桁特殊番号（0200...）
     if (num.length === 14 && num.startsWith('0200')) return true;
     return false;
