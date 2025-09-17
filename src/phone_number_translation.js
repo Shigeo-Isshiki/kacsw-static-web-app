@@ -5,6 +5,12 @@
  * また、電話番号の入力に使用される可能性のある全角数字や記号を半角数字に変換し、不要な記号を削除します。
  * 電話番号データ（_pn_phoneNumberData関数内に格納）は、2025年8月1日現在の総務省の公開情報（https://www.soumu.go.jp/main_sosiki/joho_tsusin/top/tel_number/index.html）に基づいています。
  * なお、このプログラムは日本国内の利用者設備識別番号のうちIMSIを除いた番号に特化しており、国際電話番号には対応していません。
+ * 
+ * エラーハンドリング:
+ * - 無効な電話番号入力に対しては、throw new Error()で適切なエラーメッセージを投げます。
+ * - 従来のnull返却ではなく、例外ベースのエラーハンドリングを採用しています。
+ * - 使用時はtry-catch文でエラーをキャッチしてください。
+ * 
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
  * @version 1.0.0
  */
@@ -899,22 +905,32 @@ const _pn_zenkakuNumReg = /[０-９]/g;
 /**
  * 電話番号として処理できる数字のみの文字列に変換する関数（正規化）
  * @param {string|number|null|undefined} str - 入力された文字列
- * @returns {string|null} 電話番号として処理できる数字のみの文字列、もしくはnull
+ * @returns {string} 電話番号として処理できる数字のみの文字列
+ * @throws {Error} 入力が空または数字を含まない場合にエラーを投げる
  */
 const _pn_getPhoneNumberOnly = (str) => {
-    if (!str) return null;
-    return String(str)
+    if (!str) {
+        throw new Error('電話番号が入力されていません');
+    }
+    const result = String(str)
         .replace(_pn_removeSymbolsReg, '') // 記号除去
         .replace(_pn_zenkakuNumReg, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)); // 全角数字→半角
+    
+    if (!result || !/^\d+$/.test(result)) {
+        throw new Error(`電話番号として無効です（数字以外の文字が含まれているか、数字が含まれていません）: ${str}`);
+    }
+    
+    return result;
 };
 /**
  * 電話番号の種別を判定する関数
  * @param {string|number|null|undefined} number - 入力された電話番号
  * @returns {string} 'landline' | 'mobile' | 'special' | 'unknown'
+ * @throws {Error} 無効な入力の場合にエラーを投げる
  */
 const _pn_getPhoneType = (number) => {
-    const num = _pn_getPhoneNumberOnly(number);
-    if (!num) return 'unknown';
+    const num = _pn_getPhoneNumberOnly(number); // この時点でエラーが投げられる可能性あり
+    
     // 11桁番号のtype判定（digit11PhoneNumberRangeの各typeに対応）
     if (num.length === 11) {
         // 4桁prefix優先
@@ -985,11 +1001,12 @@ const _pn_getHyphenPattern = (number, type) => {
 /**
  * 電話番号を正規化し、ハイフン付きでフォーマットする関数
  * @param {string|number|null|undefined} str - 入力された電話番号
- * @returns {string|null} フォーマット済み電話番号、もしくはnull
+ * @returns {string} フォーマット済み電話番号
+ * @throws {Error} 無効な電話番号の場合にエラーを投げる
  */
 const _pn_formatPhoneNumber = (str) => {
-    const num = _pn_getPhoneNumberOnly(str);
-    if (!num) return null;
+    const num = _pn_getPhoneNumberOnly(str); // この時点でエラーが投げられる可能性あり
+    
     // 091特殊番号は必ず091-以下全て
     if (num.startsWith('091') && num.length >= 6 && num.length <= 13) {
         return `${num.substring(0,3)}-${num.substring(3)}`;
@@ -1119,11 +1136,12 @@ const _pn_isValidJapanesePhoneNumber = (str) => {
 /**
  * フォールバック用の従来詳細ロジック
  * @param {string|number|null|undefined} telephoneNumber
- * @returns {string|null}
+ * @returns {string} フォーマット済み電話番号
+ * @throws {Error} フォーマットに失敗した場合にエラーを投げる
  */
 const _pn_fallbackFormatPhoneNumber = (telephoneNumber) => {
-    const telephoneNumberPNO = _pn_getPhoneNumberOnly(telephoneNumber);
-    if (!telephoneNumberPNO) return null;
+    const telephoneNumberPNO = _pn_getPhoneNumberOnly(telephoneNumber); // この時点でエラーが投げられる可能性あり
+    
     // 11桁の携帯・PHS等
     if (_pn_is11DigitMobile(telephoneNumberPNO)) {
         return _pn_format11DigitMobile(telephoneNumberPNO);
@@ -1152,29 +1170,38 @@ const _pn_fallbackFormatPhoneNumber = (telephoneNumber) => {
 /**
  * 日本国内用バリデーションを強化した電話番号フォーマット関数
  * @param {string|number|null|undefined} telephoneNumber - 入力された電話番号
- * @returns {string|null} ハイフン位置を修正した電話番号、もしくはnull
+ * @returns {string} ハイフン位置を修正した電話番号
+ * @throws {Error} 無効な電話番号の場合にエラーを投げる
  */
 const phone_number_formatting = (telephoneNumber) => {
-    if (!telephoneNumber) return null;
+    if (!telephoneNumber) {
+        throw new Error('電話番号が入力されていません');
+    }
     // まず日本国内用バリデーション
-    if (!_pn_isValidJapanesePhoneNumber(telephoneNumber)) return null;
+    if (!_pn_isValidJapanesePhoneNumber(telephoneNumber)) {
+        throw new Error(`無効な日本国内電話番号です（桁数・形式が不正です）: ${telephoneNumber}`);
+    }
     // まず新しい汎用ロジックで判定・フォーマット
     const formatted = _pn_formatPhoneNumber(telephoneNumber);
     if (formatted && formatted !== _pn_getPhoneNumberOnly(telephoneNumber)) {
         return formatted;
     }
     // フォールバックとして従来の詳細ロジックを分離関数で適用
-    return _pn_fallbackFormatPhoneNumber(telephoneNumber);
+    const fallbackResult = _pn_fallbackFormatPhoneNumber(telephoneNumber);
+    if (!fallbackResult) {
+        throw new Error(`有効な電話番号ではありません: ${telephoneNumber}`);
+    }
+    return fallbackResult;
 };
 
 /**
  * フォーマット済み電話番号と携帯判定を返す拡張関数
  * @param {string|number|null|undefined} telephoneNumber
- * @returns {{ formatted: string|null, isMobile: boolean }}
+ * @returns {{ formatted: string, isMobile: boolean, type: string }}
+ * @throws {Error} 無効な電話番号の場合にエラーを投げる
  */
 const phone_number_formatting_with_type = (telephoneNumber) => {
-    const formatted = phone_number_formatting(telephoneNumber);
-    if (!formatted) return { formatted: null, isMobile: false, type: 'unknown' };
+    const formatted = phone_number_formatting(telephoneNumber); // この時点でエラーが投げられる可能性あり
     const num = _pn_getPhoneNumberOnly(telephoneNumber);
     const type = _pn_getPhoneType(num);
     return {
