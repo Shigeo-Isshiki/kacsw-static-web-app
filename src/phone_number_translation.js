@@ -1139,6 +1139,14 @@ const _pn_isValidJapanesePhoneNumber = (str) => {
                 break;
             }
         }
+        // 11桁の場合は携帯・PHS等のprefixでなければNG
+        if (num.length === 11) {
+            const prefix4 = num.substring(0, 4);
+            const digit11Prefixes = Object.values(_pn_phoneNumberData.digit11PhoneNumberRange).flat();
+            if (!digit11Prefixes.includes(prefix4)) {
+                return false;
+            }
+        }
         if (!found) return false;
         return true;
     }
