@@ -967,6 +967,10 @@ const _pn_getPhoneType = (number) => {
 const _pn_getHyphenPattern = (number, type) => {
     const num = _pn_getPhoneNumberOnly(number);
     if (!num) return [];
+    // 14桁の0200番号（M2M専用）は[4,5,5]で分割
+    if (num.length === 14 && num.startsWith('0200')) {
+        return [4, 5, 5];
+    }
     // 11桁系番号
     if (
         type === 'mobile' ||
