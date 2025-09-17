@@ -1127,8 +1127,17 @@ const _pn_isValidJapanesePhoneNumber = (str) => {
     }
     // 091で始まる6～13桁の特殊番号を許可
     if (num.startsWith('091') && num.length >= 6 && num.length <= 13) return true;
-    // 10桁/11桁の場合は市外局番リストに該当しなければfalse
-    if (num.length === 10 || num.length === 11) {
+    // 11桁は携帯・PHS等のprefixのみ許可
+    if (num.length === 11) {
+        const prefix4 = num.substring(0, 4);
+        const digit11Prefixes = Object.values(_pn_phoneNumberData.digit11PhoneNumberRange).flat();
+        if (digit11Prefixes.includes(prefix4)) {
+            return true;
+        }
+        return false;
+    }
+    // 10桁は市外局番リストに該当しなければfalse
+    if (num.length === 10) {
         const areaCodeList = _pn_getAreaCodeList();
         let found = false;
         for (let c = 0, l = areaCodeList.length; c < l; c++) {
@@ -1137,14 +1146,6 @@ const _pn_isValidJapanesePhoneNumber = (str) => {
             if (_pn_getAreaCodeInfo(areaCodeLen, areaCode)) {
                 found = true;
                 break;
-            }
-        }
-        // 11桁の場合は携帯・PHS等のprefixでなければNG
-        if (num.length === 11) {
-            const prefix4 = num.substring(0, 4);
-            const digit11Prefixes = Object.values(_pn_phoneNumberData.digit11PhoneNumberRange).flat();
-            if (!digit11Prefixes.includes(prefix4)) {
-                return false;
             }
         }
         if (!found) return false;
