@@ -1201,7 +1201,7 @@ const phone_number_formatting = (telephoneNumber) => {
     if (!telephoneNumber) {
         throw new Error('電話番号が入力されていません');
     }
-    // まず日本国内用バリデーション
+    // バリデーション
     if (!_pn_isValidJapanesePhoneNumber(telephoneNumber)) {
         throw new Error(`無効な日本国内電話番号です（桁数・形式が不正です）: ${telephoneNumber}`);
     }
@@ -1218,7 +1218,6 @@ const phone_number_formatting = (telephoneNumber) => {
         let areaCode = num.substring(0, areaCodeLen);
         let localLen = _pn_getAreaCodeInfo(areaCodeLen, areaCode);
         if (localLen) {
-            // 最初に見つかった最長一致を記録
             matchedAreaCodeLen = areaCodeLen;
             matchedAreaCode = areaCode;
             matchedLocalLen = localLen;
@@ -1233,9 +1232,7 @@ const phone_number_formatting = (telephoneNumber) => {
     const range = _pn_getLocalAreaCodeRange(matchedAreaCode);
     if (range) {
         const local_code_str = num.substring(matchedAreaCodeLen, matchedAreaCodeLen + matchedLocalLen);
-        // ゼロパディング長
         const padLen = local_code_str.length;
-        // 文字列比較で範囲チェック
         if (!range.some(([min, max]) => {
             const minStr = String(min).padStart(padLen, '0');
             const maxStr = String(max).padStart(padLen, '0');
@@ -1244,17 +1241,9 @@ const phone_number_formatting = (telephoneNumber) => {
             throw new Error(`無効な日本国内電話番号です（桁数・形式が不正です）: ${telephoneNumber}`);
         }
     }
-    // まず新しい汎用ロジックで判定・フォーマット
+    // ここまでバリデーションを通過した場合のみフォーマット
     const formatted = _pn_formatPhoneNumber(telephoneNumber);
-    if (formatted && formatted !== num) {
-        return formatted;
-    }
-    // フォールバックとして従来の詳細ロジックを分離関数で適用
-    const fallbackResult = _pn_fallbackFormatPhoneNumber(telephoneNumber);
-    if (!fallbackResult) {
-        throw new Error(`有効な電話番号ではありません: ${telephoneNumber}`);
-    }
-    return fallbackResult;
+    return formatted;
 };
 
 /**
