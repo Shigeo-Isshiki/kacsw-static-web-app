@@ -1232,8 +1232,15 @@ const phone_number_formatting = (telephoneNumber) => {
     // areaCodeRangesに範囲が定義されている場合は必ず範囲チェック
     const range = _pn_getLocalAreaCodeRange(matchedAreaCode);
     if (range) {
-        const local_code = Number(num.substring(matchedAreaCodeLen, matchedAreaCodeLen + matchedLocalLen));
-        if (!range.some(([min, max]) => local_code >= min && local_code <= max)) {
+        const local_code_str = num.substring(matchedAreaCodeLen, matchedAreaCodeLen + matchedLocalLen);
+        // ゼロパディング長
+        const padLen = local_code_str.length;
+        // 文字列比較で範囲チェック
+        if (!range.some(([min, max]) => {
+            const minStr = String(min).padStart(padLen, '0');
+            const maxStr = String(max).padStart(padLen, '0');
+            return local_code_str >= minStr && local_code_str <= maxStr;
+        })) {
             throw new Error(`無効な日本国内電話番号です（桁数・形式が不正です）: ${telephoneNumber}`);
         }
     }
