@@ -1013,7 +1013,9 @@ const isValidTransferDate = (designateTransferDate, todaySw = false, callback) =
     // 曜日・祝日・年末年始判定
     _fi_process(() => {
         const weekday = checkDate.getDay();
-        if (now.getHours() >= _fi_CUTOFF_HOUR_FOR_NEXT_DAY || (weekday === _fi_SUNDAY || weekday === _fi_SATURDAY)) {
+        // cutoff(18時以降は翌日扱い)は todaySw=true の評価時のみ影響させる。
+        // 仕様: todaySw=false の場合は曜日/祝日/年末年始のみを見る。
+        if ((weekday === _fi_SUNDAY || weekday === _fi_SATURDAY) || (todaySw && now.getHours() >= _fi_CUTOFF_HOUR_FOR_NEXT_DAY)) {
             checkFlag = false;
         }
         const ymd = checkDate.toISOString().slice(0, 10);
