@@ -941,18 +941,16 @@ const convertAccountHolderKana = (inputStr, acronymSw = true) => {
  * 振込指定日が有効かどうかを判定する非同期関数（コールバック型）。
  * @function
  * @param {string} designateTransferDate - 振込指定日（ISO形式: 'YYYY-MM-DD' など）。
- * @param {boolean|((isValid:boolean)=>void)} [todaySw=false] - 日付限定スイッチ または コールバック（第2引数をコールバックにした簡易呼び出し可）。
- * @param {(isValid: boolean) => void} [callback] - 判定結果（有効:true/無効:false）を返すコールバック関数。省略時はPromise<boolean>を返す。
- * @returns {void|Promise<boolean>} コールバック省略時はPromise<boolean>。
+ * @param {boolean} todaySw - 日付限定スイッチ（true:今日以降14日以内かつ平日・営業日かを判定/false:日付範囲判定なし）。
+ * @param {(isValid: boolean) => void} callback - 判定結果（有効:true/無効:false）を返すコールバック関数。
+ * @returns {void}
  * @throws {Error} 引数の型が不正な場合。
  * @public
  * @description
- * - todaySw=true の場合: 現在（18時以降は翌日扱い）を起点とした 1～14 日以内かつ平日・営業日（祝日・年末年始（12/31～1/3）除く）かを判定。
- * - todaySw=false の場合: 指定日の曜日・祝日・年末年始（12/31～1/3）のみを判定（時間制限なし）。
- * - コールバックを省略すると Promise モードで利用できます。
+ * - todaySw=trueの場合、今日（18時以降は翌日扱い）から14日以内かつ平日・営業日（祝日・年末年始（12/31～1/3）除く）かを判定します。
+ * - todaySw=falseの場合は、曜日・祝日・年末年始（12/31～1/3）のみ判定します。
  *
  * @example <caption>通常の利用例</caption>
- * // コールバック利用
  * isValidTransferDate('2025-09-15', true, (isValid) => {
  *   if (isValid) {
  *     alert('指定日は有効です');
@@ -960,13 +958,6 @@ const convertAccountHolderKana = (inputStr, acronymSw = true) => {
  *     alert('指定日は無効です');
  *   }
  * });
- *
- * // 第2引数に直接コールバック（todaySw省略）
- * isValidTransferDate('2025-09-24', (ok) => console.log(ok));
- *
- * // Promise 利用
- * const ok = await isValidTransferDate('2025-09-24', true);
- * console.log(ok);
  *
  * @example <caption>型不正時の例外</caption>
  * try {
@@ -976,79 +967,71 @@ const convertAccountHolderKana = (inputStr, acronymSw = true) => {
  * }
  */
 const isValidTransferDate = (designateTransferDate, todaySw = false, callback) => {
-    // 引数揺れ対応: 第2引数が関数なら todaySw 省略
-    if (typeof todaySw === 'function') {
-        callback = todaySw;
-        todaySw = false;
-    }
-    const promiseMode = (typeof callback === 'undefined');
-    // バリデーション
     if (typeof designateTransferDate !== 'string') throw new _fi_FinancialInstitutionError('振込指定日は文字列である必要があります', 'logic');
     if (typeof todaySw !== 'boolean') throw new _fi_FinancialInstitutionError('日付限定スイッチはboolean型である必要があります', 'logic');
-    if (!promiseMode && typeof callback !== 'function') throw new _fi_FinancialInstitutionError('コールバックは関数である必要があります', 'logic');
+    if (typeof callback !== 'function') throw new _fi_FinancialInstitutionError('コールバックは関数である必要があります', 'logic');
+    if (designateTransferDate.length === 0) return callback(false);
+    let now = new Date();
+    let checkFlag = true;
+    // ISO日付文字列をDateに変換
+    const checkDate = new Date(designateTransferDate);
+    if (isNaN(checkDate.getTime())) return callback(false);
 
-    const executor = (resolveCb) => {
-        if (designateTransferDate.length === 0) return resolveCb(false);
-        const now = new Date();
-        let checkFlag = true;
-        const checkDate = new Date(designateTransferDate);
-        if (isNaN(checkDate.getTime())) return resolveCb(false);
-
-        const _fi_process = (skipHolidayCb) => {
-            if (todaySw) {
-                let today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                if (now.getHours() >= _fi_CUTOFF_HOUR_FOR_NEXT_DAY) {
-                    today.setDate(today.getDate() + 1);
-                }
-                const _fi_skipHoliday = (date, cb) => {
-                    const ymd = date.toISOString().slice(0, 10);
-                    _fi_getNationalHolidayName(ymd, (name) => {
-                        if (name) {
-                            date.setDate(date.getDate() + 1);
-                            _fi_skipHoliday(date, cb);
-                        } else {
-                            cb(date);
-                        }
-                    });
-                };
-                _fi_skipHoliday(today, (validToday) => {
-                    const diffDays = Math.floor((checkDate - validToday) / (1000 * 60 * 60 * 24));
-                    if (diffDays < _fi_TRANSFER_DATE_MIN_DAYS || diffDays >= _fi_TRANSFER_DATE_MAX_DAYS) {
-                        checkFlag = false;
+    // 今日の判定
+    const _fi_process = (skipHolidayCb) => {
+        if (todaySw) {
+            let today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            // 18時以降は翌日扱い
+            if (now.getHours() >= _fi_CUTOFF_HOUR_FOR_NEXT_DAY) {
+                today.setDate(today.getDate() + 1);
+            }
+            // 祝日をスキップ
+            const _fi_skipHoliday = (date, cb) => {
+                const ymd = date.toISOString().slice(0, 10);
+                _fi_getNationalHolidayName(ymd, (name) => {
+                    if (name) {
+                        date.setDate(date.getDate() + 1);
+                        _fi_skipHoliday(date, cb);
+                    } else {
+                        cb(date);
                     }
-                    skipHolidayCb();
                 });
-            } else {
+            };
+            _fi_skipHoliday(today, (validToday) => {
+                // checkDateとtodayの差（日数）
+                const diffDays = Math.floor((checkDate - validToday) / (1000 * 60 * 60 * 24));
+                if (diffDays < _fi_TRANSFER_DATE_MIN_DAYS || diffDays >= _fi_TRANSFER_DATE_MAX_DAYS) {
+                    checkFlag = false;
+                }
                 skipHolidayCb();
-            }
-        };
-
-        _fi_process(() => {
-            const weekday = checkDate.getDay();
-            if ((weekday === _fi_SUNDAY || weekday === _fi_SATURDAY) || (todaySw && now.getHours() >= _fi_CUTOFF_HOUR_FOR_NEXT_DAY)) {
-                checkFlag = false;
-            }
-            const ymd = checkDate.toISOString().slice(0, 10);
-            _fi_getNationalHolidayName(ymd, (name) => {
-                if (name) {
-                    checkFlag = false;
-                }
-                if (checkDate.getMonth() === _fi_JANUARY && _fi_NEW_YEAR_DAYS.includes(checkDate.getDate())) {
-                    checkFlag = false;
-                }
-                if (checkDate.getMonth() === _fi_DECEMBER && checkDate.getDate() === _fi_NEW_YEAR_EVE) {
-                    checkFlag = false;
-                }
-                resolveCb(checkFlag);
             });
-        });
+        } else {
+            skipHolidayCb();
+        }
     };
 
-    if (promiseMode) {
-        return new Promise((resolve) => executor(resolve));
-    } else {
-        executor((r) => callback(r));
-    }
+    // 曜日・祝日・年末年始判定
+    _fi_process(() => {
+        const weekday = checkDate.getDay();
+        if (weekday === _fi_SUNDAY || weekday === _fi_SATURDAY) {
+            checkFlag = false;
+        }
+        const ymd = checkDate.toISOString().slice(0, 10);
+        _fi_getNationalHolidayName(ymd, (name) => {
+            if (name) {
+                checkFlag = false;
+            }
+            // 1/1～1/3は不可
+            if (checkDate.getMonth() === _fi_JANUARY && _fi_NEW_YEAR_DAYS.includes(checkDate.getDate())) {
+                checkFlag = false;
+            }
+            // 12/31は不可
+            if (checkDate.getMonth() === _fi_DECEMBER && checkDate.getDate() === _fi_NEW_YEAR_EVE) {
+                checkFlag = false;
+            }
+            callback(checkFlag);
+        });
+    });
 };
 
 /**
