@@ -1,6 +1,6 @@
 /** 文字列処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.0.0
+ * @version 1.1.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_ch_)で始める
 'use strict';
@@ -231,8 +231,28 @@ const convert_to_email_address = (email_address = '') => {
     const single_byte_characters = convert_to_single_byte_characters(trimmed);
     // 連続ドットや@直前・直後のドット禁止
     if (/\.\.|^\.|\.@|@\.|\.$/.test(single_byte_characters)) return '';
-    const email_pattern = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    const email_pattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return email_pattern.test(single_byte_characters) ? single_byte_characters : '';
+};
+
+/**
+ * メールアドレスの表記を半角文字に変換し、RFC 5322に基づいた形式であるかを判定し、正しくない場合は例外を投げる関数
+ * @param {string} emailAddress
+ * @returns {string} 正常な場合は変換済みメールアドレス
+ * @throws {Error} 不正な場合は例外
+ */
+const assertEmailAddress = (emailAddress = '') => {
+    if (!_ch_checkString(emailAddress)) throw new Error('メールアドレスは文字列である必要があります');
+    if (!emailAddress) throw new Error('メールアドレスが入力されていません');
+    // 前後空白除去
+    const trimmed = emailAddress.trim();
+    const singleByteCharacters = convert_to_single_byte_characters(trimmed);
+    // 連続ドットや@直前・直後のドット禁止
+    if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters)) throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
+    // 簡易的なRFC5322準拠の正規表現（一般的な用途で十分）
+    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailPattern.test(singleByteCharacters)) throw new Error('メールアドレスの形式が正しくありません');
+    return singleByteCharacters;
 };
 
 /**
