@@ -83,7 +83,7 @@ const _ch_buildPattern = (keys) => {
 /**
  * 半角カタカナ変換用のマップを作成する
  */
-const _ch_half_width_kana_map = new Map(Object.entries(_ch_convert_character_list.half_width_kana));
+const _ch_halfWidthKanaMap = new Map(Object.entries(_ch_convert_character_list.half_width_kana));
 /**
  * 全角カタカナ変換用のマップを作成する
  */
@@ -113,8 +113,8 @@ const _ch_replace_with_map = (str, pattern, map) => {
  */
 const convert_to_half_width_kana = (str = '') => {
     if (!_ch_checkString(str)) return '';
-    const half_width_kana_pattern = _ch_buildPattern(_ch_half_width_kana_map.keys());
-    return _ch_replace_with_map(str, half_width_kana_pattern, _ch_half_width_kana_map);
+    const half_width_kana_pattern = _ch_buildPattern(_ch_halfWidthKanaMap.keys());
+    return _ch_replace_with_map(str, half_width_kana_pattern, _ch_halfWidthKanaMap);
 };
 
 /**
@@ -258,6 +258,80 @@ const check_single_byte_kana = (str = '') => {
 };
 
 /**
+ * 文字列の中の各文字を半角カタカナに変換する関数
+ * @param {string} str 変換対象の文字列
+ * @param {boolean} [throwOnError=true] 変換不能な文字があった場合にエラーを投げるかどうか
+ * @returns {string} 可能な限り半角カタカナに変換した文字列
+ * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
+ */
+const toHalfWidthKana = (str = '', throwOnError = true) => {
+    if (!_ch_checkString(str)) throw new Error('変換対象は文字列である必要があります');
+    if (!str) throw new Error('変換対象の文字列が空です');
+    const halfWidthKanaPattern = _ch_buildPattern(_ch_halfWidthKanaMap.keys());
+    let errorChar = null;
+    const result = str.replace(halfWidthKanaPattern, char => _ch_halfWidthKanaMap.get(char) ?? char);
+    // 変換後に全角カタカナ・ひらがな・漢字・その他全角文字が残っていればエラー
+    for (const char of result) {
+        const code = char.charCodeAt(0);
+        if (
+            (code >= 0x4E00 && code <= 0x9FFF) || // 漢字
+            (code >= 0x3040 && code <= 0x309F) || // ひらがな
+            (code >= 0x30A0 && code <= 0x30FF) || // カタカナ
+            (code >= 0xFF00 && code <= 0xFFEF)    // その他全角
+        ) {
+            if (throwOnError) {
+                errorChar = char;
+                break;
+            }
+        }
+    }
+    if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
+    return result;
+};
+
+/**
+ * 文字列の中の各文字を半角文字（英数字・記号・スペース含む）に変換する関数
+ * @param {string} str 変換対象の文字列
+ * @param {boolean} [throwOnError=true] 変換不能な文字があった場合にエラーを投げるかどうか
+ * @returns {string} 半角文字に変換した文字列
+ * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
+ */
+const toHalfWidth = (str = '', throwOnError = true) => {
+    if (!_ch_checkString(str)) throw new Error('変換対象は文字列である必要があります');
+    if (!str) throw new Error('変換対象の文字列が空です');
+    const hyphenProcessed = str.replace(/[－‐‑–—−ー―]/g, '-');
+    try {
+        const halfWidthKana = toHalfWidthKana(hyphenProcessed, false);
+        let errorChar = null;
+        const singleByteCharacters = [...halfWidthKana].map((char) => {
+            const code = char.charCodeAt(0);
+            // 半角英数字・記号・スペース・カナ以外は変換不能とみなす
+            if (
+                (code >= 0xFF01 && code <= 0xFF5E) // 全角記号・英数字
+            ) {
+                return String.fromCodePoint(code - 0xFEE0);
+            }
+            if (char === '\u3000') return ' '; // 全角スペースを半角に
+            // 変換後が全角カナ・ひらがな・漢字・その他全角文字の場合はエラーまたはそのまま
+            if (
+                (code >= 0x4E00 && code <= 0x9FFF) || // 漢字
+                (code >= 0x3040 && code <= 0x309F) || // ひらがな
+                (code >= 0x30A0 && code <= 0x30FF) || // カタカナ
+                (code >= 0xFF00 && code <= 0xFFEF)    // その他全角
+            ) {
+                if (throwOnError) errorChar = char;
+                // throwOnError=falseならそのまま返す
+            }
+            return char;
+        }).join('');
+        if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
+        return singleByteCharacters;
+    } catch (error) {
+        throw new Error(`変換不能な文字が含まれています: ${error.message}`);
+    }
+};
+
+/**
  * メールアドレスの表記を半角文字に変換し、RFC 5322に基づいた形式であるかを判定し、正しくない場合は例外を投げる関数
  * @param {string} emailAddress
  * @returns {string} 正常な場合は変換済みメールアドレス
@@ -267,10 +341,14 @@ const assertEmailAddress = (emailAddress = '') => {
     // 簡易的なRFC5322準拠の正規表現（一般的な用途で十分）
     const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!_ch_checkString(emailAddress)) throw new Error('メールアドレスは文字列である必要があります');
-    if (!emailAddress) throw new Error('メールアドレスが入力されていません');
+    if (!emailAddress) throw new Error('メールアドレスが空です');
     const trimmed = emailAddress.trim();
-    const singleByteCharacters = convert_to_single_byte_characters(trimmed);
-    if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters)) throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
-    if (!emailPattern.test(singleByteCharacters)) throw new Error('メールアドレスの形式が正しくありません');
-    return singleByteCharacters;
+    try {
+        const singleByteCharacters = toHalfWidth(trimmed);
+        if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters)) throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
+        if (!emailPattern.test(singleByteCharacters)) throw new Error('メールアドレスの形式が正しくありません');
+        return singleByteCharacters;
+    } catch (error) {
+        throw new Error(`メールアドレスの形式が正しくありません: ${error.message}`);
+    }
 };
