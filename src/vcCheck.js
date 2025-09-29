@@ -62,3 +62,18 @@ const validateZoomMeetingId = (id, isWebinar = false) => {
     }
     return halfWidthId;
 };
+
+/**
+ * ZoomミーティングURLを半角化し、正しい形式かどうかを判定する関数
+ * 半角化した上で「https://」で始まり、かつ「zoom.us」を含む場合のみ許容。不正ならthrow。
+ * @param {string} url チェック対象のURL
+ * @returns {string} 半角化済みのURL（正しい場合）
+ * @throws {Error} 不正な場合は例外
+ */
+const validateZoomUrl = (url) => {
+    if (!_vc_checkString(url)) throw new Error('URLは文字列である必要があります');
+    const halfWidthUrl = _vc_toHalfWidth(url);
+    if (!halfWidthUrl.startsWith('https://')) throw new Error('URLはhttps://で始まる必要があります');
+    if (!halfWidthUrl.includes('zoom.us')) throw new Error('URLにzoom.usが含まれている必要があります');
+    return halfWidthUrl;
+};
