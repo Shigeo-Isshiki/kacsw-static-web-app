@@ -77,3 +77,22 @@ const validateZoomUrl = (url) => {
     if (!halfWidthUrl.includes('zoom.us')) throw new Error('URLにzoom.usが含まれている必要があります');
     return halfWidthUrl;
 };
+
+/**
+ * Zoomパスコードを半角化し、6～10桁の半角英数字・記号のみか判定する関数
+ * @param {string} passcode チェック対象のパスコード
+ * @returns {string} 半角化済みのパスコード（正しい場合）
+ * @throws {Error} 不正な場合は例外
+ */
+const validateZoomPasscode = (passcode) => {
+    if (!_vc_checkString(passcode)) throw new Error('パスコードは文字列である必要があります');
+    const halfWidthPasscode = _vc_toHalfWidth(passcode);
+    if (halfWidthPasscode.length < 6 || halfWidthPasscode.length > 10) {
+        throw new Error('パスコードは6桁以上10桁以下である必要があります');
+    }
+    // 半角英数字・記号（ASCII 0x21-0x7E）
+    if (!/^[\x21-\x7E]+$/.test(halfWidthPasscode)) {
+        throw new Error('パスコードは半角英数字・記号のみ許容されます');
+    }
+    return halfWidthPasscode;
+};
