@@ -349,6 +349,6 @@ const assertEmailAddress = (emailAddress = '') => {
         if (!emailPattern.test(singleByteCharacters)) throw new Error('メールアドレスの形式が正しくありません');
         return singleByteCharacters;
     } catch (error) {
-        throw new Error('メールアドレスの形式が正しくありません');
+        throw new Error('`メールアドレスの形式が正しくありません: ${error.message}`');
     }
 };
