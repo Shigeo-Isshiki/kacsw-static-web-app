@@ -327,7 +327,7 @@ const toHalfWidth = (str = '', throwOnError = true) => {
         if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
         return singleByteCharacters;
     } catch (error) {
-        throw new Error(`変換不能な文字が含まれています: ${error.message}`);
+        throw new Error(error.message);
     }
 };
 
@@ -349,6 +349,6 @@ const assertEmailAddress = (emailAddress = '') => {
         if (!emailPattern.test(singleByteCharacters)) throw new Error('メールアドレスの形式が正しくありません');
         return singleByteCharacters;
     } catch (error) {
-        throw new Error(`メールアドレスの形式が正しくありません: ${error.message}`);
+        throw new Error('メールアドレスの形式が正しくありません');
     }
 };
