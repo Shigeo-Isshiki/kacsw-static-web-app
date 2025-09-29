@@ -264,15 +264,13 @@ const check_single_byte_kana = (str = '') => {
  * @throws {Error} 不正な場合は例外
  */
 const assertEmailAddress = (emailAddress = '') => {
-    if (!_ch_checkString(emailAddress)) throw new Error('メールアドレスは文字列である必要があります');
-    if (!emailAddress) throw new Error('メールアドレスが入力されていません');
-    // 前後空白除去
-    const trimmed = emailAddress.trim();
-    const singleByteCharacters = convert_to_single_byte_characters(trimmed);
-    // 連続ドットや@直前・直後のドット禁止
-    if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters)) throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
     // 簡易的なRFC5322準拠の正規表現（一般的な用途で十分）
     const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!_ch_checkString(emailAddress)) throw new Error('メールアドレスは文字列である必要があります');
+    if (!emailAddress) throw new Error('メールアドレスが入力されていません');
+    const trimmed = emailAddress.trim();
+    const singleByteCharacters = convert_to_single_byte_characters(trimmed);
+    if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters)) throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
     if (!emailPattern.test(singleByteCharacters)) throw new Error('メールアドレスの形式が正しくありません');
     return singleByteCharacters;
 };
