@@ -85,7 +85,6 @@ const _dh_createDatePattern = (separators = [''], includeDay = true, includeInit
     const month = '\\d{1,2}';
     const day = includeDay ? '\\d{1,2}' : '';
     const warekiYear = _dh_warekiYearPattern;
-    const eraInitials = ['M', 'T', 'S', 'H', 'R'];
     const patterns = [];
     // 西暦
     patterns.push(new RegExp(`^${year}年${month}月${includeDay ? `${day}日` : ''}$`));

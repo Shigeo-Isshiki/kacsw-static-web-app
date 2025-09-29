@@ -1013,7 +1013,7 @@ const isValidTransferDate = (designateTransferDate, todaySw = false, callback) =
     // 曜日・祝日・年末年始判定
     _fi_process(() => {
         const weekday = checkDate.getDay();
-        if (now.getHours() >= _fi_CUTOFF_HOUR_FOR_NEXT_DAY || (weekday === _fi_SUNDAY || weekday === _fi_SATURDAY)) {
+        if (weekday === _fi_SUNDAY || weekday === _fi_SATURDAY) {
             checkFlag = false;
         }
         const ymd = checkDate.toISOString().slice(0, 10);
