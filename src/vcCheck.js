@@ -5,6 +5,8 @@
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_vc_)で始める
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
+// ハイフン類を統一するための正規表現（全角・半角・ダッシュ類）
+const _VC_HYPHEN_REGEX = /[－‐‑–—−ー―]/g;
 
 //　ライブラリ内の共通関数定義部
 /**
@@ -26,7 +28,7 @@ const _vc_checkString = (str) => {
 const _vc_toHalfWidth = (str = '') => {
     if (!_vc_checkString(str)) throw new Error('変換対象は文字列である必要があります');
     if (!str) throw new Error('変換対象の文字列が空です');
-    const hyphenProcessed = str.replace(_TS_HYPHEN_REGEX, '-');
+    const hyphenProcessed = str.replace(_VC_HYPHEN_REGEX, '-');
     // 全角英数字・記号・スペースを半角に変換
     const converted = hyphenProcessed.replace(/[！-～]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
                         .replace(/\u3000/g, ' ');
