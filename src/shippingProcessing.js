@@ -5,11 +5,11 @@
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_sp_)で始める
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
-// ハイフン類を検出するための正規表現（全角・半角・ダッシュ類）
-const _SP_HYPHEN_REGEX = /[－‐‑–—−ー―]/g;
-
 // 祝日APIベースURL
 const _SP_HOLIDAY_API_BASE_URL = 'https://api.national-holidays.jp';
+
+// ハイフン類を検出するための正規表現（全角・半角・ダッシュ類）
+const _SP_HYPHEN_REGEX = /[－‐‑–—−ー―]/g;
 
 //　ライブラリ内の共通関数定義部
 /**
