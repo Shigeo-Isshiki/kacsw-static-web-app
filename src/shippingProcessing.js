@@ -156,7 +156,7 @@ const validateTrackingNumber = (trackingNumber, minLength = 10, maxLength = 14) 
  * 土曜日、日曜日、国民の祝日、年末年始（12月29日～1月4日）を除いた営業日を返す
  * 現在時刻が16時以降の場合は翌営業日を返す
  * @param {Date|string} [baseDate=new Date()] 基準日時（省略時は現在日時、kintoneの日付・日時フィールド形式にも対応）
- * @param {(businessDay: string) => void} callback 発送可能な営業日（yyyy-mm-dd形式）を返すコールバック関数
+ * @param {(businessDay: string) => void} callback 発送可能な営業日（YYYY-MM-DD形式）を返すコールバック関数
  * @returns {void}
  * @throws {Error} 不正な日付の場合は例外
  */
@@ -166,24 +166,25 @@ const getNextBusinessDay = (baseDate = new Date(), callback) => {
     }
     
     let targetDate;
-    
+    let hasTimeInfo = false;
     // 文字列の場合はDateオブジェクトに変換
     if (typeof baseDate === 'string') {
         targetDate = new Date(baseDate);
+        // 文字列に時刻情報が含まれているか判定（"T"や空白区切りで時刻がある場合）
+        hasTimeInfo = /T\d{2}:\d{2}|\d{2}:\d{2}/.test(baseDate);
     } else if (baseDate instanceof Date) {
         targetDate = new Date(baseDate);
+        // Date型で時刻が0:0:0以外なら時刻情報あり
+        hasTimeInfo = targetDate.getHours() !== 0 || targetDate.getMinutes() !== 0 || targetDate.getSeconds() !== 0;
     } else {
         throw new Error('baseDate は Date オブジェクトまたは日付文字列である必要があります');
     }
-    
     // 有効な日付かチェック
     if (isNaN(targetDate.getTime())) {
         throw new Error('baseDate は有効な日付である必要があります');
     }
-    const currentHour = targetDate.getHours();
-    
-    // 16時以降の場合は翌日から開始
-    if (currentHour >= 16) {
+    // 時刻情報がある場合のみ16時判定
+    if (hasTimeInfo && targetDate.getHours() >= 16) {
         targetDate.setDate(targetDate.getDate() + 1);
     }
     
