@@ -1216,6 +1216,6 @@ const normalizePhoneNumber = (phoneNumber) => {
     try {
         return _pu_getPhoneNumberOnly(phoneNumber);
     } catch (error) {
-        throw new Error(`電話番号の正規化中にエラーが発生しました: ${error.message}`);
+        throw new Error(`電話番号の数字のみの文字列化中にエラーが発生しました: ${error.message}`);
     }
 }
