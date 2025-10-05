@@ -1,4 +1,4 @@
-/** 電話番号のフォーマット統一と電話番号の種類を判定する処理をまとめたJavaScriptの関数群です。
+/** 日本の電話番号のフォーマット統一と日本の電話番号の種類を判定する処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
  * @version 1.0.0
  */
@@ -968,6 +968,10 @@ const _pu_getPhoneNumberOnly = (str) => {
  */
 const _pu_getPhoneType = (number) => {
     const num = _pu_getPhoneNumberOnly(number); // この時点でエラーが投げられる可能性あり
+    // 091で始まる6～13桁の特定接続番号
+    if (num.startsWith('091') && num.length >= 6 && num.length <= 13) {
+        return '特定接続';
+    }
     // 14桁番号のtype判定
     if (num.length === 14) {
         const prefix4 = num.substring(0, 4);
@@ -1091,44 +1095,48 @@ const _pu_isValidJapanesePhoneNumber = (str) => {
     if (!num) return false;
     // 先頭0でなければNG
     if (!num.startsWith('0')) return false;
-    // 0200で始まる場合は14桁以外NG（最優先）
-    if (num.startsWith('0200')) {
-        return num.length === 14;
-    }
-    // 11桁必要なprefixで10桁しかない場合はNG
-    if (num.length === 10) {
-        const prefix4 = num.substring(0, 4);
-        const prefix3 = num.substring(0, 3);
-        const digit11Prefixes = Object.values(_PU_PHONE_NUMBER_CONFIG.digit11PhoneNumberRange).flat();
-        if (digit11Prefixes.includes(prefix4) || digit11Prefixes.includes(prefix3)) {
-            return false;
-        }
-        // 10桁は市外局番リストに該当しなければfalse
-        const areaCodeList = _pu_getAreaCodeList();
-        let found = false;
-        for (let c = 0, l = areaCodeList.length; c < l; c++) {
-            let areaCodeLen = areaCodeList[c];
-            let areaCode = num.substring(0, areaCodeLen);
-            if (_pu_getAreaCodeInfo(areaCodeLen, areaCode)) {
-                found = true;
-                break;
+    // areaCodeRangesに範囲指定があるprefixは、桁数に関係なく範囲チェックを行う
+    // 例：0200（14桁）、0800/0120/050/020/090/080（11桁）、0570/0990（10桁）など
+    const areaCodeList = _pu_getAreaCodeList();
+    for (let c = 0, l = areaCodeList.length; c < l; c++) {
+        let areaCodeLen = areaCodeList[c];
+        let areaCode = num.substring(0, areaCodeLen);
+        let localLen = _pu_getAreaCodeInfo(areaCodeLen, areaCode);
+        if (localLen) {
+            const ranges = _pu_getLocalAreaCodeRange(areaCode);
+            if (ranges) {
+                // localLenが桁数を超える場合は不正
+                if (num.length < areaCodeLen + localLen) return false;
+                let localCode = num.substring(areaCodeLen, areaCodeLen + localLen);
+                let localCodeNum = Number(localCode);
+                let inRange = false;
+                for (const [start, end] of ranges) {
+                    if (localCodeNum >= start && localCodeNum <= end) {
+                        inRange = true;
+                        break;
+                    }
+                }
+                if (!inRange) return false;
+            }
+            // 固定電話（10桁）の場合はここでtrue
+            if (num.length === 10) return true;
+            // 11桁や14桁などの場合は、areaCodeRangesの範囲チェックが通ればtrue（例：0200, 0800, 0120, 050, 020, 090, 080, 0570, 0990など）
+            if (num.length === areaCodeLen + localLen + (num.length - (areaCodeLen + localLen))) {
+                // 追加の桁数チェックはprefixごとに必要
+                // 例：0200は14桁、0800/0120/050/020/090/080は11桁、0570/0990は10桁
+                // areaCodeごとに桁数を厳密に判定
+                if (areaCode === '0200' && num.length === 14) return true;
+                if ((areaCode === '0800' || areaCode === '0120' || areaCode === '050' || areaCode === '020' || areaCode === '090' || areaCode === '080' || areaCode === '070' || areaCode === '060') && num.length === 11) return true;
+                if ((areaCode === '0570' || areaCode === '0990') && num.length === 10) return true;
             }
         }
-        if (!found) return false;
-        return true;
     }
+    // 10桁番号でareaCodeRangesに該当しない場合はfalse（上記forでtrueにならなければfalse）
+    if (num.length === 10) return false;
     // 091で始まる6～13桁の特殊番号を許可
     if (num.startsWith('091') && num.length >= 6 && num.length <= 13) return true;
-    // 11桁は携帯・PHS等のprefixのみ許可
-    if (num.length === 11) {
-        const prefix4 = num.substring(0, 4);
-        const prefix3 = num.substring(0, 3);
-        const digit11Prefixes = Object.values(_PU_PHONE_NUMBER_CONFIG.digit11PhoneNumberRange).flat();
-        if (digit11Prefixes.includes(prefix4) || digit11Prefixes.includes(prefix3)) {
-            return true;
-        }
-        return false;
-    }
+    // 11桁はareaCodeRangesで範囲チェックが通った場合のみtrue（上記forでtrueにならなければfalse）
+    if (num.length === 11) return false;
     return false;
 };
 
@@ -1136,11 +1144,10 @@ const _pu_isValidJapanesePhoneNumber = (str) => {
 /**
  * 電話番号を正規化してフォーマットし、電話番号の種類を返すメイン関数
  * @param {string|number|null|undefined} phoneNumber 電話番号
- * @returns {Object} {formattedNumber: string, type: string, isValid: boolean}
+ * @returns {Object} {formattedNumber: string, type: string}
  *   - formattedNumber: ハイフン付きでフォーマットされた電話番号
  *   - type: 電話番号の種類 ('固定電話'|'携帯電話'|'着信課金'|'M2M'|'無線呼出'|'IP電話'|'FMC'|'付加サービス'|'不明')
- *   - isValid: 有効な日本の電話番号かどうか
- * @throws {Error} 不正な電話番号の場合
+ * @throws {Error} 無効な電話番号の場合（日本の電話番号形式に合致しない場合）
  */
 const formatPhoneNumber = (phoneNumber) => {
     // 基本的な正規化とバリデーション
@@ -1150,19 +1157,20 @@ const formatPhoneNumber = (phoneNumber) => {
 
     let num;
     try {
+        if (!isValidPhoneNumber(phoneNumber)) {
+            throw new Error('無効な電話番号です。電話番号の形式に合致しません。');
+        }
         num = _pu_getPhoneNumberOnly(phoneNumber);
     } catch (error) {
-        throw new Error(`電話番号の形式が正しくありません: ${error.message}`);
+        throw error;
     }
 
-    const isValid = _pu_isValidJapanesePhoneNumber(phoneNumber);
     const type = _pu_getPhoneType(num);
     const formatted = _pu_formatPhoneNumber(num);
 
     return {
         formattedNumber: formatted,
-        type: type,
-        isValid: isValid
+        type: type
     };
 }
 
@@ -1170,7 +1178,7 @@ const formatPhoneNumber = (phoneNumber) => {
  * 電話番号の種別のみを返す関数
  * @param {string|number|null|undefined} phoneNumber 電話番号
  * @returns {string} 電話番号の種類 ('固定電話'|'携帯電話'|'着信課金'|'M2M'|'無線呼出'|'IP電話'|'FMC'|'付加サービス'|'不明')
- * @throws {Error} 不正な電話番号の場合
+ * @throws {Error} 無効な電話番号の場合（日本の電話番号形式に合致しない場合）
  */
 const getPhoneNumberType = (phoneNumber) => {
     if (!phoneNumber) {
@@ -1178,17 +1186,20 @@ const getPhoneNumberType = (phoneNumber) => {
     }
     
     try {
+        if (!isValidPhoneNumber(phoneNumber)) {
+            throw new Error('無効な電話番号です。電話番号の形式に合致しません。');
+        }
         return _pu_getPhoneType(phoneNumber);
     } catch (error) {
-        throw new Error(`電話番号の種別を判定できませんでした: ${error.message}`);
+        throw error;
     }
 }
 
 /**
  * 電話番号の有効性を検証する関数
  * @param {string|number|null|undefined} phoneNumber 電話番号
- * @returns {boolean} 有効な日本の電話番号かどうか
- * @throws {Error} 不正な電話番号の場合
+ * @returns {boolean} 有効な日本の電話番号かどうか（true:有効, false:無効）
+ * @throws {Error} 入力値が空や型不正の場合
  */
 const isValidPhoneNumber = (phoneNumber) => {
     if (!phoneNumber) {
@@ -1206,7 +1217,7 @@ const isValidPhoneNumber = (phoneNumber) => {
  * 電話番号を正規化して数字のみにする関数
  * @param {string|number|null|undefined} phoneNumber 電話番号
  * @returns {string} 数字のみの電話番号
- * @throws {Error} 不正な電話番号の場合
+ * @throws {Error} 無効な電話番号の場合（日本の電話番号形式に合致しない場合）
  */
 const normalizePhoneNumber = (phoneNumber) => {
     if (!phoneNumber) {
@@ -1214,8 +1225,11 @@ const normalizePhoneNumber = (phoneNumber) => {
     }
     
     try {
+        if (!isValidPhoneNumber(phoneNumber)) {
+            throw new Error('無効な電話番号です。電話番号の形式に合致しません。');
+        }
         return _pu_getPhoneNumberOnly(phoneNumber);
     } catch (error) {
-        throw new Error(`電話番号の数字のみの文字列化中にエラーが発生しました: ${error.message}`);
+        throw error;
     }
 }
