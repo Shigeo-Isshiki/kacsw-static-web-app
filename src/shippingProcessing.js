@@ -161,7 +161,9 @@ const getNextBusinessDay = (baseDate = new Date(), cutoffHour = 16, callback) =>
     if (typeof callback !== 'function') {
         throw new Error('callback は関数である必要があります');
     }
-    if (!Number.isInteger(cutoffHour) || cutoffHour < 0 || cutoffHour > 23) {
+    // cutoffHourが文字列の場合も数値化して判定
+    const cutoffHourNum = Number(cutoffHour);
+    if (!Number.isInteger(cutoffHourNum) || cutoffHourNum < 0 || cutoffHourNum > 23) {
         throw new Error('締め時刻は0～23の整数である必要があります');
     }
     let targetDate;
@@ -183,7 +185,7 @@ const getNextBusinessDay = (baseDate = new Date(), cutoffHour = 16, callback) =>
         throw new Error('基準日時は有効な日付である必要があります');
     }
     // 時刻情報がある場合のみcutoffHour判定
-    if (hasTimeInfo && targetDate.getHours() >= cutoffHour) {
+        if (hasTimeInfo && targetDate.getHours() >= cutoffHourNum) {
         targetDate.setDate(targetDate.getDate() + 1);
     }
     // 営業日を探す再帰関数
