@@ -296,9 +296,11 @@ const toHalfWidthKana = (str = '', throwOnError = true) => {
     if (!_ts_checkString(str)) throw new Error('変換対象は文字列である必要があります');
     if (!_ts_checkBoolean(throwOnError)) throw new Error('throwOnErrorはboolean型である必要があります');
     if (!str) throw new Error('変換対象の文字列が空です');
+    // ひらがな→カタカナ変換を追加
+    const katakanaStr = toKatakana(str, false);
     const halfWidthKanaPattern = _ts_buildPattern(_TS_HALF_WIDTH_KANA_MAP.keys());
     let errorChar = null;
-    const result = str.replace(halfWidthKanaPattern, char => _TS_HALF_WIDTH_KANA_MAP.get(char) ?? char);
+    const result = katakanaStr.replace(halfWidthKanaPattern, char => _TS_HALF_WIDTH_KANA_MAP.get(char) ?? char);
     // 変換後に全角カタカナ・ひらがな・漢字・その他全角文字が残っていればエラー
     for (const char of result) {
         if (_ts_isFullWidthChar(char)) {
@@ -340,6 +342,34 @@ const toFullWidthKana = (str = '', throwOnError = true) => {
         }
     }
     if (errorChar) throw new Error(`全角カタカナに変換不能な文字が含まれています: ${errorChar}`);
+    return result;
+};
+
+/**
+ * 文字列のひらがなをカタカナに変換する関数
+ * @param {string} str 変換対象の文字列
+ * @param {boolean} [throwOnError=true] 変換不能な文字があった場合にエラーを投げるかどうか
+ * @returns {string} ひらがなをカタカナに変換した文字列
+ * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
+ */
+const toKatakana = (str = '', throwOnError = true) => {
+    if (!_ts_checkString(str)) throw new Error('変換対象は文字列である必要があります');
+    if (!_ts_checkBoolean(throwOnError)) throw new Error('throwOnErrorはboolean型である必要があります');
+    if (!str) throw new Error('変換対象の文字列が空です');
+    // ひらがな→カタカナ変換
+    const result = str.replace(/[\u3041-\u3096]/g, char => String.fromCodePoint(char.charCodeAt(0) + 0x60));
+    let errorChar = null;
+    // 変換後にひらがなが残っていればエラー
+    for (const char of result) {
+        const code = char.charCodeAt(0);
+        if (code >= 0x3041 && code <= 0x3096) {
+            if (throwOnError) {
+                errorChar = char;
+                break;
+            }
+        }
+    }
+    if (errorChar) throw new Error(`カタカナに変換不能な文字が含まれています: ${errorChar}`);
     return result;
 };
 
