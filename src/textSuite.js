@@ -115,7 +115,8 @@ const _ts_isFullWidthChar = (char) => {
         (code >= 0x4E00 && code <= 0x9FFF) || // 漢字
         (code >= 0x3040 && code <= 0x309F) || // ひらがな
         (code >= 0x30A0 && code <= 0x30FF) || // カタカナ
-        (code >= 0xFF00 && code <= 0xFFEF)    // その他全角
+        (code >= 0xFF00 && code <= 0xFF60) || // 全角記号・英数字・スペースなど
+        (code >= 0xFFA0 && code <= 0xFFEF)    // 全角記号など
     );
 };
 
@@ -286,7 +287,7 @@ const check_single_byte_kana = (str = '') => {
 
 //　ライブラリ本体部
 /**
- * 文字列の中の各文字を半角カタカナに変換する関数
+ * 文字列を半角カタカナに変換する関数
  * @param {string} str 変換対象の文字列
  * @param {boolean} [throwOnError=true] 変換不能な文字があった場合にエラーを投げるかどうか
  * @returns {string} 可能な限り半角カタカナに変換した文字列
@@ -297,80 +298,86 @@ const toHalfWidthKana = (str = '', throwOnError = true) => {
     if (!_ts_checkBoolean(throwOnError)) throw new Error('throwOnErrorはboolean型である必要があります');
     if (!str) throw new Error('変換対象の文字列が空です');
     // ひらがな→カタカナ変換を追加
-    const katakanaStr = toKatakana(str, false);
+    const katakanaStr = toFullWidthKatakana(str, false);
     const halfWidthKanaPattern = _ts_buildPattern(_TS_HALF_WIDTH_KANA_MAP.keys());
     let errorChar = null;
     const result = katakanaStr.replace(halfWidthKanaPattern, char => _TS_HALF_WIDTH_KANA_MAP.get(char) ?? char);
-    // 変換後に全角カタカナ・ひらがな・漢字・その他全角文字が残っていればエラー
+    // 変換後に半角カタカナ以外が含まれていればエラー
     for (const char of result) {
-        if (_ts_isFullWidthChar(char)) {
+        const code = char.charCodeAt(0);
+        if (!(code >= 0xFF61 && code <= 0xFF9F)) { // 半角カタカナ以外
             if (throwOnError) {
                 errorChar = char;
                 break;
             }
         }
     }
-    if (errorChar) throw new Error(`半角カタカナに変換不能な文字が含まれています: ${errorChar}`);
+    if (errorChar) throw new Error(`半角カタカナ以外の文字が含まれています: ${errorChar}`);
     return result;
 };
 
 /**
- * 半角カタカナを全角カタカナに変換する関数
+ * 文字列を全角カタカナに変換する関数
  * @param {string} str 変換対象の文字列
  * @param {boolean} [throwOnError=true] 変換不能な文字があった場合にエラーを投げるかどうか
  * @returns {string} 可能な限り全角カタカナに変換した文字列
  * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
  */
-const toFullWidthKana = (str = '', throwOnError = true) => {
+const toFullWidthKatakana = (str = '', throwOnError = true) => {
     if (!_ts_checkString(str)) throw new Error('変換対象は文字列である必要があります');
     if (!_ts_checkBoolean(throwOnError)) throw new Error('throwOnErrorはboolean型である必要があります');
     if (!str) throw new Error('変換対象の文字列が空です');
     const fullWidthKanaPattern = _ts_buildPattern(_TS_FULL_WIDTH_KANA_MAP.keys());
     const turbidityKanaPattern = _ts_buildPattern(_TS_TURBIDITY_KANA_MAP.keys());
     let errorChar = null;
-    // まず半角カナ→全角カナ
-    let result = str.replace(fullWidthKanaPattern, char => _TS_FULL_WIDTH_KANA_MAP.get(char) ?? char);
+    // ひらがな→全角カタカナ
+    let work = str.replace(/[\u3041-\u3096]/g, char => String.fromCodePoint(char.charCodeAt(0) + 0x60));
+    // 半角カタカナ→全角カタカナ
+    work = work.replace(fullWidthKanaPattern, char => _TS_FULL_WIDTH_KANA_MAP.get(char) ?? char);
     // 合成濁点・半濁点（カ゛→ガ等）を変換
-    result = result.replace(turbidityKanaPattern, pair => _TS_TURBIDITY_KANA_MAP.get(pair) ?? pair);
-    // 変換後に半角カナが残っていればエラー
-    for (const char of result) {
-        if (char.charCodeAt(0) >= 0xFF61 && char.charCodeAt(0) <= 0xFF9F) {
+    work = work.replace(turbidityKanaPattern, pair => _TS_TURBIDITY_KANA_MAP.get(pair) ?? pair);
+    // 変換後に全角カタカナ以外が含まれていればエラー
+    for (const char of work) {
+        const code = char.charCodeAt(0);
+        if (!(code >= 0x30A1 && code <= 0x30F6)) {
             if (throwOnError) {
                 errorChar = char;
                 break;
             }
         }
     }
-    if (errorChar) throw new Error(`全角カタカナに変換不能な文字が含まれています: ${errorChar}`);
-    return result;
+    if (errorChar) throw new Error(`全角カタカナ以外の文字が含まれています: ${errorChar}`);
+    return work;
 };
 
 /**
- * 文字列のひらがなをカタカナに変換する関数
+ * 文字列を全角ひらがなに変換する関数
  * @param {string} str 変換対象の文字列
  * @param {boolean} [throwOnError=true] 変換不能な文字があった場合にエラーを投げるかどうか
- * @returns {string} ひらがなをカタカナに変換した文字列
+ * @returns {string} 可能な限り全角ひらがなに変換した文字列
  * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
  */
-const toKatakana = (str = '', throwOnError = true) => {
+const toFullWidthHiragana = (str = '', throwOnError = true) => {
     if (!_ts_checkString(str)) throw new Error('変換対象は文字列である必要があります');
     if (!_ts_checkBoolean(throwOnError)) throw new Error('throwOnErrorはboolean型である必要があります');
     if (!str) throw new Error('変換対象の文字列が空です');
-    // ひらがな→カタカナ変換
-    const result = str.replace(/[\u3041-\u3096]/g, char => String.fromCodePoint(char.charCodeAt(0) + 0x60));
+    // 半角カタカナ→全角カタカナ
+    let work = toFullWidthKatakana(str, false);
+    // 全角カタカナ→ひらがな
+    work = work.replace(/[\u30A1-\u30F6]/g, char => String.fromCodePoint(char.charCodeAt(0) - 0x60));
     let errorChar = null;
-    // 変換後にひらがなが残っていればエラー
-    for (const char of result) {
+    // 変換後にひらがな以外が残っていればエラー
+    for (const char of work) {
         const code = char.charCodeAt(0);
-        if (code >= 0x3041 && code <= 0x3096) {
+        if (!(code >= 0x3041 && code <= 0x3096)) {
             if (throwOnError) {
                 errorChar = char;
                 break;
             }
         }
     }
-    if (errorChar) throw new Error(`カタカナに変換不能な文字が含まれています: ${errorChar}`);
-    return result;
+    if (errorChar) throw new Error(`ひらがな以外の文字が含まれています: ${errorChar}`);
+    return work;
 };
 
 /**
@@ -411,12 +418,12 @@ const toHalfWidth = (str = '', throwOnError = true) => {
         if (errorChar) throw new Error(`半角文字に変換不能な文字が含まれています: ${errorChar}`);
         return halfWidthStr;
     } catch (error) {
-        throw new Error(error.message);
+        throw error;
     }
 };
 
 /**
- * 半角文字列を全角文字列に変換する関数
+ * 文字列の中の各文字を全角文字列に変換する関数
  * @param {string} str 変換対象の文字列
  * @param {boolean} [throwOnError=true] 変換不能文字があった場合に例外を投げるか（true:投げる, false:そのまま返す）
  * @returns {string} 変換後の文字列
@@ -427,31 +434,42 @@ const toFullWidth = (str = '', throwOnError = true) => {
     if (!_ts_checkBoolean(throwOnError)) throw new Error('throwOnErrorはboolean型である必要があります');
     if (!str) throw new Error('変換対象の文字列が空です');
     try {
-        // まず半角カタカナを全角カタカナに変換
-        const kanaConverted = toFullWidthKana(str, false);
         let errorChar = null;
-            const fullWidthStr = [...kanaConverted].map((char) => {
-                const code = char.charCodeAt(0);
-                // バックスラッシュ→円マーク
-                if (char === '\\') return '￥';
-                // チルダ→全角チルダ
-                if (char === '~') return '～';
-                // 半角英数字・記号
-                if (code >= 0x21 && code <= 0x7E) {
-                    return String.fromCodePoint(code + 0xFEE0);
-                }
-                if (char === ' ') return '\u3000'; // 半角スペースを全角に
-                // 変換後が半角カナ・その他半角文字の場合はエラーまたはそのまま
-                if (!_ts_isFullWidthChar(char)) {
-                    if (throwOnError) errorChar = char;
-                    // throwOnError=falseならそのまま返す
-                }
+        // 半角カタカナの連続部分をまとめて変換
+        const replaced = str.replace(/([\uFF61-\uFF9F]+)/g, (kana) => {
+            try {
+                return toFullWidthKatakana(kana, throwOnError);
+            } catch (e) {
+                if (throwOnError) errorChar = kana;
+                return kana;
+            }
+        });
+        const fullWidthStr = [...replaced].map((char) => {
+            const code = char.charCodeAt(0);
+            // ひらがなはそのまま
+            if (code >= 0x3041 && code <= 0x3096) {
                 return char;
-            }).join('');
+            }
+            // バックスラッシュ→円マーク
+            if (char === '\\') return '￥';
+            // チルダ→全角チルダ
+            if (char === '~') return '～';
+            // 半角英数字・記号
+            if (code >= 0x21 && code <= 0x7E) {
+                return String.fromCodePoint(code + 0xFEE0);
+            }
+            if (char === ' ') return '\u3000'; // 半角スペースを全角に
+            // 変換後が半角カナ・その他半角文字の場合はエラーまたはそのまま
+            if (!_ts_isFullWidthChar(char)) {
+                if (throwOnError) errorChar = char;
+                // throwOnError=falseならそのまま返す
+            }
+            return char;
+        }).join('');
         if (errorChar) throw new Error(`全角文字に変換不能な文字が含まれています: ${errorChar}`);
         return fullWidthStr;
     } catch (error) {
-        throw new Error(error.message);
+        throw error;
     }
 };
 
@@ -473,6 +491,6 @@ const assertEmailAddress = (emailAddress = '') => {
         if (!emailPattern.test(singleByteCharacters)) throw new Error('メールアドレスの形式が正しくありません');
         return singleByteCharacters;
     } catch (error) {
-        throw new Error('`メールアドレスの形式が正しくありません: ${error.message}`');
+        throw error;
     }
 };
