@@ -73,9 +73,12 @@ const validateZoomMeetingId = (id, isWebinar = false) => {
  */
 const validateZoomUrl = (url) => {
     if (!_vc_checkString(url)) throw new Error('URLは文字列である必要があります');
-    const halfWidthUrl = _vc_toHalfWidth(url);
+    let halfWidthUrl = _vc_toHalfWidth(url);
     if (!halfWidthUrl.startsWith('https://')) throw new Error('URLはhttps://で始まる必要があります');
-    if (!halfWidthUrl.includes('zoom.us')) throw new Error('URLにzoom.usが含まれている必要があります');
+    // ドメイン部分の大文字・小文字を区別しない判定
+    if (!halfWidthUrl.toLowerCase().includes('zoom.us')) throw new Error('URLにzoom.usが含まれている必要があります');
+    // zoom.us部分を小文字化して統一
+    halfWidthUrl = halfWidthUrl.replace(/zoom\.us/gi, 'zoom.us');
     return halfWidthUrl;
 };
 
