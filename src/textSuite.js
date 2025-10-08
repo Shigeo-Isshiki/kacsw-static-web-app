@@ -489,7 +489,7 @@ const assertEmailAddress = (emailAddress = '') => {
         const singleByteCharacters = toHalfWidth(trimmed);
         if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters)) throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
         if (!emailPattern.test(singleByteCharacters)) throw new Error('メールアドレスの形式が正しくありません');
-        return singleByteCharacters;
+        return singleByteCharacters.toLowerCase();
     } catch (error) {
         throw error;
     }
