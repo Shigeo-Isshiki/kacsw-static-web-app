@@ -159,11 +159,11 @@ const convert_to_full_width_kana = (str = '', hiragana_sw = true) => {
             String.fromCodePoint(char.charCodeAt(0) + 0x60)
         );
     };
-    const full_width_kana_pattern = _ts_buildPattern(_ts_full_width_kana_map.keys());
-    const turbidity_kana_pattern = _ts_buildPattern(_ts_turbidity_kana_map.keys());
+    const full_width_kana_pattern = _ts_buildPattern(_TS_FULL_WIDTH_KANA_MAP.keys());
+    const turbidity_kana_pattern = _ts_buildPattern(_TS_TURBIDITY_KANA_MAP.keys());
     let result = hiragana_sw ? hiraganaToKatakana(str) : str;
-    result = _ts_replace_with_map(result, full_width_kana_pattern, _ts_full_width_kana_map);
-    result = _ts_replace_with_map(result, turbidity_kana_pattern, _ts_turbidity_kana_map);
+    result = _ts_replace_with_map(result, full_width_kana_pattern, _TS_FULL_WIDTH_KANA_MAP);
+    result = _ts_replace_with_map(result, turbidity_kana_pattern, _TS_TURBIDITY_KANA_MAP);
     return result;
 };
 
