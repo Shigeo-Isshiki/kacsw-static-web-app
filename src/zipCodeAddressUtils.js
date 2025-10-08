@@ -203,15 +203,18 @@ const checkZipCodeExists = (zipCode, callback) => {
  *
  * 住所情報オブジェクトの例：
  * {
- *   zipCode: '123-4567', // ハイフン付き郵便番号
+ *   originalZipCode: '１２３－４５６７', // 入力値（記号・全角含む）
+ *   normalizedZipCode: '1234567',      // 正規化済み（半角・記号除去・大文字化）
+ *   apiZipCode: '1234567',             // API返却値（7桁数字のみ）
+ *   zipCode: '123-4567',               // ハイフン付き郵便番号（表示用）
+ *   zipCode1: '1', zipCode2: '2', ... zipCode7: '7', // 各桁分割
  *   address: '神奈川県横浜市西区みなとみらい', // 住所（都道府県＋市区町村＋町名＋番地等）
- *   prefName: '神奈川県', // 都道府県
- *   cityName: '横浜市西区', // 市区町村
- *   townName: 'みなとみらい', // 町名
- *   blockName: '1-1-1', // 番地（存在する場合）
- *   otherName: '○○マンション', // その他住所（存在する場合）
- *   bizName: '株式会社○○', // 事業所名（存在する場合）
- *   zipCode1: '1', zipCode2: '2', ... zipCode7: '7' // 各桁分割
+ *   prefName: '神奈川県',               // 都道府県
+ *   cityName: '横浜市西区',             // 市区町村
+ *   townName: 'みなとみらい',           // 町名
+ *   blockName: '1-1-1',                // 番地（存在する場合）
+ *   otherName: '○○マンション',          // その他住所（存在する場合）
+ *   bizName: '株式会社○○'               // 事業所名（存在する場合）
  * }
  *
  * エラー時の例：
@@ -307,14 +310,10 @@ const getAddressByZipCode = (zipCode, callback) => {
                 }
                 formatZipCode(addressObj.zip_code, (zipResult) => {
                     callback({
+                        originalZipCode: zipCode,
+                        normalizedZipCode: normalized,
+                        apiZipCode: addressObj.zip_code,
                         zipCode: zipResult.zipCode || null,
-                        address: fullAddress ? fullAddress.replace(/[\u3000\u0020]/g, '') : null,
-                        prefName: addressObj.pref_name ? addressObj.pref_name.replace(/[\u3000\u0020]/g, '') : null,
-                        cityName: addressObj.city_name ? addressObj.city_name.replace(/[\u3000\u0020]/g, '') : null,
-                        townName: addressObj.town_name ? addressObj.town_name.replace(/[\u3000\u0020]/g, '') : null,
-                        blockName: addressObj.block_name ? addressObj.block_name.replace(/[\u3000\u0020]/g, '') : null,
-                        otherName: addressObj.other_name ? addressObj.other_name.replace(/[\u3000\u0020]/g, '') : null,
-                        bizName: addressObj.biz_name ? addressObj.biz_name.replace(/[\u3000\u0020]/g, '') : null,
                         zipCode1: zipCodeArray[0] || null,
                         zipCode2: zipCodeArray[1] || null,
                         zipCode3: zipCodeArray[2] || null,
@@ -322,6 +321,13 @@ const getAddressByZipCode = (zipCode, callback) => {
                         zipCode5: zipCodeArray[4] || null,
                         zipCode6: zipCodeArray[5] || null,
                         zipCode7: zipCodeArray[6] || null,
+                        address: fullAddress ? fullAddress.replace(/[\u3000\u0020]/g, '') : null,
+                        prefName: addressObj.pref_name ? addressObj.pref_name.replace(/[\u3000\u0020]/g, '') : null,
+                        cityName: addressObj.city_name ? addressObj.city_name.replace(/[\u3000\u0020]/g, '') : null,
+                        townName: addressObj.town_name ? addressObj.town_name.replace(/[\u3000\u0020]/g, '') : null,
+                        blockName: addressObj.block_name ? addressObj.block_name.replace(/[\u3000\u0020]/g, '') : null,
+                        otherName: addressObj.other_name ? addressObj.other_name.replace(/[\u3000\u0020]/g, '') : null,
+                        bizName: addressObj.biz_name ? addressObj.biz_name.replace(/[\u3000\u0020]/g, '') : null
                     });
                 });
             } else {
