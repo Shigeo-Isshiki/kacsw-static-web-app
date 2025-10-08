@@ -220,7 +220,7 @@ const checkZipCodeExists = (zipCode, callback) => {
  * }
  *
  */
-const getAddressByZipCode = (zipCode, callback, retryCount = 0) => {
+const getAddressByZipCode = (zipCode, callback) => {
     const normalized = _zc_normalizeZipCodeInput(zipCode);
     fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
         .then(response => {
