@@ -158,6 +158,17 @@ const check_single_byte_kana = (str = '') => {
 
 //　ライブラリ本体部
 /**
+ * 文字列が半角英数字・記号・スペースのみで構成されているかチェックする関数
+ * @param {string} str チェック対象の文字列
+ * @returns {boolean} 半角英数字・記号・スペースのみならtrue、それ以外はfalse
+ */
+const isSingleByteAlnumOnly = (str = '') => {
+    if (!_ts_checkString(str)) return false;
+    // 半角英数字・記号・スペースのみ
+    const pattern = /^[\x20-\x7E]*$/;
+    return pattern.test(str);
+};
+/**
  * 文字列を半角カタカナに変換する関数
  * @param {string} str 変換対象の文字列
  * @param {boolean} [throwOnError=true] 変換不能な文字があった場合にエラーを投げるかどうか
