@@ -173,10 +173,10 @@ const toHalfWidthKana = (str = '', throwOnError = true) => {
     const halfWidthKanaPattern = _ts_buildPattern(_TS_HALF_WIDTH_KANA_MAP.keys());
     let errorChar = null;
     const result = katakanaStr.replace(halfWidthKanaPattern, char => _TS_HALF_WIDTH_KANA_MAP.get(char) ?? char);
-    // 変換後に半角カタカナ以外が含まれていればエラー
+    // 変換後に半角カタカナ以外が含まれていればエラー（ただし変換テーブルの値は許容）
+    const allowedValues = Object.values(_TS_CONVERT_CHARACTER_LIST.halfWidthKana);
     for (const char of result) {
-        const code = char.charCodeAt(0);
-        if (!(code >= 0xFF61 && code <= 0xFF9F)) { // 半角カタカナ以外
+        if (!allowedValues.includes(char)) {
             if (throwOnError) {
                 errorChar = char;
                 break;
@@ -207,10 +207,12 @@ const toFullWidthKatakana = (str = '', throwOnError = true) => {
     work = work.replace(fullWidthKanaPattern, char => _TS_FULL_WIDTH_KANA_MAP.get(char) ?? char);
     // 合成濁点・半濁点（カ゛→ガ等）を変換
     work = work.replace(turbidityKanaPattern, pair => _TS_TURBIDITY_KANA_MAP.get(pair) ?? pair);
-    // 変換後に全角カタカナ以外が含まれていればエラー
+    // 変換後に全角カタカナ以外が含まれていればエラー（ただし変換テーブルの値は許容）
+    const allowedValues = Object.values(_TS_CONVERT_CHARACTER_LIST.fullWidthKana);
     for (const char of work) {
         const code = char.charCodeAt(0);
-        if (!(code >= 0x30A1 && code <= 0x30F6)) {
+        // allowedValuesに含まれるか、全角カタカナ範囲なら許容
+        if (!allowedValues.includes(char) && !(code >= 0x30A1 && code <= 0x30FA)) {
             if (throwOnError) {
                 errorChar = char;
                 break;
@@ -240,7 +242,8 @@ const toFullWidthHiragana = (str = '', throwOnError = true) => {
     // 変換後にひらがな以外が残っていればエラー
     for (const char of work) {
         const code = char.charCodeAt(0);
-        if (!(code >= 0x3041 && code <= 0x3096)) {
+        // ひらがなUnicode範囲、または全角スペースなら許容
+        if (!(code >= 0x3041 && code <= 0x3096) && char !== '\u3000') {
             if (throwOnError) {
                 errorChar = char;
                 break;
