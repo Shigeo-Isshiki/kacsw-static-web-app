@@ -1,3 +1,4 @@
+
 /** 郵便番号や電話番号処理を除いた運送会社に関する処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
  * @version 1.0.0
@@ -7,6 +8,12 @@
 //　ライブラリ内の共通定数・変換テーブル定義部
 // 祝日APIベースURL
 const _SP_HOLIDAY_API_BASE_URL = 'https://api.national-holidays.jp';
+
+// 運送会社ごとの問い合わせURLテンプレート
+const _SP_SHIPPING_INQUIRY_URL_MAP = {
+    yamato: 'https://member.kms.kuronekoyamato.co.jp/parcel/detail?pno={trackingNumber}',
+    japanpost: 'https://trackings.post.japanpost.jp/services/srv/search/direct?searchKind=S002&locale=ja&reqCodeNo1={trackingNumber}'
+};
 
 // ハイフン類を検出するための正規表現（全角・半角・ダッシュ類）
 const _SP_HYPHEN_REGEX = /[－‐‑–—−ー―]/g;
@@ -206,3 +213,81 @@ const getNextBusinessDay = (baseDate = new Date(), cutoffHour = 16, callback) =>
     };
     findBusinessDay();
 };
+
+/**
+ * kintoneのスペースフィールドに荷物問い合わせボタンを追加・削除する関数
+ *
+ * @function
+ * @param {string} spaceField - スペースフィールドのフィールドコード
+ * @param {string} id - ボタン要素のID名（任意のもの）
+ * @param {string|undefined|null} label - ボタンラベル（省略時はデフォルト文言）
+ *   - 文字列: 指定ラベル
+ *   - undefined: デフォルト文言（例: '荷物問い合わせ'）
+ *   - null/空文字: ボタン非表示（削除）
+ * @param {string} trackingNumber - 問い合わせ番号（伝票番号）
+ * @param {('yamato'|'japanpost')} carrier - 運送会社（'yamato'または'japanpost'）
+ * @returns {void}
+ * @description labelの値により表示制御：
+ *   - 文字列なら指定ラベルで表示
+ *   - undefinedならデフォルト文言で表示
+ *   - null/空文字ならボタン非表示（削除）
+ *   ボタン押下時、公式サイト（ヤマト運輸・日本郵便）に遷移します。
+ */
+const kintoneShippingInquiryButton = (spaceField, id, label, trackingNumber, carrier) => {
+    if (
+        typeof spaceField !== 'string' || !spaceField.trim() ||
+        typeof id !== 'string' || !id.trim() ||
+        (label !== null && typeof label !== 'string' && typeof label !== 'undefined') ||
+        typeof trackingNumber !== 'string' || !trackingNumber.trim() ||
+        (carrier !== 'yamato' && carrier !== 'japanpost')
+    ) {
+        return;
+    }
+    // 既存ボタン削除
+    const buttonElementById = document.getElementById(id);
+    if (buttonElementById) {
+        buttonElementById.remove();
+    }
+    // URL生成関数
+    const getInquiryUrl = (carrier, trackingNumber) => {
+        const template = _SP_SHIPPING_INQUIRY_URL_MAP[carrier];
+        if (!template) return '';
+        return template.replace('{trackingNumber}', encodeURIComponent(trackingNumber));
+    };
+    if (label !== undefined && label !== null && label !== '') {
+        // ボタン追加
+        const button = document.createElement('button');
+        button.id = id;
+        button.textContent = label;
+        button.addEventListener('click', () => {
+            const url = getInquiryUrl(carrier, trackingNumber);
+            if (url) window.open(url, '_blank');
+        });
+        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+        if (spaceElement) {
+            spaceElement.appendChild(button);
+            spaceElement.parentNode.style.display = '';
+        }
+    } else if (label === undefined) {
+        // デフォルト文言
+        const button = document.createElement('button');
+        button.id = id;
+        button.textContent = '荷物問い合わせ';
+        button.addEventListener('click', () => {
+            const url = getInquiryUrl(carrier, trackingNumber);
+            if (url) window.open(url, '_blank');
+        });
+        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+        if (spaceElement) {
+            spaceElement.appendChild(button);
+            spaceElement.parentNode.style.display = '';
+        }
+    } else {
+        // 非表示
+        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+        if (spaceElement && spaceElement.parentNode) {
+            spaceElement.parentNode.style.display = 'none';
+        }
+    }
+    return;
+}
