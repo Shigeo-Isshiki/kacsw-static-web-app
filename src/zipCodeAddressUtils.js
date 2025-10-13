@@ -422,8 +422,7 @@ const kintoneZipSetSpaceFieldButton = (spaceField, id, label, zipCode, callback)
         // ボタン追加
         const button = document.createElement('button');
         button.id = id;
-        const label = '郵便番号から' + label + '住所を取得';
-        button.textContent = label;
+        button.textContent = '郵便番号から' + label + '住所を取得';
         button.addEventListener('click', () => {
             getAddressByZipCode(zipCode, (result) => {
                 // 呼び出し元で処理できるようにコールバックで返す
