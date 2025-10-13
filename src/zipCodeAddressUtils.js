@@ -337,4 +337,39 @@ const getAddressByZipCode = (zipCode, callback) => {
         .catch(error => {
             callback({ error: `APIへの接続に失敗しました: ${error.message}` });
         });
-}
+};
+
+/**
+ * kintoneのスペースフィールドに郵便番号の処理に関する説明を表示・非表示する関数
+ * @function
+ * @param {string} spaceField - スペースフィールドのフィールドコード
+ * @param {string} id - 出力する要素のID名（任意のもの）
+ * @param {boolean} display - 表示する場合はtrue、非表示はfalse
+ * @returns {void}
+ * @description innerHTMLがあれば表示、なければ削除して非表示にします。
+ */
+const kintoneZipSpaceFieldText = (spaceField, id, display) => {
+    if (!spaceField || !id) {
+        return;
+    }
+    // 既存要素削除
+    const spaceFieldElementById = document.getElementById(id);
+    if (spaceFieldElementById) {
+        spaceFieldElementById.remove();
+    }
+    const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+    if (display) {
+        // 表示
+        const createSpaceFieldElement = document.createElement('div');
+        createSpaceFieldElement.id = id;
+        createSpaceFieldElement.innerHTML = '<div>郵便番号の代わりにデジタルアドレスでも検索可能です。<br>デジタルアドレスの場合は郵便番号に変換されます。</div>';
+        if (spaceElement) {
+            spaceElement.appendChild(createSpaceFieldElement);
+            spaceElement.parentNode.style.display = '';
+        }
+    } else {
+        // 非表示
+        spaceElement.parentNode.style.display = 'none';
+    }
+    return;
+};
