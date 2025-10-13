@@ -23,47 +23,38 @@ const setSpaceFieldDisplay = (spaceField, display) => {
     return;
 };
 
+
 /**
- * kintoneのスペースフィールドにテキストを表示する関数
+ * kintoneのスペースフィールドにテキストを表示・非表示する統合関数
  * @function
  * @param {string} spaceField - スペースフィールドのフィールドコード
  * @param {string} id - 出力する要素のID名（任意のもの）
- * @param {string} innerHTML - 表示するHTML文字列
+ * @param {string|null} innerHTML - 表示するHTML文字列。nullまたは空文字で非表示
  * @returns {void}
- * @description 指定したスペースフィールドに、指定したIDとHTML内容でテキストを表示します。既存の同ID要素があれば削除し、新たに追加します。
+ * @description innerHTMLがあれば表示、なければ削除して非表示にします。
  */
-const appendSpaceText = (spaceField, id, innerHTML) => {
-    if (!spaceField || !id || !innerHTML) {
-        return;
-    }
-    removeSpaceText(spaceField, id);
-    const createSpaceFieldElement = document.createElement('div');
-    createSpaceFieldElement.id = id;
-    createSpaceFieldElement.innerHTML = '<div>' + innerHTML + '</div>';
-    const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-    if (spaceElement) {
-        spaceElement.appendChild(createSpaceFieldElement);
-        setSpaceFieldDisplay(spaceField, true);
-    }
-    return;
-};
-
-/**
- * kintoneのスペースフィールドからテキストを削除する関数
- * @function
- * @param {string} spaceField - スペースフィールドのフィールドコード
- * @param {string} id - 削除する要素のID名
- * @returns {void}
- * @description 指定したスペースフィールド内の、指定したIDの要素を削除し、スペースフィールドの表示を非表示にします。
- */
-const removeSpaceText = (spaceField, id) => {
+const setSpaceFieldText = (spaceField, id, innerHTML) => {
     if (!spaceField || !id) {
         return;
     }
+    // 既存要素削除
     const spaceFieldElementById = document.getElementById(id);
     if (spaceFieldElementById) {
         spaceFieldElementById.remove();
     }
-    setSpaceFieldDisplay(spaceField, false);
+    if (innerHTML) {
+        // 表示
+        const createSpaceFieldElement = document.createElement('div');
+        createSpaceFieldElement.id = id;
+        createSpaceFieldElement.innerHTML = '<div>' + innerHTML + '</div>';
+        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+        if (spaceElement) {
+            spaceElement.appendChild(createSpaceFieldElement);
+            setSpaceFieldDisplay(spaceField, true);
+        }
+    } else {
+        // 非表示
+        setSpaceFieldDisplay(spaceField, false);
+    }
     return;
 };
