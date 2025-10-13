@@ -5,6 +5,25 @@
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_kc_)で始める
 
 /**
+ * kintoneのスペースフィールドの表示・非表示を切り替える関数
+ * @function
+ * @param {string} spaceField - スペースフィールドのフィールドコード
+ * @param {boolean} display - 表示する場合はtrue、非表示はfalse
+ * @returns {void}
+ * @description 指定したスペースフィールドの表示状態を切り替えます。
+ */
+const setSpaceFieldDisplay = (spaceField, display) => {
+    if (!spaceField || typeof display !== 'boolean') {
+        return;
+    }
+    const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+    if (spaceElement) {
+        spaceElement.parentNode.style.display = display ? '' : 'none';
+    }
+    return;
+};
+
+/**
  * kintoneのスペースフィールドにテキストを表示する関数
  * @function
  * @param {string} spaceField - スペースフィールドのフィールドコード
@@ -24,7 +43,7 @@ const appendSpaceText = (spaceField, id, innerHTML) => {
     const spaceElement = kintone.app.record.getSpaceElement(spaceField);
     if (spaceElement) {
         spaceElement.appendChild(createSpaceFieldElement);
-        spaceElement.parentNode.style.display = '';
+        setSpaceFieldDisplay(spaceField, true);
     }
     return;
 };
@@ -45,8 +64,6 @@ const removeSpaceText = (spaceField, id) => {
     if (spaceFieldElementById) {
         spaceFieldElementById.remove();
     }
-    const spaceFieldElement = kintone.app.record.getSpaceElement(spaceField);
-    if (spaceFieldElement && spaceFieldElement.parentNode) {
-        spaceFieldElement.parentNode.style.display = 'none';
-    }
+    setSpaceFieldDisplay(spaceField, false);
+    return;
 };
