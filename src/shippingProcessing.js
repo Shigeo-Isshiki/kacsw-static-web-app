@@ -11,8 +11,8 @@ const _SP_HOLIDAY_API_BASE_URL = 'https://api.national-holidays.jp';
 
 // 運送会社ごとの問い合わせURLテンプレート
 const _SP_SHIPPING_INQUIRY_URL_MAP = {
-    yamato: 'https://member.kms.kuronekoyamato.co.jp/parcel/detail?pno={trackingNumber}',
-    japanpost: 'https://trackings.post.japanpost.jp/services/srv/search/direct?searchKind=S002&locale=ja&reqCodeNo1={trackingNumber}'
+    yamato: 'https://member.kms.kuronekoyamato.co.jp/parcel/detail?pno={trackingNumber}',                                             // ヤマト運輸
+    japanpost: 'https://trackings.post.japanpost.jp/services/srv/search/direct?searchKind=S002&locale=ja&reqCodeNo1={trackingNumber}' // 日本郵便
 };
 
 // ハイフン類を検出するための正規表現（全角・半角・ダッシュ類）
