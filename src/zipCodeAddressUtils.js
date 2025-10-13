@@ -349,7 +349,11 @@ const getAddressByZipCode = (zipCode, callback) => {
  * @description innerHTMLがあれば表示、なければ削除して非表示にします。
  */
 const kintoneZipSpaceFieldText = (spaceField, id, display) => {
-    if (!spaceField || !id) {
+    if (
+        typeof spaceField !== 'string' || !spaceField.trim() ||
+        typeof id !== 'string' || !id.trim() ||
+        typeof display !== 'boolean'
+    ) {
         return;
     }
     // 既存要素削除
