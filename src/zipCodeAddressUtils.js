@@ -377,3 +377,61 @@ const kintoneZipSpaceFieldText = (spaceField, id, display) => {
     }
     return;
 };
+
+/**
+ * kintoneのスペースフィールドに「郵便番号から住所取得」ボタンを追加・削除する関数
+ *
+ * @function
+ * @param {string} spaceField - スペースフィールドのフィールドコード
+ * @param {string} id - ボタン要素のID名（任意のもの）
+ * @param {string} title - 住所フィールドのタイトル名（ボタンラベルに使用）
+ * @param {string|number} zipCode - 郵便番号またはデジタルアドレス（7桁の半角英数字）。全角や記号・空白は自動で除去・変換されます。
+ * @param {function} [callback] - 住所取得結果を受け取るコールバック関数（省略可）。
+ *   - 引数: result（住所情報オブジェクト or エラーオブジェクト）
+ *   - 住所情報オブジェクト例: {
+ *       originalZipCode, normalizedZipCode, apiZipCode, zipCode, zipCode1...zipCode7,
+ *       address, prefName, cityName, townName, blockName, otherName, bizName
+ *     }
+ *   - エラー時: { error: エラーメッセージ }
+ * @returns {void}
+ * @description titleがあればボタンを追加、なければ削除して非表示にします。ボタン押下時、callbackコールバックで住所取得結果を返します。
+ */
+const kintoneZipSetSpaceFieldButton = (spaceField, id, title, zipCode, callback) => {
+    if (
+        typeof spaceField !== 'string' || !spaceField.trim() ||
+        typeof id !== 'string' || !id.trim() ||
+        (title !== null && typeof title !== 'string') ||
+        (zipCode !== null && typeof zipCode !== 'string' && typeof zipCode !== 'number') ||
+        (callback !== undefined && typeof callback !== 'function' && callback !== null)
+    ) {
+        return;
+    }
+    // 既存ボタン削除
+    const buttonElementById = document.getElementById(id);
+    if (buttonElementById) {
+        buttonElementById.remove();
+    }
+    if (title) {
+        // ボタン追加
+        const button = document.createElement('button');
+        button.id = id;
+        button.textContent = '郵便番号から' + title + '住所を取得';
+        button.addEventListener('click', () => {
+            getAddressByZipCode(zipCode, (result) => {
+                // 呼び出し元で処理できるようにコールバックで返す
+                if (typeof callback === 'function') {
+                    callback(result);
+                }
+            });
+        });
+        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+        if (spaceElement) {
+            spaceElement.appendChild(button);
+            setSpaceFieldDisplay(spaceField, true);
+        }
+    } else {
+        // 非表示
+        setSpaceFieldDisplay(spaceField, false);
+    }
+    return;
+};
