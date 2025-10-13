@@ -418,44 +418,32 @@ const kintoneZipSetSpaceFieldButton = (spaceField, id, label, zipCode, callback)
     if (buttonElementById) {
         buttonElementById.remove();
     }
-    if (label !== undefined && label !== null && label !== '') {
-        // ボタン追加
-        const button = document.createElement('button');
-        button.id = id;
-        button.textContent = '郵便番号から' + label + '住所を取得';
-        button.addEventListener('click', () => {
-            getAddressByZipCode(zipCode, (result) => {
-                // 呼び出し元で処理できるようにコールバックで返す
-                if (typeof callback === 'function') {
-                    callback(result);
-                }
-            });
-        });
-        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-        if (spaceElement) {
-            spaceElement.appendChild(button);
-            setSpaceFieldDisplay(spaceField, true);
-        }
+    let textContent = '';
+    if (label !== null && label !== '') {
+        textContent = '郵便番号から' + label + '住所を取得';
     } else if (label === undefined) {
         // labelがundefinedの場合はデフォルト文言
-        const button = document.createElement('button');
-        button.id = id;
-        button.textContent = '郵便番号から住所を取得';
-        button.addEventListener('click', () => {
-            getAddressByZipCode(zipCode, (result) => {
-                if (typeof callback === 'function') {
-                    callback(result);
-                }
-            });
-        });
-        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-        if (spaceElement) {
-            spaceElement.appendChild(button);
-            setSpaceFieldDisplay(spaceField, true);
-        }
+        textContent = '郵便番号から住所を取得';
     } else {
         // 非表示
         setSpaceFieldDisplay(spaceField, false);
+        return;
+    }
+    const button = document.createElement('button');
+    button.id = id;
+    button.textContent = textContent;
+    button.addEventListener('click', () => {
+        getAddressByZipCode(zipCode, (result) => {
+            // 呼び出し元で処理できるようにコールバックで返す
+            if (typeof callback === 'function') {
+                callback(result);
+            }
+        });
+    });
+    const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+    if (spaceElement) {
+        spaceElement.appendChild(button);
+        setSpaceFieldDisplay(spaceField, true);
     }
     return;
 };
