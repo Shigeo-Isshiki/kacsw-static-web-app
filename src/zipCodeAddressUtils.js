@@ -407,7 +407,7 @@ const kintoneZipSetSpaceFieldButton = (spaceField, id, title, zipCode, callback)
     if (
         typeof spaceField !== 'string' || !spaceField.trim() ||
         typeof id !== 'string' || !id.trim() ||
-        (title !== null && typeof title !== 'string') ||
+        (title !== null && typeof title !== 'string' && typeof title !== 'undefined') ||
         (zipCode !== null && typeof zipCode !== 'string' && typeof zipCode !== 'number') ||
         (callback !== undefined && typeof callback !== 'function' && callback !== null)
     ) {
