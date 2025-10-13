@@ -384,7 +384,10 @@ const kintoneZipSpaceFieldText = (spaceField, id, display) => {
  * @function
  * @param {string} spaceField - スペースフィールドのフィールドコード
  * @param {string} id - ボタン要素のID名（任意のもの）
- * @param {string} title - 住所フィールドのタイトル名（ボタンラベルに使用）
+ * @param {string|undefined|null} title - ボタンラベル用のタイトル名。
+ *   - 文字列: 「郵便番号から{title}住所を取得」ラベルで表示
+ *   - undefined: 「郵便番号から住所を取得」ラベルで表示（デフォルト文言）
+ *   - null/空文字: ボタン非表示（削除）
  * @param {string|number} zipCode - 郵便番号またはデジタルアドレス（7桁の半角英数字）。全角や記号・空白は自動で除去・変換されます。
  * @param {function} [callback] - 住所取得結果を受け取るコールバック関数（省略可）。
  *   - 引数: result（住所情報オブジェクト or エラーオブジェクト）
@@ -394,7 +397,11 @@ const kintoneZipSpaceFieldText = (spaceField, id, display) => {
  *     }
  *   - エラー時: { error: エラーメッセージ }
  * @returns {void}
- * @description titleがあればボタンを追加、なければ削除して非表示にします。ボタン押下時、callbackコールバックで住所取得結果を返します。
+ * @description titleの値により表示制御：
+ *   - 文字列なら「郵便番号から{title}住所を取得」ラベルで表示
+ *   - undefinedなら「郵便番号から住所を取得」ラベルで表示
+ *   - null/空文字ならボタン非表示（削除）
+ *   ボタン押下時、callbackコールバックで住所取得結果を返します。
  */
 const kintoneZipSetSpaceFieldButton = (spaceField, id, title, zipCode, callback) => {
     if (
@@ -411,14 +418,32 @@ const kintoneZipSetSpaceFieldButton = (spaceField, id, title, zipCode, callback)
     if (buttonElementById) {
         buttonElementById.remove();
     }
-    if (title) {
+    if (title !== undefined && title !== null && title !== '') {
         // ボタン追加
         const button = document.createElement('button');
         button.id = id;
-        button.textContent = '郵便番号から' + title + '住所を取得';
+        const label = '郵便番号から' + title + '住所を取得';
+        button.textContent = label;
         button.addEventListener('click', () => {
             getAddressByZipCode(zipCode, (result) => {
                 // 呼び出し元で処理できるようにコールバックで返す
+                if (typeof callback === 'function') {
+                    callback(result);
+                }
+            });
+        });
+        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+        if (spaceElement) {
+            spaceElement.appendChild(button);
+            setSpaceFieldDisplay(spaceField, true);
+        }
+    } else if (title === undefined) {
+        // titleがundefinedの場合はデフォルト文言
+        const button = document.createElement('button');
+        button.id = id;
+        button.textContent = '郵便番号から住所を取得';
+        button.addEventListener('click', () => {
+            getAddressByZipCode(zipCode, (result) => {
                 if (typeof callback === 'function') {
                     callback(result);
                 }
