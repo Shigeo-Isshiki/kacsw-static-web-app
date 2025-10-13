@@ -419,7 +419,7 @@ const kintoneZipSetSpaceFieldButton = (spaceField, id, label, zipCode, callback)
         buttonElementById.remove();
     }
     let textContent = '';
-    if (label !== null && label !== '') {
+    if (label !== undefined && label !== null && label !== '') {
         textContent = '郵便番号から' + label + '住所を取得';
     } else if (label === undefined) {
         // labelがundefinedの場合はデフォルト文言
