@@ -254,40 +254,32 @@ const kintoneShippingInquiryButton = (spaceField, id, label, trackingNumber, car
         if (!template) return '';
         return template.replace('{trackingNumber}', encodeURIComponent(trackingNumber));
     };
+    let textContent = '';
     if (label !== undefined && label !== null && label !== '') {
-        // ボタン追加
-        const button = document.createElement('button');
-        button.id = id;
-        button.textContent = label;
-        button.addEventListener('click', () => {
-            const url = getInquiryUrl(carrier, trackingNumber);
-            if (url) window.open(url, '_blank');
-        });
-        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-        if (spaceElement) {
-            spaceElement.appendChild(button);
-            spaceElement.parentNode.style.display = '';
-        }
+        textContent = label;
     } else if (label === undefined) {
         // デフォルト文言
-        const button = document.createElement('button');
-        button.id = id;
-        button.textContent = '荷物問い合わせ';
-        button.addEventListener('click', () => {
-            const url = getInquiryUrl(carrier, trackingNumber);
-            if (url) window.open(url, '_blank');
-        });
-        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-        if (spaceElement) {
-            spaceElement.appendChild(button);
-            spaceElement.parentNode.style.display = '';
-        }
+        textContent = '荷物問い合わせ';
     } else {
         // 非表示
         const spaceElement = kintone.app.record.getSpaceElement(spaceField);
         if (spaceElement && spaceElement.parentNode) {
             spaceElement.parentNode.style.display = 'none';
         }
+        return;
+    }
+    // ボタン追加
+    const button = document.createElement('button');
+    button.id = id;
+    button.textContent = textContent;
+    button.addEventListener('click', () => {
+        const url = getInquiryUrl(carrier, trackingNumber);
+        if (url) window.open(url, '_blank');
+    });
+    const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+    if (spaceElement) {
+        spaceElement.appendChild(button);
+        spaceElement.parentNode.style.display = '';
     }
     return;
 }
