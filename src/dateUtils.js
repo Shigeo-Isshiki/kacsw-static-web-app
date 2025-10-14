@@ -64,7 +64,8 @@ const convertToSeireki = (date) => {
         const eraNames = _DU_ERAS.map(e => e.name).join('');
         // 年・月・日それぞれ漢数字または数字
         const waKanjiReg = new RegExp(`^([${eraNames}])([元一二三四五六七八九十百千〇\d]+)年([元一二三四五六七八九十百千〇\d]+)月([元一二三四五六七八九十百千〇\d]+)日$`);
-        const matchKanji = normalized.match(waKanjiReg);
+        // 変換前（漢数字含む）で判定
+        let matchKanji = date.match(waKanjiReg);
         if (matchKanji) {
             const eraKanji = matchKanji[1];
             const eraYearStr = matchKanji[2];
@@ -77,6 +78,26 @@ const convertToSeireki = (date) => {
             let monthNum = _du_kanjiToNumber(monthStr);
             let dayNum = _du_kanjiToNumber(dayStr);
             // 0は不正なので1に補正
+            if (yearNum === 0) yearNum = 1;
+            if (monthNum === 0) monthNum = 1;
+            if (dayNum === 0) dayNum = 1;
+            const year = era.start.getFullYear() + yearNum - 1;
+            const resultDate = new Date(year, monthNum - 1, dayNum);
+            return formatDate(resultDate);
+        }
+        // 変換後（数字化済み）でも判定
+        matchKanji = normalized.match(waKanjiReg);
+        if (matchKanji) {
+            const eraKanji = matchKanji[1];
+            const eraYearStr = matchKanji[2];
+            const monthStr = matchKanji[3];
+            const dayStr = matchKanji[4];
+            const era = _DU_ERAS.find(e => e.name.startsWith(eraKanji));
+            if (!era) throw new Error('不正な元号です');
+            // 年・月・日を数字変換
+            let yearNum = _du_kanjiToNumber(eraYearStr);
+            let monthNum = _du_kanjiToNumber(monthStr);
+            let dayNum = _du_kanjiToNumber(dayStr);
             if (yearNum === 0) yearNum = 1;
             if (monthNum === 0) monthNum = 1;
             if (dayNum === 0) dayNum = 1;
