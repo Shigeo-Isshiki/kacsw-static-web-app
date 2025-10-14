@@ -196,9 +196,8 @@ const convertToEra = (date) => {
     }
     for (const era of _DU_ERAS) {
         if (d >= era.start) {
-            // 年号の開始年と月日を考慮
-            const eraYear = d.getFullYear() - era.start.getFullYear() +
-            (d.getMonth() > era.start.getMonth() || (d.getMonth() === era.start.getMonth() && d.getDate() >= era.start.getDate()) ? 1 : 0);
+            // 年号の開始年のみで計算（+1）
+            const eraYear = d.getFullYear() - era.start.getFullYear() + 1;
             const kanji = `${era.name}${eraYear === 1 ? '元' : eraYear}年`;
             const initial = `${era.initial}${eraYear === 1 ? '1' : eraYear}`;
             const initialOnly = `${era.initial}`;
