@@ -123,7 +123,11 @@ const convertToSeireki = (date) => {
 /**
  * 日付から元号表記（和暦）に変換し、複数形式で返す
  * @param {Date|string} date 日付（Date型または'YYYY-MM-DD'形式の文字列）
- * @returns {object} { kanji, initial, initialOnly, numberOnly }
+ * @returns {object} 戻り値オブジェクトの内容:
+ *   - kanji: 元号＋年（例: "令和7年"、"平成元年"）
+ *   - initial: 元号イニシャル＋年（例: "R7"、"H1"）
+ *   - initialOnly: 元号イニシャルのみ（例: "R"、"H"）
+ *   - numberOnly: 元号年の2桁（例: "07"、"53"、元年は"01"）
  */
 const convertToEra = (date) => {
     // まずconvertToSeirekiで西暦日付（YYYY-MM-DD）に変換
@@ -148,7 +152,7 @@ const convertToEra = (date) => {
             const kanji = `${era.name}${eraYear === 1 ? '元' : eraYear}年`;
             const initial = `${era.initial}${eraYear === 1 ? '1' : eraYear}`;
             const initialOnly = `${era.initial}`;
-            const numberOnly = `${era.number}${eraYear === 1 ? '01' : String(eraYear).padStart(2, '0')}`;
+            const numberOnly = `${eraYear === 1 ? '01' : String(eraYear).padStart(2, '0')}`;
             return {
                 kanji,
                 initial,
