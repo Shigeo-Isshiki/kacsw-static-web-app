@@ -59,7 +59,9 @@ const convertToSeireki = (date) => {
     }
     if (typeof date === 'string') {
         // 漢数字をアラビア数字に変換（年・月・日）
-        let normalized = date;
+    // 全角数字→半角数字変換
+    const toHankaku = s => s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+    let normalized = toHankaku(date);
         // 和暦（漢数字含む）パターン: "元号+年+月+日" 例: "昭和五十三年七月二十九日"
         const eraNames = _DU_ERAS.map(e => e.name).join('');
         // 年・月・日それぞれ漢数字または数字
@@ -86,6 +88,8 @@ const convertToSeireki = (date) => {
             return formatDate(resultDate);
         }
         // 変換後（数字化済み）でも判定
+        // normalizedも半角化
+        normalized = toHankaku(normalized);
         matchKanji = normalized.match(waKanjiReg);
         if (matchKanji) {
             const eraKanji = matchKanji[1];
@@ -115,8 +119,8 @@ const convertToSeireki = (date) => {
         
         // 動的に元号名・イニシャルを取得
         const eraInitials = _DU_ERAS.map(e => e.initial).join('');
-        // 和暦パターン1: "元号+年+年+月+日" 例: "令和7年10月14日", "平成元年1月8日"
-        const waReg1 = new RegExp(`^([${eraNames}])([元\d]+)年(\d{1,2})月(\d{1,2})日$`);
+        // 和暦パターン1: "元号+年+年+月+日" 例: "令和7年10月14日", "平成元年1月8日", "昭和53年7月29日"
+        const waReg1 = new RegExp(`^([${eraNames}])([元\d]+)年([\d]+)月([\d]+)日$`);
         const match1 = normalized.match(waReg1);
         if (match1) {
             const eraKanji = match1[1];
