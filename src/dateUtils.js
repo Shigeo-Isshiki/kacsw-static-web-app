@@ -59,7 +59,27 @@ const convertToSeireki = (date) => {
     }
     if (typeof date === 'string') {
         // 漢数字をアラビア数字に変換（年・月・日）
-        let normalized = date.replace(/[一二三四五六七八九十百千〇元]+/g, (m) => _du_kanjiToNumber(m));
+        let normalized = date;
+        // 和暦（漢数字含む）パターン: "元号+年+月+日" 例: "昭和五十三年七月二十九日"
+        const eraNames = _DU_ERAS.map(e => e.name).join('');
+        const waKanjiReg = new RegExp(`^([${eraNames}])([元一二三四五六七八九十百千〇\d]+)年([一二三四五六七八九十百千〇\d]+)月([一二三四五六七八九十百千〇\d]+)日$`);
+        const matchKanji = normalized.match(waKanjiReg);
+        if (matchKanji) {
+            const eraKanji = matchKanji[1];
+            const eraYearStr = matchKanji[2];
+            const monthStr = matchKanji[3];
+            const dayStr = matchKanji[4];
+            const era = _DU_ERAS.find(e => e.name.startsWith(eraKanji));
+            if (!era) throw new Error('不正な元号です');
+            let yearNum = _du_kanjiToNumber(eraYearStr);
+            let monthNum = _du_kanjiToNumber(monthStr);
+            let dayNum = _du_kanjiToNumber(dayStr);
+            const year = era.start.getFullYear() + yearNum - 1;
+            const resultDate = new Date(year, monthNum - 1, dayNum);
+            return formatDate(resultDate);
+        }
+        // 漢数字をアラビア数字に変換（年・月・日）
+        normalized = normalized.replace(/[一二三四五六七八九十百千〇元]+/g, (m) => _du_kanjiToNumber(m));
         // 日本語表記（YYYY年MM月DD日）をISO形式に変換
         normalized = normalized.replace(/(\d{4})年(\d{1,2})月(\d{1,2})日/, '$1-$2-$3');
         // 西暦（YYYY-MM-DD, YYYY/MM/DD, YYYY年MM月DD日）
@@ -67,7 +87,6 @@ const convertToSeireki = (date) => {
         if (!isNaN(d.getTime())) return formatDate(d);
         
         // 動的に元号名・イニシャルを取得
-        const eraNames = _DU_ERAS.map(e => e.name).join('');
         const eraInitials = _DU_ERAS.map(e => e.initial).join('');
         // 和暦パターン1: "元号+年+年+月+日" 例: "令和7年10月14日", "平成元年1月8日"
         const waReg1 = new RegExp(`^([${eraNames}])([元\d]+)年(\d{1,2})月(\d{1,2})日$`);
