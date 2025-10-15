@@ -58,54 +58,59 @@ const convertToSeireki = (date) => {
         return formatDate(date);
     }
     if (typeof date === 'string') {
-        // 前処理: 全角数字・英字→半角、漢数字→アラビア数字
+        // 前処理: 全角数字・英字→半角、漢数字→半角アラビア数字、元号漢字→イニシャル、区切りをYYYY-MM-DDに統一
         const toHankaku = s => s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
         const toHankakuAlpha = s => s.replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
-        let normalized = toHankakuAlpha(toHankaku(date));
+        // 漢数字→半角アラビア数字（1～3999程度まで対応）
+        const kanjiNumReg = /[元一二三四五六七八九十百千〇]+/g;
+        const kanjiToNumStr = s => s.replace(kanjiNumReg, m => _du_kanjiToNumber(m));
+        // 元号漢字→イニシャル
         const eraInitials = _DU_ERAS.map(e => e.initial).join('');
         const eraNames = _DU_ERAS.map(e => e.name).join('|');
-        // 判定パターン配列
-        const patterns = [
-            // 1. 元号漢字＋漢数字（例: 令和元年五月一日）
-            {
-                regex: new RegExp(`^(${eraNames})([元一二三四五六七八九十百千〇\d]+)年([元一二三四五六七八九十百千〇\d]+)月([元一二三四五六七八九十百千〇\d]+)日$`),
-                getEra: m => _DU_ERAS.find(e => e.name.startsWith(m[1])),
-                yearStr: m => m[2], monthStr: m => m[3], dayStr: m => m[4]
-            },
-            // 2. 元号イニシャル＋漢数字（例: R元年五月一日）
-            {
-                regex: new RegExp(`^([${eraInitials}${eraInitials.toLowerCase()}])([元一二三四五六七八九十百千〇\d]+)年([元一二三四五六七八九十百千〇\d]+)月([元一二三四五六七八九十百千〇\d]+)日$`),
-                getEra: m => _DU_ERAS.find(e => e.initial === m[1].toUpperCase()),
-                yearStr: m => m[2], monthStr: m => m[3], dayStr: m => m[4]
-            },
-            // 3. 元号漢字＋数字（例: 令和1年5月1日）
-            {
-                regex: new RegExp(`^(${eraNames})([元\d]+)年([\d]+)月([\d]+)日$`),
-                getEra: m => _DU_ERAS.find(e => e.name.startsWith(m[1])),
-                yearStr: m => m[2], monthStr: m => m[3], dayStr: m => m[4]
-            },
-            // 4. 元号イニシャル＋数字＋区切り（例: R01-05-01, r01/5/1, H01.1.8）
-            {
-                regex: new RegExp(`^([${eraInitials}${eraInitials.toLowerCase()}])\s*(\d{1,2,3}|元)[-/\.年 ](\d{1,2})[-/\.月 ](\d{1,2})`),
-                getEra: m => _DU_ERAS.find(e => e.initial === m[1].toUpperCase()),
-                yearStr: m => m[2], monthStr: m => m[3], dayStr: m => m[4]
-            },
-            // 5. 元号漢字＋数字＋区切り（例: 令和1/5/1, 平成1-1-8）
-            {
-                regex: new RegExp(`^([${eraNames}])\s*(\d{1,2,3}|元)[-/\.年 ](\d{1,2})[-/\.月 ](\d{1,2})`),
-                getEra: m => _DU_ERAS.find(e => e.name.startsWith(m[1])),
-                yearStr: m => m[2], monthStr: m => m[3], dayStr: m => m[4]
+        const kanjiToInitial = s => {
+            let result = s;
+            _DU_ERAS.forEach(e => {
+                result = result.replace(new RegExp(e.name, 'g'), e.initial);
+            });
+            return result;
+        };
+        // 区切りをYYYY-MM-DDに統一
+        const normalizeDateSeparator = s => s
+            .replace(/年|\/|\.|\s|月/g, '-')
+            .replace(/日/g, '');
+        let normalized = (typeof date === 'string') ? date : '';
+        normalized = toHankakuAlpha(toHankaku(normalized));
+        normalized = kanjiToNumStr(normalized);
+        normalized = kanjiToInitial(normalized);
+        normalized = normalizeDateSeparator(normalized);
+        if (typeof normalized !== 'string') normalized = String(normalized ?? '');
+        normalized = normalized.replace(/^-+|-+$/g, ''); // 先頭・末尾の余分な区切りを除去
+        // 区切りで分割し、和暦パターン判定
+        const parts = normalized.split('-').filter(Boolean);
+        // 例: ["H", "1", "1", "8"] or ["H", "1", "8"]
+        if (parts.length >= 3 && parts.length <= 4) {
+            let initial = parts[0];
+            let yearStr = '';
+            // initialが2文字以上の場合（例: H1, R7, S53）
+            if (initial.length > 1) {
+                yearStr = initial.slice(1);
+                initial = initial[0];
             }
-        ];
-        // パターン判定
-        for (const p of patterns) {
-            const m = normalized.match(p.regex);
-            if (m) {
-                const era = p.getEra(m);
-                if (!era) throw new Error('不正な元号です');
-                let yearNum = _du_kanjiToNumber(p.yearStr(m));
-                let monthNum = _du_kanjiToNumber(p.monthStr(m));
-                let dayNum = _du_kanjiToNumber(p.dayStr(m));
+            // 大文字・小文字両方対応
+            let era = _DU_ERAS.find(e => e.initial.toUpperCase() === initial.toUpperCase());
+            if (era) {
+                let yearNum, monthNum, dayNum;
+                if (yearStr) {
+                    // initial+年パターン
+                    yearNum = parseInt(yearStr, 10);
+                    monthNum = parseInt(parts[1], 10);
+                    dayNum = parseInt(parts[2], 10);
+                } else {
+                    // initial, 年, 月, 日パターン
+                    yearNum = parseInt(parts[1], 10);
+                    monthNum = parseInt(parts[2], 10);
+                    dayNum = parts.length === 4 ? parseInt(parts[3], 10) : 1;
+                }
                 if (yearNum === 0) yearNum = 1;
                 if (monthNum === 0) monthNum = 1;
                 if (dayNum === 0) dayNum = 1;
@@ -114,13 +119,19 @@ const convertToSeireki = (date) => {
                 return formatDate(resultDate);
             }
         }
-        // その他: 漢数字をアラビア数字に変換（年・月・日）
-        normalized = normalized.replace(/[一二三四五六七八九十百千〇元]+/g, (m) => _du_kanjiToNumber(m));
-        // 日本語表記（YYYY年MM月DD日）をISO形式に変換
-        normalized = normalized.replace(/(\d{4})年(\d{1,2})月(\d{1,2})日/, '$1-$2-$3');
         // 西暦（YYYY-MM-DD, YYYY/MM/DD, YYYY年MM月DD日）
-        let d = new Date(normalized);
-        if (!isNaN(d.getTime())) return formatDate(d);
+        const ymdMatch = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (ymdMatch) {
+            const y = parseInt(ymdMatch[1], 10);
+            const m = parseInt(ymdMatch[2], 10);
+            const d0 = parseInt(ymdMatch[3], 10);
+            // 日付部分が1～31以外はエラー
+            if (d0 < 1 || d0 > 31) {
+                throw new Error('存在しない日付です');
+            }
+            const d = new Date(`${y}-${String(m).padStart(2, '0')}-${String(d0).padStart(2, '0')}`);
+            return formatDate(d);
+        }
     }
     throw new Error('不正な入力形式です');
 };
