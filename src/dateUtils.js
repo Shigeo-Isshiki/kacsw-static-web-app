@@ -61,7 +61,9 @@ const convertToSeireki = (date) => {
         // 漢数字をアラビア数字に変換（年・月・日）
     // 全角数字→半角数字変換
     const toHankaku = s => s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
-    let normalized = toHankaku(date);
+    // 全角英字→半角英字変換
+    const toHankakuAlpha = s => s.replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+    let normalized = toHankakuAlpha(toHankaku(date));
         // 和暦（漢数字含む）パターン: "元号+年+月+日" 例: "昭和五十三年七月二十九日"
     const eraNames = _DU_ERAS.map(e => e.name).join('|');
         // 年・月・日それぞれ漢数字または数字
