@@ -91,7 +91,7 @@ const convertToSeireki = (date) => {
         if (parts.length >= 3 && parts.length <= 4) {
             let initial = parts[0];
             let yearStr = '';
-            // initialが2文字以上の場合（例: H1, R7, S53）
+            // initialが2文字以上の場合（例: H1, R7, H13）
             if (initial.length > 1) {
                 yearStr = initial.slice(1);
                 initial = initial[0];
