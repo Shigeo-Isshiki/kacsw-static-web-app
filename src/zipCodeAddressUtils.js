@@ -225,6 +225,13 @@ const checkZipCodeExists = (zipCode, callback) => {
  */
 const getAddressByZipCode = (zipCode, callback) => {
     const normalized = _zc_normalizeZipCodeInput(zipCode);
+    // 正規化後は7文字の半角英数字である必要がある
+    if (typeof normalized !== 'string' || !/^[0-9A-Z]{7}$/.test(normalized)) {
+        if (typeof callback === 'function') {
+            callback({ error: '郵便番号／デジタルアドレスは7桁の半角英数字で指定してください' });
+        }
+        return;
+    }
     fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
         .then(response => {
             if (!response.ok) {
