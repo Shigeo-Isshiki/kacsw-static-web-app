@@ -30,6 +30,19 @@ const _zc_normalizeZipCodeInput = (zipCode) => {
         .replace(_ZC_SYMBOLS_REGEX, '');
 };
 
+/**
+ * 正規化＋7桁チェックを行う内部ヘルパー
+ * @param {string|number} zipCode
+ * @returns {{ok: boolean, normalized?: string, error?: string}}
+ */
+const _zc_getValidatedNormalized = (zipCode) => {
+    const normalized = _zc_normalizeZipCodeInput(zipCode);
+    if (typeof normalized !== 'string' || !/^[0-9A-Z]{7}$/.test(normalized)) {
+        return { ok: false, error: '郵便番号／デジタルアドレスは7桁の半角英数字で指定してください' };
+    }
+    return { ok: true, normalized };
+};
+
 //　ライブラリ本体部
 /**
  * 郵便番号をハイフン付き（123-4567）にフォーマットする関数（APIで存在確認、callback型）
@@ -37,8 +50,13 @@ const _zc_normalizeZipCodeInput = (zipCode) => {
  * @param {function} callback - (result: { zipCode: string } | { error: string }) => void
  */
 const formatZipCode = (zipCode, callback) => {
-    const result = _zc_normalizeZipCodeInput(zipCode);
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${result}`)
+    const v = _zc_getValidatedNormalized(zipCode);
+    if (!v.ok) {
+        if (typeof callback === 'function') callback({ error: v.error });
+        return;
+    }
+    const normalized = v.normalized;
+    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
         .then(response => {
             if (response.status === 404) {
                 callback({ error: '郵便番号が存在しません' });
@@ -56,10 +74,10 @@ const formatZipCode = (zipCode, callback) => {
                 return null;
             }
             // 数字7桁ならハイフン付き、それ以外はそのまま
-            if (/^\d{7}$/.test(result)) {
-                callback({ zipCode: result.slice(0, 3) + '-' + result.slice(3) });
+            if (/^\d{7}$/.test(normalized)) {
+                callback({ zipCode: normalized.slice(0, 3) + '-' + normalized.slice(3) });
             } else {
-                callback({ zipCode: result });
+                callback({ zipCode: normalized });
             }
         })
         .catch(() => {
@@ -73,8 +91,13 @@ const formatZipCode = (zipCode, callback) => {
  * @param {function} callback - (result: { zipCode: string } | { error: string }) => void
  */
 const normalizeZipCode = (zipCode, callback) => {
-    const result = _zc_normalizeZipCodeInput(zipCode);
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${result}`)
+    const v = _zc_getValidatedNormalized(zipCode);
+    if (!v.ok) {
+        if (typeof callback === 'function') callback({ error: v.error });
+        return;
+    }
+    const normalized = v.normalized;
+    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
         .then(response => {
             if (response.status === 404) {
                 callback({ error: '郵便番号が存在しません' });
@@ -92,7 +115,7 @@ const normalizeZipCode = (zipCode, callback) => {
                 callback({ error: '郵便番号が存在しません' });
                 return null;
             }
-            callback({ zipCode: result });
+            callback({ zipCode: normalized });
         })
         .catch(() => {
             callback({ error: 'API接続エラー' });
@@ -105,8 +128,13 @@ const normalizeZipCode = (zipCode, callback) => {
  * @param {function} callback - (prefName: string|null) => void 都道府県名（存在しない場合はnull）
  */
 const getPrefectureByZipCode = (zipCode, callback) => {
-    const result = _zc_normalizeZipCodeInput(zipCode);
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${result}`)
+    const v = _zc_getValidatedNormalized(zipCode);
+    if (!v.ok) {
+        if (typeof callback === 'function') callback(null);
+        return;
+    }
+    const normalized = v.normalized;
+    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
         .then(response => {
             if (response.status === 404) {
                 callback(null);
@@ -136,8 +164,13 @@ const getPrefectureByZipCode = (zipCode, callback) => {
  * @param {function} callback - (cityName: string|null) => void 市区町村名（存在しない場合はnull）
  */
 const getCityByZipCode = (zipCode, callback) => {
-    const result = _zc_normalizeZipCodeInput(zipCode);
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${result}`)
+    const v = _zc_getValidatedNormalized(zipCode);
+    if (!v.ok) {
+        if (typeof callback === 'function') callback(null);
+        return;
+    }
+    const normalized = v.normalized;
+    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
         .then(response => {
             if (response.status === 404) {
                 callback(null);
@@ -167,8 +200,13 @@ const getCityByZipCode = (zipCode, callback) => {
  * @param {function} callback - (exists: boolean) => void 存在する場合はtrue、存在しない場合はfalse
  */
 const checkZipCodeExists = (zipCode, callback) => {
-    const result = _zc_normalizeZipCodeInput(zipCode);
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${result}`)
+    const v = _zc_getValidatedNormalized(zipCode);
+    if (!v.ok) {
+        if (typeof callback === 'function') callback(false);
+        return;
+    }
+    const normalized = v.normalized;
+    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
         .then(response => {
             if (response.status === 404) {
                 callback(false);
@@ -224,19 +262,18 @@ const checkZipCodeExists = (zipCode, callback) => {
  *
  */
 const getAddressByZipCode = (zipCode, callback) => {
-    const normalized = _zc_normalizeZipCodeInput(zipCode);
-    // 正規化後は7文字の半角英数字である必要がある
-    if (typeof normalized !== 'string' || !/^[0-9A-Z]{7}$/.test(normalized)) {
-        if (typeof callback === 'function') {
-            callback({ error: '郵便番号／デジタルアドレスは7桁の半角英数字で指定してください' });
-        }
+    const v = _zc_getValidatedNormalized(zipCode);
+    if (!v.ok) {
+        if (typeof callback === 'function') callback({ error: v.error });
         return;
     }
+    const normalized = v.normalized;
+    // 正規化後は7文字の半角英数字であることが保証されている
     fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
         .then(response => {
             if (!response.ok) {
-                if (response.status === 404) {
-                    callback({ error: `郵便番号／デジタルアドレス「${validatedZipCode}」に該当する住所が見つかりません` });
+                    if (response.status === 404) {
+                    callback({ error: `郵便番号／デジタルアドレス「${zipCode}」に該当する住所が見つかりません` });
                     return null;
                 } else if (response.status >= 500) {
                     callback({ error: 'サーバーエラーが発生しました' });
