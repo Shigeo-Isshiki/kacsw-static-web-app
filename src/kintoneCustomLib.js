@@ -6,9 +6,13 @@
 
 // 内部関数
 /**
- * HTMLをサニタイズする関数
- * @param {*} html 
- * @returns 
+ * HTML文字列をサニタイズして安全な HTML を返します。
+ * - 可能なら DOMPurify.sanitize を利用します。
+ * - フォールバックとして script 要素や on* 属性、javascript: URL を除去します。
+ * - 最終的に失敗した場合はエスケープしたプレーンテキストを返します。
+ *
+ * @param {string} html サニタイズ対象の HTML 文字列（null/非文字列でも許容し String() で扱います）
+ * @returns {string} サニタイズ済の HTML 文字列
  */
 const _kc_sanitizeHtml = (html) => {
     try {
@@ -52,12 +56,11 @@ const _kc_sanitizeHtml = (html) => {
 
 // ここから外部に公開する関数群
 /**
- * kintoneのスペースフィールドの表示・非表示を切り替える関数
- * @function
- * @param {string} spaceField - スペースフィールドのフィールドコード
- * @param {boolean} display - 表示する場合はtrue、非表示はfalse
- * @returns {void}
- * @description 指定したスペースフィールドの表示状態を切り替えます。
+ * kintone のスペースフィールド（スペースエレメント）を表示/非表示に切り替えます。
+ *
+ * @param {string} spaceField スペースフィールドのフィールドコード
+ * @param {boolean} display true=表示, false=非表示
+ * @returns {boolean} 成功したら true、引数不正や要素が見つからなければ false
  */
 const setSpaceFieldDisplay = (spaceField, display) => {
     if (typeof spaceField !== 'string' || !spaceField.trim() || typeof display !== 'boolean') {
@@ -74,13 +77,14 @@ const setSpaceFieldDisplay = (spaceField, display) => {
 };
 
 /**
- * kintoneのスペースフィールドにテキストを表示・非表示する関数
- * @function
- * @param {string} spaceField - スペースフィールドのフィールドコード
- * @param {string} id - 出力する要素のID名（任意のもの）
- * @param {string|null} innerHTML - 表示するHTML文字列。nullまたは空文字で非表示
- * @returns {void}
- * @description innerHTMLがあれば表示、なければ削除して非表示にします。
+ * kintone のスペースフィールド内に任意の HTML 文字列を挿入して表示／削除します。
+ * - 挿入時は既存の同 ID 要素を削除してから追加します。
+ * - innerHTML は内部でサニタイズされます。
+ *
+ * @param {string} spaceField スペースフィールドのフィールドコード
+ * @param {string} id 追加する要素の id（既存要素があれば上書きの代わりに削除して再作成）
+ * @param {string|null} innerHTML 表示する HTML。null/空文字 の場合は要素を削除して非表示にする
+ * @returns {boolean} 成功したら true、引数不正や要素未発見などで失敗したら false
  */
 const setSpaceFieldText = (spaceField, id, innerHTML) => {
     if (
@@ -117,14 +121,15 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
 };
 
 /**
- * kintoneのスペースフィールドにボタンを追加・削除する関数
- * @function
- * @param {string} spaceField - スペースフィールドのフィールドコード
- * @param {string} id - ボタン要素のID名（任意のもの）
- * @param {string|null} textContent - ボタンに表示するテキスト。nullまたは空文字で削除
- * @param {function} [onClick] - ボタンのクリック時に実行する関数（省略可）
- * @returns {void}
- * @description textContentがあればボタンを追加、なければ削除して非表示にします。onClickでクリックイベントを割り当て可能。
+ * kintone のスペースフィールドにボタン要素を追加または削除します。
+ * - 既存の同 ID の要素は常に削除されます。
+ * - 追加時は type="button" として作成し、onClick が関数であれば click イベントを登録します。
+ *
+ * @param {string} spaceField スペースフィールドのフィールドコード
+ * @param {string} id 追加するボタン要素の id
+ * @param {string|null} textContent ボタンの表示テキスト。null/空なら要素を削除して非表示にする
+ * @param {function|null|undefined} [onClick] クリック時に実行するコールバック（関数でない場合は無視される）
+ * @returns {boolean|undefined} 要素の追加/削除に成功したら true/false を返します。入力が不正な場合は undefined を返すことがあります。
  */
 const setSpaceFieldButton = (spaceField, id, textContent, onClick) => {
     if (
@@ -166,9 +171,15 @@ const setSpaceFieldButton = (spaceField, id, textContent, onClick) => {
 };
 
 /**
- * エラーメッセージを通知する共通関数
- * @param {*} message エラーメッセージの内容
- * @param {*} title ダイアログタイトル（省略可）
+ * エラーをユーザーに通知するダイアログを表示します。
+ * - 可能なら kintone.createDialog を使ってカスタムダイアログを表示します。
+ * - 失敗時は alert をフォールバックで使用します。
+ * - allowHtml が true のときのみ message を HTML として挿入（サニタイズあり）、
+ *   デフォルトはプレーンテキストとして表示します。
+ *
+ * @param {string|Node} message 表示するメッセージ（文字列が想定）。Node を渡す場合はそのまま挿入されます。
+ * @param {string} [title='エラー'] ダイアログのタイトル
+ * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか（サニタイズされます）
  * @returns {void}
  */
 const notifyError = (message, title = 'エラー', allowHtml = false) => {
@@ -231,7 +242,6 @@ const notifyError = (message, title = 'エラー', allowHtml = false) => {
                     const okBtn = container.querySelector('button.kintone-dialog-ok-button, button');
                     if (okBtn) {
                         okBtn.setAttribute('aria-label', '閉じる');
-                        try { okBtn.focus(); } catch(e) {}
                     }
                 }
             } catch (error) {
