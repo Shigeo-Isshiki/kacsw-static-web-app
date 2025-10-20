@@ -56,121 +56,6 @@ const _kc_sanitizeHtml = (html) => {
 
 // ここから外部に公開する関数群
 /**
- * kintone のスペースフィールド（スペースエレメント）を表示/非表示に切り替えます。
- *
- * @param {string} spaceField スペースフィールドのフィールドコード
- * @param {boolean} display true=表示, false=非表示
- * @returns {boolean} 成功したら true、引数不正や要素が見つからなければ false
- */
-const setSpaceFieldDisplay = (spaceField, display) => {
-    if (typeof spaceField !== 'string' || !spaceField.trim() || typeof display !== 'boolean') {
-        console.warn('setSpaceFieldDisplay: invalid arguments', { spaceField, display });
-        return false;
-    }
-    const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-    if (!spaceElement) {
-        console.warn('setSpaceFieldDisplay: space element not found', spaceField);
-        return false;
-    }
-    spaceElement.parentNode.style.display = display ? '' : 'none';
-    return true;
-};
-
-/**
- * kintone のスペースフィールド内に任意の HTML 文字列を挿入して表示／削除します。
- * - 挿入時は既存の同 ID 要素を削除してから追加します。
- * - innerHTML は内部でサニタイズされます。
- *
- * @param {string} spaceField スペースフィールドのフィールドコード
- * @param {string} id 追加する要素の id（既存要素があれば上書きの代わりに削除して再作成）
- * @param {string|null} innerHTML 表示する HTML。null/空文字 の場合は要素を削除して非表示にする
- * @returns {boolean} 成功したら true、引数不正や要素未発見などで失敗したら false
- */
-const setSpaceFieldText = (spaceField, id, innerHTML) => {
-    if (
-        typeof spaceField !== 'string' || !spaceField.trim() ||
-        typeof id !== 'string' || !id.trim() ||
-        (innerHTML !== null && typeof innerHTML !== 'string')
-    ) {
-        console.warn('setSpaceFieldText: invalid arguments', { spaceField, id, innerHTML });
-        return false;
-    }
-    // 既存要素削除
-    const spaceFieldElementById = document.getElementById(id);
-    if (spaceFieldElementById) {
-        spaceFieldElementById.remove();
-    }
-    if (innerHTML) {
-        // 表示
-        const createSpaceFieldElement = document.createElement('div');
-        createSpaceFieldElement.id = id;
-        // innerHTML は HTML 形式での入力が想定されるため、可能な限りサニタイズしてから挿入する
-        createSpaceFieldElement.innerHTML = _kc_sanitizeHtml(innerHTML);
-        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-        if (!spaceElement) {
-            console.warn('setSpaceFieldText: space element not found', spaceField);
-            return false;
-        }
-        spaceElement.appendChild(createSpaceFieldElement);
-        return setSpaceFieldDisplay(spaceField, true);
-    } else {
-        // 非表示
-        return setSpaceFieldDisplay(spaceField, false);
-    }
-    
-};
-
-/**
- * kintone のスペースフィールドにボタン要素を追加または削除します。
- * - 既存の同 ID の要素は常に削除されます。
- * - 追加時は type="button" として作成し、onClick が関数であれば click イベントを登録します。
- *
- * @param {string} spaceField スペースフィールドのフィールドコード
- * @param {string} id 追加するボタン要素の id
- * @param {string|null} textContent ボタンの表示テキスト。null/空なら要素を削除して非表示にする
- * @param {function|null|undefined} [onClick] クリック時に実行するコールバック（関数でない場合は無視される）
- * @returns {boolean|undefined} 要素の追加/削除に成功したら true/false を返します。入力が不正な場合は undefined を返すことがあります。
- */
-const setSpaceFieldButton = (spaceField, id, textContent, onClick) => {
-    if (
-        typeof spaceField !== 'string' || !spaceField.trim() ||
-        typeof id !== 'string' || !id.trim() ||
-        (textContent !== null && typeof textContent !== 'string') ||
-        (onClick !== undefined && typeof onClick !== 'function' && onClick !== null)
-    ) {
-        return;
-    }
-    // 既存ボタン削除
-    const buttonElementById = document.getElementById(id);
-    if (buttonElementById) {
-        buttonElementById.remove();
-    }
-    if (textContent) {
-        // ボタン追加
-        const button = document.createElement('button');
-        // フォーム内で誤って submit を引き起こさないように type を明示する
-        button.type = 'button';
-        button.id = id;
-        button.textContent = textContent;
-        if (typeof onClick === 'function') {
-            button.addEventListener('click', onClick);
-        }
-        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-        if (!spaceElement) {
-            console.warn('setSpaceFieldButton: space element not found', spaceField);
-            return false;
-        }
-        spaceElement.appendChild(button);
-        setSpaceFieldDisplay(spaceField, true);
-        return true;
-    } else {
-        // 非表示
-        return setSpaceFieldDisplay(spaceField, false);
-    }
-    
-};
-
-/**
  * エラーをユーザーに通知するダイアログを表示します。
  * - 可能なら kintone.createDialog を使ってカスタムダイアログを表示します。
  * - 失敗時は alert をフォールバックで使用します。
@@ -266,4 +151,186 @@ const notifyError = (message, title = 'エラー', allowHtml = false) => {
             // noop
         }
     }
+};
+
+/**
+ * kintoneEventOn - kintone のイベント登録ラッパー
+ * - 引数チェックを行い、登録成功で true、失敗で false を返します。
+ * @param {string|string[]} events イベント名またはイベント名配列
+ * @param {function} handler イベントハンドラ関数
+ * @returns {boolean} 登録に成功したら true、入力が不正な場合は false
+ */
+const kintoneEventOn = (events, handler) => {
+    // basic validation
+    const isValidEvents = typeof events === 'string' || (Array.isArray(events) && events.every(e => typeof e === 'string'));
+    if (!isValidEvents || typeof handler !== 'function') {
+        console.warn('kintoneEventOn: invalid arguments', { events, handler });
+        return false;
+    }
+
+    try {
+        kintone.events.on(events, (event) => {
+            try {
+                return handler(event);
+            } catch (error) {
+                console.error('kintone event handler error', { events, error });
+                try { notifyError('システムエラーが発生しました。詳細はコンソールを確認してください。'); } catch (err) {}
+                return event;
+            }
+        });
+        return true;
+    } catch (error) {
+        console.error('kintoneEventOn: failed to register events', { events, error });
+        return false;
+    }
+};
+
+/**
+ * setRecordValues - record の複数フィールドに対して値を一括設定するユーティリティ
+ * - 引数チェックを行い、成功時は true、失敗時は false を返します。
+ * @param {Object} record 各フィールドの値（kintone の record オブジェクト想定）
+ * @param {Object} values 設定するフィールド値のオブジェクト（キーがフィールドコード、値が設定値）
+ * @returns {boolean} 成功したら true、入力が不正な場合は false
+ */
+const setRecordValues = (record, values) => {
+    if (typeof record !== 'object' || record === null || Array.isArray(record) || typeof values !== 'object' || values === null) {
+        console.warn('setRecordValues: invalid arguments', { record, values });
+        return false;
+    }
+    Object.keys(values).forEach((k) => {
+        // 既存フィールドがある場合は value に設定する（kintone フィールドオブジェクト想定）
+        if (Object.prototype.hasOwnProperty.call(record, k)) {
+            const fieldObj = record[k];
+            if (fieldObj && typeof fieldObj === 'object') {
+                if (Object.prototype.hasOwnProperty.call(fieldObj, 'value')) {
+                    fieldObj.value = values[k];
+                } else {
+                    // オブジェクトだが value プロパティが無い場合は value を追加する
+                    fieldObj.value = values[k];
+                }
+            } else {
+                // 原始値が入っている場合は上書き
+                record[k] = values[k];
+            }
+        } else {
+            // フィールドが存在しない場合は簡易フィールドオブジェクトを作成して value を設定する
+            record[k] = { value: values[k] };
+        }
+    });
+    return true;
+};
+
+/**
+ * kintone のスペースフィールド（スペースエレメント）を表示/非表示に切り替えます。
+ *
+ * @param {string} spaceField スペースフィールドのフィールドコード
+ * @param {boolean} display true=表示, false=非表示
+ * @returns {boolean} 成功したら true、引数不正や要素が見つからなければ false
+ */
+const setSpaceFieldDisplay = (spaceField, display) => {
+    if (typeof spaceField !== 'string' || !spaceField.trim() || typeof display !== 'boolean') {
+        console.warn('setSpaceFieldDisplay: invalid arguments', { spaceField, display });
+        return false;
+    }
+    const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+    if (!spaceElement) {
+        console.warn('setSpaceFieldDisplay: space element not found', spaceField);
+        return false;
+    }
+    spaceElement.parentNode.style.display = display ? '' : 'none';
+    return true;
+};
+
+/**
+ * kintone のスペースフィールドにボタン要素を追加または削除します。
+ * - 既存の同 ID の要素は常に削除されます。
+ * - 追加時は type="button" として作成し、onClick が関数であれば click イベントを登録します。
+ *
+ * @param {string} spaceField スペースフィールドのフィールドコード
+ * @param {string} id 追加するボタン要素の id
+ * @param {string|null} textContent ボタンの表示テキスト。null/空なら要素を削除して非表示にする
+ * @param {function|null|undefined} [onClick] クリック時に実行するコールバック（関数でない場合は無視される）
+ * @returns {boolean|undefined} 要素の追加/削除に成功したら true/false を返します。入力が不正な場合は undefined を返すことがあります。
+ */
+const setSpaceFieldButton = (spaceField, id, textContent, onClick) => {
+    if (
+        typeof spaceField !== 'string' || !spaceField.trim() ||
+        typeof id !== 'string' || !id.trim() ||
+        (textContent !== null && typeof textContent !== 'string') ||
+        (onClick !== undefined && typeof onClick !== 'function' && onClick !== null)
+    ) {
+        return;
+    }
+    // 既存ボタン削除
+    const buttonElementById = document.getElementById(id);
+    if (buttonElementById) {
+        buttonElementById.remove();
+    }
+    if (textContent) {
+        // ボタン追加
+        const button = document.createElement('button');
+        // フォーム内で誤って submit を引き起こさないように type を明示する
+        button.type = 'button';
+        button.id = id;
+        button.textContent = textContent;
+        if (typeof onClick === 'function') {
+            button.addEventListener('click', onClick);
+        }
+        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+        if (!spaceElement) {
+            console.warn('setSpaceFieldButton: space element not found', spaceField);
+            return false;
+        }
+        spaceElement.appendChild(button);
+        setSpaceFieldDisplay(spaceField, true);
+        return true;
+    } else {
+        // 非表示
+        return setSpaceFieldDisplay(spaceField, false);
+    }
+    
+};
+
+/**
+ * kintone のスペースフィールド内に任意の HTML 文字列を挿入して表示／削除します。
+ * - 挿入時は既存の同 ID 要素を削除してから追加します。
+ * - innerHTML は内部でサニタイズされます。
+ *
+ * @param {string} spaceField スペースフィールドのフィールドコード
+ * @param {string} id 追加する要素の id（既存要素があれば上書きの代わりに削除して再作成）
+ * @param {string|null} innerHTML 表示する HTML。null/空文字 の場合は要素を削除して非表示にする
+ * @returns {boolean} 成功したら true、引数不正や要素未発見などで失敗したら false
+ */
+const setSpaceFieldText = (spaceField, id, innerHTML) => {
+    if (
+        typeof spaceField !== 'string' || !spaceField.trim() ||
+        typeof id !== 'string' || !id.trim() ||
+        (innerHTML !== null && typeof innerHTML !== 'string')
+    ) {
+        console.warn('setSpaceFieldText: invalid arguments', { spaceField, id, innerHTML });
+        return false;
+    }
+    // 既存要素削除
+    const spaceFieldElementById = document.getElementById(id);
+    if (spaceFieldElementById) {
+        spaceFieldElementById.remove();
+    }
+    if (innerHTML) {
+        // 表示
+        const createSpaceFieldElement = document.createElement('div');
+        createSpaceFieldElement.id = id;
+        // innerHTML は HTML 形式での入力が想定されるため、可能な限りサニタイズしてから挿入する
+        createSpaceFieldElement.innerHTML = _kc_sanitizeHtml(innerHTML);
+        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+        if (!spaceElement) {
+            console.warn('setSpaceFieldText: space element not found', spaceField);
+            return false;
+        }
+        spaceElement.appendChild(createSpaceFieldElement);
+        return setSpaceFieldDisplay(spaceField, true);
+    } else {
+        // 非表示
+        return setSpaceFieldDisplay(spaceField, false);
+    }
+    
 };
