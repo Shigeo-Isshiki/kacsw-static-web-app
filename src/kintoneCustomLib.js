@@ -154,6 +154,42 @@ const notifyError = (message, title = 'エラー', allowHtml = false) => {
 };
 
 /**
+ * getFieldValueOr - record から指定フィールドの value を安全に取得します。
+ * - record が null/非オブジェクト、fieldCode が文字列でない場合は defaultValue を返します。
+ * - 指定フィールドが存在しない、または value が undefined の場合は defaultValue を返します。
+ * - defaultValue を省略した場合は undefined が返ります。
+ *
+ * @param {Object} record kintone の record オブジェクト想定
+ * @param {string} fieldCode 取得するフィールドのフィールドコード
+ * @param {*} [defaultValue] フィールドが無ければ返す既定値（省略可能）
+ * @returns {*} フィールドの value または defaultValue
+ */
+const getFieldValueOr = (record, fieldCode, defaultValue) => {
+    try {
+        if (typeof fieldCode !== 'string' || !fieldCode.trim()) {
+            console.warn('getFieldValueOr: invalid fieldCode', { fieldCode });
+            return defaultValue;
+        }
+        if (typeof record !== 'object' || record === null || Array.isArray(record)) {
+            console.warn('getFieldValueOr: invalid record', { record });
+            return defaultValue;
+        }
+        const field = Object.prototype.hasOwnProperty.call(record, fieldCode) ? record[fieldCode] : undefined;
+        if (!field || typeof field !== 'object') {
+            return defaultValue;
+        }
+        // value が存在する場合はそのまま返す（null や空文字も有効値として返す）
+        if (Object.prototype.hasOwnProperty.call(field, 'value')) {
+            return field.value;
+        }
+        return defaultValue;
+    } catch (error) {
+        console.error('getFieldValueOr: unexpected error', { error, record, fieldCode });
+        return defaultValue;
+    }
+};
+
+/**
  * kintoneEventOn - kintone のイベント登録ラッパー
  * - 引数チェックを行い、登録成功で true、失敗で false を返します。
  * @param {string|string[]} events イベント名またはイベント名配列
