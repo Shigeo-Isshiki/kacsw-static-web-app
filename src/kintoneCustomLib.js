@@ -308,7 +308,7 @@ const kintoneEventOn = (events, handler) => {
                 return handler(event);
             } catch (error) {
                 console.error('kintone event handler error', { events, error });
-                try { notifyError('システムエラーが発生しました。詳細はコンソールを確認してください。'); } catch (err) {}
+                try { notifyError('システムエラーが発生しました。詳細はコンソールを確認してください。', undefined, true); } catch (err) {}
                 return event;
             }
         });
