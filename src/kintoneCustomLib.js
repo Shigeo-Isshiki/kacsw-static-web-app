@@ -54,6 +54,24 @@ const _kc_sanitizeHtml = (html) => {
 };
 
 /**
+ * 内部: アセットの絶対 URL を返すヘルパー
+ * - document.currentScript が利用できればそれを基点に相対パスを解決する
+ * - それ以外は location.href を基点に解決する
+ */
+const _kc_assetUrl = (relativePath) => {
+    try {
+        const base = (document.currentScript && document.currentScript.src) ? document.currentScript.src : location.href;
+        return new URL(relativePath, base).href;
+    } catch (e) {
+        try {
+            return new URL(relativePath, location.origin).href;
+        } catch (err) {
+            return relativePath;
+        }
+    }
+};
+
+/**
  * 内部: ダイアログ作成＆表示の共通ロジック
  * options: {
  *   title: string,
@@ -128,7 +146,7 @@ const notifyError = (message, title = 'エラー', allowHtml = false) => {
     body.style.gap = '1em';
     body.style.margin = '1em';
     const errorImage = document.createElement('img');
-    errorImage.src = './image/errorIcon.svg';
+    errorImage.src = _kc_assetUrl('./image/errorIcon.svg');
     errorImage.alt = 'エラーアイコン';
     errorImage.style.width = '32px';
     errorImage.style.height = '32px';
@@ -177,7 +195,7 @@ const notifyInfo = (message, title = '情報', allowHtml = false) => {
     body.style.margin = '1em';
 
     const infoImage = document.createElement('img');
-    infoImage.src = './image/infoIcon.svg';
+    infoImage.src = _kc_assetUrl('./image/infoIcon.svg');
     infoImage.alt = '情報アイコン';
     infoImage.style.width = '32px';
     infoImage.style.height = '32px';
@@ -222,7 +240,7 @@ const notifyWarning = (message, title = '注意', allowHtml = false) => {
     body.style.margin = '1em';
 
     const warnImage = document.createElement('img');
-    warnImage.src = './image/warningIcon.svg';
+    warnImage.src = _kc_assetUrl('./image/warningIcon.svg');
     warnImage.alt = '注意アイコン';
     warnImage.style.width = '32px';
     warnImage.style.height = '32px';
