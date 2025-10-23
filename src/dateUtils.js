@@ -178,3 +178,94 @@ const convertToEra = (date) => {
     }
     throw new Error('明治以前の日付は対応していません');
 };
+
+/**
+ * 様々な日付入力から西暦の年（数値）だけを取り出す
+ * @param {string|Date} date 例: "令和元年5月1日", "R1/5/1", "2019-05-01", "2025", Date
+ * @returns {number} 西暦年（例: 2019）
+ * @throws {Error} 解釈できない場合
+ */
+const convertToYear = (date) => {
+    // 1) Dateオブジェクトならそのまま
+    if (date instanceof Date) {
+        if (isNaN(date.getTime())) throw new Error('不正な日付です');
+        return date.getFullYear();
+    }
+
+    // 2) まず既存のconvertToSeirekiでフル日付として解釈を試みる
+    if (typeof date === 'string') {
+        try {
+            const seireki = convertToSeireki(date); // 'YYYY-MM-DD' 形式
+            const y = parseInt(seireki.slice(0, 4), 10);
+            if (!isNaN(y)) return y;
+        } catch (e) {
+            // フル日付として解釈できないケース（元号のみ、年のみ等）はここでフォールバックする
+        }
+
+        // フォールバック: 元号のみ / 年のみ / 全角数字や漢数字を含むケースを処理
+        const toHankaku = s => s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+        const toHankakuAlpha = s => s.replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+        const kanjiNumReg = /[元一二三四五六七八九十百千〇]+/g;
+        const kanjiToNumStr = s => s.replace(kanjiNumReg, m => _du_kanjiToNumber(m));
+        const kanjiToInitial = s => {
+            let result = s;
+            _DU_ERAS.forEach(e => {
+                result = result.replace(new RegExp(e.name, 'g'), e.initial);
+            });
+            return result;
+        };
+
+        let normalized = toHankakuAlpha(toHankaku(String(date)));
+        normalized = kanjiToNumStr(normalized);
+        normalized = kanjiToInitial(normalized);
+        // 年月日や区切りを '-' に統一（ただし日付の存在は問いません）
+        normalized = normalized.replace(/年|日|\/|\.|\s|月|\//g, '-');
+        normalized = normalized.replace(/^-+|-+$/g, '');
+
+        // 4桁の西暦年単独
+        let m = normalized.match(/^(\d{4})$/);
+        if (m) return parseInt(m[1], 10);
+        // 文字列先頭に4桁西暦がある場合（例: '2025-5' や '2025/05/01' の正規化不足ケース）
+        m = normalized.match(/^(\d{4})(?:-|$)/);
+        if (m) return parseInt(m[1], 10);
+
+        // 元号（イニシャル）パターン: 先頭がイニシャルのとき 年が続くか、次のパートに年がある
+        // 例: 'R1', 'R01', 'R-1-5-1', 'R-1' , 'R1-5-1'
+        const parts = normalized.split('-').filter(Boolean);
+        if (parts.length > 0) {
+            // 先頭がイニシャル単体もしくはイニシャル＋数字のパターン
+            const head = parts[0];
+            const headMatch = head.match(/^([A-Za-z])(?:?(\d+))?/i);
+            // headMatch may be null in some engines due to invalid group, do alternative
+            let initial = null, yearNum = null;
+            if (/^[A-Za-z]\d*$/.test(head)) {
+                // 'R1' や 'R01' のような形
+                initial = head[0];
+                const rest = head.slice(1);
+                if (rest) yearNum = parseInt(rest, 10);
+            } else if (/^[A-Za-z]$/.test(head) && parts.length >= 2 && /^\d+$/.test(parts[1])) {
+                // 'R' '-' '1' のように分かれている場合
+                initial = head[0];
+                yearNum = parseInt(parts[1], 10);
+            }
+
+            if (initial) {
+                if (!yearNum) {
+                    // 年が指定されていない（例: 'R' 単体）は解釈できない
+                    throw new Error('元号のみの指定は年が不明です');
+                }
+                if (yearNum === 0) yearNum = 1; // 0 が来たら元年扱い
+                const era = _DU_ERAS.find(e => e.initial.toUpperCase() === initial.toUpperCase());
+                if (era) {
+                    return era.start.getFullYear() + yearNum - 1;
+                }
+            }
+        }
+
+        // 最後の手段: 文字列中の4桁を探す
+        m = normalized.match(/(\d{4})/);
+        if (m) return parseInt(m[1], 10);
+    }
+
+    throw new Error('不正な入力形式です');
+};
