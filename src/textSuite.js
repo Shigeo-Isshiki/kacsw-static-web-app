@@ -139,7 +139,7 @@ const _ts_replace_with_map = (str, pattern, map) => {
  * @param {*} str チェック対象の文字列
  * @returns {boolean} 半角数字のみ含まれる場合はtrue、それ以外はfalse
  */
-const check_single_byte_numbers = (str = '') => {
+const _old_check_single_byte_numbers = (str = '') => {
     if ((typeof str !== 'string' && typeof str !== 'number') || str === null || str === undefined) return false;
     const number_pattern = /^[0-9]+$/;
     return number_pattern.test(String(str));
@@ -150,7 +150,7 @@ const check_single_byte_numbers = (str = '') => {
  * @param {string} str チェック対象の文字列
  * @returns {boolean} 半角カナ文字のみ含まれる場合はtrue、それ以外はfalse
  */
-const check_single_byte_kana = (str = '') => {
+const _old_check_single_byte_kana = (str = '') => {
     if (!_ts_checkString(str)) return false;
     const kana_pattern = /^[\uFF61-\uFF9F]+$/;
     return kana_pattern.test(str);
