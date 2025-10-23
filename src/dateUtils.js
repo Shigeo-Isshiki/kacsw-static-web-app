@@ -235,8 +235,6 @@ const convertToYear = (date) => {
         if (parts.length > 0) {
             // 先頭がイニシャル単体もしくはイニシャル＋数字のパターン
             const head = parts[0];
-            const headMatch = head.match(/^([A-Za-z])(?:?(\d+))?/i);
-            // headMatch may be null in some engines due to invalid group, do alternative
             let initial = null, yearNum = null;
             if (/^[A-Za-z]\d*$/.test(head)) {
                 // 'R1' や 'R01' のような形
