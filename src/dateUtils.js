@@ -194,12 +194,27 @@ const convertToYear = (date) => {
 
     // 2) まず既存のconvertToSeirekiでフル日付として解釈を試みる
     if (typeof date === 'string') {
+        // まず convertToSeireki でフル日付として解釈を試みる
         try {
             const seireki = convertToSeireki(date); // 'YYYY-MM-DD' 形式
             const y = parseInt(seireki.slice(0, 4), 10);
             if (!isNaN(y)) return y;
         } catch (e) {
-            // フル日付として解釈できないケース（元号のみ、年のみ等）はここでフォールバックする
+            // フル日付として解釈できないケースは、年のみ／年+月のみ等の可能性があるため
+            // '1日' や '1月1日' を付けて再試行してみる（例: '昭和八十年' -> '昭和八十年1月1日'）
+            try {
+                const seireki = convertToSeireki(String(date) + '1日');
+                const y = parseInt(seireki.slice(0, 4), 10);
+                if (!isNaN(y)) return y;
+            } catch (e2) {
+                try {
+                    const seireki = convertToSeireki(String(date) + '1月1日');
+                    const y = parseInt(seireki.slice(0, 4), 10);
+                    if (!isNaN(y)) return y;
+                } catch (e3) {
+                    // どれもダメなら下のフォールバック処理へ
+                }
+            }
         }
 
         // フォールバック: 元号のみ / 年のみ / 全角数字や漢数字を含むケースを処理
