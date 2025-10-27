@@ -137,7 +137,7 @@ const convertToSeireki = (date) => {
 };
 
 /**
- * 日付から元号表記（和暦）に変換し、複数形式で返す
+ * 日付から元号表記（和暦）に変換し、和暦の年のみ複数形式で返す
  * @param {Date|string} date 日付（Date型または'YYYY-MM-DD'形式の文字列）
  * @returns {object} 戻り値オブジェクトの内容:
  *   - kanji: 元号＋年（例: "令和7年"、"平成元年"）
