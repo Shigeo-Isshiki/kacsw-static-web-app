@@ -104,7 +104,7 @@ const _kc_showDialog = (options) => {
         }
     } catch (error) {
         console.error('_kc_showDialog error', error);
-        try { alert(body && body.textContent ? body.textContent : String(title)); } catch (err) { /* noop */ }
+        try { alert(body && body.textContent ? body.textContent : String(title)); } catch (error) { /* noop */ }
     }
 };
 
@@ -308,7 +308,7 @@ const kintoneEventOn = (events, handler) => {
                 return handler(event);
             } catch (error) {
                 console.error('kintone event handler error', { events, error });
-                try { notifyError('システムエラーが発生しました。詳細はコンソールを確認してください。', undefined, true); } catch (err) {}
+                try { notifyError('システムエラーが発生しました。詳細はコンソールを確認してください。', undefined, true); } catch (error) {}
                 return event;
             }
         });
@@ -475,7 +475,7 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
             } else {
                 // do nothing here; we'll retry below
             }
-        } catch (err) {
+        } catch (error) {
             // ignore and let retry handle it
             appended = false;
         }
@@ -501,7 +501,7 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
                         }
                         return;
                     }
-                } catch (e) {
+                } catch (error) {
                     // ignore and will retry
                 }
                 // schedule next attempt if available
