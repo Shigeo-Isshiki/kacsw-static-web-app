@@ -451,17 +451,70 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
     }
     if (innerHTML) {
         // 表示
-        const createSpaceFieldElement = document.createElement('div');
-        createSpaceFieldElement.id = id;
-        // innerHTML は HTML 形式での入力が想定されるため、可能な限りサニタイズしてから挿入する
-        createSpaceFieldElement.innerHTML = _kc_sanitizeHtml(innerHTML);
-        const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-        if (!spaceElement) {
-            console.warn('setSpaceFieldText: space element not found', spaceField);
-            return false;
+        // createElement を関数化してリトライ時にも使えるようにする
+        const createSpaceFieldElement = () => {
+            const el = document.createElement('div');
+            el.id = id;
+            // innerHTML は HTML 形式での入力が想定されるため、可能な限りサニタイズしてから挿入する
+            el.innerHTML = _kc_sanitizeHtml(innerHTML);
+            return el;
+        };
+
+        // 初回アタック（同期的に試す）
+        let appended = false;
+        try {
+            const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+            if (spaceElement) {
+                // 既に同 id の要素がある場合は削除してから追加
+                const existing = document.getElementById(id);
+                if (existing) existing.remove();
+                spaceElement.appendChild(createSpaceFieldElement());
+                appended = true;
+                // 表示を許可
+                setSpaceFieldDisplay(spaceField, true);
+            } else {
+                // do nothing here; we'll retry below
+            }
+        } catch (err) {
+            // ignore and let retry handle it
+            appended = false;
         }
-        spaceElement.appendChild(createSpaceFieldElement);
-        return setSpaceFieldDisplay(spaceField, true);
+
+        // 非同期リトライ: 一時的な早すぎる実行や別処理による上書きを数回の試行で修復する
+        // ※ 即時の戻り値は従来通り同期的な成功/失敗を返します（破壊的変更を避ける）
+        (function startRetryLoop() {
+            const DEFAULT_MAX_ATTEMPTS = 5;
+            const DEFAULT_INTERVAL_MS = 200;
+            let attempts = 0;
+            const timer = setInterval(() => {
+                attempts++;
+                // 要素が既に存在すれば成功とみなして終了
+                if (document.getElementById(id)) {
+                    clearInterval(timer);
+                    return;
+                }
+                // スペース要素が利用可能であれば追加を試みる
+                try {
+                    const se = kintone.app.record.getSpaceElement(spaceField);
+                    if (se) {
+                        // 既に存在するか確認してから追加
+                        if (!document.getElementById(id)) {
+                            se.appendChild(createSpaceFieldElement());
+                            setSpaceFieldDisplay(spaceField, true);
+                        }
+                        clearInterval(timer);
+                        return;
+                    }
+                } catch (e) {
+                    // ignore and continue retry
+                }
+                if (attempts >= DEFAULT_MAX_ATTEMPTS) {
+                    clearInterval(timer);
+                }
+            }, DEFAULT_INTERVAL_MS);
+        })();
+
+        return appended;
     } else {
         // 非表示
         return setSpaceFieldDisplay(spaceField, false);
