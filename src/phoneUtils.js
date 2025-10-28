@@ -842,6 +842,14 @@ const _PU_PHONE_NUMBER_CONFIG = {
     'notLandlinePhoneNumberRange': [
         '0120', '0170', '0180', '0570', '0990'
     ]
+    ,
+    // 属性判定ルール（将来の変更を容易にするため設定に移動）
+    // - callCapableTypes: 通話可能とみなす type の一覧
+    // - faxExcludedTypes: FAX 判定から除外する type の一覧
+    // - mobileType: 携帯電話を示す type 名（通常 '携帯電話'）
+    'callCapableTypes': ['固定電話', '着信課金', '統一番号', '携帯電話', 'IP電話'],
+    'faxExcludedTypes': ['IP電話', '携帯電話'],
+    'mobileType': '携帯電話'
 };
 // ==================== 電話番号データ定義ここまで ====================
 
@@ -993,7 +1001,9 @@ const _pu_getPhoneType = (number) => {
     // 10桁特殊番号（0120は着信課金、その他は付加サービス）
     if (num.length === 10 && _pu_isNotLandlinePhoneNumberRange(num.substring(0, 4))) {
         const prefix4 = num.substring(0, 4);
+        // 0120 は着信課金、0570 は統一番号として扱う（ナビダイヤル等）
         if (prefix4 === '0120') return '着信課金';
+        if (prefix4 === '0570') return '統一番号';
         return '付加サービス';
     }
     if (num.length === 10) {
@@ -1033,7 +1043,7 @@ const _pu_getHyphenPattern = (number, type) => {
         }
     }
     // 10桁系番号（着信課金の0120、付加サービス等）
-    if (num.length === 10 && (type === '着信課金' || type === '付加サービス')) {
+    if (num.length === 10 && (type === '着信課金' || type === '付加サービス' || type === '統一番号')) {
         // 例: 0120-123-456, 0570-123-456
         return [4, 3, 3];
     }
@@ -1142,12 +1152,27 @@ const _pu_isValidJapanesePhoneNumber = (str) => {
 
 //　ライブラリ本体部
 /**
- * 電話番号を正規化してフォーマットし、電話番号の種類を返すメイン関数
- * @param {string|number|null|undefined} phoneNumber 電話番号
- * @returns {Object} {formattedNumber: string, type: string}
- *   - formattedNumber: ハイフン付きでフォーマットされた電話番号
- *   - type: 電話番号の種類 ('固定電話'|'携帯電話'|'着信課金'|'M2M'|'無線呼出'|'IP電話'|'FMC'|'付加サービス'|'不明')
- * @throws {Error} 無効な電話番号の場合（日本の電話番号形式に合致しない場合）
+ * 電話番号を正規化してフォーマットし、電話番号の種類と各種フラグを返すメイン関数
+ *
+ * @param {string|number|null|undefined} phoneNumber 電話番号（任意の記号や全角数字を含む文字列可）
+ * @returns {Object} 結果オブジェクト
+ *   - formattedNumber {string} : ハイフン付きでフォーマットされた電話番号（例: "03-1234-5678"）
+ *   - type {string} : 判定された電話番号の種類。主な戻り値例:
+ *       '固定電話', '携帯電話', '着信課金', '統一番号', 'IP電話', 'M2M', '無線呼出', 'FMC', '特定接続', '付加サービス', '不明'
+ *   - callCapable {boolean} : 通話可能とみなす回線かどうか。次の種別を通話可能とする:
+ *       ['固定電話','着信課金','統一番号','携帯電話','IP電話']
+ *       上記に含まれる type のとき true、それ以外は false になります。
+ *   - homeLine {boolean} : 自宅で使える回線（いわゆる固定回線）かどうか。
+ *       定義: 通話可能（callCapable が true）かつ '携帯電話' でないものを true とする。
+ *   - faxCapable {boolean} : FAX 送受信に適した回線かどうか。
+ *       定義: 通話可能かつ 'IP電話' と '携帯電話' を除外したものを true とする。
+ *   - mobile {boolean} : 携帯電話番号 ('携帯電話') かどうか。
+ *
+ * @throws {Error} 入力が空、あるいは日本の電話番号形式に合致しない場合にスローされます。
+ *
+ * 備考:
+ *  - '0570' は本ライブラリでは '統一番号' として扱い、10桁は "0570-xxx-xxx" とフォーマットされます。
+ *  - '091' で始まる6〜13桁は '特定接続' として許可されますが、今回の通話可能集合には含めていません。
  */
 const formatPhoneNumber = (phoneNumber) => {
     // 基本的な正規化とバリデーション
@@ -1168,17 +1193,54 @@ const formatPhoneNumber = (phoneNumber) => {
     const type = _pu_getPhoneType(num);
     const formatted = _pu_formatPhoneNumber(num);
 
+    // 属性判定ルール（更新）
+    // - homeLine: 通話可能な種別で、かつ携帯電話ではないものを true とする
+    // - mobile: '携帯電話' のみ true
+    // - faxCapable: 通話可能な種別のうち IP 電話は除外する（携帯も除外）
+    // 通話可能／FAX等の属性判定は設定から読み込む（将来の変更を容易にする）
+    const cfgCallCapable = Array.isArray(_PU_PHONE_NUMBER_CONFIG.callCapableTypes) ? _PU_PHONE_NUMBER_CONFIG.callCapableTypes : ['固定電話', '着信課金', '統一番号', '携帯電話', 'IP電話'];
+    const cfgFaxExcluded = Array.isArray(_PU_PHONE_NUMBER_CONFIG.faxExcludedTypes) ? _PU_PHONE_NUMBER_CONFIG.faxExcludedTypes : ['IP電話', '携帯電話'];
+    const cfgMobileType = _PU_PHONE_NUMBER_CONFIG.mobileType || '携帯電話';
+
+    const callCapableTypes = new Set(cfgCallCapable);
+    const mobile = (type === cfgMobileType);
+    const isCallCapable = callCapableTypes.has(type);
+    const homeLine = isCallCapable && !mobile; // 携帯を除外
+    // FAX は通話可能で、かつ設定で除外されたタイプを除外
+    const faxCapable = isCallCapable && !cfgFaxExcluded.includes(type) && !mobile;
+
     return {
         formattedNumber: formatted,
-        type: type
+        type: type,
+        callCapable: isCallCapable,
+        homeLine: homeLine,
+        faxCapable: faxCapable,
+        mobile: mobile
     };
 }
 
 /**
  * 電話番号の種別のみを返す関数
- * @param {string|number|null|undefined} phoneNumber 電話番号
- * @returns {string} 電話番号の種類 ('固定電話'|'携帯電話'|'着信課金'|'M2M'|'無線呼出'|'IP電話'|'FMC'|'付加サービス'|'不明')
- * @throws {Error} 無効な電話番号の場合（日本の電話番号形式に合致しない場合）
+ *
+ * @param {string|number|null|undefined} phoneNumber 電話番号（任意の記号や全角数字を含む文字列可）
+ * @returns {string} 判定された電話番号の種類。可能な戻り値の例:
+ *   - '固定電話'
+ *   - '携帯電話'
+ *   - '着信課金'
+ *   - '統一番号'  // 0570（ナビダイヤル等）の扱い
+ *   - 'IP電話'
+ *   - 'M2M'
+ *   - '無線呼出'
+ *   - 'FMC'
+ *   - '特定接続' // 091で始まる6〜13桁の番号
+ *   - '付加サービス'
+ *   - '不明'
+ *
+ * @throws {Error} 入力が空、または日本の電話番号形式に合致しない場合にスローされます。
+ *
+ * 備考:
+ *  - 本関数の種別判定は `formatPhoneNumber` と同じ判定ロジックを使います。
+ *  - 0570 プレフィックスは '統一番号' として扱われます。
  */
 const getPhoneNumberType = (phoneNumber) => {
     if (!phoneNumber) {
