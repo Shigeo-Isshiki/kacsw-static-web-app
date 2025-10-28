@@ -483,35 +483,36 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
         // 非同期リトライ: 一時的な早すぎる実行や別処理による上書きを数回の試行で修復する
         // ※ 即時の戻り値は従来通り同期的な成功/失敗を返します（破壊的変更を避ける）
         (function startRetryLoop() {
-            const DEFAULT_MAX_ATTEMPTS = 5;
-            const DEFAULT_INTERVAL_MS = 200;
-            let attempts = 0;
-            const timer = setInterval(() => {
-                attempts++;
+            // exponential backoff style intervals for faster initial response
+            const intervals = [50, 100, 200, 400, 800]; // ms
+            let idx = 0;
+            const tryOnce = () => {
                 // 要素が既に存在すれば成功とみなして終了
                 if (document.getElementById(id)) {
-                    clearInterval(timer);
                     return;
                 }
                 // スペース要素が利用可能であれば追加を試みる
                 try {
                     const se = kintone.app.record.getSpaceElement(spaceField);
                     if (se) {
-                        // 既に存在するか確認してから追加
                         if (!document.getElementById(id)) {
                             se.appendChild(createSpaceFieldElement());
                             setSpaceFieldDisplay(spaceField, true);
                         }
-                        clearInterval(timer);
                         return;
                     }
                 } catch (e) {
-                    // ignore and continue retry
+                    // ignore and will retry
                 }
-                if (attempts >= DEFAULT_MAX_ATTEMPTS) {
-                    clearInterval(timer);
+                // schedule next attempt if available
+                if (idx < intervals.length) {
+                    const wait = intervals[idx++];
+                    setTimeout(tryOnce, wait);
                 }
-            }, DEFAULT_INTERVAL_MS);
+            };
+
+            // kick off immediately (non-blocking)
+            setTimeout(tryOnce, 0);
         })();
 
         return appended;
