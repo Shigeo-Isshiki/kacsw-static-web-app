@@ -843,7 +843,7 @@ const _PU_PHONE_NUMBER_CONFIG = {
         '0120', '0170', '0180', '0570', '0990'
     ]
     ,
-    // 属性判定ルール（将来の変更を容易にするため設定に移動）
+    // 属性判定ルール
     // - callCapableTypes: 通話可能とみなす type の一覧
     // - faxExcludedTypes: FAX 判定から除外する type の一覧
     // - mobileType: 携帯電話を示す type 名（通常 '携帯電話'）
