@@ -5,8 +5,11 @@
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_kc_)で始める
 
 // 共通定数
-// ダイアログ表示の際に使用するアイコンが格納されている URLのベースパス
-const KC_ASSET_BASE = 'https://js.kacsw.or.jp/image';
+/**
+ * ダイアログ表示の際に使用するアイコンが格納されている URLのベースパス
+ * @constant {string} _KC_ASSET_BASE - アイコン画像のベースURL
+ */
+const _KC_ASSET_BASE = 'https://js.kacsw.or.jp/image';
 
 // 内部関数
 /**
@@ -18,13 +21,6 @@ const KC_ASSET_BASE = 'https://js.kacsw.or.jp/image';
  * @returns {string} サニタイズ済の HTML 文字列
  */
 const _kc_sanitizeHtml = (html) => {
-    try {
-        if (typeof DOMPurify !== 'undefined' && DOMPurify && typeof DOMPurify.sanitize === 'function') {
-            return DOMPurify.sanitize(html);
-        }
-    } catch (error) {
-        // ignore and fallback
-    }
     // フォールバック: 単純なサニタイズ（スクリプトタグ除去・on* 属性除去）
     // 完全な保護を約束するものではありません
     try {
@@ -111,10 +107,10 @@ const _kc_showDialog = (options) => {
 // ここから外部に公開する関数群
 /**
  * エラーをユーザーに通知するダイアログを表示します。
- * - 可能なら kintone.createDialog を使ってカスタムダイアログを表示します。
- * - 失敗時は alert をフォールバックで使用します。
+ * - kintone.createDialog を使ってカスタムダイアログを表示します。
  * - allowHtml が true のときのみ message を HTML として挿入（サニタイズあり）、
  *   デフォルトはプレーンテキストとして表示します。
+ * - notifyInfo/notifyWarning と同様に共通ロジックを利用します。
  *
  * @param {string|Node} message 表示するメッセージ（文字列が想定）。Node を渡す場合はそのまま挿入されます。
  * @param {string} [title='エラー'] ダイアログのタイトル
@@ -132,7 +128,7 @@ const notifyError = (message, title = 'エラー', allowHtml = false) => {
     body.style.gap = '1em';
     body.style.margin = '1em';
     const errorImage = document.createElement('img');
-    errorImage.src = KC_ASSET_BASE + '/errorIcon.png';
+    errorImage.src = _KC_ASSET_BASE + '/errorIcon.png';
     errorImage.alt = 'エラーアイコン';
     errorImage.style.width = '32px';
     errorImage.style.height = '32px';
@@ -156,95 +152,6 @@ const notifyError = (message, title = 'エラー', allowHtml = false) => {
     }
     body.appendChild(errorText);
     // ダイアログにタイトルをラベルとして与える。aria-describedby で本文を参照。
-    body.setAttribute('aria-label', String(title));
-    body.setAttribute('aria-describedby', messageId);
-    // 共通処理でダイアログ表示
-    _kc_showDialog({ title, body });
-};
-
-/**
- * notifyInfo - 情報メッセージをユーザーに通知するダイアログを表示します。
- * - notifyError/notifyWarning と同様に共通ロジックを利用します。
- *
- * @param {string|Node} message 表示するメッセージ
- * @param {string} [title='情報'] ダイアログのタイトル
- * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか
- * @returns {void}
- */
-const notifyInfo = (message, title = '情報', allowHtml = false) => {
-    const body = document.createElement('div');
-    body.className = 'kc-notify-info';
-    body.setAttribute('role', 'alertdialog');
-    body.style.display = 'flex';
-    body.style.alignItems = 'center';
-    body.style.gap = '1em';
-    body.style.margin = '1em';
-
-    const infoImage = document.createElement('img');
-    infoImage.src = KC_ASSET_BASE + '/infoIcon.png';
-    infoImage.alt = '情報アイコン';
-    infoImage.style.width = '32px';
-    infoImage.style.height = '32px';
-    infoImage.setAttribute('aria-hidden', 'true');
-    body.appendChild(infoImage);
-
-    const infoText = document.createElement('div');
-    infoText.setAttribute('role', 'status');
-    infoText.setAttribute('aria-live', 'polite');
-    infoText.className = 'kc-notify-info__message';
-    const messageId = 'kc-notify-info__message-' + Math.random().toString(36).slice(2,8);
-    infoText.id = messageId;
-    if (allowHtml) {
-        infoText.innerHTML = _kc_sanitizeHtml(message);
-    } else {
-        infoText.textContent = String(message);
-    }
-    body.appendChild(infoText);
-    body.setAttribute('aria-label', String(title));
-    body.setAttribute('aria-describedby', messageId);
-
-    _kc_showDialog({ title, body });
-};
-
-/**
- * notifyWarning - 注意喚起メッセージをユーザーに通知するダイアログを表示します。
- * - 基本的な振る舞いは notifyError に準拠しますが、スタイルやアイコンが警告向けになります。
- * - allowHtml が true のときのみ message を HTML として挿入（サニタイズあり）。
- *
- * @param {string|Node} message 表示するメッセージ
- * @param {string} [title='注意'] ダイアログのタイトル
- * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか
- * @returns {void}
- */
-const notifyWarning = (message, title = '注意', allowHtml = false) => {
-    const body = document.createElement('div');
-    body.className = 'kc-notify-warning';
-    body.setAttribute('role', 'alertdialog');
-    body.style.display = 'flex';
-    body.style.alignItems = 'center';
-    body.style.gap = '1em';
-    body.style.margin = '1em';
-
-    const warnImage = document.createElement('img');
-    warnImage.src = KC_ASSET_BASE + '/warningIcon.png';
-    warnImage.alt = '注意アイコン';
-    warnImage.style.width = '32px';
-    warnImage.style.height = '32px';
-    warnImage.setAttribute('aria-hidden', 'true');
-    body.appendChild(warnImage);
-
-    const warnText = document.createElement('div');
-    warnText.setAttribute('role', 'status');
-    warnText.setAttribute('aria-live', 'polite');
-    warnText.className = 'kc-notify-warning__message';
-    const messageId = 'kc-notify-warning__message-' + Math.random().toString(36).slice(2,8);
-    warnText.id = messageId;
-    if (allowHtml) {
-        warnText.innerHTML = _kc_sanitizeHtml(message);
-    } else {
-        warnText.textContent = String(message);
-    }
-    body.appendChild(warnText);
     body.setAttribute('aria-label', String(title));
     body.setAttribute('aria-describedby', messageId);
     // 共通処理でダイアログ表示
@@ -317,6 +224,100 @@ const kintoneEventOn = (events, handler) => {
         console.error('kintoneEventOn: failed to register events', { events, error });
         return false;
     }
+};
+
+/**
+ * 情報をユーザーに通知するダイアログを表示します。
+ * - kintone.createDialog を使ってカスタムダイアログを表示します。
+ * - allowHtml が true のときのみ message を HTML として挿入（サニタイズあり）、
+ *   デフォルトはプレーンテキストとして表示します。
+ * - notifyError/notifyWarning と同様に共通ロジックを利用します。
+ *
+ * @param {string|Node} message 表示するメッセージ（文字列が想定）。Node を渡す場合はそのまま挿入されます。
+ * @param {string} [title='情報'] ダイアログのタイトル
+ * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか（サニタイズされます）
+ * @returns {void}
+ */
+const notifyInfo = (message, title = '情報', allowHtml = false) => {
+    const body = document.createElement('div');
+    body.className = 'kc-notify-info';
+    body.setAttribute('role', 'alertdialog');
+    body.style.display = 'flex';
+    body.style.alignItems = 'center';
+    body.style.gap = '1em';
+    body.style.margin = '1em';
+
+    const infoImage = document.createElement('img');
+    infoImage.src = _KC_ASSET_BASE + '/infoIcon.png';
+    infoImage.alt = '情報アイコン';
+    infoImage.style.width = '32px';
+    infoImage.style.height = '32px';
+    infoImage.setAttribute('aria-hidden', 'true');
+    body.appendChild(infoImage);
+
+    const infoText = document.createElement('div');
+    infoText.setAttribute('role', 'status');
+    infoText.setAttribute('aria-live', 'polite');
+    infoText.className = 'kc-notify-info__message';
+    const messageId = 'kc-notify-info__message-' + Math.random().toString(36).slice(2,8);
+    infoText.id = messageId;
+    if (allowHtml) {
+        infoText.innerHTML = _kc_sanitizeHtml(message);
+    } else {
+        infoText.textContent = String(message);
+    }
+    body.appendChild(infoText);
+    body.setAttribute('aria-label', String(title));
+    body.setAttribute('aria-describedby', messageId);
+
+    _kc_showDialog({ title, body });
+};
+
+/**
+ * 注意をユーザーに通知するダイアログを表示します。
+ * - kintone.createDialog を使ってカスタムダイアログを表示します。
+ * - allowHtml が true のときのみ message を HTML として挿入（サニタイズあり）、
+ *   デフォルトはプレーンテキストとして表示します。
+ * - notifyError/notifyWarning と同様に共通ロジックを利用します。
+ *
+ * @param {string|Node} message 表示するメッセージ（文字列が想定）。Node を渡す場合はそのまま挿入されます。
+ * @param {string} [title='注意'] ダイアログのタイトル
+ * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか（サニタイズされます）
+ * @returns {void}
+ */
+const notifyWarning = (message, title = '注意', allowHtml = false) => {
+    const body = document.createElement('div');
+    body.className = 'kc-notify-warning';
+    body.setAttribute('role', 'alertdialog');
+    body.style.display = 'flex';
+    body.style.alignItems = 'center';
+    body.style.gap = '1em';
+    body.style.margin = '1em';
+
+    const warnImage = document.createElement('img');
+    warnImage.src = _KC_ASSET_BASE + '/warningIcon.png';
+    warnImage.alt = '注意アイコン';
+    warnImage.style.width = '32px';
+    warnImage.style.height = '32px';
+    warnImage.setAttribute('aria-hidden', 'true');
+    body.appendChild(warnImage);
+
+    const warnText = document.createElement('div');
+    warnText.setAttribute('role', 'status');
+    warnText.setAttribute('aria-live', 'polite');
+    warnText.className = 'kc-notify-warning__message';
+    const messageId = 'kc-notify-warning__message-' + Math.random().toString(36).slice(2,8);
+    warnText.id = messageId;
+    if (allowHtml) {
+        warnText.innerHTML = _kc_sanitizeHtml(message);
+    } else {
+        warnText.textContent = String(message);
+    }
+    body.appendChild(warnText);
+    body.setAttribute('aria-label', String(title));
+    body.setAttribute('aria-describedby', messageId);
+    // 共通処理でダイアログ表示
+    _kc_showDialog({ title, body });
 };
 
 /**
