@@ -128,7 +128,7 @@ const notifyError = (message, title = 'エラー', allowHtml = false) => {
     body.style.gap = '1em';
     body.style.margin = '1em';
     const errorImage = document.createElement('img');
-    errorImage.src = _KC_ASSET_BASE + '/errorIcon.png';
+    errorImage.src = _KC_ASSET_BASE + '/error-icon.png';
     errorImage.alt = 'エラーアイコン';
     errorImage.style.width = '32px';
     errorImage.style.height = '32px';
@@ -248,7 +248,7 @@ const notifyInfo = (message, title = '情報', allowHtml = false) => {
     body.style.margin = '1em';
 
     const infoImage = document.createElement('img');
-    infoImage.src = _KC_ASSET_BASE + '/infoIcon.png';
+    infoImage.src = _KC_ASSET_BASE + '/info-icon.png';
     infoImage.alt = '情報アイコン';
     infoImage.style.width = '32px';
     infoImage.style.height = '32px';
@@ -295,7 +295,7 @@ const notifyWarning = (message, title = '注意', allowHtml = false) => {
     body.style.margin = '1em';
 
     const warnImage = document.createElement('img');
-    warnImage.src = _KC_ASSET_BASE + '/warningIcon.png';
+    warnImage.src = _KC_ASSET_BASE + '/warning-icon.png';
     warnImage.alt = '注意アイコン';
     warnImage.style.width = '32px';
     warnImage.style.height = '32px';
