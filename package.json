@@ -9,13 +9,22 @@
     "build": "esbuild src/main.js --bundle --minify --sourcemap --outfile=dist/bundle.js",
     "watch": "esbuild src/main.js --bundle --sourcemap --outfile=dist/bundle.js --watch",
     "prepare:dist": "rm -rf dist && mkdir -p dist && cp src/kintone-custom-lib.js src/zip-code-address-utils.js src/zipcode_processing.js src/phone_number_translation.js src/phone-utils.js src/character_handling.js src/date-utils.js src/date_handling.js src/text-suite.js src/financial_institution_processing.js src/shipping-processing.js src/vc-check.js src/password_generation.js src/jquery.autoKana.js src/index.html src/styles.css dist/ || true && cp -R src/image dist/ || true",
-    "zip": "cd dist && zip -r ../package.zip ."
+    "zip": "cd dist && zip -r ../package.zip .",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "src/**/*.{js,css,html}": [
+      "prettier --write",
+      "git add"
+    ]
   },
   "devDependencies": {
     "esbuild": "^0.25.11",
     "eslint": "^9.38.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
+    "husky": "^8.0.0",
+    "lint-staged": "^16.2.6",
     "prettier": "^3.6.2",
     "sirv": "^3.0.2",
     "sirv-cli": "^3.0.1"
