@@ -3,6 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
+/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, kintoneZipSetSpaceFieldButton, kintoneZipSpaceFieldText, normalizeZipCode */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // 郵便番号APIベースURL
@@ -24,10 +25,10 @@ const _ZC_ZENKAKU_ALPHA_NUM_REG = /[Ａ-Ｚａ-ｚ０-９]/g;
  * @returns {string} 正規化済みの半角英数字（記号除去・大文字化済み）
  */
 const _zc_normalizeZipCodeInput = (zipCode) => {
-    return String(zipCode)
-        .replace(_ZC_ZENKAKU_ALPHA_NUM_REG, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-        .toUpperCase()
-        .replace(_ZC_SYMBOLS_REGEX, '');
+  return String(zipCode)
+    .replace(_ZC_ZENKAKU_ALPHA_NUM_REG, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+    .toUpperCase()
+    .replace(_ZC_SYMBOLS_REGEX, '');
 };
 
 /**
@@ -36,11 +37,14 @@ const _zc_normalizeZipCodeInput = (zipCode) => {
  * @returns {{ok: boolean, normalized?: string, error?: string}}
  */
 const _zc_getValidatedNormalized = (zipCode) => {
-    const normalized = _zc_normalizeZipCodeInput(zipCode);
-    if (typeof normalized !== 'string' || !/^[0-9A-Z]{7}$/.test(normalized)) {
-        return { ok: false, error: '郵便番号／デジタルアドレスは7桁の半角英数字で指定してください' };
-    }
-    return { ok: true, normalized };
+  const normalized = _zc_normalizeZipCodeInput(zipCode);
+  if (typeof normalized !== 'string' || !/^[0-9A-Z]{7}$/.test(normalized)) {
+    return {
+      ok: false,
+      error: '郵便番号／デジタルアドレスは7桁の半角英数字で指定してください',
+    };
+  }
+  return { ok: true, normalized };
 };
 
 /**
@@ -51,17 +55,20 @@ const _zc_getValidatedNormalized = (zipCode) => {
  * @returns {boolean} 成功したら true、引数不正や要素が見つからなければ false
  */
 const _zc_setSpaceFieldDisplay = (spaceField, display) => {
-    if (typeof spaceField !== 'string' || !spaceField.trim() || typeof display !== 'boolean') {
-        console.warn('_zc_setSpaceFieldDisplay: invalid arguments', { spaceField, display });
-        return false;
-    }
-    const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-    if (!spaceElement) {
-        console.warn('_zc_setSpaceFieldDisplay: space element not found', spaceField);
-        return false;
-    }
-    spaceElement.parentNode.style.display = display ? '' : 'none';
-    return true;
+  if (typeof spaceField !== 'string' || !spaceField.trim() || typeof display !== 'boolean') {
+    console.warn('_zc_setSpaceFieldDisplay: invalid arguments', {
+      spaceField,
+      display,
+    });
+    return false;
+  }
+  const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+  if (!spaceElement) {
+    console.warn('_zc_setSpaceFieldDisplay: space element not found', spaceField);
+    return false;
+  }
+  spaceElement.parentNode.style.display = display ? '' : 'none';
+  return true;
 };
 
 //　ライブラリ本体部
@@ -71,34 +78,34 @@ const _zc_setSpaceFieldDisplay = (spaceField, display) => {
  * @param {function} callback - (exists: boolean) => void 存在する場合はtrue、存在しない場合はfalse
  */
 const checkZipCodeExists = (zipCode, callback) => {
-    const v = _zc_getValidatedNormalized(zipCode);
-    if (!v.ok) {
-        if (typeof callback === 'function') callback(false);
-        return;
-    }
-    const normalized = v.normalized;
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
-        .then(response => {
-            if (response.status === 404) {
-                callback(false);
-                return null;
-            }
-            if (!response.ok) {
-                callback(false);
-                return null;
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!data || !data.addresses || data.addresses.length === 0) {
-                callback(false);
-                return null;
-            }
-            callback(true);
-        })
-        .catch(() => {
-            callback(false);
-        });
+  const v = _zc_getValidatedNormalized(zipCode);
+  if (!v.ok) {
+    if (typeof callback === 'function') callback(false);
+    return;
+  }
+  const normalized = v.normalized;
+  fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+    .then((response) => {
+      if (response.status === 404) {
+        callback(false);
+        return null;
+      }
+      if (!response.ok) {
+        callback(false);
+        return null;
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (!data || !data.addresses || data.addresses.length === 0) {
+        callback(false);
+        return null;
+      }
+      callback(true);
+    })
+    .catch(() => {
+      callback(false);
+    });
 };
 
 /**
@@ -107,39 +114,41 @@ const checkZipCodeExists = (zipCode, callback) => {
  * @param {function} callback - (result: { zipCode: string } | { error: string }) => void
  */
 const formatZipCode = (zipCode, callback) => {
-    const v = _zc_getValidatedNormalized(zipCode);
-    if (!v.ok) {
-        if (typeof callback === 'function') callback({ error: v.error });
-        return;
-    }
-    const normalized = v.normalized;
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
-        .then(response => {
-            if (response.status === 404) {
-                callback({ error: '郵便番号が存在しません' });
-                return null;
-            }
-            if (!response.ok) {
-                callback({ error: `APIエラー（${response.status}）` });
-                return null;
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!data || !data.addresses || data.addresses.length === 0) {
-                callback({ error: '郵便番号が存在しません' });
-                return null;
-            }
-            // 数字7桁ならハイフン付き、それ以外はそのまま
-            if (/^\d{7}$/.test(normalized)) {
-                callback({ zipCode: normalized.slice(0, 3) + '-' + normalized.slice(3) });
-            } else {
-                callback({ zipCode: normalized });
-            }
-        })
-        .catch(() => {
-            callback({ error: 'API接続エラー' });
+  const v = _zc_getValidatedNormalized(zipCode);
+  if (!v.ok) {
+    if (typeof callback === 'function') callback({ error: v.error });
+    return;
+  }
+  const normalized = v.normalized;
+  fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+    .then((response) => {
+      if (response.status === 404) {
+        callback({ error: '郵便番号が存在しません' });
+        return null;
+      }
+      if (!response.ok) {
+        callback({ error: `APIエラー（${response.status}）` });
+        return null;
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (!data || !data.addresses || data.addresses.length === 0) {
+        callback({ error: '郵便番号が存在しません' });
+        return null;
+      }
+      // 数字7桁ならハイフン付き、それ以外はそのまま
+      if (/^\d{7}$/.test(normalized)) {
+        callback({
+          zipCode: normalized.slice(0, 3) + '-' + normalized.slice(3),
         });
+      } else {
+        callback({ zipCode: normalized });
+      }
+    })
+    .catch(() => {
+      callback({ error: 'API接続エラー' });
+    });
 };
 
 /**
@@ -174,197 +183,238 @@ const formatZipCode = (zipCode, callback) => {
  *
  */
 const getAddressByZipCode = (zipCode, callback) => {
-    const v = _zc_getValidatedNormalized(zipCode);
-    if (!v.ok) {
-        if (typeof callback === 'function') callback({ error: v.error });
-        return;
-    }
-    const normalized = v.normalized;
-    // 正規化後は7文字の半角英数字であることが保証されている
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
-        .then(response => {
-            if (!response.ok) {
-                    if (response.status === 404) {
-                    callback({ error: `郵便番号／デジタルアドレス「${zipCode}」に該当する住所が見つかりません` });
-                    return null;
-                } else if (response.status >= 500) {
-                    callback({ error: 'サーバーエラーが発生しました' });
-                    return null;
-                } else {
-                    callback({ error: `通信エラー（${response.status}）` });
-                    return null;
-                }
-            }
-            // JSONパースエラーも個別に捕捉
-            return response.json().catch(() => {
-                callback({ error: 'APIレスポンスのJSONパースに失敗しました' });
-                return null;
-            });
-        })
-        .then(result => {
-            if (!result) return;
-            if (!result.addresses || result.addresses.length === 0) {
-                callback({ error: '該当する住所データが見つかりませんでした。郵便番号／デジタルアドレスを確認してください。' });
-                return null;
-            }
-            let invalid = false;
-            result.addresses.forEach((addr) => {
-                if (
-                    !addr ||
-                    addr.zip_code == null || typeof addr.zip_code !== 'string' ||
-                    addr.pref_name == null || typeof addr.pref_name !== 'string' ||
-                    addr.city_name == null || typeof addr.city_name !== 'string' ||
-                    addr.town_name == null || typeof addr.town_name !== 'string' ||
-                    (addr.block_name != null && typeof addr.block_name !== 'string') ||
-                    (addr.other_name != null && typeof addr.other_name !== 'string') ||
-                    (addr.biz_name != null && typeof addr.biz_name !== 'string')
-                ) {
-                    invalid = true;
-                }
-            });
-            if (invalid) {
-                callback({ error: 'APIレスポンスが不正です（郵便番号・デジタルアドレス情報）' });
-                return null;
-            }
-            if (result.addresses.length === 1) {
-                if (!result) return null;
-                if (!result.addresses || result.addresses.length === 0) {
-                    callback({ error: '該当する住所データが見つかりませんでした。郵便番号／デジタルアドレスを確認してください。' });
-                    return null;
-                }
-                let isInvalid = false;
-                result.addresses.forEach((addressObj) => {
-                    if (
-                        !addressObj ||
-                        addressObj.zip_code == null || typeof addressObj.zip_code !== 'string' ||
-                        addressObj.pref_name == null || typeof addressObj.pref_name !== 'string' ||
-                        addressObj.city_name == null || typeof addressObj.city_name !== 'string' ||
-                        addressObj.town_name == null || typeof addressObj.town_name !== 'string' ||
-                        (addressObj.block_name != null && typeof addressObj.block_name !== 'string') ||
-                        (addressObj.other_name != null && typeof addressObj.other_name !== 'string') ||
-                        (addressObj.biz_name != null && typeof addressObj.biz_name !== 'string')
-                    ) {
-                        isInvalid = true;
-                    }
-                });
-                if (isInvalid) {
-                    callback({ error: 'APIレスポンスが不正です（郵便番号・デジタルアドレス情報）' });
-                    return null;
-                }
-                const addressObj = result.addresses[0];
-                const fullAddress = [addressObj.pref_name, addressObj.city_name, addressObj.town_name, addressObj.block_name ? addressObj.block_name : ''].filter(Boolean).join('');
-                let zipCodeLeft;
-                let zipCodeRight;
-                let zipCodeArray = [];
-                for (let i = 0; i < addressObj.zip_code.length; i++) {
-                    zipCodeArray.push(addressObj.zip_code[i]);
-                    if (i <= 2) {
-                        zipCodeLeft = (zipCodeLeft || '') + addressObj.zip_code[i];
-                    } else if (i >= 3) {
-                        zipCodeRight = (zipCodeRight || '') + addressObj.zip_code[i];
-                    }
-                }
-                formatZipCode(addressObj.zip_code, (zipResult) => {
-                    callback({
-                        originalZipCode: zipCode,
-                        normalizedZipCode: normalized,
-                        apiZipCode: addressObj.zip_code,
-                        zipCode: zipResult.zipCode || null,
-                        zipCode1: zipCodeArray[0] || null,
-                        zipCode2: zipCodeArray[1] || null,
-                        zipCode3: zipCodeArray[2] || null,
-                        zipCode4: zipCodeArray[3] || null,
-                        zipCode5: zipCodeArray[4] || null,
-                        zipCode6: zipCodeArray[5] || null,
-                        zipCode7: zipCodeArray[6] || null,
-                        address: fullAddress ? fullAddress.replace(/[\u3000\u0020]/g, '') : null,
-                        prefName: addressObj.pref_name ? addressObj.pref_name.replace(/[\u3000\u0020]/g, '') : null,
-                        cityName: addressObj.city_name ? addressObj.city_name.replace(/[\u3000\u0020]/g, '') : null,
-                        townName: addressObj.town_name ? addressObj.town_name.replace(/[\u3000\u0020]/g, '') : null,
-                        blockName: addressObj.block_name ? addressObj.block_name.replace(/[\u3000\u0020]/g, '') : null,
-                        otherName: addressObj.other_name ? addressObj.other_name.replace(/[\u3000\u0020]/g, '') : null,
-                        bizName: addressObj.biz_name ? addressObj.biz_name.replace(/[\u3000\u0020]/g, '') : null
-                    });
-                });
-            } else {
-                callback({ error: `郵便番号／デジタルアドレス「${result.addresses[0].zip_code}」に該当する住所が複数見つかりました。郵便番号／デジタルアドレスを確認して再検索してください。` });
-            }
-        })
-        .catch(error => {
-            callback({ error: `APIへの接続に失敗しました: ${error.message}` });
+  const v = _zc_getValidatedNormalized(zipCode);
+  if (!v.ok) {
+    if (typeof callback === 'function') callback({ error: v.error });
+    return;
+  }
+  const normalized = v.normalized;
+  // 正規化後は7文字の半角英数字であることが保証されている
+  fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+    .then((response) => {
+      if (!response.ok) {
+        if (response.status === 404) {
+          callback({
+            error: `郵便番号／デジタルアドレス「${zipCode}」に該当する住所が見つかりません`,
+          });
+          return null;
+        } else if (response.status >= 500) {
+          callback({ error: 'サーバーエラーが発生しました' });
+          return null;
+        } else {
+          callback({ error: `通信エラー（${response.status}）` });
+          return null;
+        }
+      }
+      // JSONパースエラーも個別に捕捉
+      return response.json().catch(() => {
+        callback({ error: 'APIレスポンスのJSONパースに失敗しました' });
+        return null;
+      });
+    })
+    .then((result) => {
+      if (!result) return;
+      if (!result.addresses || result.addresses.length === 0) {
+        callback({
+          error:
+            '該当する住所データが見つかりませんでした。郵便番号／デジタルアドレスを確認してください。',
         });
+        return null;
+      }
+      let invalid = false;
+      result.addresses.forEach((addr) => {
+        if (
+          !addr ||
+          addr.zip_code == null ||
+          typeof addr.zip_code !== 'string' ||
+          addr.pref_name == null ||
+          typeof addr.pref_name !== 'string' ||
+          addr.city_name == null ||
+          typeof addr.city_name !== 'string' ||
+          addr.town_name == null ||
+          typeof addr.town_name !== 'string' ||
+          (addr.block_name != null && typeof addr.block_name !== 'string') ||
+          (addr.other_name != null && typeof addr.other_name !== 'string') ||
+          (addr.biz_name != null && typeof addr.biz_name !== 'string')
+        ) {
+          invalid = true;
+        }
+      });
+      if (invalid) {
+        callback({
+          error: 'APIレスポンスが不正です（郵便番号・デジタルアドレス情報）',
+        });
+        return null;
+      }
+      if (result.addresses.length === 1) {
+        if (!result) return null;
+        if (!result.addresses || result.addresses.length === 0) {
+          callback({
+            error:
+              '該当する住所データが見つかりませんでした。郵便番号／デジタルアドレスを確認してください。',
+          });
+          return null;
+        }
+        let isInvalid = false;
+        result.addresses.forEach((addressObj) => {
+          if (
+            !addressObj ||
+            addressObj.zip_code == null ||
+            typeof addressObj.zip_code !== 'string' ||
+            addressObj.pref_name == null ||
+            typeof addressObj.pref_name !== 'string' ||
+            addressObj.city_name == null ||
+            typeof addressObj.city_name !== 'string' ||
+            addressObj.town_name == null ||
+            typeof addressObj.town_name !== 'string' ||
+            (addressObj.block_name != null && typeof addressObj.block_name !== 'string') ||
+            (addressObj.other_name != null && typeof addressObj.other_name !== 'string') ||
+            (addressObj.biz_name != null && typeof addressObj.biz_name !== 'string')
+          ) {
+            isInvalid = true;
+          }
+        });
+        if (isInvalid) {
+          callback({
+            error: 'APIレスポンスが不正です（郵便番号・デジタルアドレス情報）',
+          });
+          return null;
+        }
+        const addressObj = result.addresses[0];
+        const fullAddress = [
+          addressObj.pref_name,
+          addressObj.city_name,
+          addressObj.town_name,
+          addressObj.block_name ? addressObj.block_name : '',
+        ]
+          .filter(Boolean)
+          .join('');
+        let zipCodeLeft;
+        let zipCodeRight;
+        let zipCodeArray = [];
+        for (let i = 0; i < addressObj.zip_code.length; i++) {
+          zipCodeArray.push(addressObj.zip_code[i]);
+          if (i <= 2) {
+            zipCodeLeft = (zipCodeLeft || '') + addressObj.zip_code[i];
+          } else if (i >= 3) {
+            zipCodeRight = (zipCodeRight || '') + addressObj.zip_code[i];
+          }
+        }
+        formatZipCode(addressObj.zip_code, (zipResult) => {
+          callback({
+            originalZipCode: zipCode,
+            normalizedZipCode: normalized,
+            apiZipCode: addressObj.zip_code,
+            zipCode: zipResult.zipCode || null,
+            zipCode1: zipCodeArray[0] || null,
+            zipCode2: zipCodeArray[1] || null,
+            zipCode3: zipCodeArray[2] || null,
+            zipCode4: zipCodeArray[3] || null,
+            zipCode5: zipCodeArray[4] || null,
+            zipCode6: zipCodeArray[5] || null,
+            zipCode7: zipCodeArray[6] || null,
+            address: fullAddress ? fullAddress.replace(/[\u3000\u0020]/g, '') : null,
+            prefName: addressObj.pref_name
+              ? addressObj.pref_name.replace(/[\u3000\u0020]/g, '')
+              : null,
+            cityName: addressObj.city_name
+              ? addressObj.city_name.replace(/[\u3000\u0020]/g, '')
+              : null,
+            townName: addressObj.town_name
+              ? addressObj.town_name.replace(/[\u3000\u0020]/g, '')
+              : null,
+            blockName: addressObj.block_name
+              ? addressObj.block_name.replace(/[\u3000\u0020]/g, '')
+              : null,
+            otherName: addressObj.other_name
+              ? addressObj.other_name.replace(/[\u3000\u0020]/g, '')
+              : null,
+            bizName: addressObj.biz_name
+              ? addressObj.biz_name.replace(/[\u3000\u0020]/g, '')
+              : null,
+          });
+        });
+      } else {
+        callback({
+          error: `郵便番号／デジタルアドレス「${result.addresses[0].zip_code}」に該当する住所が複数見つかりました。郵便番号／デジタルアドレスを確認して再検索してください。`,
+        });
+      }
+    })
+    .catch((error) => {
+      callback({ error: `APIへの接続に失敗しました: ${error.message}` });
+    });
 };
 
 /**
  * 郵便番号から市区町村名のみ取得する関数（API利用、コールバック型）
  * @param {string|number} zipCode 郵便番号またはデジタルアドレス（7桁の半角英数字）。全角や記号・空白は自動で除去・変換されます。
- * @param {function} callback - (cityName: string|null) => void 市区町村名（存在しない場合はnull）
+ * @param {ZipCodeCityCallback} callback - 市区町村名（存在しない場合は null）を受け取るコールバック
  */
 const getCityByZipCode = (zipCode, callback) => {
-    const v = _zc_getValidatedNormalized(zipCode);
-    if (!v.ok) {
-        if (typeof callback === 'function') callback(null);
-        return;
-    }
-    const normalized = v.normalized;
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
-        .then(response => {
-            if (response.status === 404) {
-                callback(null);
-                return null;
-            }
-            if (!response.ok) {
-                callback(null);
-                return null;
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!data || !data.addresses || data.addresses.length === 0) {
-                callback(null);
-                return null;
-            }
-            callback(data.addresses[0].city_name || null);
-        })
-        .catch(() => {
-            callback(null);
-        });
+  const v = _zc_getValidatedNormalized(zipCode);
+  if (!v.ok) {
+    if (typeof callback === 'function') callback(null);
+    return;
+  }
+  const normalized = v.normalized;
+  fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+    .then((response) => {
+      if (response.status === 404) {
+        callback(null);
+        return null;
+      }
+      if (!response.ok) {
+        callback(null);
+        return null;
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (!data || !data.addresses || data.addresses.length === 0) {
+        callback(null);
+        return null;
+      }
+      callback(data.addresses[0].city_name || null);
+    })
+    .catch(() => {
+      callback(null);
+    });
 };
 
 /**
  * 郵便番号から都道府県名のみ取得する関数（API利用、コールバック型）
  * @param {string|number} zipCode 郵便番号またはデジタルアドレス（7桁の半角英数字）。全角や記号・空白は自動で除去・変換されます。
- * @param {function} callback - (prefName: string|null) => void 都道府県名（存在しない場合はnull）
+ * @param {ZipCodePrefCallback} callback - 都道府県名（存在しない場合は null）を受け取るコールバック
  */
 const getPrefectureByZipCode = (zipCode, callback) => {
-    const v = _zc_getValidatedNormalized(zipCode);
-    if (!v.ok) {
-        if (typeof callback === 'function') callback(null);
-        return;
-    }
-    const normalized = v.normalized;
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
-        .then(response => {
-            if (response.status === 404) {
-                callback(null);
-                return null;
-            }
-            if (!response.ok) {
-                callback(null);
-                return null;
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!data || !data.addresses || data.addresses.length === 0) {
-                callback(null);
-                return null;
-            }
-            callback(data.addresses[0].pref_name || null);
-        })
-        .catch(() => {
-            callback(null);
-        });
+  const v = _zc_getValidatedNormalized(zipCode);
+  if (!v.ok) {
+    if (typeof callback === 'function') callback(null);
+    return;
+  }
+  const normalized = v.normalized;
+  fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+    .then((response) => {
+      if (response.status === 404) {
+        callback(null);
+        return null;
+      }
+      if (!response.ok) {
+        callback(null);
+        return null;
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (!data || !data.addresses || data.addresses.length === 0) {
+        callback(null);
+        return null;
+      }
+      callback(data.addresses[0].pref_name || null);
+    })
+    .catch(() => {
+      callback(null);
+    });
 };
 
 /**
@@ -393,48 +443,50 @@ const getPrefectureByZipCode = (zipCode, callback) => {
  *   ボタン押下時、callbackコールバックで住所取得結果を返します。
  */
 const kintoneZipSetSpaceFieldButton = (spaceField, id, label, zipCode, callback) => {
-    if (
-        typeof spaceField !== 'string' || !spaceField.trim() ||
-        typeof id !== 'string' || !id.trim() ||
-        (label !== null && typeof label !== 'string' && typeof label !== 'undefined') ||
-        (zipCode !== null && typeof zipCode !== 'string' && typeof zipCode !== 'number') ||
-        (callback !== undefined && typeof callback !== 'function' && callback !== null)
-    ) {
-        return;
-    }
-    // 既存ボタン削除
-    const buttonElementById = document.getElementById(id);
-    if (buttonElementById) {
-        buttonElementById.remove();
-    }
-    let textContent = '';
-    if (label !== undefined && label !== null && label !== '') {
-        textContent = '郵便番号から' + label + '住所を取得';
-    } else if (label === undefined) {
-        // labelがundefinedの場合はデフォルト文言
-        textContent = '郵便番号から住所を取得';
-    } else {
-        // 非表示
-        _zc_setSpaceFieldDisplay(spaceField, false);
-        return;
-    }
-    const button = document.createElement('button');
-    button.id = id;
-    button.textContent = textContent;
-    button.addEventListener('click', () => {
-        getAddressByZipCode(zipCode, (result) => {
-            // 呼び出し元で処理できるようにコールバックで返す
-            if (typeof callback === 'function') {
-                callback(result);
-            }
-        });
-    });
-    const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-    if (spaceElement) {
-        spaceElement.appendChild(button);
-        _zc_setSpaceFieldDisplay(spaceField, true);
-    }
+  if (
+    typeof spaceField !== 'string' ||
+    !spaceField.trim() ||
+    typeof id !== 'string' ||
+    !id.trim() ||
+    (label !== null && typeof label !== 'string' && typeof label !== 'undefined') ||
+    (callback !== undefined && typeof callback !== 'function' && callback !== null)
+  ) {
     return;
+  }
+  // 既存ボタン削除
+  const buttonElementById = document.getElementById(id);
+  if (buttonElementById) {
+    buttonElementById.remove();
+  }
+  let textContent = '';
+  if (label !== undefined && label !== null && label !== '') {
+    textContent = '郵便番号から' + label + '住所を取得';
+  } else if (label === undefined) {
+    // labelがundefinedの場合はデフォルト文言
+    textContent = '郵便番号から住所を取得';
+  }
+  if (textContent === '' || !zipCode) {
+    // 非表示
+    _zc_setSpaceFieldDisplay(spaceField, false);
+    return;
+  }
+  const button = document.createElement('button');
+  button.id = id;
+  button.textContent = textContent;
+  button.addEventListener('click', () => {
+    getAddressByZipCode(zipCode, (result) => {
+      // 呼び出し元で処理できるようにコールバックで返す
+      if (typeof callback === 'function') {
+        callback(result);
+      }
+    });
+  });
+  const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+  if (spaceElement) {
+    spaceElement.appendChild(button);
+    _zc_setSpaceFieldDisplay(spaceField, true);
+  }
+  return;
 };
 
 /**
@@ -447,33 +499,36 @@ const kintoneZipSetSpaceFieldButton = (spaceField, id, label, zipCode, callback)
  * @description innerHTMLがあれば表示、なければ削除して非表示にします。
  */
 const kintoneZipSpaceFieldText = (spaceField, id, display) => {
-    if (
-        typeof spaceField !== 'string' || !spaceField.trim() ||
-        typeof id !== 'string' || !id.trim() ||
-        typeof display !== 'boolean'
-    ) {
-        return;
-    }
-    // 既存要素削除
-    const spaceFieldElementById = document.getElementById(id);
-    if (spaceFieldElementById) {
-        spaceFieldElementById.remove();
-    }
-    const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-    if (display) {
-        // 表示
-        const createSpaceFieldElement = document.createElement('div');
-        createSpaceFieldElement.id = id;
-        createSpaceFieldElement.innerHTML = '<div>郵便番号の代わりにデジタルアドレスでも検索可能です。<br>デジタルアドレスの場合は郵便番号に変換されます。</div>';
-        if (spaceElement) {
-            spaceElement.appendChild(createSpaceFieldElement);
-            spaceElement.parentNode.style.display = '';
-        }
-    } else {
-        // 非表示
-        spaceElement.parentNode.style.display = 'none';
-    }
+  if (
+    typeof spaceField !== 'string' ||
+    !spaceField.trim() ||
+    typeof id !== 'string' ||
+    !id.trim() ||
+    typeof display !== 'boolean'
+  ) {
     return;
+  }
+  // 既存要素削除
+  const spaceFieldElementById = document.getElementById(id);
+  if (spaceFieldElementById) {
+    spaceFieldElementById.remove();
+  }
+  const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+  if (display) {
+    // 表示
+    const createSpaceFieldElement = document.createElement('div');
+    createSpaceFieldElement.id = id;
+    createSpaceFieldElement.innerHTML =
+      '<div>郵便番号の代わりにデジタルアドレスでも検索可能です。<br>デジタルアドレスの場合は郵便番号に変換されます。</div>';
+    if (spaceElement) {
+      spaceElement.appendChild(createSpaceFieldElement);
+      spaceElement.parentNode.style.display = '';
+    }
+  } else {
+    // 非表示
+    spaceElement.parentNode.style.display = 'none';
+  }
+  return;
 };
 
 /**
@@ -482,33 +537,45 @@ const kintoneZipSpaceFieldText = (spaceField, id, display) => {
  * @param {function} callback - (result: { zipCode: string } | { error: string }) => void
  */
 const normalizeZipCode = (zipCode, callback) => {
-    const v = _zc_getValidatedNormalized(zipCode);
-    if (!v.ok) {
-        if (typeof callback === 'function') callback({ error: v.error });
-        return;
-    }
-    const normalized = v.normalized;
-    fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
-        .then(response => {
-            if (response.status === 404) {
-                callback({ error: '郵便番号が存在しません' });
-                return null;
-            }
-            if (!response.ok) {
-                callback({ error: `APIエラー（${response.status}）` });
-                return null;
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!data) return;
-            if (!data.addresses || data.addresses.length === 0) {
-                callback({ error: '郵便番号が存在しません' });
-                return null;
-            }
-            callback({ zipCode: normalized });
-        })
-        .catch(() => {
-            callback({ error: 'API接続エラー' });
-        });
+  const v = _zc_getValidatedNormalized(zipCode);
+  if (!v.ok) {
+    if (typeof callback === 'function') callback({ error: v.error });
+    return;
+  }
+  const normalized = v.normalized;
+  fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+    .then((response) => {
+      if (response.status === 404) {
+        callback({ error: '郵便番号が存在しません' });
+        return null;
+      }
+      if (!response.ok) {
+        callback({ error: `APIエラー（${response.status}）` });
+        return null;
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (!data) return;
+      if (!data.addresses || data.addresses.length === 0) {
+        callback({ error: '郵便番号が存在しません' });
+        return null;
+      }
+      callback({ zipCode: normalized });
+    })
+    .catch(() => {
+      callback({ error: 'API接続エラー' });
+    });
 };
+
+// 公開
+if (typeof window !== 'undefined') {
+  window.checkZipCodeExists = checkZipCodeExists;
+  window.formatZipCode = formatZipCode;
+  window.getAddressByZipCode = getAddressByZipCode;
+  window.getCityByZipCode = getCityByZipCode;
+  window.getPrefectureByZipCode = getPrefectureByZipCode;
+  window.kintoneZipSetSpaceFieldButton = kintoneZipSetSpaceFieldButton;
+  window.kintoneZipSpaceFieldText = kintoneZipSpaceFieldText;
+  window.normalizeZipCode = normalizeZipCode;
+}

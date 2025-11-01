@@ -6,6 +6,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_nh_)で始める
+/* exported getNationalHolidayName */
 // リソースの読み込み制限を行っている場合は、fetch通信を下記のURLに対して許可する必要があります
 // https://api.national-holidays.jp
 'use strict';
@@ -27,11 +28,11 @@ const _nh_HOLIDAY_API_BASE_URL = 'https://api.national-holidays.jp';
  * @private
  */
 class _nh_FinancialInstitutionError extends Error {
-    constructor(message, type = 'unknown') {
-        super(message);
-        this.name = 'NationalHolidayError';
-        this.type = type;
-    }
+  constructor(message, type = 'unknown') {
+    super(message);
+    this.name = 'NationalHolidayError';
+    this.type = type;
+  }
 }
 
 /**
@@ -58,34 +59,41 @@ class _nh_FinancialInstitutionError extends Error {
  * - fetch通信エラーやAPI異常時は必ずnullを返します。
  */
 const getNationalHolidayName = (date_str, callback) => {
-    if (typeof date_str !== 'string') throw new _nh_FinancialInstitutionError('検索対象の日付は文字列である必要があります', 'logic');
-    if (typeof callback !== 'function') throw new _nh_FinancialInstitutionError('コールバックは関数である必要があります', 'logic');
-    if (!date_str) return callback(null);
-    if (date_str < '1948-07-20') return callback(null);
-    fetch(_nh_HOLIDAY_API_BASE_URL + '/' + date_str)
-        .then(res => {
-            if (!res.ok) {
-                throw new Error('祝日APIのレスポンスが不正です: ' + res.status);
-            }
-            return res.json();
-        })
-        .then(result => {
-            // 祝日でない場合 { error: "not_found" }
-            if (result && typeof result === 'object') {
-                if (result.error === 'not_found') {
-                    callback(null);
-                    return;
-                }
-                if (typeof result.date === 'string' && typeof result.name === 'string') {
-                    callback(result.name);
-                    return;
-                }
-            }
-            // それ以外はnull
-            callback(null);
-        })
-        .catch(err => {
-            // 通信エラーやAPI異常時も必ずnullで抜ける
-            callback(null);
-        });
+  if (typeof date_str !== 'string')
+    throw new _nh_FinancialInstitutionError('検索対象の日付は文字列である必要があります', 'logic');
+  if (typeof callback !== 'function')
+    throw new _nh_FinancialInstitutionError('コールバックは関数である必要があります', 'logic');
+  if (!date_str) return callback(null);
+  if (date_str < '1948-07-20') return callback(null);
+  fetch(_nh_HOLIDAY_API_BASE_URL + '/' + date_str)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error('祝日APIのレスポンスが不正です: ' + res.status);
+      }
+      return res.json();
+    })
+    .then((result) => {
+      // 祝日でない場合 { error: "not_found" }
+      if (result && typeof result === 'object') {
+        if (result.error === 'not_found') {
+          callback(null);
+          return;
+        }
+        if (typeof result.date === 'string' && typeof result.name === 'string') {
+          callback(result.name);
+          return;
+        }
+      }
+      // それ以外はnull
+      callback(null);
+    })
+    .catch((_err) => {
+      // 通信エラーやAPI異常時も必ずnullで抜ける
+      callback(null);
+    });
 };
+
+// 公開（kintone から直接呼ばれるため）
+if (typeof window !== 'undefined') {
+  window.getNationalHolidayName = getNationalHolidayName;
+}
