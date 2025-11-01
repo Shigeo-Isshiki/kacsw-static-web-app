@@ -21,6 +21,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check formatting with Prettier
+        run: npx prettier --check "src/**/*.{js,css,html}"
+
+      - name: Run ESLint
+        run: npx eslint "src/**/*.js"
+
+      - name: Run tests (if defined)
+        run: |
+          # If package.json has a `test` script, run it; otherwise skip
+          if node -e "const p=require('./package.json'); console.log(Boolean(p.scripts && p.scripts.test));" | grep -q true; then
+            echo "Running npm test..."
+            npm test
+          else
+            echo "No test script defined; skipping npm test"
+          fi
+
       - name: Run prepare:dist
         run: npm run prepare:dist
 
