@@ -5,9 +5,7 @@
     "start": "sirv ./src public --cors --single --no-clear --port 8000",
     "lint": "eslint \"src/**/*.js\"",
     "lint:fix": "eslint \"src/**/*.js\" --fix",
-    "format": "prettier --write \"src/**/*.{js,css,html}\"",
-    "build": "esbuild src/main.js --bundle --minify --sourcemap --outfile=dist/bundle.js",
-    "watch": "esbuild src/main.js --bundle --sourcemap --outfile=dist/bundle.js --watch",
+  "format": "prettier --write \"src/**/*.{js,css,html}\"",
     "prepare:dist": "rm -rf dist && mkdir -p dist && cp src/kintone-custom-lib.js src/zip-code-address-utils.js src/zipcode_processing.js src/phone_number_translation.js src/phone-utils.js src/character_handling.js src/date-utils.js src/date_handling.js src/text-suite.js src/financial_institution_processing.js src/shipping-processing.js src/vc-check.js src/password_generation.js src/jquery.autoKana.js src/index.html src/styles.css dist/ || true && cp -R src/image dist/ || true",
     "zip": "cd dist && zip -r ../package.zip .",
     "prepare": "husky install"
