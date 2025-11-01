@@ -1,3 +1,10 @@
 node_modules/
 /test-results/
 
+# macOS
+.DS_Store
+
+# ESLint/report outputs
+eslint-*.txt
+eslint-report*.json
+
