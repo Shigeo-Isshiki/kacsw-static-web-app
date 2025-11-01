@@ -53,3 +53,34 @@ npm run zip
 ---
 
 必要なら、この README に具体的なファイル一覧や `prepare:dist` のサンプルを追加します。どのファイルを配布対象にするか教えてください。
+
+## 配布対象ファイル（例）
+
+通常 kintone に登録する配布対象ファイルの例を以下に示します。プロジェクト構成に合わせて個別に選択して下さい。
+
+- JavaScript ユーティリティ（主に kintone 上で利用するファイル）
+	- `src/kintone-custom-lib.js`
+	- `src/zip-code-address-utils.js`
+	- `src/zipcode_processing.js`
+	- `src/phone_number_translation.js`
+	- `src/phone-utils.js`
+	- `src/character_handling.js`
+	- `src/date-utils.js`
+	- `src/date_handling.js`
+	- `src/text-suite.js`
+	- `src/financial_institution_processing.js`
+	- `src/shipping-processing.js`
+	- `src/vc-check.js`
+	- `src/password_generation.js`
+	- `src/jquery.autoKana.js` (必要なら)
+
+- 静的アセット / テンプレート
+	- `src/index.html` （ローカルでの確認用）
+	- `src/styles.css` （必要なら）
+
+- 画像等のリソース
+	- `src/image/` ディレクトリ内のファイル（必要に応じて）
+
+メモ:
+- kintone のアプリ設定で「JavaScript/CSSで読み込むファイル」を登録する際は、依存関係の順番（ユーティリティ → それを使うコード）を守ってください。
+- もし配布対象を固定化したい場合は、`prepare:dist` スクリプトで上記ファイルのみを `dist/` にコピーするようにしておくと便利です。
