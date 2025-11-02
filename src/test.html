@@ -1,39 +1,58 @@
 <!doctype html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <title>dist test</title>
-  <style>body{font-family:system-ui,monospace}pre{white-space:pre-wrap}</style>
-</head>
-<body>
-  <h1>dist/test.html — window export check</h1>
-  <pre id="out">loading...
-</pre>
-
-  <!-- load scripts in order (keep all-window-exports.js last) -->
-  <!-- jQuery is required by jquery.autoKana and other plugins used in the test page -->
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="jquery.autoKana.js"></script>
-  <script src="kintone-custom-lib.js"></script>
-  <script src="text-suite.js"></script>
-  <script src="character_handling.js"></script>
-  <script src="national_holiday_handling.js"></script>
-  <script src="all-window-exports.js"></script>
-
-  <script>
-    (function(){
-      var out = document.getElementById('out');
-      var names = ['getNationalHolidayName','isSingleByteAlnumOnly','toFullWidthKatakana','toFullWidth','toHalfWidth','convert_to_hiragana','start'];
-      function show(){
-        out.textContent = '';
-        names.forEach(function(n){
-          var t = typeof window[n];
-          out.textContent += n + ': ' + t + '\n';
-        });
-        out.textContent += '\nwindow keys:\n' + Object.keys(window).slice(0,200).join(', ');
+  <head>
+    <meta charset="utf-8" />
+    <title>dist test</title>
+    <style>
+      body {
+        font-family: system-ui, monospace;
       }
-      if (document.readyState === 'complete') show(); else window.addEventListener('load', show);
-    })();
-  </script>
-</body>
+      pre {
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>dist/test.html — window export check</h1>
+    <pre id="out">
+loading...
+</pre
+    >
+
+    <!-- load scripts in order (keep all-window-exports.js last) -->
+    <!-- jQuery is required by jquery.autoKana and other plugins used in the test page -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="jquery.autoKana.js"></script>
+    <script src="kintone-custom-lib.js"></script>
+    <script src="text-suite.js"></script>
+    <script src="character_handling.js"></script>
+    <script src="national_holiday_handling.js"></script>
+    <script src="all-window-exports.js"></script>
+
+    <script>
+      (function () {
+        var out = document.getElementById("out");
+        var names = [
+          "getNationalHolidayName",
+          "isSingleByteAlnumOnly",
+          "toFullWidthKatakana",
+          "toFullWidth",
+          "toHalfWidth",
+          "convert_to_hiragana",
+          "start",
+        ];
+        function show() {
+          out.textContent = "";
+          names.forEach(function (n) {
+            var t = typeof window[n];
+            out.textContent += n + ": " + t + "\n";
+          });
+          out.textContent +=
+            "\nwindow keys:\n" + Object.keys(window).slice(0, 200).join(", ");
+        }
+        if (document.readyState === "complete") show();
+        else window.addEventListener("load", show);
+      })();
+    </script>
+  </body>
 </html>
