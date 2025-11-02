@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>dist test</title>
+    <title>dist test (with jQuery)</title>
     <style>
       body {
         font-family: system-ui, monospace;
@@ -13,13 +13,15 @@
     </style>
   </head>
   <body>
-    <h1>dist/test.html — window export check</h1>
+    <h1>dist/test-only.html — window export check (includes jQuery)</h1>
     <pre id="out">
 loading...
 </pre
     >
 
     <!-- load scripts in order (keep all-window-exports.js last) -->
+    <!-- jQuery included here for local testing only -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="jquery.autoKana.js"></script>
     <script src="kintone-custom-lib.js"></script>
     <script src="text-suite.js"></script>
@@ -42,8 +44,7 @@ loading...
         function show() {
           out.textContent = "";
           names.forEach(function (n) {
-            var t = typeof window[n];
-            out.textContent += n + ": " + t + "\n";
+            out.textContent += n + ": " + typeof window[n] + "\n";
           });
           out.textContent +=
             "\nwindow keys:\n" + Object.keys(window).slice(0, 200).join(", ");
