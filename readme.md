@@ -1,4 +1,4 @@
-# My First Static Web App
+# KACSW Static Web App
 
 This repository is a small static web app used for building and testing
 JavaScript utilities for handling Japanese phone numbers, postal codes,
