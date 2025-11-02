@@ -11,34 +11,70 @@
 (function () {
   'use strict';
 
-  var globalObj = typeof window !== 'undefined' ? window : typeof self !== 'undefined' ? self : globalThis;
+  var globalObj =
+    typeof window !== 'undefined' ? window : typeof self !== 'undefined' ? self : globalThis;
 
   // src/* 内の /* exported ... */ コメントから抽出した公開候補名のリスト
   var names = [
     // date-utils.js
-    'convertToSeireki', 'convertToEra', 'convertToYear',
+    'convertToSeireki',
+    'convertToEra',
+    'convertToYear',
     // kintone-custom-lib.js
-    'notifyError', 'getFieldValueOr', 'kintoneEventOn', 'notifyInfo', 'notifyWarning', 'setRecordValues', 'setSpaceFieldButton', 'setSpaceFieldText',
+    'notifyError',
+    'getFieldValueOr',
+    'kintoneEventOn',
+    'notifyInfo',
+    'notifyWarning',
+    'setRecordValues',
+    'setSpaceFieldButton',
+    'setSpaceFieldText',
     // national_holiday_handling.js
     'getNationalHolidayName',
     // password_generation.js
     'getPassword',
     // shipping-processing.js
-    'getNextBusinessDay', 'kintoneShippingInquiryButton', 'validateTrackingNumber',
+    'getNextBusinessDay',
+    'kintoneShippingInquiryButton',
+    'validateTrackingNumber',
     // text-suite.js
-    'isSingleByteAlnumOnly', 'toFullWidthKatakana', 'toFullWidth', 'toFullWidthHiragana', 'toHalfWidthKana', 'toHalfWidth', 'assertEmailAddress',
+    'isSingleByteAlnumOnly',
+    'toFullWidthKatakana',
+    'toFullWidth',
+    'toFullWidthHiragana',
+    'toHalfWidthKana',
+    'toHalfWidth',
+    'assertEmailAddress',
     // vc-check.js
-    'validateZoomMeetingId', 'validateZoomPasscode', 'validateZoomUrl',
+    'validateZoomMeetingId',
+    'validateZoomPasscode',
+    'validateZoomUrl',
     // zip-code-address-utils.js
-    'checkZipCodeExists', 'formatZipCode', 'getAddressByZipCode', 'getCityByZipCode', 'getPrefectureByZipCode', 'kintoneZipSetSpaceFieldButton', 'kintoneZipSpaceFieldText', 'normalizeZipCode',
+    'checkZipCodeExists',
+    'formatZipCode',
+    'getAddressByZipCode',
+    'getCityByZipCode',
+    'getPrefectureByZipCode',
+    'kintoneZipSetSpaceFieldButton',
+    'kintoneZipSpaceFieldText',
+    'normalizeZipCode',
     // zipcode_processing.js
     'getZipcodeAddress',
     // character_handling.js
-    'convert_to_hiragana', 'convert_to_double_byte_characters', 'convert_to_email_address', 'check_single_byte_numbers',
+    'convert_to_hiragana',
+    'convert_to_double_byte_characters',
+    'convert_to_email_address',
+    'check_single_byte_numbers',
     // financial_institution_processing.js
-    'convertAccountHolderKana', 'getByteLength', 'sliceByByteLength', 'convertJapanPostAccount', 'isValidTransferDate',
+    'convertAccountHolderKana',
+    'getByteLength',
+    'sliceByByteLength',
+    'convertJapanPostAccount',
+    'isValidTransferDate',
     // jquery.autoKana.js
-    'start', 'stop', 'toggle'
+    'start',
+    'stop',
+    'toggle',
   ];
 
   names.forEach(function (name) {
@@ -51,7 +87,7 @@
           globalObj[name] = eval(name);
         }
       }
-    } catch (e) {
+    } catch {
       // 安全のため何もしない
     }
   });
