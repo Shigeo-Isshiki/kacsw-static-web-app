@@ -226,6 +226,20 @@ const _BT_TURBIDITY_KANA_MAP = new Map(Object.entries(_BT_CONVERT_CHARACTER_LIST
 // 内部ユーティリティ
 const _bt_toStr = (v) => (v == null ? '' : String(v));
 
+// 安全なログ貯め: kintone 等で console が捕まらない場合に備えて
+const _bt_safeLog = (msg) => {
+  try {
+    if (typeof window !== 'undefined') {
+      window.KACSW = window.KACSW || {};
+      window.KACSW._bt_debugLogs = window.KACSW._bt_debugLogs || [];
+      window.KACSW._bt_debugLogs.push(String(msg));
+    }
+  } catch (e) {}
+  try {
+    if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug(msg);
+  } catch (e) {}
+};
+
 /**
  * 文字列が文字列型であることを確認する関数
  * @param {*} str 確認する文字列
@@ -244,18 +258,67 @@ const _bt_checkBoolean = (val) => {
   return typeof val === 'boolean';
 };
 
+// callback 呼び出しの互換ヘルパ
+// - cb に宣言引数が 2 個以上ある場合は (err, res) シグネチャで呼ぶ
+// - そうでない場合は zip-code utils と同様に single-arg result を渡す
+const _bt_invokeCallback = (cb, err, res) => {
+  try {
+    if (typeof cb !== 'function') return;
+    if ((cb && typeof cb.length === 'number' && cb.length >= 2) || false) {
+      // Node 風
+      cb(err || null, res || null);
+    } else {
+      // single-arg スタイル（成功時はオブジェクト、失敗時は { error: '...' }）
+      if (err) {
+        // err は { success:false, error: '...' } 形式で来る想定
+        const out =
+          err && err.error
+            ? { error: err.error }
+            : { error: err && err.message ? err.message : String(err) };
+        cb(out);
+      } else if (res) {
+        // res は { success:true, bank } 形式のことが多い -> zip-style の期待に合わせて bank オブジェクトを返す
+        if (res && res.bank) cb(res.bank);
+        else cb(res);
+      } else {
+        cb(null);
+      }
+    }
+  } catch (e) {
+    try {
+      _bt_safeLog(
+        '[KACSW.bankTransfer] _bt_invokeCallback error: ' + (e && e.message ? e.message : e)
+      );
+    } catch (e2) {}
+  }
+};
+
 /**
  * イテラブルな文字列集合から正規表現パターンを構築する関数
  * @param {Iterable<string>} keys イテラブルな文字列集合
  * @returns {RegExp} 正規表現のパターン
  */
 const _bt_buildPattern = (keys) => {
-  if (!keys) throw new Error('keys is required');
-  const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  if (!(keys && typeof keys[Symbol.iterator] === 'function'))
-    throw new Error('keys must be an Iterable');
-  const escapedKeys = [...keys].map(escapeRegExp);
-  return new RegExp(escapedKeys.join('|'), 'g');
+  try {
+    if (!keys) {
+      _bt_safeLog('[KACSW.bankTransfer] _bt_buildPattern: keys is required');
+      return /(?:)/g;
+    }
+    const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!(keys && typeof keys[Symbol.iterator] === 'function')) {
+      _bt_safeLog('[KACSW.bankTransfer] _bt_buildPattern: keys must be an Iterable');
+      return /(?:)/g;
+    }
+    const escapedKeys = [...keys].map(escapeRegExp);
+    return new RegExp(escapedKeys.join('|'), 'g');
+  } catch (e) {
+    try {
+      _bt_safeLog(
+        '[KACSW.bankTransfer] _bt_buildPattern error: ' + (e && e.message ? e.message : e)
+      );
+    } catch (e2) {}
+    return /(?:)/g;
+  }
 };
 
 /**
@@ -266,35 +329,59 @@ const _bt_buildPattern = (keys) => {
  * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
  */
 const _bt_toFullWidthKatakana = (str = '', throwOnError = true) => {
-  if (!_bt_checkString(str)) throw new Error('変換対象は文字列である必要があります');
-  if (!_bt_checkBoolean(throwOnError))
-    throw new Error('throwOnErrorはboolean型である必要があります');
-  if (!str) throw new Error('変換対象の文字列が空です');
-  const fullWidthKanaPattern = _bt_buildPattern(_BT_FULL_WIDTH_KANA_MAP.keys());
-  const turbidityKanaPattern = _bt_buildPattern(_BT_TURBIDITY_KANA_MAP.keys());
-  let errorChar = null;
-  // ひらがな→全角カタカナ
-  let work = str.replace(/[\u3041-\u3096]/g, (char) =>
-    String.fromCodePoint(char.charCodeAt(0) + 0x60)
-  );
-  // 半角カタカナ→全角カタカナ
-  work = work.replace(fullWidthKanaPattern, (char) => _BT_FULL_WIDTH_KANA_MAP.get(char) ?? char);
-  // 合成濁点・半濁点（カ゛→ガ等）を変換
-  work = work.replace(turbidityKanaPattern, (pair) => _BT_TURBIDITY_KANA_MAP.get(pair) ?? pair);
-  // 変換後に全角カタカナ以外が含まれていればエラー（ただし変換テーブルの値は許容）
-  const allowedValues = Object.values(_BT_CONVERT_CHARACTER_LIST.fullWidthKana);
-  for (const char of work) {
-    const code = char.charCodeAt(0);
-    // allowedValuesに含まれるか、全角カタカナ範囲なら許容
-    if (!allowedValues.includes(char) && !(code >= 0x30a1 && code <= 0x30fa)) {
-      if (throwOnError) {
-        errorChar = char;
-        break;
+  try {
+    if (!_bt_checkString(str)) {
+      _bt_safeLog('[KACSW.bankTransfer] _bt_toFullWidthKatakana: input is not a string');
+      return str;
+    }
+    if (!_bt_checkBoolean(throwOnError)) {
+      _bt_safeLog('[KACSW.bankTransfer] _bt_toFullWidthKatakana: throwOnError is not boolean');
+      return str;
+    }
+    if (!str) {
+      _bt_safeLog('[KACSW.bankTransfer] _bt_toFullWidthKatakana: input string is empty');
+      return str;
+    }
+    const fullWidthKanaPattern = _bt_buildPattern(_BT_FULL_WIDTH_KANA_MAP.keys());
+    const turbidityKanaPattern = _bt_buildPattern(_BT_TURBIDITY_KANA_MAP.keys());
+    let errorChar = null;
+    // ひらがな→全角カタカナ
+    let work = str.replace(/[\u3041-\u3096]/g, (char) =>
+      String.fromCodePoint(char.charCodeAt(0) + 0x60)
+    );
+    // 半角カタカナ→全角カタカナ
+    work = work.replace(fullWidthKanaPattern, (char) => _BT_FULL_WIDTH_KANA_MAP.get(char) ?? char);
+    // 合成濁点・半濁点（カ゛→ガ等）を変換
+    work = work.replace(turbidityKanaPattern, (pair) => _BT_TURBIDITY_KANA_MAP.get(pair) ?? pair);
+    // 変換後に全角カタカナ以外が含まれていればエラー（ただし変換テーブルの値は許容）
+    const allowedValues = Object.values(_BT_CONVERT_CHARACTER_LIST.fullWidthKana);
+    for (const char of work) {
+      const code = char.charCodeAt(0);
+      // allowedValuesに含まれるか、全角カタカナ範囲なら許容
+      if (!allowedValues.includes(char) && !(code >= 0x30a1 && code <= 0x30fa)) {
+        if (throwOnError) {
+          errorChar = char;
+          break;
+        }
       }
     }
+    if (errorChar) {
+      _bt_safeLog('[KACSW.bankTransfer] _bt_toFullWidthKatakana: invalid char ' + errorChar);
+      return str;
+    }
+    return work;
+  } catch (e) {
+    // DevTools の "pause on exceptions" による停止を避けるため、同期的な throw は
+    // キャッチして入力文字列を返す。（副作用が心配な場合は個別に見直し可）
+    try {
+      if (typeof console !== 'undefined' && typeof console.warn === 'function')
+        console.warn(
+          '[KACSW.bankTransfer] _bt_toFullWidthKatakana fallback on error',
+          e && e.message ? e.message : e
+        );
+    } catch (e2) {}
+    return str;
   }
-  if (errorChar) throw new Error(`全角カタカナ以外の文字が含まれています: ${errorChar}`);
-  return work;
 };
 
 /**
@@ -305,34 +392,63 @@ const _bt_toFullWidthKatakana = (str = '', throwOnError = true) => {
  * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
  */
 const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
-  if (!_bt_checkString(str)) throw new Error('変換対象は文字列である必要があります');
-  if (!_bt_checkBoolean(throwOnError))
-    throw new Error('throwOnErrorはboolean型である必要があります');
-  if (!str) throw new Error('変換対象の文字列が空です');
-  // ひらがな→カタカナ変換を追加
-  const katakanaStr = _bt_toFullWidthKatakana(str, false);
-  const halfWidthKanaPattern = _bt_buildPattern(_BT_HALF_WIDTH_KANA_MAP.keys());
-  let errorChar = null;
-  let result = katakanaStr.replace(
-    halfWidthKanaPattern,
-    (char) => _BT_HALF_WIDTH_KANA_MAP.get(char) ?? char
-  );
-  // 長音記号や類似文字をすべて半角ハイフンに正規化
-  // 対象: 全角カタカナ長音 'ー' (U+30FC), 全角ハイフンマイナス '－' (U+FF0D),
-  // 半角長音 'ｰ' と各種ダッシュ類
-  result = result.replace(/[ー－ｰ‐−–—―─━]/g, '-');
-  // 変換後に半角カタカナ以外が含まれていればエラー（ただし変換テーブルの値は許容）
-  const allowedValues = Object.values(_BT_CONVERT_CHARACTER_LIST.halfWidthKana).concat('-');
-  for (const char of result) {
-    if (!allowedValues.includes(char)) {
-      if (throwOnError) {
-        errorChar = char;
-        break;
+  try {
+    if (!_bt_checkString(str)) {
+      _bt_safeLog('[KACSW.bankTransfer] _bt_toHalfWidthKana: input is not a string');
+      return str;
+    }
+    if (!_bt_checkBoolean(throwOnError)) {
+      _bt_safeLog('[KACSW.bankTransfer] _bt_toHalfWidthKana: throwOnError is not boolean');
+      return str;
+    }
+    if (!str) {
+      _bt_safeLog('[KACSW.bankTransfer] _bt_toHalfWidthKana: input string is empty');
+      return str;
+    }
+    // ひらがな→カタカナ変換を追加
+    const katakanaStr = _bt_toFullWidthKatakana(str, false);
+    // 全角英数字（例: ＵＦＪ）を半角に変換して英字は大文字化する。
+    // これにより、例えば 'ミツビシＵＦＪギンコウ' の 'ＵＦＪ' が 'UFJ' になる。
+    let asciiNormalized = katakanaStr.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) =>
+      String.fromCharCode(c.charCodeAt(0) - 0xfee0)
+    );
+    // 英小文字が混じる場合は大文字化（銀行名の表記揺れ防止）
+    asciiNormalized = asciiNormalized.replace(/[a-z]/g, (c) => c.toUpperCase());
+    const halfWidthKanaPattern = _bt_buildPattern(_BT_HALF_WIDTH_KANA_MAP.keys());
+    let errorChar = null;
+    let result = asciiNormalized.replace(
+      halfWidthKanaPattern,
+      (char) => _BT_HALF_WIDTH_KANA_MAP.get(char) ?? char
+    );
+    // 長音記号や類似文字をすべて半角ハイフンに正規化
+    // 対象: 全角カタカナ長音 'ー' (U+30FC), 全角ハイフンマイナス '－' (U+FF0D),
+    // 半角長音 'ｰ' と各種ダッシュ類
+    result = result.replace(/[ー－ｰ‐−–—―─━]/g, '-');
+    // 変換後に半角カタカナ以外が含まれていればエラー（ただし変換テーブルの値は許容）
+    const allowedValues = Object.values(_BT_CONVERT_CHARACTER_LIST.halfWidthKana).concat('-');
+    for (const char of result) {
+      if (!allowedValues.includes(char)) {
+        if (throwOnError) {
+          errorChar = char;
+          break;
+        }
       }
     }
+    if (errorChar) {
+      _bt_safeLog('[KACSW.bankTransfer] _bt_toHalfWidthKana: invalid char ' + errorChar);
+      return str;
+    }
+    return result;
+  } catch (e) {
+    try {
+      if (typeof console !== 'undefined' && typeof console.warn === 'function')
+        console.warn(
+          '[KACSW.bankTransfer] _bt_toHalfWidthKana fallback on error',
+          e && e.message ? e.message : e
+        );
+    } catch (e2) {}
+    return str;
   }
-  if (errorChar) throw new Error(`半角カタカナ以外の文字が含まれています: ${errorChar}`);
-  return result;
 };
 
 // -------------------------
@@ -342,67 +458,205 @@ const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
 // -------------------------
 // internal: _bt_loadBankByCode - not exposed to window.KACSW
 const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
-  if (typeof options === 'function') {
-    callback = options;
-    options = {};
-  }
-  const {
-    apiBaseUrl = 'https://bank.teraren.com',
-    apiKey,
-    timeout = 5000,
-    pathTemplate = '/banks/{code}.json',
-  } = options;
-  const code = _bt_toStr(bankCode).padStart(4, '0');
-  const base = apiBaseUrl.replace(/\/$/, '');
-  const path = pathTemplate.replace('{code}', code);
-  const url = base + path;
-  const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
-  const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  let timer = null;
-  if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
-
-  fetch(url, { headers, signal: abortController ? abortController.signal : undefined })
-    .then((res) => {
-      if (!res.ok) {
-        // HTTP ステータスが OK でない場合は日本語でわかりやすいメッセージを投げる
-        throw new Error(`銀行情報の取得に失敗しました（HTTPステータス: ${res.status}）`);
-      }
-      return res.json();
-    })
-    .then((j) => {
-      const bankObj = {
-        code: _bt_toStr(j.code).padStart(4, '0'),
-        name: _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name),
-        kana: _bt_toStr(j.normalize && j.normalize.kana ? j.normalize.kana : j.kana),
-        url: _bt_toStr(j.url || url),
-        branches_url: _bt_toStr(j.branches_url || base + `/banks/${code}/branches.json`),
-      };
-      const idx = _bt_BANKS.findIndex((b) => b.code === bankObj.code);
-      if (idx >= 0) _bt_BANKS[idx] = bankObj;
-      else _bt_BANKS.push(bankObj);
-      if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
-    })
-    .catch((err) => {
-      // AbortError（タイムアウト等）を判別して分かりやすい日本語メッセージに変換
-      let message = null;
+  try {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
+    }
+    const {
+      apiBaseUrl = 'https://bank.teraren.com',
+      apiKey,
+      timeout = 5000,
+      pathTemplate = '/banks/{code}.json',
+    } = options;
+    const code = _bt_toStr(bankCode).padStart(4, '0');
+    const base = apiBaseUrl.replace(/\/$/, '');
+    const path = pathTemplate.replace('{code}', code);
+    const url = base + path;
+    const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+    _bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: enter');
+    const abortController = (function () {
       try {
-        if (err && err.name === 'AbortError') {
-          message = '取得がタイムアウトしました（指定時間内に応答がありません）';
-        } else if (err && err.message) {
-          // すでに日本語のメッセージを投げている場合はそのまま使う
-          message = err.message;
-        } else {
-          message = '銀行情報の取得中に不明なエラーが発生しました';
-        }
-      } catch (e2) {
-        message = '銀行情報の取得中にエラーが発生しました';
+        if (typeof console !== 'undefined' && typeof console.debug === 'function')
+          console.debug(
+            '[KACSW.bankTransfer] _bt_loadBankByCode: attempting to create AbortController'
+          );
+        return typeof AbortController !== 'undefined' ? new AbortController() : null;
+      } catch (e) {
+        try {
+          if (typeof console !== 'undefined' && typeof console.warn === 'function')
+            console.warn(
+              '[KACSW.bankTransfer] _bt_loadBankByCode: AbortController ctor threw',
+              e && e.message ? e.message : e
+            );
+        } catch (e2) {}
+        return null;
       }
-      const e = { success: false, error: message };
-      if (typeof callback === 'function') callback(e, null);
-    })
-    .finally(() => {
-      if (timer) clearTimeout(timer);
-    });
+    })();
+    let timer = null;
+    try {
+      if (abortController && typeof abortController.abort === 'function') {
+        if (typeof console !== 'undefined' && typeof console.debug === 'function')
+          console.debug('[KACSW.bankTransfer] _bt_loadBankByCode: scheduling abort timer', timeout);
+        _bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: scheduling abort timer ' + timeout);
+        timer = setTimeout(() => {
+          try {
+            if (typeof console !== 'undefined' && typeof console.warn === 'function')
+              console.warn('[KACSW.bankTransfer] _bt_loadBankByCode: abort timer fired');
+            _bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: abort timer fired');
+            abortController.abort();
+          } catch (e) {
+            try {
+              if (typeof console !== 'undefined' && typeof console.warn === 'function')
+                console.warn(
+                  '[KACSW.bankTransfer] _bt_loadBankByCode: abort failed',
+                  e && e.message ? e.message : e
+                );
+            } catch (e2) {}
+          }
+        }, timeout);
+      }
+    } catch (e) {
+      timer = null;
+    }
+
+    // fetch に signal を渡すと一部環境で同期的に例外が出ることがあるため、
+    // まず signal を渡して試行し、同期例外が出たら signal を除いて再試行する
+    const _bt_performFetch = (fetchPromise) => {
+      try {
+        return fetchPromise
+          .then((res) => {
+            if (!res.ok) {
+              return Promise.reject(
+                new Error(`銀行情報の取得に失敗しました（HTTPステータス: ${res.status}）`)
+              );
+            }
+            return res.json();
+          })
+          .then((j) => {
+            let bankObj = {
+              code: _bt_toStr(j.code).padStart(4, '0'),
+              name: _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name),
+              kana: _bt_toStr(j.normalize && j.normalize.kana ? j.normalize.kana : j.kana),
+              url: _bt_toStr(j.url || url),
+              branches_url: _bt_toStr(j.branches_url || base + `/banks/${code}/branches.json`),
+            };
+            // API からの kana を可能な限り半角カナ化＋全角英数字は半角化して大文字化
+            try {
+              bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
+            } catch (e) {}
+            let idx = _bt_BANKS.findIndex((b) => {
+              return b.code === bankObj.code;
+            });
+            if (idx >= 0) _bt_BANKS[idx] = bankObj;
+            else _bt_BANKS.push(bankObj);
+            try {
+              _bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: fetch success ' + bankObj.code);
+            } catch (e) {}
+            if (typeof callback === 'function') callback(bankObj);
+          })
+          .catch((err) => {
+            let message = null;
+            try {
+              if (err && err.name === 'AbortError') {
+                message = '取得がタイムアウトしました（指定時間内に応答がありません）';
+              } else if (err && err.message) {
+                // ブラウザの fetch が失敗すると 'Failed to fetch' や TypeError になることがある
+                var m = String(err.message || err);
+                if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
+                  message =
+                    '銀行情報の取得に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
+                } else {
+                  message = m;
+                }
+              } else {
+                message = '銀行情報の取得中に不明なエラーが発生しました';
+              }
+            } catch (e2) {
+              message = '銀行情報の取得中にエラーが発生しました';
+            }
+            let e = { error: message };
+            if (typeof callback === 'function') callback(e);
+          })
+          .finally(() => {
+            if (timer) clearTimeout(timer);
+          });
+      } catch (syncErr) {
+        // 同期例外が発生した場合はコールバックで返す
+        let se = { error: syncErr && syncErr.message ? syncErr.message : String(syncErr) };
+        if (typeof callback === 'function') callback(se);
+      }
+    };
+
+    try {
+      // signal を渡して試行
+      try {
+        if (typeof console !== 'undefined' && typeof console.debug === 'function')
+          console.debug(
+            '[KACSW.bankTransfer] _bt_loadBankByCode: attempting fetch with signal',
+            url
+          );
+      } catch (e) {}
+      _bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: attempting fetch with signal ' + url);
+      _bt_performFetch(
+        fetch(url, { headers, signal: abortController ? abortController.signal : undefined })
+      );
+    } catch (e) {
+      // 一部環境では fetch に signal を渡すと同期例外が発生することがあるため、
+      // signal を除いて再試行する
+      try {
+        try {
+          if (typeof console !== 'undefined' && typeof console.warn === 'function')
+            console.warn(
+              '[KACSW.bankTransfer] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal',
+              e && e.message ? e.message : e
+            );
+        } catch (e3) {}
+        _bt_safeLog(
+          '[KACSW.bankTransfer] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal ' +
+            (e && e.message ? e.message : e)
+        );
+        if (typeof console !== 'undefined' && typeof console.debug === 'function')
+          console.debug(
+            '[KACSW.bankTransfer] _bt_loadBankByCode: attempting fetch without signal',
+            url
+          );
+        _bt_safeLog(
+          '[KACSW.bankTransfer] _bt_loadBankByCode: attempting fetch without signal ' + url
+        );
+        _bt_performFetch(fetch(url, { headers }));
+      } catch (e2) {
+        // 最悪同期的に fetch が失敗する場合はエラーハンドリングへ送る
+        try {
+          if (typeof console !== 'undefined' && typeof console.error === 'function')
+            console.error(
+              '[KACSW.bankTransfer] _bt_loadBankByCode: fetch without signal also threw',
+              e2 && e2.message ? e2.message : e2
+            );
+        } catch (e4) {}
+        _bt_safeLog(
+          '[KACSW.bankTransfer] _bt_loadBankByCode: fetch without signal also threw ' +
+            (e2 && e2.message ? e2.message : e2)
+        );
+        const err = { success: false, error: e2 && e2.message ? e2.message : String(e2) };
+        if (typeof callback === 'function') callback(err, null);
+        if (timer) clearTimeout(timer);
+      }
+    }
+  } catch (topErr) {
+    try {
+      if (typeof console !== 'undefined' && typeof console.error === 'function')
+        console.error(
+          '[KACSW.bankTransfer] _bt_loadBankByCode: top-level sync error',
+          topErr && topErr.message ? topErr.message : topErr
+        );
+    } catch (e) {}
+    if (typeof callback === 'function')
+      callback(
+        { success: false, error: topErr && topErr.message ? topErr.message : String(topErr) },
+        null
+      );
+  }
 };
 
 // -------------------------
@@ -433,11 +687,13 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
   fetch(url, { headers, signal: abortController ? abortController.signal : undefined })
     .then((res) => {
       if (!res.ok)
-        throw new Error(`銀行名検索の実行に失敗しました（HTTPステータス: ${res.status}）`);
+        return Promise.reject(
+          new Error(`銀行名検索の実行に失敗しました（HTTPステータス: ${res.status}）`)
+        );
       return res.json();
     })
     .then((arr) => {
-      if (!Array.isArray(arr)) throw new Error('検索結果の形式が不正です');
+      if (!Array.isArray(arr)) return Promise.reject(new Error('検索結果の形式が不正です'));
       if (arr.length === 0) {
         if (typeof callback === 'function')
           callback({ success: false, error: '該当する銀行が見つかりませんでした' }, null);
@@ -455,9 +711,15 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
             j.branches_url || base + `/banks/${_bt_toStr(j.code).padStart(4, '0')}/branches.json`
           ),
         };
+        try {
+          bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
+        } catch (e) {}
         const idx = _bt_BANKS.findIndex((b) => b.code === bankObj.code);
         if (idx >= 0) _bt_BANKS[idx] = bankObj;
         else _bt_BANKS.push(bankObj);
+        try {
+          _bt_safeLog('[KACSW.bankTransfer] _bt_searchBankByName: success ' + bankObj.code);
+        } catch (e) {}
         if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
         return;
       }
@@ -478,6 +740,9 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
             j.branches_url || base + `/banks/${_bt_toStr(j.code).padStart(4, '0')}/branches.json`
           ),
         };
+        try {
+          bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
+        } catch (e) {}
         const idx = _bt_BANKS.findIndex((b) => b.code === bankObj.code);
         if (idx >= 0) _bt_BANKS[idx] = bankObj;
         else _bt_BANKS.push(bankObj);
@@ -507,8 +772,15 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
       try {
         if (err && err.name === 'AbortError')
           message = '検索がタイムアウトしました（指定時間内に応答がありません）';
-        else if (err && err.message) message = err.message;
-        else message = '銀行名検索中に不明なエラーが発生しました';
+        else if (err && err.message) {
+          const m = String(err.message || err);
+          if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
+            message =
+              '銀行名検索に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
+          } else {
+            message = m;
+          }
+        } else message = '銀行名検索中に不明なエラーが発生しました';
       } catch (e2) {
         message = '銀行名検索中にエラーが発生しました';
       }
@@ -525,34 +797,70 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 // 入力が数字のみ（<=4桁）ならコード検索して単一オブジェクトまたは null を返す
 // そうでなければ名前で部分一致検索して配列を返す
 // -------------------------
-// getBank: (input, [callback])
-// - if input looks like a bank code and a callback is provided, call internal _bt_loadBankByCode
-//   and return via callback the simplified object { code, name, kana }
-// - otherwise behave as before (synchronous): return object|null for code lookup or array for name search
+// getBank: kintone 向け single-arg コールバック専用版
+// 使い方: getBank('0138', (result) => { 成功: {code,name,kana} / 失敗: { error: '...' } })
 const getBank = (input, callback) => {
   const s = _bt_toStr(input).trim();
-  // コールバック必須に変更: 第二引数が関数でない場合はエラーを返す
   if (typeof callback !== 'function') {
+    // 既存と同じくコールバック必須で早期返却（エラーオブジェクトを返す）
     return { success: false, error: '第二引数はコールバック関数である必要があります' };
   }
-  // 空検索語はエラーをコールバックで返す
   if (!s) {
-    return callback({ success: false, error: '検索語が空です' }, null);
+    // single-arg スタイルでエラーを返す
+    _bt_invokeCallback(callback, { error: '検索語が空です' }, null);
+    return;
   }
 
   const digitsOnly = /^[0-9]+$/.test(s);
 
   if (digitsOnly && s.length <= 4) {
     const key = s.padStart(4, '0');
-    _bt_loadBankByCode(key, {}, (err, res) => {
-      if (err) return callback(err, null);
-      if (!res) return callback({ success: false, error: '銀行情報の取得結果が空です' }, null);
-      if (res && res.success === false) return callback(res, null);
-      if (!res.bank)
-        return callback(
-          { success: false, error: '銀行データがレスポンスに含まれていません' },
+    _bt_loadBankByCode(key, {}, function (/* flexible args from loader */) {
+      // 内部ローダーが single-arg を返す場合
+      if (arguments.length === 1) {
+        const out = arguments[0];
+        if (!out) {
+          _bt_invokeCallback(callback, { error: '銀行情報の取得結果が空です' }, null);
+          return;
+        }
+        if (out && out.error) {
+          _bt_invokeCallback(callback, out, null);
+          return;
+        }
+        // out が { success:true, bank } 形式の可能性にも対応
+        const b = out && out.bank ? out.bank : out;
+        let kanaOut = _bt_toStr(b.kana);
+        try {
+          kanaOut = _bt_toHalfWidthKana(kanaOut, false);
+        } catch (e) {
+          kanaOut = _bt_toStr(b.kana);
+        }
+        _bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut });
+        return;
+      }
+      // node-style (err, res) が来た場合の保険（可能なら使わない前提）
+      const err = arguments[0];
+      const res = arguments[1];
+      if (err) {
+        _bt_invokeCallback(
+          callback,
+          { error: err && err.error ? err.error : err && err.message ? err.message : String(err) },
           null
         );
+        return;
+      }
+      if (!res) {
+        _bt_invokeCallback(callback, { error: '銀行情報の取得結果が空です' }, null);
+        return;
+      }
+      if (res && res.success === false) {
+        _bt_invokeCallback(callback, { error: res.error || '取得エラー' }, null);
+        return;
+      }
+      if (!res.bank) {
+        _bt_invokeCallback(callback, { error: '銀行データがレスポンスに含まれていません' }, null);
+        return;
+      }
       const b = res.bank;
       let kanaOut = _bt_toStr(b.kana);
       try {
@@ -560,15 +868,48 @@ const getBank = (input, callback) => {
       } catch (e) {
         kanaOut = _bt_toStr(b.kana);
       }
-      return callback(null, { code: b.code, name: b.name, kana: kanaOut });
+      _bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut });
+      return;
     });
     return;
   }
 
-  // 名前検索は必ず非同期（外部API経由）で厳密ルールを適用する
-  _bt_searchBankByName(s, {}, (err, res) => {
-    if (err) return callback(err, null);
-    if (!res || res.success === false) return callback(res, null);
+  // 名前検索（非同期）
+  _bt_searchBankByName(s, {}, function (/* flexible args from search */) {
+    if (arguments.length === 1) {
+      const out = arguments[0];
+      if (!out) {
+        _bt_invokeCallback(callback, { error: '検索結果が空です' }, null);
+        return;
+      }
+      if (out && out.error) {
+        _bt_invokeCallback(callback, out, null);
+        return;
+      }
+      const b = out && out.bank ? out.bank : out;
+      let kanaOut2 = _bt_toStr(b.kana);
+      try {
+        kanaOut2 = _bt_toHalfWidthKana(kanaOut2, false);
+      } catch (e) {
+        kanaOut2 = _bt_toStr(b.kana);
+      }
+      _bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut2 });
+      return;
+    }
+    const err = arguments[0];
+    const res = arguments[1];
+    if (err) {
+      _bt_invokeCallback(
+        callback,
+        { error: err && err.error ? err.error : err && err.message ? err.message : String(err) },
+        null
+      );
+      return;
+    }
+    if (!res || res.success === false) {
+      _bt_invokeCallback(callback, { error: res && res.error ? res.error : '検索エラー' }, null);
+      return;
+    }
     const b = res.bank;
     let kanaOut2 = _bt_toStr(b.kana);
     try {
@@ -576,7 +917,8 @@ const getBank = (input, callback) => {
     } catch (e) {
       kanaOut2 = _bt_toStr(b.kana);
     }
-    return callback(null, { code: b.code, name: b.name, kana: kanaOut2 });
+    _bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut2 });
+    return;
   });
   return;
 };
@@ -676,17 +1018,23 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
 
   fetch(base + banksPath, { headers, signal: abortController ? abortController.signal : undefined })
     .then((banksRes) => {
-      if (!banksRes.ok) throw new Error(`banks fetch failed: ${banksRes.status}`);
+      if (!banksRes.ok) return Promise.reject(new Error(`banks fetch failed: ${banksRes.status}`));
       return banksRes.json();
     })
     .then((banksJson) => {
-      if (!Array.isArray(banksJson)) throw new Error('banks response not array');
+      if (!Array.isArray(banksJson)) return Promise.reject(new Error('banks response not array'));
       _bt_BANKS.length = 0;
       for (const b of banksJson) {
         _bt_BANKS.push({
           code: _bt_toStr(b.code).padStart(4, '0'),
           name: _bt_toStr(b.name),
-          kana: _bt_toStr(b.kana),
+          kana: (function () {
+            try {
+              return _bt_toHalfWidthKana(_bt_toStr(b.kana), false);
+            } catch (e) {
+              return _bt_toStr(b.kana);
+            }
+          })(),
         });
       }
       return fetch(base + branchesPath, {
@@ -701,7 +1049,8 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
         return;
       }
       return branchesRes.json().then((branchesJson) => {
-        if (!Array.isArray(branchesJson)) throw new Error('branches response not array');
+        if (!Array.isArray(branchesJson))
+          return Promise.reject(new Error('branches response not array'));
         // clear
         for (const k in _bt_BRANCHES) delete _bt_BRANCHES[k];
         for (const br of branchesJson) {
@@ -710,7 +1059,13 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
           _bt_BRANCHES[bk].push({
             branchCode: _bt_toStr(br.branchCode).padStart(3, '0'),
             name: _bt_toStr(br.name),
-            kana: _bt_toStr(br.kana),
+            kana: (function () {
+              try {
+                return _bt_toHalfWidthKana(_bt_toStr(br.kana), false);
+              } catch (e) {
+                return _bt_toStr(br.kana);
+              }
+            })(),
           });
         }
         const resObj = {
@@ -723,6 +1078,28 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
         };
         if (typeof callback === 'function') callback(null, resObj);
       });
+    })
+    .catch((err) => {
+      let message = null;
+      try {
+        if (err && err.name === 'AbortError') {
+          message = '取得がタイムアウトしました（指定時間内に応答がありません）';
+        } else if (err && err.message) {
+          const m = String(err.message || err);
+          if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
+            message =
+              '銀行データの取得に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
+          } else {
+            message = m;
+          }
+        } else {
+          message = '銀行データ取得中に不明なエラーが発生しました';
+        }
+      } catch (e2) {
+        message = '銀行データ取得中にエラーが発生しました';
+      }
+      const e = { success: false, error: message };
+      if (typeof callback === 'function') callback(e, null);
     })
     .catch((err) => {
       const e = { success: false, error: err && err.message ? err.message : String(err) };
