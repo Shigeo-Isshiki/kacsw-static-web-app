@@ -29,27 +29,26 @@ loading...
 
     <script>
       (function () {
-        var out = document.getElementById("out");
+        var out = document.getElementById('out');
         var names = [
-          "getNationalHolidayName",
-          "isSingleByteAlnumOnly",
-          "toFullWidthKatakana",
-          "toFullWidth",
-          "toHalfWidth",
-          "convert_to_hiragana",
-          "start",
+          'getNationalHolidayName',
+          'isSingleByteAlnumOnly',
+          'toFullWidthKatakana',
+          'toFullWidth',
+          'toHalfWidth',
+          'convert_to_hiragana',
+          'start',
         ];
         function show() {
-          out.textContent = "";
+          out.textContent = '';
           names.forEach(function (n) {
             var t = typeof window[n];
-            out.textContent += n + ": " + t + "\n";
+            out.textContent += n + ': ' + t + '\n';
           });
-          out.textContent +=
-            "\nwindow keys:\n" + Object.keys(window).slice(0, 200).join(", ");
+          out.textContent += '\nwindow keys:\n' + Object.keys(window).slice(0, 200).join(', ');
         }
-        if (document.readyState === "complete") show();
-        else window.addEventListener("load", show);
+        if (document.readyState === 'complete') show();
+        else window.addEventListener('load', show);
       })();
     </script>
   </body>
