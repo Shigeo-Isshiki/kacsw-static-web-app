@@ -227,12 +227,13 @@ const getBank = (input, callback) => {
   if (arguments.length >= 2 && typeof callback !== 'function') {
     return { success: false, error: '第二引数はコールバック関数である必要があります' };
   }
+  const _isCallback = typeof callback === 'function';
   if (!s) return null;
   const digitsOnly = /^[0-9]+$/.test(s);
   if (digitsOnly && s.length <= 4) {
     const key = s.padStart(4, '0');
     // If a callback is provided, use the internal async loader to refresh/obtain bank info
-    if (typeof callback === 'function') {
+    if (_isCallback) {
       // call internal loader; it returns via callback(err, { success, bank })
       _bt_loadBankByCode(key, {}, (err, res) => {
         // err があればそのまま中継
@@ -261,7 +262,7 @@ const getBank = (input, callback) => {
       _bt_toStr(b.name).toLowerCase().includes(q) || _bt_toStr(b.kana).toLowerCase().includes(q)
   );
   // callback が渡されている場合は非同期風にコールバックで返す（コード検索と同様の扱い）
-  if (typeof callback === 'function') {
+  if (_isCallback) {
     // 名前検索のコールバック呼び出しは外部 API を使うよう変更
     // ここではローカルキャッシュを使わず、Web API 経由で厳密ルールを適用する
     _bt_searchBankByName(s, {}, (err, res) => {
