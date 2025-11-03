@@ -28,11 +28,11 @@
       {
         katakana: false,
       },
-      passedOptions
+      passedOptions,
     );
 
-    var kana_extraction_pattern = new RegExp('[^ 　ぁあ-んー]', 'g');
-    var kana_compacting_pattern = new RegExp('[ぁぃぅぇぉっゃゅょ]', 'g');
+    var kana_extraction_pattern = new RegExp("[^ 　ぁあ-んー]", "g");
+    var kana_compacting_pattern = new RegExp("[ぁぃぅぇぉっゃゅょ]", "g");
     var elName,
       elKana,
       active = false,
@@ -79,12 +79,15 @@
     function _checkConvert(new_values) {
       if (!flagConvert) {
         if (Math.abs(values.length - new_values.length) > 1) {
-          var tmp_values = new_values.join('').replace(kana_compacting_pattern, '').split('');
+          var tmp_values = new_values
+            .join("")
+            .replace(kana_compacting_pattern, "")
+            .split("");
           if (Math.abs(values.length - tmp_values.length) > 1) {
             _stateConvert();
           }
         } else {
-          if (values.length == input.length && values.join('') != input) {
+          if (values.length == input.length && values.join("") != input) {
             if (input.match(kana_extraction_pattern)) {
               _stateConvert();
             }
@@ -96,7 +99,7 @@
     function _checkValue() {
       var new_input, new_values;
       new_input = elName.val();
-      if (new_input == '' && elKana.val() != '') {
+      if (new_input == "" && elKana.val() != "") {
         _stateClear();
         _setKana();
       } else {
@@ -106,7 +109,9 @@
         } else {
           input = new_input;
           if (!flagConvert) {
-            new_values = new_input.replace(kana_extraction_pattern, '').split('');
+            new_values = new_input
+              .replace(kana_extraction_pattern, "")
+              .split("");
             _checkConvert(new_values);
             _setKana(new_values);
           }
@@ -131,21 +136,23 @@
       }
     }
     function _isHiragana(chara) {
-      return (chara >= 12353 && chara <= 12435) || chara == 12445 || chara == 12446;
+      return (
+        (chara >= 12353 && chara <= 12435) || chara == 12445 || chara == 12446
+      );
     }
     function _removeString(new_input) {
       if (new_input.indexOf(ignoreString) !== -1) {
-        return new_input.replace(ignoreString, '');
+        return new_input.replace(ignoreString, "");
       } else {
         var i, ignoreArray, inputArray;
-        ignoreArray = ignoreString.split('');
-        inputArray = new_input.split('');
+        ignoreArray = ignoreString.split("");
+        inputArray = new_input.split("");
         for (i = 0; i < ignoreArray.length; i++) {
           if (ignoreArray[i] == inputArray[i]) {
-            inputArray[i] = '';
+            inputArray[i] = "";
           }
         }
-        return inputArray.join('');
+        return inputArray.join("");
       }
     }
     function _setInterval() {
@@ -157,16 +164,16 @@
           values = new_values;
         }
         if (active) {
-          var _val = _toKatakana(baseKana + values.join(''));
+          var _val = _toKatakana(baseKana + values.join(""));
           elKana.val(_val).change();
         }
       }
     }
     function _stateClear() {
-      baseKana = '';
+      baseKana = "";
       flagConvert = false;
-      ignoreString = '';
-      input = '';
+      ignoreString = "";
+      input = "";
       values = [];
     }
     function _stateInput() {
@@ -175,7 +182,7 @@
       ignoreString = elName.val();
     }
     function _stateConvert() {
-      baseKana = baseKana + values.join('');
+      baseKana = baseKana + values.join("");
       flagConvert = true;
       values = [];
     }
