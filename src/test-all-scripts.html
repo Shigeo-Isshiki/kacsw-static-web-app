@@ -37,36 +37,32 @@
 
     <script>
       (function () {
-        var out = document.getElementById("out");
+        var out = document.getElementById('out');
         function parseNamesFromText(txt) {
           var m = txt.match(/var\s+names\s*=\s*\[([\s\S]*?)\];/m);
           if (!m) return null;
-          var body = m[1]
-            .replace(/\/\*[^]*?\*\//g, "")
-            .replace(/\/\/.*$/gm, "");
-          var normalized =
-            "[" + body.replace(/'/g, '"').replace(/,\s*\]/g, "]") + "]";
+          var body = m[1].replace(/\/\*[^]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+          var normalized = '[' + body.replace(/'/g, '"').replace(/,\s*\]/g, ']') + ']';
           try {
             return JSON.parse(normalized);
           } catch (e) {
             try {
-              return eval("([" + body + "])");
+              return eval('([' + body + '])');
             } catch (e2) {
               return null;
             }
           }
         }
         function show(names) {
-          out.textContent = "";
+          out.textContent = '';
           (names || []).forEach(function (n) {
-            out.textContent += n + ": " + typeof window[n] + "\n";
+            out.textContent += n + ': ' + typeof window[n] + '\n';
           });
-          out.textContent +=
-            "\nwindow keys:\n" + Object.keys(window).slice(0, 300).join(", ");
+          out.textContent += '\nwindow keys:\n' + Object.keys(window).slice(0, 300).join(', ');
         }
         function runShow() {
           try {
-            fetch("all-window-exports.js")
+            fetch('all-window-exports.js')
               .then(function (r) {
                 if (!r.ok) return show();
                 return r.text().then(function (txt) {
@@ -82,8 +78,8 @@
             show();
           }
         }
-        if (document.readyState === "complete") runShow();
-        else window.addEventListener("load", runShow);
+        if (document.readyState === 'complete') runShow();
+        else window.addEventListener('load', runShow);
       })();
     </script>
   </body>
