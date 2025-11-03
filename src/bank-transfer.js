@@ -116,9 +116,18 @@ const getBank = (input, callback) => {
     if (typeof callback === 'function') {
       // call internal loader; it returns via callback(err, { success, bank })
       _bt_loadBankByCode(key, {}, (err, res) => {
+        // err があればそのまま中継
         if (err) return callback(err, null);
-        if (!res || !res.success || !res.bank)
-          return callback({ success: false, error: 'no_bank' }, null);
+        // 結果が無い場合は汎用メッセージ
+        if (!res) return callback({ success: false, error: '銀行情報の取得結果が空です' }, null);
+        // _bt_loadBankByCode が失敗を示す場合はそのオブジェクトをそのまま中継
+        if (res && res.success === false) return callback(res, null);
+        // 成功だが bank がない場合は不整合エラーを返す
+        if (!res.bank)
+          return callback(
+            { success: false, error: '銀行データがレスポンスに含まれていません' },
+            null
+          );
         const b = res.bank;
         return callback(null, { code: b.code, name: b.name, kana: b.kana });
       });
