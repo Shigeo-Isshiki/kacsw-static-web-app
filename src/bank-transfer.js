@@ -137,10 +137,15 @@ const getBank = (input, callback) => {
     return _bt_BANKS.find((b) => b.code === key) || null;
   }
   const q = s.toLowerCase();
-  return _bt_BANKS.filter(
+  const results = _bt_BANKS.filter(
     (b) =>
       _bt_toStr(b.name).toLowerCase().includes(q) || _bt_toStr(b.kana).toLowerCase().includes(q)
   );
+  // callback が渡されている場合は非同期風にコールバックで返す（コード検索と同様の扱い）
+  if (typeof callback === 'function') {
+    return callback(null, results);
+  }
+  return results;
 };
 
 // -------------------------
