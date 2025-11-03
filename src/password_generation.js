@@ -6,7 +6,7 @@
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_pg_)で始める
 /* exported getPassword */
-'use strict';
+"use strict";
 // --- パスワードに関する初期設定 ---
 // 生成するパスワードに使用する文字を定義（パスワードとして使用するとどちらの文字か紛らわしいものは除くことが望ましい）
 /**
@@ -15,126 +15,126 @@
  * 使用文字: a b c d e f g h j k m n p q r s t u v w x y z
  * @type {string}
  */
-const _pg_lowerCaseLetters = 'abcdefghjkmnpqrstuvwxyz';
+const _pg_lowerCaseLetters = "abcdefghjkmnpqrstuvwxyz";
 /**
  * アルファベット大文字を定義
  * 除外文字: I（アイ）, O（オー）, L（エル）
  * 使用文字: A B C D E F G H J K M N P Q R S T U V W X Y Z
  * @type {string}
  */
-const _pg_upperCaseLetters = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+const _pg_upperCaseLetters = "ABCDEFGHJKMNPQRSTUVWXYZ";
 /**
  * 数字を定義
  * 除外文字: 0（ゼロ）, 1（イチ）
  * 使用文字: 2 3 4 5 6 7 8 9
  * @type {string}
  */
-const _pg_numerals = '23456789';
+const _pg_numerals = "23456789";
 /**
  * 記号を定義
  * 使用記号: # $ % & = @ + * / ?
  * 一般的なWebサービスで利用可能な記号のみを採用。
  * @type {string}
  */
-const _pg_symbols = '#$%&=@+*/?';
+const _pg_symbols = "#$%&=@+*/?";
 // --- 変換用定数・マッピング ---
 /** ヨミガナを定義
  * @type {Object<string, string>}
  */
 const _pg_readingList = {
-  a: 'エイ',
-  A: 'エイ',
-  b: 'ビー',
-  B: 'ビー',
-  c: 'シー',
-  C: 'シー',
-  d: 'ディー',
-  D: 'ディー',
-  e: 'イー',
-  E: 'イー',
-  f: 'エフ',
-  F: 'エフ',
-  g: 'ジー',
-  G: 'ジー',
-  h: 'エイチ',
-  H: 'エイチ',
-  i: 'アイ',
-  I: 'アイ',
-  j: 'ジェイ',
-  J: 'ジェイ',
-  k: 'ケイ',
-  K: 'ケイ',
-  l: 'エル',
-  L: 'エル',
-  m: 'エム',
-  M: 'エム',
-  n: 'エヌ',
-  N: 'エヌ',
-  o: 'オー',
-  O: 'オー',
-  p: 'ピー',
-  P: 'ピー',
-  q: 'キュー',
-  Q: 'キュー',
-  r: 'アール',
-  R: 'アール',
-  s: 'エス',
-  S: 'エス',
-  t: 'ティー',
-  T: 'ティー',
-  u: 'ユー',
-  U: 'ユー',
-  v: 'ブイ',
-  V: 'ブイ',
-  w: 'ダブリュー',
-  W: 'ダブリュー',
-  x: 'エックス',
-  X: 'エックス',
-  y: 'ワイ',
-  Y: 'ワイ',
-  z: 'ゼット',
-  Z: 'ゼット',
-  1: 'イチ',
-  2: 'ニ',
-  3: 'サン',
-  4: 'ヨン',
-  5: 'ゴ',
-  6: 'ロク',
-  7: 'ナナ',
-  8: 'ハチ',
-  9: 'キュウ',
-  0: 'ゼロ',
-  '!': 'エクスクラメーションマーク',
-  '"': 'ダブルクォーテーション',
-  '#': 'ハッシュ',
-  $: 'ドル',
-  '%': 'パーセント',
-  '&': 'アンパサンド',
-  "'": 'アポストロフィー',
-  '(': 'ヒダリカッコ',
-  ')': 'ミギカッコ',
-  '~': 'チルダ',
-  '^': 'キャレット',
-  '|': 'パイプライン',
-  '@': 'アットマーク',
-  '`': 'バッククオート',
-  '[': 'ヒダリダイカッコ',
-  '{': 'ヒダリチュウカッコ',
-  ':': 'コロン',
-  ';': 'セミコロン',
-  '*': 'アスタリスク',
-  ']': 'ミギダイカッコ',
-  '}': 'ミギチュウカッコ',
-  ',': 'カンマ',
-  '.': 'ドット',
-  '<': 'レスザン',
-  '>': 'グレーターザン',
-  '/': 'スラッシュ',
-  '?': 'クエスチョンマーク',
-  _: 'アンダーバー',
-  '=': 'イコール',
-  '-': 'ハイフン',
-  '+': 'プラス',
+  a: "エイ",
+  A: "エイ",
+  b: "ビー",
+  B: "ビー",
+  c: "シー",
+  C: "シー",
+  d: "ディー",
+  D: "ディー",
+  e: "イー",
+  E: "イー",
+  f: "エフ",
+  F: "エフ",
+  g: "ジー",
+  G: "ジー",
+  h: "エイチ",
+  H: "エイチ",
+  i: "アイ",
+  I: "アイ",
+  j: "ジェイ",
+  J: "ジェイ",
+  k: "ケイ",
+  K: "ケイ",
+  l: "エル",
+  L: "エル",
+  m: "エム",
+  M: "エム",
+  n: "エヌ",
+  N: "エヌ",
+  o: "オー",
+  O: "オー",
+  p: "ピー",
+  P: "ピー",
+  q: "キュー",
+  Q: "キュー",
+  r: "アール",
+  R: "アール",
+  s: "エス",
+  S: "エス",
+  t: "ティー",
+  T: "ティー",
+  u: "ユー",
+  U: "ユー",
+  v: "ブイ",
+  V: "ブイ",
+  w: "ダブリュー",
+  W: "ダブリュー",
+  x: "エックス",
+  X: "エックス",
+  y: "ワイ",
+  Y: "ワイ",
+  z: "ゼット",
+  Z: "ゼット",
+  1: "イチ",
+  2: "ニ",
+  3: "サン",
+  4: "ヨン",
+  5: "ゴ",
+  6: "ロク",
+  7: "ナナ",
+  8: "ハチ",
+  9: "キュウ",
+  0: "ゼロ",
+  "!": "エクスクラメーションマーク",
+  '"': "ダブルクォーテーション",
+  "#": "ハッシュ",
+  $: "ドル",
+  "%": "パーセント",
+  "&": "アンパサンド",
+  "'": "アポストロフィー",
+  "(": "ヒダリカッコ",
+  ")": "ミギカッコ",
+  "~": "チルダ",
+  "^": "キャレット",
+  "|": "パイプライン",
+  "@": "アットマーク",
+  "`": "バッククオート",
+  "[": "ヒダリダイカッコ",
+  "{": "ヒダリチュウカッコ",
+  ":": "コロン",
+  ";": "セミコロン",
+  "*": "アスタリスク",
+  "]": "ミギダイカッコ",
+  "}": "ミギチュウカッコ",
+  ",": "カンマ",
+  ".": "ドット",
+  "<": "レスザン",
+  ">": "グレーターザン",
+  "/": "スラッシュ",
+  "?": "クエスチョンマーク",
+  _: "アンダーバー",
+  "=": "イコール",
+  "-": "ハイフン",
+  "+": "プラス",
 };
 /**
  * 正規表現用に文字列をエスケープする関数
@@ -142,7 +142,7 @@ const _pg_readingList = {
  * @returns {string}
  */
 const _pg_escapeRegExp = (str) => {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
 
 /**
@@ -166,17 +166,26 @@ const _pg_escapeRegExp = (str) => {
  * - 選択した文字種数より短い長さを指定した場合はエラーとなります。
  */
 const getPassword = (length = 10, type = 0b1111) => {
-  if (typeof length !== 'number' || isNaN(length) || length < 1 || !Number.isInteger(length)) {
-    throw new TypeError('生成するパスワードの長さは1以上の整数で指定してください');
+  if (
+    typeof length !== "number" ||
+    isNaN(length) ||
+    length < 1 ||
+    !Number.isInteger(length)
+  ) {
+    throw new TypeError(
+      "生成するパスワードの長さは1以上の整数で指定してください",
+    );
   }
   if (
-    typeof type !== 'number' ||
+    typeof type !== "number" ||
     isNaN(type) ||
     type < 0 ||
     type > 0b1111 ||
     !Number.isInteger(type)
   ) {
-    throw new TypeError('生成するパスワードのタイプは0から15までの整数で指定してください');
+    throw new TypeError(
+      "生成するパスワードのタイプは0から15までの整数で指定してください",
+    );
   }
   let passwordLength = length;
   if (length < 4) {
@@ -207,20 +216,30 @@ const getPassword = (length = 10, type = 0b1111) => {
   let passwordArr = [];
   if (lowerLetterSwitch)
     passwordArr.push(
-      _pg_lowerCaseLetters.charAt(Math.floor(Math.random() * _pg_lowerCaseLetters.length))
+      _pg_lowerCaseLetters.charAt(
+        Math.floor(Math.random() * _pg_lowerCaseLetters.length),
+      ),
     );
   if (upperLetterSwitch)
     passwordArr.push(
-      _pg_upperCaseLetters.charAt(Math.floor(Math.random() * _pg_upperCaseLetters.length))
+      _pg_upperCaseLetters.charAt(
+        Math.floor(Math.random() * _pg_upperCaseLetters.length),
+      ),
     );
   if (numeralSwitch)
-    passwordArr.push(_pg_numerals.charAt(Math.floor(Math.random() * _pg_numerals.length)));
+    passwordArr.push(
+      _pg_numerals.charAt(Math.floor(Math.random() * _pg_numerals.length)),
+    );
   if (symbolSwitch)
-    passwordArr.push(_pg_symbols.charAt(Math.floor(Math.random() * _pg_symbols.length)));
+    passwordArr.push(
+      _pg_symbols.charAt(Math.floor(Math.random() * _pg_symbols.length)),
+    );
 
   // エラー処理: 選択した文字種数より短い長さは不可
   if (passwordLength < charTypes.length) {
-    throw new Error(`選択された文字種の数（${charTypes.length}種）以上の長さを指定してください`);
+    throw new Error(
+      `選択された文字種の数（${charTypes.length}種）以上の長さを指定してください`,
+    );
   }
 
   // 残りをランダムで埋める
@@ -233,7 +252,7 @@ const getPassword = (length = 10, type = 0b1111) => {
     const j = Math.floor(Math.random() * (i + 1));
     [passwordArr[i], passwordArr[j]] = [passwordArr[j], passwordArr[i]];
   }
-  const password = passwordArr.join('');
+  const password = passwordArr.join("");
   return {
     password: password,
     reading: getPasswordReading(password),
@@ -241,7 +260,7 @@ const getPassword = (length = 10, type = 0b1111) => {
 };
 
 // 公開
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   window.getPassword = getPassword;
 }
 
@@ -257,16 +276,24 @@ if (typeof window !== 'undefined') {
  * - 定義されていない文字は無視されます。
  */
 const getPasswordReading = (str) => {
-  if (typeof str !== 'string') {
-    throw new TypeError('ヨミガナを生成する元の文字列は文字列で指定してください');
+  if (typeof str !== "string") {
+    throw new TypeError(
+      "ヨミガナを生成する元の文字列は文字列で指定してください",
+    );
   }
   const keys = Object.keys(_pg_readingList).map(_pg_escapeRegExp);
-  const readingListRReg = new RegExp(keys.join('|'), 'g');
-  if (typeof str !== 'string' || str.length === 0) return null;
+  const readingListRReg = new RegExp(keys.join("|"), "g");
+  if (typeof str !== "string" || str.length === 0) return null;
   const replaced = str.replace(readingListRReg, (match) => {
-    if (_pg_readingList[match] !== undefined) return _pg_readingList[match] + '・';
-    if (_pg_readingList['\\' + match] !== undefined) return _pg_readingList['\\' + match] + '・';
-    return '';
+    if (_pg_readingList[match] !== undefined)
+      return _pg_readingList[match] + "・";
+    if (_pg_readingList["\\" + match] !== undefined)
+      return _pg_readingList["\\" + match] + "・";
+    return "";
   });
-  return replaced === '' ? null : replaced.endsWith('・') ? replaced.slice(0, -1) : replaced;
+  return replaced === ""
+    ? null
+    : replaced.endsWith("・")
+      ? replaced.slice(0, -1)
+      : replaced;
 };

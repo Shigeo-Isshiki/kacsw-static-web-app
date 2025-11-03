@@ -4,7 +4,7 @@
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_vc_)で始める
 /* exported validateZoomMeetingId, validateZoomPasscode, validateZoomUrl */
-'use strict';
+"use strict";
 //　ライブラリ内の共通定数・変換テーブル定義部
 // ハイフン類を検出するための正規表現（全角・半角・ダッシュ類）
 const _VC_HYPHEN_REGEX = /[－‐‑–—−ー―]/g;
@@ -16,7 +16,7 @@ const _VC_HYPHEN_REGEX = /[－‐‑–—−ー―]/g;
  * @returns {boolean} 文字列である = true、文字でない = false
  */
 const _vc_checkString = (str) => {
-  return typeof str === 'string';
+  return typeof str === "string";
 };
 
 /**
@@ -26,18 +26,21 @@ const _vc_checkString = (str) => {
  * @returns {string} 半角英数字・記号・スペースに変換した文字列
  * @throws {Error} 半角英数字・記号・スペース以外が含まれている場合
  */
-const _vc_toHalfWidth = (str = '') => {
-  if (!_vc_checkString(str)) throw new Error('変換対象は文字列である必要があります');
-  if (!str) throw new Error('変換対象の文字列が空です');
-  const hyphenProcessed = str.replace(_VC_HYPHEN_REGEX, '-');
+const _vc_toHalfWidth = (str = "") => {
+  if (!_vc_checkString(str))
+    throw new Error("変換対象は文字列である必要があります");
+  if (!str) throw new Error("変換対象の文字列が空です");
+  const hyphenProcessed = str.replace(_VC_HYPHEN_REGEX, "-");
   // 全角英数字・記号・スペースを半角に変換
   const converted = hyphenProcessed
     .replace(/[！-～]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0))
-    .replace(/\u3000/g, ' ');
+    .replace(/\u3000/g, " ");
   // 半角英数字・記号・スペース以外が含まれていればエラー
   if (/[^\x20-\x7E]/.test(converted)) {
     const invalid = converted.match(/[^\x20-\x7E]/)[0];
-    throw new Error(`半角英数字・記号・スペース以外の文字が含まれています: ${invalid}`);
+    throw new Error(
+      `半角英数字・記号・スペース以外の文字が含まれています: ${invalid}`,
+    );
   }
   return converted;
 };
@@ -53,17 +56,23 @@ const _vc_toHalfWidth = (str = '') => {
  * @throws {Error} 不正な場合は例外
  */
 const validateZoomMeetingId = (id, isWebinar = false) => {
-  if (!_vc_checkString(id)) throw new Error('IDは文字列である必要があります');
-  if (typeof isWebinar !== 'boolean') throw new Error('isWebinarはboolean型である必要があります');
+  if (!_vc_checkString(id)) throw new Error("IDは文字列である必要があります");
+  if (typeof isWebinar !== "boolean")
+    throw new Error("isWebinarはboolean型である必要があります");
   const halfWidthId = _vc_toHalfWidth(id);
-  if (!/^[0-9 ]+$/.test(halfWidthId)) throw new Error('IDは半角数字と空白のみ許容されます');
-  const digits = halfWidthId.replace(/ /g, '');
+  if (!/^[0-9 ]+$/.test(halfWidthId))
+    throw new Error("IDは半角数字と空白のみ許容されます");
+  const digits = halfWidthId.replace(/ /g, "");
   if (isWebinar) {
     if (digits.length !== 11)
-      throw new Error('ウェビナーIDは空白を除いて11桁の半角数字である必要があります');
+      throw new Error(
+        "ウェビナーIDは空白を除いて11桁の半角数字である必要があります",
+      );
   } else {
     if (!(digits.length === 10 || digits.length === 11))
-      throw new Error('ミーティングIDは空白を除いて10桁または11桁の半角数字である必要があります');
+      throw new Error(
+        "ミーティングIDは空白を除いて10桁または11桁の半角数字である必要があります",
+      );
   }
   return halfWidthId;
 };
@@ -75,14 +84,15 @@ const validateZoomMeetingId = (id, isWebinar = false) => {
  * @throws {Error} 不正な場合は例外
  */
 const validateZoomPasscode = (passcode) => {
-  if (!_vc_checkString(passcode)) throw new Error('パスコードは文字列である必要があります');
+  if (!_vc_checkString(passcode))
+    throw new Error("パスコードは文字列である必要があります");
   const halfWidthPasscode = _vc_toHalfWidth(passcode);
   if (halfWidthPasscode.length < 6 || halfWidthPasscode.length > 10) {
-    throw new Error('パスコードは6桁以上10桁以下である必要があります');
+    throw new Error("パスコードは6桁以上10桁以下である必要があります");
   }
   // 半角英数字・記号（ASCII 0x21-0x7E）
   if (!/^[\x21-\x7E]+$/.test(halfWidthPasscode)) {
-    throw new Error('パスコードは半角英数字・記号のみ許容されます');
+    throw new Error("パスコードは半角英数字・記号のみ許容されます");
   }
   return halfWidthPasscode;
 };
@@ -95,19 +105,20 @@ const validateZoomPasscode = (passcode) => {
  * @throws {Error} 不正な場合は例外
  */
 const validateZoomUrl = (url) => {
-  if (!_vc_checkString(url)) throw new Error('URLは文字列である必要があります');
+  if (!_vc_checkString(url)) throw new Error("URLは文字列である必要があります");
   let halfWidthUrl = _vc_toHalfWidth(url);
-  if (!halfWidthUrl.startsWith('https://')) throw new Error('URLはhttps://で始まる必要があります');
+  if (!halfWidthUrl.startsWith("https://"))
+    throw new Error("URLはhttps://で始まる必要があります");
   // ドメイン部分の大文字・小文字を区別しない判定
-  if (!halfWidthUrl.toLowerCase().includes('zoom.us'))
-    throw new Error('URLにzoom.usが含まれている必要があります');
+  if (!halfWidthUrl.toLowerCase().includes("zoom.us"))
+    throw new Error("URLにzoom.usが含まれている必要があります");
   // zoom.us部分を小文字化して統一
-  halfWidthUrl = halfWidthUrl.replace(/zoom\.us/gi, 'zoom.us');
+  halfWidthUrl = halfWidthUrl.replace(/zoom\.us/gi, "zoom.us");
   return halfWidthUrl;
 };
 
 // 公開
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   window.validateZoomMeetingId = validateZoomMeetingId;
   window.validateZoomPasscode = validateZoomPasscode;
   window.validateZoomUrl = validateZoomUrl;
