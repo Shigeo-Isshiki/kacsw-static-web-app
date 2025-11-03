@@ -60,8 +60,30 @@ function createStaticServer(root) {
       server.on('error', reject);
     });
     const port = server.address().port;
-    target = 'http://127.0.0.1:' + port + '/test.html';
-    console.log('started internal static server at', target.replace('/test.html', '/'));
+    target = 'http://127.0.0.1:' + port + '/test-all-scripts.html';
+    console.log('started internal static server at', target.replace('/test-all-scripts.html', '/'));
+  }
+
+  // attempt to read the full export list from dist/all-window-exports.js (if present)
+  let namesFromFile = null;
+  try {
+    const exportsPath = path.resolve(__dirname, '..', 'dist', 'all-window-exports.js');
+    const txt = fs.readFileSync(exportsPath, 'utf8');
+    const m = txt.match(/var\s+names\s*=\s*\[([\s\S]*?)\];/m);
+    if (m && m[1]) {
+      const body = m[1]
+        .replace(/\/\*[^]*?\*\//g, '')
+        .replace(/\/\/.*$/gm, '')
+        .trim();
+      const normalized = '[' + body.replace(/'/g, '"').replace(/,\s*\]/g, ']') + ']';
+      try {
+        namesFromFile = JSON.parse(normalized);
+      } catch (e) {
+        try { namesFromFile = eval('([' + body + '])'); } catch (e2) { namesFromFile = null; }
+      }
+    }
+  } catch (e) {
+    // ignore - file may not exist in all environments
   }
 
   const browser = await puppeteer.launch({args: ['--no-sandbox','--disable-setuid-sandbox']});
@@ -78,15 +100,15 @@ function createStaticServer(root) {
     console.log('---- #out content ----');
     console.log(out);
     console.log('---- window check via page.evaluate ----');
-    const results = await page.evaluate(() => {
-      const names = ['getNationalHolidayName','isSingleByteAlnumOnly','toFullWidthKatakana','toFullWidth','toHalfWidth','convert_to_hiragana','start'];
+    const results = await page.evaluate((maybeNames) => {
+      const fallback = ['getNationalHolidayName','isSingleByteAlnumOnly','toFullWidthKatakana','toFullWidth','toHalfWidth','convert_to_hiragana','start'];
+      const names = Array.isArray(maybeNames) && maybeNames.length ? maybeNames : fallback;
       const res = {};
       names.forEach(n => {
-        res[n] = typeof window[n];
+        try { res[n] = typeof window[n]; } catch (e) { res[n] = 'error'; }
       });
-      // also check if any runtime errors were thrown and attached to window.__errors (not used normally)
       return res;
-    });
+    }, namesFromFile);
     console.log(results);
   } catch (err) {
     console.error('ERROR:', err && err.message ? err.message : err);
