@@ -28,6 +28,76 @@ const _bt_BRANCHES = {
 const _bt_toStr = (v) => (v == null ? '' : String(v));
 
 // -------------------------
+// 公開: BankKun 単一銀行取得（/banks/{code}.json） callback-only
+// - loadBankByCode('0001', options?, callback)
+// - callback(err, result)  result: { success:true, bank } or error
+// -------------------------
+// internal: _bt_loadBankByCode - not exposed to window.KACSW
+const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
+  if (typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+  const {
+    apiBaseUrl = 'https://bank.teraren.com',
+    apiKey,
+    timeout = 5000,
+    pathTemplate = '/banks/{code}.json',
+  } = options;
+  const code = _bt_toStr(bankCode).padStart(4, '0');
+  const base = apiBaseUrl.replace(/\/$/, '');
+  const path = pathTemplate.replace('{code}', code);
+  const url = base + path;
+  const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+  const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  let timer = null;
+  if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
+
+  fetch(url, { headers, signal: abortController ? abortController.signal : undefined })
+    .then((res) => {
+      if (!res.ok) {
+        // HTTP ステータスが OK でない場合は日本語でわかりやすいメッセージを投げる
+        throw new Error(`銀行情報の取得に失敗しました（HTTPステータス: ${res.status}）`);
+      }
+      return res.json();
+    })
+    .then((j) => {
+      const bankObj = {
+        code: _bt_toStr(j.code).padStart(4, '0'),
+        name: _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name),
+        kana: _bt_toStr(j.normalize && j.normalize.kana ? j.normalize.kana : j.kana),
+        url: _bt_toStr(j.url || url),
+        branches_url: _bt_toStr(j.branches_url || base + `/banks/${code}/branches.json`),
+      };
+      const idx = _bt_BANKS.findIndex((b) => b.code === bankObj.code);
+      if (idx >= 0) _bt_BANKS[idx] = bankObj;
+      else _bt_BANKS.push(bankObj);
+      if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
+    })
+    .catch((err) => {
+      // AbortError（タイムアウト等）を判別して分かりやすい日本語メッセージに変換
+      let message = null;
+      try {
+        if (err && err.name === 'AbortError') {
+          message = '取得がタイムアウトしました（指定時間内に応答がありません）';
+        } else if (err && err.message) {
+          // すでに日本語のメッセージを投げている場合はそのまま使う
+          message = err.message;
+        } else {
+          message = '銀行情報の取得中に不明なエラーが発生しました';
+        }
+      } catch (e2) {
+        message = '銀行情報の取得中にエラーが発生しました';
+      }
+      const e = { success: false, error: message };
+      if (typeof callback === 'function') callback(e, null);
+    })
+    .finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+};
+
+// -------------------------
 // 公開: 銀行取得（自動判定）
 // 入力が数字のみ（<=4桁）ならコード検索して単一オブジェクトまたは null を返す
 // そうでなければ名前で部分一致検索して配列を返す
@@ -206,59 +276,6 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
         };
         if (typeof callback === 'function') callback(null, resObj);
       });
-    })
-    .catch((err) => {
-      const e = { success: false, error: err && err.message ? err.message : String(err) };
-      if (typeof callback === 'function') callback(e, null);
-    })
-    .finally(() => {
-      if (timer) clearTimeout(timer);
-    });
-};
-
-// -------------------------
-// 公開: BankKun 単一銀行取得（/banks/{code}.json） callback-only
-// - loadBankByCode('0001', options?, callback)
-// - callback(err, result)  result: { success:true, bank } or error
-// -------------------------
-// internal: _bt_loadBankByCode - not exposed to window.KACSW
-const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
-  if (typeof options === 'function') {
-    callback = options;
-    options = {};
-  }
-  const {
-    apiBaseUrl = 'https://bank.teraren.com',
-    apiKey,
-    timeout = 5000,
-    pathTemplate = '/banks/{code}.json',
-  } = options;
-  const code = _bt_toStr(bankCode).padStart(4, '0');
-  const base = apiBaseUrl.replace(/\/$/, '');
-  const path = pathTemplate.replace('{code}', code);
-  const url = base + path;
-  const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
-  const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  let timer = null;
-  if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
-
-  fetch(url, { headers, signal: abortController ? abortController.signal : undefined })
-    .then((res) => {
-      if (!res.ok) throw new Error(`fetch failed ${res.status}`);
-      return res.json();
-    })
-    .then((j) => {
-      const bankObj = {
-        code: _bt_toStr(j.code).padStart(4, '0'),
-        name: _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name),
-        kana: _bt_toStr(j.normalize && j.normalize.kana ? j.normalize.kana : j.kana),
-        url: _bt_toStr(j.url || url),
-        branches_url: _bt_toStr(j.branches_url || base + `/banks/${code}/branches.json`),
-      };
-      const idx = _bt_BANKS.findIndex((b) => b.code === bankObj.code);
-      if (idx >= 0) _bt_BANKS[idx] = bankObj;
-      else _bt_BANKS.push(bankObj);
-      if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
     })
     .catch((err) => {
       const e = { success: false, error: err && err.message ? err.message : String(err) };
