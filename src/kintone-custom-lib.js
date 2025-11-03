@@ -10,7 +10,7 @@
  * ダイアログ表示の際に使用するアイコンが格納されている URLのベースパス
  * @constant {string} _KC_ASSET_BASE - アイコン画像のベースURL
  */
-const _KC_ASSET_BASE = "https://js.kacsw.or.jp/image";
+const _KC_ASSET_BASE = 'https://js.kacsw.or.jp/image';
 
 // 内部関数
 /**
@@ -25,17 +25,17 @@ const _kc_sanitizeHtml = (html) => {
   // フォールバック: 単純なサニタイズ（スクリプトタグ除去・on* 属性除去）
   // 完全な保護を約束するものではありません
   try {
-    const template = document.createElement("template");
+    const template = document.createElement('template');
     template.innerHTML = html;
     // remove script elements
-    const scripts = template.content.querySelectorAll("script");
+    const scripts = template.content.querySelectorAll('script');
     scripts.forEach((s) => s.remove());
     // remove on* attributes
     const walker = document.createTreeWalker(
       template.content,
       NodeFilter.SHOW_ELEMENT,
       null,
-      false,
+      false
     );
     let node = walker.nextNode();
     while (node) {
@@ -44,10 +44,7 @@ const _kc_sanitizeHtml = (html) => {
           node.removeAttribute(attr.name);
         }
         // javascript: URL を除去
-        if (
-          /^href$|^src$/i.test(attr.name) &&
-          /javascript:\s*/i.test(attr.value)
-        ) {
+        if (/^href$|^src$/i.test(attr.name) && /javascript:\s*/i.test(attr.value)) {
           node.removeAttribute(attr.name);
         }
       });
@@ -56,7 +53,7 @@ const _kc_sanitizeHtml = (html) => {
     return template.innerHTML;
   } catch {
     // 最後の手段: プレーンテキストにして挿入
-    const tmp = document.createElement("div");
+    const tmp = document.createElement('div');
     tmp.textContent = html;
     return tmp.innerHTML;
   }
@@ -70,15 +67,15 @@ const _kc_sanitizeHtml = (html) => {
  * }
  */
 const _kc_showDialog = (options) => {
-  if (!options || typeof options !== "object") return;
+  if (!options || typeof options !== 'object') return;
   const { title, body } = options;
   const config = {
-    title: String(title || ""),
+    title: String(title || ''),
     body: body,
     showOkButton: true,
-    okButtonText: "閉じる",
+    okButtonText: '閉じる',
     showCancelButton: false,
-    cancelButtonText: "",
+    cancelButtonText: '',
     showCloseButton: false,
     beforeClose: () => {
       return;
@@ -89,21 +86,18 @@ const _kc_showDialog = (options) => {
     const dialog = kintone.createDialog && kintone.createDialog(config);
     const setOkAriaLabel = (dialogObj) => {
       try {
-        const container =
-          dialogObj.element || dialogObj.dialog || dialogObj.container || null;
+        const container = dialogObj.element || dialogObj.dialog || dialogObj.container || null;
         if (container) {
-          const okBtn = container.querySelector(
-            "button.kintone-dialog-ok-button, button",
-          );
+          const okBtn = container.querySelector('button.kintone-dialog-ok-button, button');
           if (okBtn) {
-            okBtn.setAttribute("aria-label", "閉じる");
+            okBtn.setAttribute('aria-label', '閉じる');
           }
         }
       } catch {
         // noop
       }
     };
-    if (dialog && typeof dialog.then === "function") {
+    if (dialog && typeof dialog.then === 'function') {
       dialog
         .then((object) => {
           try {
@@ -111,13 +105,13 @@ const _kc_showDialog = (options) => {
           } catch {}
           setOkAriaLabel(object);
         })
-        .catch((error) => console.error("ダイアログ表示中にエラー:", error));
-    } else if (dialog && typeof dialog.show === "function") {
+        .catch((error) => console.error('ダイアログ表示中にエラー:', error));
+    } else if (dialog && typeof dialog.show === 'function') {
       dialog.show();
       setOkAriaLabel(dialog);
     }
   } catch (error) {
-    console.error("_kc_showDialog error", error);
+    console.error('_kc_showDialog error', error);
     try {
       alert(body && body.textContent ? body.textContent : String(title));
     } catch {
@@ -141,32 +135,31 @@ const _kc_showDialog = (options) => {
  * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか（サニタイズされます）
  * @returns {void}
  */
-const notifyError = (message, title = "エラー", allowHtml = false) => {
-  const body = document.createElement("div");
+const notifyError = (message, title = 'エラー', allowHtml = false) => {
+  const body = document.createElement('div');
   // class 名を付与してスタイルやテストを容易にする
-  body.className = "kc-notify-error";
+  body.className = 'kc-notify-error';
   // アクセシビリティ: アラートダイアログとして扱う
-  body.setAttribute("role", "alertdialog");
-  body.style.display = "flex";
-  body.style.alignItems = "center";
-  body.style.gap = "1em";
-  body.style.margin = "1em";
-  const errorImage = document.createElement("img");
-  errorImage.src = _KC_ASSET_BASE + "/error-icon.png";
-  errorImage.alt = "エラーアイコン";
-  errorImage.style.width = "32px";
-  errorImage.style.height = "32px";
+  body.setAttribute('role', 'alertdialog');
+  body.style.display = 'flex';
+  body.style.alignItems = 'center';
+  body.style.gap = '1em';
+  body.style.margin = '1em';
+  const errorImage = document.createElement('img');
+  errorImage.src = _KC_ASSET_BASE + '/error-icon.png';
+  errorImage.alt = 'エラーアイコン';
+  errorImage.style.width = '32px';
+  errorImage.style.height = '32px';
   // 装飾的な画像はスクリーンリーダーから隠す
-  errorImage.setAttribute("aria-hidden", "true");
+  errorImage.setAttribute('aria-hidden', 'true');
   body.appendChild(errorImage);
-  const errorText = document.createElement("div");
+  const errorText = document.createElement('div');
   // 読み上げ優先度: 即時読み上げが望ましいため assertive に設定
-  errorText.setAttribute("role", "status");
-  errorText.setAttribute("aria-live", "assertive");
-  errorText.className = "kc-notify-error__message";
+  errorText.setAttribute('role', 'status');
+  errorText.setAttribute('aria-live', 'assertive');
+  errorText.className = 'kc-notify-error__message';
   // 参照用 id を付与して dialog に関連付けられるようにする
-  const messageId =
-    "kc-notify-error__message-" + Math.random().toString(36).slice(2, 8);
+  const messageId = 'kc-notify-error__message-' + Math.random().toString(36).slice(2, 8);
   errorText.id = messageId;
   if (allowHtml) {
     // HTML を許可する場合のみサニタイズ済の HTML を挿入
@@ -177,8 +170,8 @@ const notifyError = (message, title = "エラー", allowHtml = false) => {
   }
   body.appendChild(errorText);
   // ダイアログにタイトルをラベルとして与える。aria-describedby で本文を参照。
-  body.setAttribute("aria-label", String(title));
-  body.setAttribute("aria-describedby", messageId);
+  body.setAttribute('aria-label', String(title));
+  body.setAttribute('aria-describedby', messageId);
   // 共通処理でダイアログ表示
   _kc_showDialog({ title, body });
 };
@@ -196,31 +189,27 @@ const notifyError = (message, title = "エラー", allowHtml = false) => {
  */
 const getFieldValueOr = (record, fieldCode, defaultValue) => {
   try {
-    if (typeof fieldCode !== "string" || !fieldCode.trim()) {
-      console.warn("getFieldValueOr: invalid fieldCode", { fieldCode });
+    if (typeof fieldCode !== 'string' || !fieldCode.trim()) {
+      console.warn('getFieldValueOr: invalid fieldCode', { fieldCode });
       return defaultValue;
     }
-    if (
-      typeof record !== "object" ||
-      record === null ||
-      Array.isArray(record)
-    ) {
-      console.warn("getFieldValueOr: invalid record", { record });
+    if (typeof record !== 'object' || record === null || Array.isArray(record)) {
+      console.warn('getFieldValueOr: invalid record', { record });
       return defaultValue;
     }
     const field = Object.prototype.hasOwnProperty.call(record, fieldCode)
       ? record[fieldCode]
       : undefined;
-    if (!field || typeof field !== "object") {
+    if (!field || typeof field !== 'object') {
       return defaultValue;
     }
     // value が存在する場合はそのまま返す（null や空文字も有効値として返す）
-    if (Object.prototype.hasOwnProperty.call(field, "value")) {
+    if (Object.prototype.hasOwnProperty.call(field, 'value')) {
       return field.value;
     }
     return defaultValue;
   } catch (error) {
-    console.error("getFieldValueOr: unexpected error", {
+    console.error('getFieldValueOr: unexpected error', {
       error,
       record,
       fieldCode,
@@ -239,10 +228,10 @@ const getFieldValueOr = (record, fieldCode, defaultValue) => {
 const kintoneEventOn = (events, handler) => {
   // basic validation
   const isValidEvents =
-    typeof events === "string" ||
-    (Array.isArray(events) && events.every((e) => typeof e === "string"));
-  if (!isValidEvents || typeof handler !== "function") {
-    console.warn("kintoneEventOn: invalid arguments", { events, handler });
+    typeof events === 'string' ||
+    (Array.isArray(events) && events.every((e) => typeof e === 'string'));
+  if (!isValidEvents || typeof handler !== 'function') {
+    console.warn('kintoneEventOn: invalid arguments', { events, handler });
     return false;
   }
 
@@ -251,12 +240,12 @@ const kintoneEventOn = (events, handler) => {
       try {
         return handler(event);
       } catch (error) {
-        console.error("kintone event handler error", { events, error });
+        console.error('kintone event handler error', { events, error });
         try {
           notifyError(
-            "システムエラーが発生しました。詳細はコンソールを確認してください。",
+            'システムエラーが発生しました。詳細はコンソールを確認してください。',
             undefined,
-            true,
+            true
           );
         } catch {}
         return event;
@@ -264,7 +253,7 @@ const kintoneEventOn = (events, handler) => {
     });
     return true;
   } catch (error) {
-    console.error("kintoneEventOn: failed to register events", {
+    console.error('kintoneEventOn: failed to register events', {
       events,
       error,
     });
@@ -284,29 +273,28 @@ const kintoneEventOn = (events, handler) => {
  * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか（サニタイズされます）
  * @returns {void}
  */
-const notifyInfo = (message, title = "情報", allowHtml = false) => {
-  const body = document.createElement("div");
-  body.className = "kc-notify-info";
-  body.setAttribute("role", "alertdialog");
-  body.style.display = "flex";
-  body.style.alignItems = "center";
-  body.style.gap = "1em";
-  body.style.margin = "1em";
+const notifyInfo = (message, title = '情報', allowHtml = false) => {
+  const body = document.createElement('div');
+  body.className = 'kc-notify-info';
+  body.setAttribute('role', 'alertdialog');
+  body.style.display = 'flex';
+  body.style.alignItems = 'center';
+  body.style.gap = '1em';
+  body.style.margin = '1em';
 
-  const infoImage = document.createElement("img");
-  infoImage.src = _KC_ASSET_BASE + "/info-icon.png";
-  infoImage.alt = "情報アイコン";
-  infoImage.style.width = "32px";
-  infoImage.style.height = "32px";
-  infoImage.setAttribute("aria-hidden", "true");
+  const infoImage = document.createElement('img');
+  infoImage.src = _KC_ASSET_BASE + '/info-icon.png';
+  infoImage.alt = '情報アイコン';
+  infoImage.style.width = '32px';
+  infoImage.style.height = '32px';
+  infoImage.setAttribute('aria-hidden', 'true');
   body.appendChild(infoImage);
 
-  const infoText = document.createElement("div");
-  infoText.setAttribute("role", "status");
-  infoText.setAttribute("aria-live", "polite");
-  infoText.className = "kc-notify-info__message";
-  const messageId =
-    "kc-notify-info__message-" + Math.random().toString(36).slice(2, 8);
+  const infoText = document.createElement('div');
+  infoText.setAttribute('role', 'status');
+  infoText.setAttribute('aria-live', 'polite');
+  infoText.className = 'kc-notify-info__message';
+  const messageId = 'kc-notify-info__message-' + Math.random().toString(36).slice(2, 8);
   infoText.id = messageId;
   if (allowHtml) {
     infoText.innerHTML = _kc_sanitizeHtml(message);
@@ -314,8 +302,8 @@ const notifyInfo = (message, title = "情報", allowHtml = false) => {
     infoText.textContent = String(message);
   }
   body.appendChild(infoText);
-  body.setAttribute("aria-label", String(title));
-  body.setAttribute("aria-describedby", messageId);
+  body.setAttribute('aria-label', String(title));
+  body.setAttribute('aria-describedby', messageId);
 
   _kc_showDialog({ title, body });
 };
@@ -332,29 +320,28 @@ const notifyInfo = (message, title = "情報", allowHtml = false) => {
  * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか（サニタイズされます）
  * @returns {void}
  */
-const notifyWarning = (message, title = "注意", allowHtml = false) => {
-  const body = document.createElement("div");
-  body.className = "kc-notify-warning";
-  body.setAttribute("role", "alertdialog");
-  body.style.display = "flex";
-  body.style.alignItems = "center";
-  body.style.gap = "1em";
-  body.style.margin = "1em";
+const notifyWarning = (message, title = '注意', allowHtml = false) => {
+  const body = document.createElement('div');
+  body.className = 'kc-notify-warning';
+  body.setAttribute('role', 'alertdialog');
+  body.style.display = 'flex';
+  body.style.alignItems = 'center';
+  body.style.gap = '1em';
+  body.style.margin = '1em';
 
-  const warnImage = document.createElement("img");
-  warnImage.src = _KC_ASSET_BASE + "/warning-icon.png";
-  warnImage.alt = "注意アイコン";
-  warnImage.style.width = "32px";
-  warnImage.style.height = "32px";
-  warnImage.setAttribute("aria-hidden", "true");
+  const warnImage = document.createElement('img');
+  warnImage.src = _KC_ASSET_BASE + '/warning-icon.png';
+  warnImage.alt = '注意アイコン';
+  warnImage.style.width = '32px';
+  warnImage.style.height = '32px';
+  warnImage.setAttribute('aria-hidden', 'true');
   body.appendChild(warnImage);
 
-  const warnText = document.createElement("div");
-  warnText.setAttribute("role", "status");
-  warnText.setAttribute("aria-live", "polite");
-  warnText.className = "kc-notify-warning__message";
-  const messageId =
-    "kc-notify-warning__message-" + Math.random().toString(36).slice(2, 8);
+  const warnText = document.createElement('div');
+  warnText.setAttribute('role', 'status');
+  warnText.setAttribute('aria-live', 'polite');
+  warnText.className = 'kc-notify-warning__message';
+  const messageId = 'kc-notify-warning__message-' + Math.random().toString(36).slice(2, 8);
   warnText.id = messageId;
   if (allowHtml) {
     warnText.innerHTML = _kc_sanitizeHtml(message);
@@ -362,8 +349,8 @@ const notifyWarning = (message, title = "注意", allowHtml = false) => {
     warnText.textContent = String(message);
   }
   body.appendChild(warnText);
-  body.setAttribute("aria-label", String(title));
-  body.setAttribute("aria-describedby", messageId);
+  body.setAttribute('aria-label', String(title));
+  body.setAttribute('aria-describedby', messageId);
   // 共通処理でダイアログ表示
   _kc_showDialog({ title, body });
 };
@@ -377,21 +364,21 @@ const notifyWarning = (message, title = "注意", allowHtml = false) => {
  */
 const setRecordValues = (record, values) => {
   if (
-    typeof record !== "object" ||
+    typeof record !== 'object' ||
     record === null ||
     Array.isArray(record) ||
-    typeof values !== "object" ||
+    typeof values !== 'object' ||
     values === null
   ) {
-    console.warn("setRecordValues: invalid arguments", { record, values });
+    console.warn('setRecordValues: invalid arguments', { record, values });
     return false;
   }
   Object.keys(values).forEach((k) => {
     // 既存フィールドがある場合は value に設定する（kintone フィールドオブジェクト想定）
     if (Object.prototype.hasOwnProperty.call(record, k)) {
       const fieldObj = record[k];
-      if (fieldObj && typeof fieldObj === "object") {
-        if (Object.prototype.hasOwnProperty.call(fieldObj, "value")) {
+      if (fieldObj && typeof fieldObj === 'object') {
+        if (Object.prototype.hasOwnProperty.call(fieldObj, 'value')) {
           fieldObj.value = values[k];
         } else {
           // オブジェクトだが value プロパティが無い場合は value を追加する
@@ -417,12 +404,8 @@ const setRecordValues = (record, values) => {
  * @returns {boolean} 成功したら true、引数不正や要素が見つからなければ false
  */
 const setSpaceFieldDisplay = (spaceField, display) => {
-  if (
-    typeof spaceField !== "string" ||
-    !spaceField.trim() ||
-    typeof display !== "boolean"
-  ) {
-    console.warn("setSpaceFieldDisplay: invalid arguments", {
+  if (typeof spaceField !== 'string' || !spaceField.trim() || typeof display !== 'boolean') {
+    console.warn('setSpaceFieldDisplay: invalid arguments', {
       spaceField,
       display,
     });
@@ -430,10 +413,10 @@ const setSpaceFieldDisplay = (spaceField, display) => {
   }
   const spaceElement = kintone.app.record.getSpaceElement(spaceField);
   if (!spaceElement) {
-    console.warn("setSpaceFieldDisplay: space element not found", spaceField);
+    console.warn('setSpaceFieldDisplay: space element not found', spaceField);
     return false;
   }
-  spaceElement.parentNode.style.display = display ? "" : "none";
+  spaceElement.parentNode.style.display = display ? '' : 'none';
   return true;
 };
 
@@ -450,12 +433,12 @@ const setSpaceFieldDisplay = (spaceField, display) => {
  */
 const setSpaceFieldButton = (spaceField, id, textContent, onClick) => {
   if (
-    typeof spaceField !== "string" ||
+    typeof spaceField !== 'string' ||
     !spaceField.trim() ||
-    typeof id !== "string" ||
+    typeof id !== 'string' ||
     !id.trim() ||
-    (textContent !== null && typeof textContent !== "string") ||
-    (onClick !== undefined && typeof onClick !== "function" && onClick !== null)
+    (textContent !== null && typeof textContent !== 'string') ||
+    (onClick !== undefined && typeof onClick !== 'function' && onClick !== null)
   ) {
     return;
   }
@@ -466,17 +449,17 @@ const setSpaceFieldButton = (spaceField, id, textContent, onClick) => {
   }
   if (textContent) {
     // ボタン追加
-    const button = document.createElement("button");
+    const button = document.createElement('button');
     // フォーム内で誤って submit を引き起こさないように type を明示する
-    button.type = "button";
+    button.type = 'button';
     button.id = id;
     button.textContent = textContent;
-    if (typeof onClick === "function") {
-      button.addEventListener("click", onClick);
+    if (typeof onClick === 'function') {
+      button.addEventListener('click', onClick);
     }
     const spaceElement = kintone.app.record.getSpaceElement(spaceField);
     if (!spaceElement) {
-      console.warn("setSpaceFieldButton: space element not found", spaceField);
+      console.warn('setSpaceFieldButton: space element not found', spaceField);
       return false;
     }
     spaceElement.appendChild(button);
@@ -500,13 +483,13 @@ const setSpaceFieldButton = (spaceField, id, textContent, onClick) => {
  */
 const setSpaceFieldText = (spaceField, id, innerHTML) => {
   if (
-    typeof spaceField !== "string" ||
+    typeof spaceField !== 'string' ||
     !spaceField.trim() ||
-    typeof id !== "string" ||
+    typeof id !== 'string' ||
     !id.trim() ||
-    (innerHTML !== null && typeof innerHTML !== "string")
+    (innerHTML !== null && typeof innerHTML !== 'string')
   ) {
-    console.warn("setSpaceFieldText: invalid arguments", {
+    console.warn('setSpaceFieldText: invalid arguments', {
       spaceField,
       id,
       innerHTML,
@@ -522,7 +505,7 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
     // 表示
     // createElement を関数化してリトライ時にも使えるようにする
     const createSpaceFieldElement = () => {
-      const el = document.createElement("div");
+      const el = document.createElement('div');
       el.id = id;
       // innerHTML は HTML 形式での入力が想定されるため、可能な限りサニタイズしてから挿入する
       el.innerHTML = _kc_sanitizeHtml(innerHTML);
@@ -594,39 +577,31 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
 };
 
 // 公開: kintone 側から直接呼び出すためにグローバルに割り当てる（初期化後に安全に行う）
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   try {
-    window.notifyError =
-      typeof notifyError !== "undefined" ? notifyError : undefined;
+    window.notifyError = typeof notifyError !== 'undefined' ? notifyError : undefined;
   } catch {}
   try {
-    window.getFieldValueOr =
-      typeof getFieldValueOr !== "undefined" ? getFieldValueOr : undefined;
+    window.getFieldValueOr = typeof getFieldValueOr !== 'undefined' ? getFieldValueOr : undefined;
   } catch {}
   try {
-    window.kintoneEventOn =
-      typeof kintoneEventOn !== "undefined" ? kintoneEventOn : undefined;
+    window.kintoneEventOn = typeof kintoneEventOn !== 'undefined' ? kintoneEventOn : undefined;
   } catch {}
   try {
-    window.notifyInfo =
-      typeof notifyInfo !== "undefined" ? notifyInfo : undefined;
+    window.notifyInfo = typeof notifyInfo !== 'undefined' ? notifyInfo : undefined;
   } catch {}
   try {
-    window.notifyWarning =
-      typeof notifyWarning !== "undefined" ? notifyWarning : undefined;
+    window.notifyWarning = typeof notifyWarning !== 'undefined' ? notifyWarning : undefined;
   } catch {}
   try {
-    window.setRecordValues =
-      typeof setRecordValues !== "undefined" ? setRecordValues : undefined;
+    window.setRecordValues = typeof setRecordValues !== 'undefined' ? setRecordValues : undefined;
   } catch {}
   try {
     window.setSpaceFieldButton =
-      typeof setSpaceFieldButton !== "undefined"
-        ? setSpaceFieldButton
-        : undefined;
+      typeof setSpaceFieldButton !== 'undefined' ? setSpaceFieldButton : undefined;
   } catch {}
   try {
     window.setSpaceFieldText =
-      typeof setSpaceFieldText !== "undefined" ? setSpaceFieldText : undefined;
+      typeof setSpaceFieldText !== 'undefined' ? setSpaceFieldText : undefined;
   } catch {}
 }
