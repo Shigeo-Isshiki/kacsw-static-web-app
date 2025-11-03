@@ -204,7 +204,7 @@ const kintoneShippingInquiryButton = (spaceField, id, label, trackingNumber, car
 		!spaceField.trim() ||
 		typeof id !== 'string' ||
 		!id.trim() ||
-		(label !== null && typeof label !== 'string') ||
+		(label !== null && typeof label !== 'string' && typeof label !== 'undefined') ||
 		(carrier !== null && typeof carrier !== 'string')
 	) {
 		return;
