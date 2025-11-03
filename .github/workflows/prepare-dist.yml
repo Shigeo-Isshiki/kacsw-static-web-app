@@ -23,6 +23,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Debug Prettier environment
+        run: |
+          echo "Node version: $(node -v)"
+          echo "npm version: $(npm -v)"
+          echo "Prettier version:"
+          npx prettier --version || true
+          echo "Files tracked by git under src/ matching patterns:"
+          git ls-files 'src/**/*.{js,css,html}' || true
+          echo "Prettier list-different (will exit non-zero if differences found):"
+          npx prettier --list-different "src/**/*.{js,css,html}" || true
+
       - name: Check formatting with Prettier
         run: npx prettier --check "src/**/*.{js,css,html}"
 
