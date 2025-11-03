@@ -23,8 +23,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check formatting with Prettier
-        run: npx prettier --check "src/**/*.{js,css,html}"
+      - name: Debug Prettier environment
+        run: |
+          echo "Node version: $(node -v)"
+          echo "npm version: $(npm -v)"
+          echo "Prettier version:"
+          npx prettier --version || true
+          echo "Files tracked by git under src/ matching patterns:"
+          git ls-files 'src/**/*.{js,css,html}' || true
+          echo "Prettier list-different (will exit non-zero if differences found):"
+          npx prettier --list-different "src/**/*.{js,css,html}" || true
+
+      - name: Check formatting with Prettier (verbose)
+        run: |
+          echo "Prettier version: $(npx prettier --version || echo 'n/a')"
+          echo "Running prettier --check..."
+          npx prettier --check "src/**/*.{js,css,html}" || {
+            echo "prettier --check failed; listing different files..."
+            npx prettier --list-different "src/**/*.{js,css,html}" || true
+            exit 1
+          }
 
       - name: Run ESLint
         run: npx eslint "src/**/*.js"
