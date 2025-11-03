@@ -1,7 +1,9 @@
 // bank-transfer.js
 // 単一ファイルで提供する銀行振込ユーティリティ（kintone向け、callback専用）
 // 公開 API (window.KACSW.bankTransfer):
-//  - getBank(input)                 // 銀行コード or 銀行名を自動判定して返す
+//  - getBank(input, callback)       // ※コールバック必須（同期返却は廃止）
+//                                     // 銀行コード or 銀行名を自動判定して非同期で返す
+//                                     // 戻り値の kana は半角カナに変換され、長音記号類は '-' に正規化されます
 //  - getBranch(bankCode, branch)    // 支店コード or 支店名で支店を返す
 //  - convertYucho(kigou, bangou)    // ゆうちょ記号/番号を全銀向け口座情報に変換（簡易）
 //  - generateZenginTransfer(records) // 簡易CSV形式の振込データ生成
@@ -24,8 +26,314 @@ const _bt_BRANCHES = {
   9900: [{ branchCode: '001', name: 'ゆうちょ本店', kana: 'ユウチョホンテン' }],
 };
 
+/**
+ * 変換用の文字リスト
+ * 各種文字の変換ルールを定義します。
+ * ひらがな、カタカナ、濁点・半濁点の変換をサポートします。
+ * @typedef {object} _TS_CONVERT_CHARACTER_LIST
+ * @property {object} halfWidthKana 全角カタカナから半角カタカナへの変換マップ
+ * @property {object} fullWidthKana 半角カタカナから全角カタカナへの変換マップ
+ * @property {object} turbidityKana 濁点・半濁点の変換マップ
+ */
+/** @type {_BT_CONVERT_CHARACTER_LIST} */
+const _BT_CONVERT_CHARACTER_LIST = {
+  halfWidthKana: {
+    ア: 'ｱ',
+    イ: 'ｲ',
+    ウ: 'ｳ',
+    エ: 'ｴ',
+    オ: 'ｵ',
+    カ: 'ｶ',
+    キ: 'ｷ',
+    ク: 'ｸ',
+    ケ: 'ｹ',
+    コ: 'ｺ',
+    サ: 'ｻ',
+    シ: 'ｼ',
+    ス: 'ｽ',
+    セ: 'ｾ',
+    ソ: 'ｿ',
+    タ: 'ﾀ',
+    チ: 'ﾁ',
+    ツ: 'ﾂ',
+    テ: 'ﾃ',
+    ト: 'ﾄ',
+    ナ: 'ﾅ',
+    ニ: 'ﾆ',
+    ヌ: 'ﾇ',
+    ネ: 'ﾈ',
+    ノ: 'ﾉ',
+    ハ: 'ﾊ',
+    ヒ: 'ﾋ',
+    フ: 'ﾌ',
+    ヘ: 'ﾍ',
+    ホ: 'ﾎ',
+    マ: 'ﾏ',
+    ミ: 'ﾐ',
+    ム: 'ﾑ',
+    メ: 'ﾒ',
+    モ: 'ﾓ',
+    ヤ: 'ﾔ',
+    ユ: 'ﾕ',
+    ヨ: 'ﾖ',
+    ラ: 'ﾗ',
+    リ: 'ﾘ',
+    ル: 'ﾙ',
+    レ: 'ﾚ',
+    ロ: 'ﾛ',
+    ワ: 'ﾜ',
+    ヲ: 'ｦ',
+    ン: 'ﾝ',
+    ガ: 'ｶﾞ',
+    ギ: 'ｷﾞ',
+    グ: 'ｸﾞ',
+    ゲ: 'ｹﾞ',
+    ゴ: 'ｺﾞ',
+    ザ: 'ｻﾞ',
+    ジ: 'ｼﾞ',
+    ズ: 'ｽﾞ',
+    ゼ: 'ｾﾞ',
+    ゾ: 'ｿﾞ',
+    ダ: 'ﾀﾞ',
+    ヂ: 'ﾁﾞ',
+    ヅ: 'ﾂﾞ',
+    デ: 'ﾃﾞ',
+    ド: 'ﾄﾞ',
+    バ: 'ﾊﾞ',
+    ビ: 'ﾋﾞ',
+    ブ: 'ﾌﾞ',
+    ベ: 'ﾍﾞ',
+    ボ: 'ﾎﾞ',
+    パ: 'ﾊﾟ',
+    ピ: 'ﾋﾟ',
+    プ: 'ﾌﾟ',
+    ペ: 'ﾍﾟ',
+    ポ: 'ﾎﾟ',
+    ヴ: 'ｳﾞ',
+    ヷ: 'ﾜﾞ',
+    ヺ: 'ｦﾞ',
+    ァ: 'ｧ',
+    ィ: 'ｨ',
+    ゥ: 'ｩ',
+    ェ: 'ｪ',
+    ォ: 'ｫ',
+    ッ: 'ｯ',
+    ャ: 'ｬ',
+    ュ: 'ｭ',
+    ョ: 'ｮ',
+    '゛': 'ﾞ',
+    '゜': 'ﾟ',
+    '　': ' ',
+  },
+  fullWidthKana: {
+    ｱ: 'ア',
+    ｲ: 'イ',
+    ｳ: 'ウ',
+    ｴ: 'エ',
+    ｵ: 'オ',
+    ｶ: 'カ',
+    ｷ: 'キ',
+    ｸ: 'ク',
+    ｹ: 'ケ',
+    ｺ: 'コ',
+    ｻ: 'サ',
+    ｼ: 'シ',
+    ｽ: 'ス',
+    ｾ: 'セ',
+    ｿ: 'ソ',
+    ﾀ: 'タ',
+    ﾁ: 'チ',
+    ﾂ: 'ツ',
+    ﾃ: 'テ',
+    ﾄ: 'ト',
+    ﾅ: 'ナ',
+    ﾆ: 'ニ',
+    ﾇ: 'ヌ',
+    ﾈ: 'ネ',
+    ﾉ: 'ノ',
+    ﾊ: 'ハ',
+    ﾋ: 'ヒ',
+    ﾌ: 'フ',
+    ﾍ: 'ヘ',
+    ﾎ: 'ホ',
+    ﾏ: 'マ',
+    ﾐ: 'ミ',
+    ﾑ: 'ム',
+    ﾒ: 'メ',
+    ﾓ: 'モ',
+    ﾔ: 'ヤ',
+    ﾕ: 'ユ',
+    ﾖ: 'ヨ',
+    ﾗ: 'ラ',
+    ﾘ: 'リ',
+    ﾙ: 'ル',
+    ﾚ: 'レ',
+    ﾛ: 'ロ',
+    ﾜ: 'ワ',
+    ｦ: 'ヲ',
+    ﾝ: 'ン',
+    ｧ: 'ァ',
+    ｨ: 'ィ',
+    ｩ: 'ゥ',
+    ｪ: 'ェ',
+    ｫ: 'ォ',
+    ｯ: 'ッ',
+    ｬ: 'ャ',
+    ｭ: 'ュ',
+    ｮ: 'ョ',
+    ﾞ: '゛',
+    ﾟ: '゜',
+    ' ': '　',
+  },
+  turbidityKana: {
+    'カ゛': 'ガ',
+    'キ゛': 'ギ',
+    'ク゛': 'グ',
+    'ケ゛': 'ゲ',
+    'コ゛': 'ゴ',
+    'サ゛': 'ザ',
+    'シ゛': 'ジ',
+    'ス゛': 'ズ',
+    'セ゛': 'ゼ',
+    'ソ゛': 'ゾ',
+    'タ゛': 'ダ',
+    'チ゛': 'ヂ',
+    'ツ゛': 'ヅ',
+    'テ゛': 'デ',
+    'ト゛': 'ド',
+    'ハ゛': 'バ',
+    'ヒ゛': 'ビ',
+    'フ゛': 'ブ',
+    'ヘ゛': 'ベ',
+    'ホ゛': 'ボ',
+    'ハ゜': 'パ',
+    'ヒ゜': 'ピ',
+    'フ゜': 'プ',
+    'ヘ゜': 'ペ',
+    'ホ゜': 'ポ',
+    'ウ゛': 'ヴ',
+    'ワ゛': 'ヷ',
+    'ヲ゛': 'ヺ',
+  },
+};
+// 全角カタカナから半角カタカナへの変換テーブルから生成するマップ（各種変換処理で利用）
+const _BT_HALF_WIDTH_KANA_MAP = new Map(Object.entries(_BT_CONVERT_CHARACTER_LIST.halfWidthKana));
+// 半角カタカナから全角カタカナへの変換テーブルから生成するマップ（各種変換処理で利用）
+const _BT_FULL_WIDTH_KANA_MAP = new Map(Object.entries(_BT_CONVERT_CHARACTER_LIST.fullWidthKana));
+// 濁点・半濁点の変換テーブルから生成するマップ（各種変換処理で利用）
+const _BT_TURBIDITY_KANA_MAP = new Map(Object.entries(_BT_CONVERT_CHARACTER_LIST.turbidityKana));
+
 // 内部ユーティリティ
 const _bt_toStr = (v) => (v == null ? '' : String(v));
+
+/**
+ * 文字列が文字列型であることを確認する関数
+ * @param {*} str 確認する文字列
+ * @returns {boolean} 文字列である = true、文字でない = false
+ */
+const _bt_checkString = (str) => {
+  return typeof str === 'string';
+};
+
+/**
+ * boolean型であることを確認する関数
+ * @param {*} val 確認する値
+ * @returns {boolean} boolean型である = true、そうでない = false
+ */
+const _bt_checkBoolean = (val) => {
+  return typeof val === 'boolean';
+};
+
+/**
+ * イテラブルな文字列集合から正規表現パターンを構築する関数
+ * @param {Iterable<string>} keys イテラブルな文字列集合
+ * @returns {RegExp} 正規表現のパターン
+ */
+const _bt_buildPattern = (keys) => {
+  if (!keys) throw new Error('keys is required');
+  const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (!(keys && typeof keys[Symbol.iterator] === 'function'))
+    throw new Error('keys must be an Iterable');
+  const escapedKeys = [...keys].map(escapeRegExp);
+  return new RegExp(escapedKeys.join('|'), 'g');
+};
+
+/**
+ * 文字列を全角カタカナに変換する関数
+ * @param {string} str 変換対象の文字列
+ * @param {boolean} [throwOnError=true] 変換不能な文字があった場合にエラーを投げるかどうか
+ * @returns {string} 可能な限り全角カタカナに変換した文字列
+ * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
+ */
+const _bt_toFullWidthKatakana = (str = '', throwOnError = true) => {
+  if (!_bt_checkString(str)) throw new Error('変換対象は文字列である必要があります');
+  if (!_bt_checkBoolean(throwOnError))
+    throw new Error('throwOnErrorはboolean型である必要があります');
+  if (!str) throw new Error('変換対象の文字列が空です');
+  const fullWidthKanaPattern = _bt_buildPattern(_BT_FULL_WIDTH_KANA_MAP.keys());
+  const turbidityKanaPattern = _bt_buildPattern(_BT_TURBIDITY_KANA_MAP.keys());
+  let errorChar = null;
+  // ひらがな→全角カタカナ
+  let work = str.replace(/[\u3041-\u3096]/g, (char) =>
+    String.fromCodePoint(char.charCodeAt(0) + 0x60)
+  );
+  // 半角カタカナ→全角カタカナ
+  work = work.replace(fullWidthKanaPattern, (char) => _BT_FULL_WIDTH_KANA_MAP.get(char) ?? char);
+  // 合成濁点・半濁点（カ゛→ガ等）を変換
+  work = work.replace(turbidityKanaPattern, (pair) => _BT_TURBIDITY_KANA_MAP.get(pair) ?? pair);
+  // 変換後に全角カタカナ以外が含まれていればエラー（ただし変換テーブルの値は許容）
+  const allowedValues = Object.values(_BT_CONVERT_CHARACTER_LIST.fullWidthKana);
+  for (const char of work) {
+    const code = char.charCodeAt(0);
+    // allowedValuesに含まれるか、全角カタカナ範囲なら許容
+    if (!allowedValues.includes(char) && !(code >= 0x30a1 && code <= 0x30fa)) {
+      if (throwOnError) {
+        errorChar = char;
+        break;
+      }
+    }
+  }
+  if (errorChar) throw new Error(`全角カタカナ以外の文字が含まれています: ${errorChar}`);
+  return work;
+};
+
+/**
+ * 文字列を半角カタカナに変換する関数
+ * @param {string} str 変換対象の文字列
+ * @param {boolean} [throwOnError=true] 変換不能な文字があった場合にエラーを投げるかどうか
+ * @returns {string} 可能な限り半角カタカナに変換した文字列
+ * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
+ */
+const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
+  if (!_bt_checkString(str)) throw new Error('変換対象は文字列である必要があります');
+  if (!_bt_checkBoolean(throwOnError))
+    throw new Error('throwOnErrorはboolean型である必要があります');
+  if (!str) throw new Error('変換対象の文字列が空です');
+  // ひらがな→カタカナ変換を追加
+  const katakanaStr = _bt_toFullWidthKatakana(str, false);
+  const halfWidthKanaPattern = _bt_buildPattern(_BT_HALF_WIDTH_KANA_MAP.keys());
+  let errorChar = null;
+  let result = katakanaStr.replace(
+    halfWidthKanaPattern,
+    (char) => _BT_HALF_WIDTH_KANA_MAP.get(char) ?? char
+  );
+  // 長音記号や類似文字をすべて半角ハイフンに正規化
+  // 対象: 全角カタカナ長音 'ー' (U+30FC), 全角ハイフンマイナス '－' (U+FF0D),
+  // 半角長音 'ｰ' と各種ダッシュ類
+  result = result.replace(/[ー－ｰ‐−–—―─━]/g, '-');
+  // 変換後に半角カタカナ以外が含まれていればエラー（ただし変換テーブルの値は許容）
+  const allowedValues = Object.values(_BT_CONVERT_CHARACTER_LIST.halfWidthKana).concat('-');
+  for (const char of result) {
+    if (!allowedValues.includes(char)) {
+      if (throwOnError) {
+        errorChar = char;
+        break;
+      }
+    }
+  }
+  if (errorChar) throw new Error(`半角カタカナ以外の文字が含まれています: ${errorChar}`);
+  return result;
+};
 
 // -------------------------
 // 公開: BankKun 単一銀行取得（/banks/{code}.json） callback-only
@@ -223,57 +531,54 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 // - otherwise behave as before (synchronous): return object|null for code lookup or array for name search
 const getBank = (input, callback) => {
   const s = _bt_toStr(input).trim();
-  // 第二引数が渡されているが関数でない場合はエラーを返す
-  if (arguments.length >= 2 && typeof callback !== 'function') {
+  // コールバック必須に変更: 第二引数が関数でない場合はエラーを返す
+  if (typeof callback !== 'function') {
     return { success: false, error: '第二引数はコールバック関数である必要があります' };
   }
-  const _isCallback = typeof callback === 'function';
-  if (!s) return null;
+  // 空検索語はエラーをコールバックで返す
+  if (!s) {
+    return callback({ success: false, error: '検索語が空です' }, null);
+  }
+
   const digitsOnly = /^[0-9]+$/.test(s);
+
   if (digitsOnly && s.length <= 4) {
     const key = s.padStart(4, '0');
-    // If a callback is provided, use the internal async loader to refresh/obtain bank info
-    if (_isCallback) {
-      // call internal loader; it returns via callback(err, { success, bank })
-      _bt_loadBankByCode(key, {}, (err, res) => {
-        // err があればそのまま中継
-        if (err) return callback(err, null);
-        // 結果が無い場合は汎用メッセージ
-        if (!res) return callback({ success: false, error: '銀行情報の取得結果が空です' }, null);
-        // _bt_loadBankByCode が失敗を示す場合はそのオブジェクトをそのまま中継
-        if (res && res.success === false) return callback(res, null);
-        // 成功だが bank がない場合は不整合エラーを返す
-        if (!res.bank)
-          return callback(
-            { success: false, error: '銀行データがレスポンスに含まれていません' },
-            null
-          );
-        const b = res.bank;
-        return callback(null, { code: b.code, name: b.name, kana: b.kana });
-      });
-      return;
-    }
-    // synchronous fallback: return from internal cache
-    return _bt_BANKS.find((b) => b.code === key) || null;
-  }
-  const q = s.toLowerCase();
-  const results = _bt_BANKS.filter(
-    (b) =>
-      _bt_toStr(b.name).toLowerCase().includes(q) || _bt_toStr(b.kana).toLowerCase().includes(q)
-  );
-  // callback が渡されている場合は非同期風にコールバックで返す（コード検索と同様の扱い）
-  if (_isCallback) {
-    // 名前検索のコールバック呼び出しは外部 API を使うよう変更
-    // ここではローカルキャッシュを使わず、Web API 経由で厳密ルールを適用する
-    _bt_searchBankByName(s, {}, (err, res) => {
+    _bt_loadBankByCode(key, {}, (err, res) => {
       if (err) return callback(err, null);
-      if (!res || res.success === false) return callback(res, null);
+      if (!res) return callback({ success: false, error: '銀行情報の取得結果が空です' }, null);
+      if (res && res.success === false) return callback(res, null);
+      if (!res.bank)
+        return callback(
+          { success: false, error: '銀行データがレスポンスに含まれていません' },
+          null
+        );
       const b = res.bank;
-      return callback(null, { code: b.code, name: b.name, kana: b.kana });
+      let kanaOut = _bt_toStr(b.kana);
+      try {
+        kanaOut = _bt_toHalfWidthKana(kanaOut, false);
+      } catch (e) {
+        kanaOut = _bt_toStr(b.kana);
+      }
+      return callback(null, { code: b.code, name: b.name, kana: kanaOut });
     });
     return;
   }
-  return results;
+
+  // 名前検索は必ず非同期（外部API経由）で厳密ルールを適用する
+  _bt_searchBankByName(s, {}, (err, res) => {
+    if (err) return callback(err, null);
+    if (!res || res.success === false) return callback(res, null);
+    const b = res.bank;
+    let kanaOut2 = _bt_toStr(b.kana);
+    try {
+      kanaOut2 = _bt_toHalfWidthKana(kanaOut2, false);
+    } catch (e) {
+      kanaOut2 = _bt_toStr(b.kana);
+    }
+    return callback(null, { code: b.code, name: b.name, kana: kanaOut2 });
+  });
+  return;
 };
 
 // -------------------------
@@ -438,6 +743,5 @@ if (typeof window !== 'undefined') {
     convertYucho,
     generateZenginTransfer,
     loadBankDataFromBankKun,
-    loadBankByCode,
   });
 }

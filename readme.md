@@ -18,6 +18,9 @@ This repo is used as a starter for a _very basic_ HTML web application using no 
 	- `.prettierrc` を追加して Prettier のルールを固定化しました（例: singleQuote, trailingComma, printWidth など）。
 	- `src/all-window-exports.js` を追加 — 公開 API を安全に `window` に露出するためのヘルパー（既に定義されている識別子のみを添付し、既存のグローバルを上書きしないようになっています）。
 	- ブラウザ検証用のテストページを追加: `src/test.html`, `src/test-only.html`, `src/test-all-scripts.html`。
+	- `src/bank-transfer.js` を追加/更新 — kintone 向けの銀行振込ユーティリティ。
+		- `getBank(input, callback)` はコールバック必須の非同期 API に変更しました（同期返却は廃止）。
+		- `getBank` がコールバックで返す `kana` は半角カタカナ化され、長音記号や類似ダッシュはすべて半角ハイフン `-` に正規化されます。
 	- 自動チェック用スクリプトを追加: `scripts/check-window-vm.js`（Node の VM 上での確認）、`scripts/puppeteer-check.js`（ヘッドレスブラウザでの確認）、`scripts/auto-check.js`（ファイル変更を監視して再実行）。
 	- CI ワークフローを追加/更新: `.github/workflows/prepare-dist.yml`（Prettier/ESLint/prepare:dist を実行して PR をブロックする設定）。
 
