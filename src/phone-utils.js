@@ -1321,6 +1321,10 @@ const normalizePhoneNumber = (phoneNumber) => {
 // 公開: 電話番号ユーティリティをグローバルに露出（ファイル末尾に非破壊的に追加）
 if (typeof window !== 'undefined') {
   try {
+    window.isValidPhoneNumber =
+      typeof isValidPhoneNumber !== 'undefined' ? isValidPhoneNumber : undefined;
+  } catch {}
+  try {
     window.formatPhoneNumber =
       typeof formatPhoneNumber !== 'undefined' ? formatPhoneNumber : undefined;
   } catch {}

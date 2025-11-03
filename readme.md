@@ -10,6 +10,38 @@ and other helpers.
 
 This repo is used as a starter for a _very basic_ HTML web application using no front-end frameworks.
 
+## 今回の追加・変更 (2025-11-03)
+
+このリポジトリに対して最近行った主要な変更点と、ローカルでの確認手順をまとめます。
+
+- 追加/変更された主なファイル・仕組み:
+	- `.prettierrc` を追加して Prettier のルールを固定化しました（例: singleQuote, trailingComma, printWidth など）。
+	- `src/all-window-exports.js` を追加 — 公開 API を安全に `window` に露出するためのヘルパー（既に定義されている識別子のみを添付し、既存のグローバルを上書きしないようになっています）。
+	- ブラウザ検証用のテストページを追加: `src/test.html`, `src/test-only.html`, `src/test-all-scripts.html`。
+	- 自動チェック用スクリプトを追加: `scripts/check-window-vm.js`（Node の VM 上での確認）、`scripts/puppeteer-check.js`（ヘッドレスブラウザでの確認）、`scripts/auto-check.js`（ファイル変更を監視して再実行）。
+	- CI ワークフローを追加/更新: `.github/workflows/prepare-dist.yml`（Prettier/ESLint/prepare:dist を実行して PR をブロックする設定）。
+
+- ローカルでの推奨確認手順（開発者向け）:
+
+```bash
+npm install
+npm run format       # Prettier でコード整形
+npm run lint         # ESLint のチェック
+npm run lint:fix     # 可能な自動修正
+npm run ci-check     # prepare:dist -> Node VM チェック -> Puppeteer ブラウザチェック
+npm run prepare:dist # dist を作成
+npm start            # src をローカル配信（http://localhost:8000）
+```
+
+- CI でよくある失敗と対処の指針:
+	- Prettier のチェックに失敗した場合: `npm run format` を実行して整形後にコミットしてください。
+	- ESLint エラーで止まる場合: `npm run lint` / `npm run lint:fix` を使って原因を確認・修正してください。
+
+- 注意事項:
+	- `window` に公開する際は、該当識別子が定義された後に公開してください（TDZ による未定義参照を避けるため）。`all-window-exports.js` はその補助をしますが、読み込み順を保証することも重要です。
+	- GitHub Actions の詳細ログ（特にアーティファクトや ZIP ログ）はリポジトリの権限に依存します。取得できない場合はリポジトリ管理者に確認してください。
+
+
 This repo has a dev container. This means if you open it inside a [GitHub Codespace](https://github.com/features/codespaces), or using [VS Code with the remote containers extension](https://code.visualstudio.com/docs/remote/containers), it will be opened inside a container with all the dependencies already installed.
 
 ## ローカル開発（日本語）
@@ -59,17 +91,17 @@ npm run zip
 通常 kintone に登録する配布対象ファイルの例を以下に示します。プロジェクト構成に合わせて個別に選択して下さい。
 
 - JavaScript ユーティリティ（主に kintone 上で利用するファイル）
+	- `src/date-utils.js`
 	- `src/kintone-custom-lib.js`
+	- `src/phone-utils.js`
+	- `src/shipping-processing.js`
+	- `src/text-suite.js`
 	- `src/zip-code-address-utils.js`
 	- `src/zipcode_processing.js`
 	- `src/phone_number_translation.js`
-	- `src/phone-utils.js`
 	- `src/character_handling.js`
-	- `src/date-utils.js`
 	- `src/date_handling.js`
-	- `src/text-suite.js`
 	- `src/financial_institution_processing.js`
-	- `src/shipping-processing.js`
 	- `src/vc-check.js`
 	- `src/password_generation.js`
 	- `src/jquery.autoKana.js` (必要なら)
