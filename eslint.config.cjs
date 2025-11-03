@@ -43,6 +43,8 @@ module.exports = [
           trailingComma: 'es5',
           semi: true,
           printWidth: 100,
+          // Allow tabs for indentation in this project (we use tabs in some legacy files)
+          useTabs: true,
           tabWidth: 2
         }
       ],
