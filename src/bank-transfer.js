@@ -223,6 +223,10 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 // - otherwise behave as before (synchronous): return object|null for code lookup or array for name search
 const getBank = (input, callback) => {
   const s = _bt_toStr(input).trim();
+  // 第二引数が渡されているが関数でない場合はエラーを返す
+  if (arguments.length >= 2 && typeof callback !== 'function') {
+    return { success: false, error: '第二引数はコールバック関数である必要があります' };
+  }
   if (!s) return null;
   const digitsOnly = /^[0-9]+$/.test(s);
   if (digitsOnly && s.length <= 4) {
