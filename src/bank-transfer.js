@@ -98,6 +98,121 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 };
 
 // -------------------------
+// internal: 銀行名で検索（BankKun の search API を使う）
+// URL: {apiBaseUrl}/banks/search.json?name={bank_name}
+// レスポンスは配列。複数件の場合は完全一致を探し、それが1件あればそれを採用。
+// それでも複数 or 完全一致なしの場合はエラーを返す。
+// callback(err, { success:true, bank }) または callback({ success:false, error }, null)
+// -------------------------
+const _bt_searchBankByName = (name, options = {}, callback) => {
+  if (typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+  const { apiBaseUrl = 'https://bank.teraren.com', apiKey, timeout = 5000 } = options;
+  const q = _bt_toStr(name).trim();
+  if (!q) {
+    if (typeof callback === 'function') callback({ success: false, error: '検索語が空です' }, null);
+    return;
+  }
+  const base = apiBaseUrl.replace(/\/$/, '');
+  const url = base + '/banks/search.json?name=' + encodeURIComponent(q);
+  const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+  const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  let timer = null;
+  if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
+
+  fetch(url, { headers, signal: abortController ? abortController.signal : undefined })
+    .then((res) => {
+      if (!res.ok)
+        throw new Error(`銀行名検索の実行に失敗しました（HTTPステータス: ${res.status}）`);
+      return res.json();
+    })
+    .then((arr) => {
+      if (!Array.isArray(arr)) throw new Error('検索結果の形式が不正です');
+      if (arr.length === 0) {
+        if (typeof callback === 'function')
+          callback({ success: false, error: '該当する銀行が見つかりませんでした' }, null);
+        return;
+      }
+      // 単一結果はそのまま採用
+      if (arr.length === 1) {
+        const j = arr[0];
+        const bankObj = {
+          code: _bt_toStr(j.code).padStart(4, '0'),
+          name: _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name),
+          kana: _bt_toStr(j.normalize && j.normalize.kana ? j.normalize.kana : j.kana),
+          url: _bt_toStr(j.url || url),
+          branches_url: _bt_toStr(
+            j.branches_url || base + `/banks/${_bt_toStr(j.code).padStart(4, '0')}/branches.json`
+          ),
+        };
+        const idx = _bt_BANKS.findIndex((b) => b.code === bankObj.code);
+        if (idx >= 0) _bt_BANKS[idx] = bankObj;
+        else _bt_BANKS.push(bankObj);
+        if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
+        return;
+      }
+      // 複数件: 完全一致を探す（normalize.name / name の両方をチェック）
+      const exact = arr.filter((j) => {
+        const n1 = _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name).trim();
+        const n2 = _bt_toStr(j.name).trim();
+        return n1 === q || n2 === q;
+      });
+      if (exact.length === 1) {
+        const j = exact[0];
+        const bankObj = {
+          code: _bt_toStr(j.code).padStart(4, '0'),
+          name: _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name),
+          kana: _bt_toStr(j.normalize && j.normalize.kana ? j.normalize.kana : j.kana),
+          url: _bt_toStr(j.url || url),
+          branches_url: _bt_toStr(
+            j.branches_url || base + `/banks/${_bt_toStr(j.code).padStart(4, '0')}/branches.json`
+          ),
+        };
+        const idx = _bt_BANKS.findIndex((b) => b.code === bankObj.code);
+        if (idx >= 0) _bt_BANKS[idx] = bankObj;
+        else _bt_BANKS.push(bankObj);
+        if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
+        return;
+      }
+      if (exact.length > 1) {
+        if (typeof callback === 'function')
+          callback(
+            {
+              success: false,
+              error: '検索結果が複数あります（完全一致の候補が複数見つかりました）',
+            },
+            null
+          );
+        return;
+      }
+      // 完全一致なし -> エラーとする（仕様）
+      if (typeof callback === 'function')
+        callback(
+          { success: false, error: '検索結果が複数あります（完全一致する銀行名が見つかりません）' },
+          null
+        );
+    })
+    .catch((err) => {
+      let message = null;
+      try {
+        if (err && err.name === 'AbortError')
+          message = '検索がタイムアウトしました（指定時間内に応答がありません）';
+        else if (err && err.message) message = err.message;
+        else message = '銀行名検索中に不明なエラーが発生しました';
+      } catch (e2) {
+        message = '銀行名検索中にエラーが発生しました';
+      }
+      const e = { success: false, error: message };
+      if (typeof callback === 'function') callback(e, null);
+    })
+    .finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+};
+
+// -------------------------
 // 公開: 銀行取得（自動判定）
 // 入力が数字のみ（<=4桁）ならコード検索して単一オブジェクトまたは null を返す
 // そうでなければ名前で部分一致検索して配列を返す
@@ -143,7 +258,15 @@ const getBank = (input, callback) => {
   );
   // callback が渡されている場合は非同期風にコールバックで返す（コード検索と同様の扱い）
   if (typeof callback === 'function') {
-    return callback(null, results);
+    // 名前検索のコールバック呼び出しは外部 API を使うよう変更
+    // ここではローカルキャッシュを使わず、Web API 経由で厳密ルールを適用する
+    _bt_searchBankByName(s, {}, (err, res) => {
+      if (err) return callback(err, null);
+      if (!res || res.success === false) return callback(res, null);
+      const b = res.bank;
+      return callback(null, { code: b.code, name: b.name, kana: b.kana });
+    });
+    return;
   }
   return results;
 };
