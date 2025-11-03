@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>dist test (all scripts, with jQuery)</title>
+    <style>
+      body {
+        font-family: system-ui, monospace;
+      }
+      pre {
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>dist/test-all-scripts.html — window export check (includes jQuery)</h1>
+    <pre id="out">loading...</pre>
+
+    <!-- load scripts in order (keep all-window-exports.js last) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="jquery.autoKana.js"></script>
+    <script src="kintone-custom-lib.js"></script>
+    <script src="zip-code-address-utils.js"></script>
+    <script src="zipcode_processing.js"></script>
+    <script src="phone_number_translation.js"></script>
+    <script src="phone-utils.js"></script>
+    <script src="date-utils.js"></script>
+    <script src="date_handling.js"></script>
+    <script src="text-suite.js"></script>
+    <script src="character_handling.js"></script>
+    <script src="national_holiday_handling.js"></script>
+    <script src="financial_institution_processing.js"></script>
+    <script src="shipping-processing.js"></script>
+    <script src="vc-check.js"></script>
+    <script src="password_generation.js"></script>
+    <script src="all-window-exports.js"></script>
+
+    <script>
+      (function () {
+        var out = document.getElementById('out');
+        function parseNamesFromText(txt) {
+          var m = txt.match(/var\s+names\s*=\s*\[([\s\S]*?)\];/m);
+          if (!m) return null;
+          var body = m[1].replace(/\/\*[^]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+          var normalized = '[' + body.replace(/'/g, '"').replace(/,\s*\]/g, ']') + ']';
+          try {
+            return JSON.parse(normalized);
+          } catch (e) {
+            try {
+              return eval('([' + body + '])');
+            } catch (e2) {
+              return null;
+            }
+          }
+        }
+        function show(names) {
+          out.textContent = '';
+          (names || []).forEach(function (n) {
+            out.textContent += n + ': ' + typeof window[n] + '\n';
+          });
+          out.textContent += '\nwindow keys:\n' + Object.keys(window).slice(0, 300).join(', ');
+        }
+        function runShow() {
+          try {
+            fetch('all-window-exports.js')
+              .then(function (r) {
+                if (!r.ok) return show();
+                return r.text().then(function (txt) {
+                  var names = parseNamesFromText(txt);
+                  if (names && names.length) return show(names);
+                  return show();
+                });
+              })
+              .catch(function () {
+                show();
+              });
+          } catch (e) {
+            show();
+          }
+        }
+        if (document.readyState === 'complete') runShow();
+        else window.addEventListener('load', runShow);
+      })();
+    </script>
+  </body>
+</html>
