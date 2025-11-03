@@ -234,10 +234,10 @@ const _bt_safeLog = (msg) => {
       window.KACSW._bt_debugLogs = window.KACSW._bt_debugLogs || [];
       window.KACSW._bt_debugLogs.push(String(msg));
     }
-  } catch (e) {}
+  } catch {}
   try {
     if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug(msg);
-  } catch (e) {}
+  } catch {}
 };
 
 /**
@@ -289,7 +289,7 @@ const _bt_invokeCallback = (cb, err, res) => {
       _bt_safeLog(
         '[KACSW.bankTransfer] _bt_invokeCallback error: ' + (e && e.message ? e.message : e)
       );
-    } catch (e2) {}
+    } catch {}
   }
 };
 
@@ -316,7 +316,7 @@ const _bt_buildPattern = (keys) => {
       _bt_safeLog(
         '[KACSW.bankTransfer] _bt_buildPattern error: ' + (e && e.message ? e.message : e)
       );
-    } catch (e2) {}
+    } catch {}
     return /(?:)/g;
   }
 };
@@ -379,7 +379,7 @@ const _bt_toFullWidthKatakana = (str = '', throwOnError = true) => {
           '[KACSW.bankTransfer] _bt_toFullWidthKatakana fallback on error',
           e && e.message ? e.message : e
         );
-    } catch (e2) {}
+    } catch {}
     return str;
   }
 };
@@ -446,7 +446,7 @@ const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
           '[KACSW.bankTransfer] _bt_toHalfWidthKana fallback on error',
           e && e.message ? e.message : e
         );
-    } catch (e2) {}
+    } catch {}
     return str;
   }
 };
@@ -489,7 +489,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
               '[KACSW.bankTransfer] _bt_loadBankByCode: AbortController ctor threw',
               e && e.message ? e.message : e
             );
-        } catch (e2) {}
+        } catch {}
         return null;
       }
     })();
@@ -512,11 +512,11 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
                   '[KACSW.bankTransfer] _bt_loadBankByCode: abort failed',
                   e && e.message ? e.message : e
                 );
-            } catch (e2) {}
+            } catch {}
           }
         }, timeout);
       }
-    } catch (e) {
+    } catch {
       timer = null;
     }
 
@@ -544,7 +544,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
             // API からの kana を可能な限り半角カナ化＋全角英数字は半角化して大文字化
             try {
               bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
-            } catch (e) {}
+            } catch {}
             let idx = _bt_BANKS.findIndex((b) => {
               return b.code === bankObj.code;
             });
@@ -552,7 +552,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
             else _bt_BANKS.push(bankObj);
             try {
               _bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: fetch success ' + bankObj.code);
-            } catch (e) {}
+            } catch {}
             if (typeof callback === 'function') callback(bankObj);
           })
           .catch((err) => {
@@ -572,7 +572,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
               } else {
                 message = '銀行情報の取得中に不明なエラーが発生しました';
               }
-            } catch (e2) {
+            } catch {
               message = '銀行情報の取得中にエラーが発生しました';
             }
             let e = { error: message };
@@ -596,7 +596,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
             '[KACSW.bankTransfer] _bt_loadBankByCode: attempting fetch with signal',
             url
           );
-      } catch (e) {}
+      } catch {}
       _bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: attempting fetch with signal ' + url);
       _bt_performFetch(
         fetch(url, { headers, signal: abortController ? abortController.signal : undefined })
@@ -611,7 +611,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
               '[KACSW.bankTransfer] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal',
               e && e.message ? e.message : e
             );
-        } catch (e3) {}
+        } catch {}
         _bt_safeLog(
           '[KACSW.bankTransfer] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal ' +
             (e && e.message ? e.message : e)
@@ -633,7 +633,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
               '[KACSW.bankTransfer] _bt_loadBankByCode: fetch without signal also threw',
               e2 && e2.message ? e2.message : e2
             );
-        } catch (e4) {}
+        } catch {}
         _bt_safeLog(
           '[KACSW.bankTransfer] _bt_loadBankByCode: fetch without signal also threw ' +
             (e2 && e2.message ? e2.message : e2)
@@ -650,7 +650,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
           '[KACSW.bankTransfer] _bt_loadBankByCode: top-level sync error',
           topErr && topErr.message ? topErr.message : topErr
         );
-    } catch (e) {}
+    } catch {}
     if (typeof callback === 'function')
       callback(
         { success: false, error: topErr && topErr.message ? topErr.message : String(topErr) },
@@ -713,13 +713,13 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
         };
         try {
           bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
-        } catch (e) {}
+        } catch {}
         const idx = _bt_BANKS.findIndex((b) => b.code === bankObj.code);
         if (idx >= 0) _bt_BANKS[idx] = bankObj;
         else _bt_BANKS.push(bankObj);
         try {
           _bt_safeLog('[KACSW.bankTransfer] _bt_searchBankByName: success ' + bankObj.code);
-        } catch (e) {}
+        } catch {}
         if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
         return;
       }
@@ -742,7 +742,7 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
         };
         try {
           bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
-        } catch (e) {}
+        } catch {}
         const idx = _bt_BANKS.findIndex((b) => b.code === bankObj.code);
         if (idx >= 0) _bt_BANKS[idx] = bankObj;
         else _bt_BANKS.push(bankObj);
@@ -781,7 +781,7 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
             message = m;
           }
         } else message = '銀行名検索中に不明なエラーが発生しました';
-      } catch (e2) {
+      } catch {
         message = '銀行名検索中にエラーが発生しました';
       }
       const e = { success: false, error: message };
@@ -832,7 +832,7 @@ const getBank = (input, callback) => {
         let kanaOut = _bt_toStr(b.kana);
         try {
           kanaOut = _bt_toHalfWidthKana(kanaOut, false);
-        } catch (e) {
+        } catch {
           kanaOut = _bt_toStr(b.kana);
         }
         _bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut });
@@ -865,7 +865,7 @@ const getBank = (input, callback) => {
       let kanaOut = _bt_toStr(b.kana);
       try {
         kanaOut = _bt_toHalfWidthKana(kanaOut, false);
-      } catch (e) {
+      } catch {
         kanaOut = _bt_toStr(b.kana);
       }
       _bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut });
@@ -890,7 +890,7 @@ const getBank = (input, callback) => {
       let kanaOut2 = _bt_toStr(b.kana);
       try {
         kanaOut2 = _bt_toHalfWidthKana(kanaOut2, false);
-      } catch (e) {
+      } catch {
         kanaOut2 = _bt_toStr(b.kana);
       }
       _bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut2 });
@@ -914,7 +914,7 @@ const getBank = (input, callback) => {
     let kanaOut2 = _bt_toStr(b.kana);
     try {
       kanaOut2 = _bt_toHalfWidthKana(kanaOut2, false);
-    } catch (e) {
+    } catch {
       kanaOut2 = _bt_toStr(b.kana);
     }
     _bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut2 });
@@ -1031,7 +1031,7 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
           kana: (function () {
             try {
               return _bt_toHalfWidthKana(_bt_toStr(b.kana), false);
-            } catch (e) {
+            } catch {
               return _bt_toStr(b.kana);
             }
           })(),
@@ -1062,7 +1062,7 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
             kana: (function () {
               try {
                 return _bt_toHalfWidthKana(_bt_toStr(br.kana), false);
-              } catch (e) {
+              } catch {
                 return _bt_toStr(br.kana);
               }
             })(),
@@ -1095,7 +1095,7 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
         } else {
           message = '銀行データ取得中に不明なエラーが発生しました';
         }
-      } catch (e2) {
+      } catch {
         message = '銀行データ取得中にエラーが発生しました';
       }
       const e = { success: false, error: message };
