@@ -32,12 +32,29 @@ const _bt_toStr = (v) => (v == null ? '' : String(v));
 // 入力が数字のみ（<=4桁）ならコード検索して単一オブジェクトまたは null を返す
 // そうでなければ名前で部分一致検索して配列を返す
 // -------------------------
-const getBank = (input) => {
+// getBank: (input, [callback])
+// - if input looks like a bank code and a callback is provided, call internal _bt_loadBankByCode
+//   and return via callback the simplified object { code, name, kana }
+// - otherwise behave as before (synchronous): return object|null for code lookup or array for name search
+const getBank = (input, callback) => {
   const s = _bt_toStr(input).trim();
   if (!s) return null;
   const digitsOnly = /^[0-9]+$/.test(s);
   if (digitsOnly && s.length <= 4) {
     const key = s.padStart(4, '0');
+    // If a callback is provided, use the internal async loader to refresh/obtain bank info
+    if (typeof callback === 'function') {
+      // call internal loader; it returns via callback(err, { success, bank })
+      _bt_loadBankByCode(key, {}, (err, res) => {
+        if (err) return callback(err, null);
+        if (!res || !res.success || !res.bank)
+          return callback({ success: false, error: 'no_bank' }, null);
+        const b = res.bank;
+        return callback(null, { code: b.code, name: b.name, kana: b.kana });
+      });
+      return;
+    }
+    // synchronous fallback: return from internal cache
     return _bt_BANKS.find((b) => b.code === key) || null;
   }
   const q = s.toLowerCase();
@@ -204,7 +221,8 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
 // - loadBankByCode('0001', options?, callback)
 // - callback(err, result)  result: { success:true, bank } or error
 // -------------------------
-const loadBankByCode = (bankCode, options = {}, callback) => {
+// internal: _bt_loadBankByCode - not exposed to window.KACSW
+const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
   if (typeof options === 'function') {
     callback = options;
     options = {};
