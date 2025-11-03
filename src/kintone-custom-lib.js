@@ -597,6 +597,10 @@ if (typeof window !== 'undefined') {
     window.setRecordValues = typeof setRecordValues !== 'undefined' ? setRecordValues : undefined;
   } catch {}
   try {
+    window.setSpaceFieldDisplay =
+      typeof setSpaceFieldDisplay !== 'undefined' ? setSpaceFieldDisplay : undefined;
+  } catch {}
+  try {
     window.setSpaceFieldButton =
       typeof setSpaceFieldButton !== 'undefined' ? setSpaceFieldButton : undefined;
   } catch {}
