@@ -352,3 +352,15 @@ const assertEmailAddress = (emailAddress = '') => {
         throw new Error('`メールアドレスの形式が正しくありません: ${error.message}`');
     }
 };
+
+// 公開（定義が完了した後で一箇所にまとめて行う）
+if (typeof window !== 'undefined') {
+	window.convert_to_half_width_kana‎ = convert_to_half_width_kana‎;
+	window.convert_to_full_width_kana‎‎ = convert_to_full_width_kana‎‎;
+	window.convert_to_hiragana = convert_to_hiragana;
+	window.convert_to_single_byte_characters‎ = convert_to_single_byte_characters‎;
+	window.convert_to_double_byte_characters = convert_to_double_byte_characters;
+	window.convert_to_email_address = convert_to_email_address;
+	window.check_single_byte_numbers = check_single_byte_numbers;
+	window.check_single_byte_kana = check_single_byte_kana;
+}
