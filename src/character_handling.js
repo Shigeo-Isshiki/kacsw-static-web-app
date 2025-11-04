@@ -3,7 +3,7 @@
  * @version 1.1.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_ch_)で始める
-/* exported convert_to_hiragana, convert_to_double_byte_characters, convert_to_email_address, check_single_byte_numbers */
+/* exported convert_to_hiragana, convert_to_double_byte_characters, convert_to_email_address, check_single_byte_numbers, check_single_byte_kana, assertEmailAddress */
 'use strict';
 /**
  * 文字列が文字列型であることを確認する関数
