@@ -1,4 +1,4 @@
-name: Prepare dist
+name: Prepare dist and package (clean)
 
 on:
   push:
@@ -31,15 +31,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint (CI)
-        run: npm run lint:ci
+      - name: Check formatting with Prettier
+        run: npx prettier --check "src/**/*.{js,css,html}"
+
+      - name: Run ESLint
+        run: npx eslint "src/**/*.js"
 
       - name: Run prepare:dist
         run: npm run prepare:dist
 
       - name: Create zip
         run: |
-          cd dist && zip -r ../package.zip .
+          if [ -d dist ]; then cd dist && zip -r ../package.zip .; else echo "dist directory not found"; exit 1; fi
 
       - name: Upload package.zip
         uses: actions/upload-artifact@v4
