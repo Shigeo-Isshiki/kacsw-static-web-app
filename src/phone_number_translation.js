@@ -1172,7 +1172,6 @@ const _pn_isValidJapanesePhoneNumber = (str) => {
  * @returns {string} フォーマット済み電話番号
  * @throws {Error} フォーマットに失敗した場合にエラーを投げる
  */
-/* eslint-disable-next-line no-unused-vars */
 const _pn_fallbackFormatPhoneNumber = (telephoneNumber) => {
 	const telephoneNumberPNO = _pn_getPhoneNumberOnly(telephoneNumber); // この時点でエラーが投げられる可能性あり
 

@@ -201,7 +201,6 @@ const convertToEra = (date) => {
  * @throws {Error} 解釈できない場合
  */
 /* exported convertToYear */
-// eslint-disable-next-line no-unused-vars
 const convertToYear = (date) => {
 	// 1) Dateオブジェクトならそのまま
 	if (date instanceof Date) {

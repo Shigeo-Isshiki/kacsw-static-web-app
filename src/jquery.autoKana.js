@@ -52,7 +52,6 @@
 		elName.focus(_eventFocus);
 		elName.keydown(_eventKeyDown);
 
-		/* eslint-disable no-unused-vars */
 		function start() {
 			active = true;
 		}
@@ -74,7 +73,6 @@
 				active = !active;
 			}
 		}
-		/* eslint-enable no-unused-vars */
 
 		function _checkConvert(new_values) {
 			if (!flagConvert) {
