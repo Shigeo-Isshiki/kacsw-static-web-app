@@ -6,14 +6,14 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  build:
-    name: Build prepare-dist and upload artifact
+  prepare-dist:
+    name: Prepare dist and upload package.zip
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -27,21 +27,62 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: Install dependencies
-        run: |
-          npm ci
+        run: npm ci
 
       - name: Run prepare:dist
-        run: |
-          npm run prepare:dist
+        run: npm run prepare:dist
 
-      - name: Zip dist
+      - name: Create zip
         run: |
           cd dist && zip -r ../package.zip .
 
-      - name: Upload dist artifact
+      - name: Upload package.zip
         uses: actions/upload-artifact@v4
         with:
-          name: dist-package
+          name: package-zip
+          path: package.zip
+name: Prepare dist
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  prepare-dist:
+    name: Prepare dist and upload package.zip
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run prepare:dist
+        run: npm run prepare:dist
+
+      - name: Create zip
+        run: |
+          cd dist && zip -r ../package.zip .
+
+      - name: Upload package.zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-zip
           path: package.zip
 name: Prepare dist and package
 
