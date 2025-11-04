@@ -18,7 +18,13 @@ module.exports = {
 // Ensure `eslint-plugin-prettier` is installed in devDependencies.
 module.exports = [
   {
-    ignores: ["node_modules/**", "dist/**"]
+    ignores: [
+      "node_modules/**",
+      "dist/**",
+      "scripts/**",
+      "public/**",
+      ".vscode/**"
+    ]
   },
   {
     files: ["**/*.js"],
