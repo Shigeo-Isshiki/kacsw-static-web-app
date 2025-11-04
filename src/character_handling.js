@@ -10,7 +10,7 @@
  * @returns {boolean} - 文字列である = true、文字でない = false
  */
 const _ch_checkString = (str) => {
-    return typeof str === 'string' && str !== null && str !== undefined;
+	return typeof str === 'string' && str !== null && str !== undefined;
 };
 /**
  * 変換用の文字リスト
@@ -23,50 +23,184 @@ const _ch_checkString = (str) => {
  */
 /** @type {_ch_convert_character_list} */
 const _ch_convert_character_list = {
-    'half_width_kana': {
-        'ア': 'ｱ', 'イ': 'ｲ', 'ウ': 'ｳ', 'エ': 'ｴ', 'オ': 'ｵ',
-        'カ': 'ｶ', 'キ': 'ｷ', 'ク': 'ｸ', 'ケ': 'ｹ', 'コ': 'ｺ',
-        'サ': 'ｻ', 'シ': 'ｼ', 'ス': 'ｽ', 'セ': 'ｾ', 'ソ': 'ｿ',
-        'タ': 'ﾀ', 'チ': 'ﾁ', 'ツ': 'ﾂ', 'テ': 'ﾃ', 'ト': 'ﾄ',
-        'ナ': 'ﾅ', 'ニ': 'ﾆ', 'ヌ': 'ﾇ', 'ネ': 'ﾈ', 'ノ': 'ﾉ',
-        'ハ': 'ﾊ', 'ヒ': 'ﾋ', 'フ': 'ﾌ', 'ヘ': 'ﾍ', 'ホ': 'ﾎ',
-        'マ': 'ﾏ', 'ミ': 'ﾐ', 'ム': 'ﾑ', 'メ': 'ﾒ', 'モ': 'ﾓ',
-        'ヤ': 'ﾔ', 'ユ': 'ﾕ', 'ヨ': 'ﾖ',
-        'ラ': 'ﾗ', 'リ': 'ﾘ', 'ル': 'ﾙ', 'レ': 'ﾚ', 'ロ': 'ﾛ',
-        'ワ': 'ﾜ', 'ヲ': 'ｦ', 'ン': 'ﾝ',
-        'ガ': 'ｶﾞ', 'ギ': 'ｷﾞ', 'グ': 'ｸﾞ', 'ゲ': 'ｹﾞ', 'ゴ': 'ｺﾞ',
-        'ザ': 'ｻﾞ', 'ジ': 'ｼﾞ', 'ズ': 'ｽﾞ', 'ゼ': 'ｾﾞ', 'ゾ': 'ｿﾞ',
-        'ダ': 'ﾀﾞ', 'ヂ': 'ﾁﾞ', 'ヅ': 'ﾂﾞ', 'デ': 'ﾃﾞ', 'ド': 'ﾄﾞ',
-        'バ': 'ﾊﾞ', 'ビ': 'ﾋﾞ', 'ブ': 'ﾌﾞ', 'ベ': 'ﾍﾞ', 'ボ': 'ﾎﾞ',
-        'パ': 'ﾊﾟ', 'ピ': 'ﾋﾟ', 'プ': 'ﾌﾟ', 'ペ': 'ﾍﾟ', 'ポ': 'ﾎﾟ',
-        'ヴ': 'ｳﾞ', 'ヷ': 'ﾜﾞ', 'ヺ': 'ｦﾞ',
-        'ァ': 'ｧ', 'ィ': 'ｨ', 'ゥ': 'ｩ', 'ェ': 'ｪ', 'ォ': 'ｫ',
-        'ッ': 'ｯ', 'ャ': 'ｬ', 'ュ': 'ｭ', 'ョ': 'ｮ',
-        '゛': 'ﾞ', '゜': 'ﾟ', '　': ' '
-    },
-    'full_width_kana': {
-        'ｱ': 'ア', 'ｲ': 'イ', 'ｳ': 'ウ', 'ｴ': 'エ', 'ｵ': 'オ',
-        'ｶ': 'カ', 'ｷ': 'キ', 'ｸ': 'ク', 'ｹ': 'ケ', 'ｺ': 'コ',
-        'ｻ': 'サ', 'ｼ': 'シ', 'ｽ': 'ス', 'ｾ': 'セ', 'ｿ': 'ソ',
-        'ﾀ': 'タ', 'ﾁ': 'チ', 'ﾂ': 'ツ', 'ﾃ': 'テ', 'ﾄ': 'ト',
-        'ﾅ': 'ナ', 'ﾆ': 'ニ', 'ﾇ': 'ヌ', 'ﾈ': 'ネ', 'ﾉ': 'ノ',
-        'ﾊ': 'ハ', 'ﾋ': 'ヒ', 'ﾌ': 'フ', 'ﾍ': 'ヘ', 'ﾎ': 'ホ',
-        'ﾏ': 'マ', 'ﾐ': 'ミ', 'ﾑ': 'ム', 'ﾒ': 'メ', 'ﾓ': 'モ',
-        'ﾔ': 'ヤ', 'ﾕ': 'ユ', 'ﾖ': 'ヨ',
-        'ﾗ': 'ラ', 'ﾘ': 'リ', 'ﾙ': 'ル', 'ﾚ': 'レ', 'ﾛ': 'ロ',
-        'ﾜ': 'ワ', 'ｦ': 'ヲ', 'ﾝ': 'ン',
-        'ｧ': 'ァ', 'ｨ': 'ィ', 'ｩ': 'ゥ', 'ｪ': 'ェ', 'ｫ': 'ォ',
-        'ｯ': 'ッ', 'ｬ': 'ャ', 'ｭ': 'ュ', 'ｮ': 'ョ',
-        'ﾞ': '゛', 'ﾟ': '゜', ' ': '　'
-    },
-    'turbidity_kana': {
-        'カ゛': 'ガ', 'キ゛': 'ギ', 'ク゛': 'グ', 'ケ゛': 'ゲ', 'コ゛': 'ゴ',
-        'サ゛': 'ザ', 'シ゛': 'ジ', 'ス゛': 'ズ', 'セ゛': 'ゼ', 'ソ゛': 'ゾ',
-        'タ゛': 'ダ', 'チ゛': 'ヂ', 'ツ゛': 'ヅ', 'テ゛': 'デ', 'ト゛': 'ド',
-        'ハ゛': 'バ', 'ヒ゛': 'ビ', 'フ゛': 'ブ', 'ヘ゛': 'ベ', 'ホ゛': 'ボ',
-        'ハ゜': 'パ', 'ヒ゜': 'ピ', 'フ゜': 'プ', 'ヘ゜': 'ペ', 'ホ゜': 'ポ',
-        'ウ゛': 'ヴ', 'ワ゛': 'ヷ', 'ヲ゛': 'ヺ'
-    }
+	half_width_kana: {
+		ア: 'ｱ',
+		イ: 'ｲ',
+		ウ: 'ｳ',
+		エ: 'ｴ',
+		オ: 'ｵ',
+		カ: 'ｶ',
+		キ: 'ｷ',
+		ク: 'ｸ',
+		ケ: 'ｹ',
+		コ: 'ｺ',
+		サ: 'ｻ',
+		シ: 'ｼ',
+		ス: 'ｽ',
+		セ: 'ｾ',
+		ソ: 'ｿ',
+		タ: 'ﾀ',
+		チ: 'ﾁ',
+		ツ: 'ﾂ',
+		テ: 'ﾃ',
+		ト: 'ﾄ',
+		ナ: 'ﾅ',
+		ニ: 'ﾆ',
+		ヌ: 'ﾇ',
+		ネ: 'ﾈ',
+		ノ: 'ﾉ',
+		ハ: 'ﾊ',
+		ヒ: 'ﾋ',
+		フ: 'ﾌ',
+		ヘ: 'ﾍ',
+		ホ: 'ﾎ',
+		マ: 'ﾏ',
+		ミ: 'ﾐ',
+		ム: 'ﾑ',
+		メ: 'ﾒ',
+		モ: 'ﾓ',
+		ヤ: 'ﾔ',
+		ユ: 'ﾕ',
+		ヨ: 'ﾖ',
+		ラ: 'ﾗ',
+		リ: 'ﾘ',
+		ル: 'ﾙ',
+		レ: 'ﾚ',
+		ロ: 'ﾛ',
+		ワ: 'ﾜ',
+		ヲ: 'ｦ',
+		ン: 'ﾝ',
+		ガ: 'ｶﾞ',
+		ギ: 'ｷﾞ',
+		グ: 'ｸﾞ',
+		ゲ: 'ｹﾞ',
+		ゴ: 'ｺﾞ',
+		ザ: 'ｻﾞ',
+		ジ: 'ｼﾞ',
+		ズ: 'ｽﾞ',
+		ゼ: 'ｾﾞ',
+		ゾ: 'ｿﾞ',
+		ダ: 'ﾀﾞ',
+		ヂ: 'ﾁﾞ',
+		ヅ: 'ﾂﾞ',
+		デ: 'ﾃﾞ',
+		ド: 'ﾄﾞ',
+		バ: 'ﾊﾞ',
+		ビ: 'ﾋﾞ',
+		ブ: 'ﾌﾞ',
+		ベ: 'ﾍﾞ',
+		ボ: 'ﾎﾞ',
+		パ: 'ﾊﾟ',
+		ピ: 'ﾋﾟ',
+		プ: 'ﾌﾟ',
+		ペ: 'ﾍﾟ',
+		ポ: 'ﾎﾟ',
+		ヴ: 'ｳﾞ',
+		ヷ: 'ﾜﾞ',
+		ヺ: 'ｦﾞ',
+		ァ: 'ｧ',
+		ィ: 'ｨ',
+		ゥ: 'ｩ',
+		ェ: 'ｪ',
+		ォ: 'ｫ',
+		ッ: 'ｯ',
+		ャ: 'ｬ',
+		ュ: 'ｭ',
+		ョ: 'ｮ',
+		'゛': 'ﾞ',
+		'゜': 'ﾟ',
+		'　': ' ',
+	},
+	full_width_kana: {
+		ｱ: 'ア',
+		ｲ: 'イ',
+		ｳ: 'ウ',
+		ｴ: 'エ',
+		ｵ: 'オ',
+		ｶ: 'カ',
+		ｷ: 'キ',
+		ｸ: 'ク',
+		ｹ: 'ケ',
+		ｺ: 'コ',
+		ｻ: 'サ',
+		ｼ: 'シ',
+		ｽ: 'ス',
+		ｾ: 'セ',
+		ｿ: 'ソ',
+		ﾀ: 'タ',
+		ﾁ: 'チ',
+		ﾂ: 'ツ',
+		ﾃ: 'テ',
+		ﾄ: 'ト',
+		ﾅ: 'ナ',
+		ﾆ: 'ニ',
+		ﾇ: 'ヌ',
+		ﾈ: 'ネ',
+		ﾉ: 'ノ',
+		ﾊ: 'ハ',
+		ﾋ: 'ヒ',
+		ﾌ: 'フ',
+		ﾍ: 'ヘ',
+		ﾎ: 'ホ',
+		ﾏ: 'マ',
+		ﾐ: 'ミ',
+		ﾑ: 'ム',
+		ﾒ: 'メ',
+		ﾓ: 'モ',
+		ﾔ: 'ヤ',
+		ﾕ: 'ユ',
+		ﾖ: 'ヨ',
+		ﾗ: 'ラ',
+		ﾘ: 'リ',
+		ﾙ: 'ル',
+		ﾚ: 'レ',
+		ﾛ: 'ロ',
+		ﾜ: 'ワ',
+		ｦ: 'ヲ',
+		ﾝ: 'ン',
+		ｧ: 'ァ',
+		ｨ: 'ィ',
+		ｩ: 'ゥ',
+		ｪ: 'ェ',
+		ｫ: 'ォ',
+		ｯ: 'ッ',
+		ｬ: 'ャ',
+		ｭ: 'ュ',
+		ｮ: 'ョ',
+		ﾞ: '゛',
+		ﾟ: '゜',
+		' ': '　',
+	},
+	turbidity_kana: {
+		'カ゛': 'ガ',
+		'キ゛': 'ギ',
+		'ク゛': 'グ',
+		'ケ゛': 'ゲ',
+		'コ゛': 'ゴ',
+		'サ゛': 'ザ',
+		'シ゛': 'ジ',
+		'ス゛': 'ズ',
+		'セ゛': 'ゼ',
+		'ソ゛': 'ゾ',
+		'タ゛': 'ダ',
+		'チ゛': 'ヂ',
+		'ツ゛': 'ヅ',
+		'テ゛': 'デ',
+		'ト゛': 'ド',
+		'ハ゛': 'バ',
+		'ヒ゛': 'ビ',
+		'フ゛': 'ブ',
+		'ヘ゛': 'ベ',
+		'ホ゛': 'ボ',
+		'ハ゜': 'パ',
+		'ヒ゜': 'ピ',
+		'フ゜': 'プ',
+		'ヘ゜': 'ペ',
+		'ホ゜': 'ポ',
+		'ウ゛': 'ヴ',
+		'ワ゛': 'ヷ',
+		'ヲ゛': 'ヺ',
+	},
 };
 /**
  * イテラブルな文字列集合から正規表現パターンを構築する関数
@@ -74,11 +208,12 @@ const _ch_convert_character_list = {
  * @returns {RegExp} 正規表現のパターン
  */
 const _ch_buildPattern = (keys) => {
-    if (!keys) throw new Error('keys is required');
-    const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (!(keys && typeof keys[Symbol.iterator] === 'function')) throw new Error('keys must be an Iterable');
-    const escapedKeys = [...keys].map(escapeRegExp);
-    return new RegExp(escapedKeys.join('|'), 'g');
+	if (!keys) throw new Error('keys is required');
+	const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	if (!(keys && typeof keys[Symbol.iterator] === 'function'))
+		throw new Error('keys must be an Iterable');
+	const escapedKeys = [...keys].map(escapeRegExp);
+	return new RegExp(escapedKeys.join('|'), 'g');
 };
 /**
  * 半角カタカナ変換用のマップを作成する
@@ -100,21 +235,22 @@ const _ch_turbidity_kana_map = new Map(Object.entries(_ch_convert_character_list
  * @returns {string} 置き換え後の文字列
  */
 const _ch_replace_with_map = (str, pattern, map) => {
-    if (!_ch_checkString(str)) throw new Error(`_ch_replace_with_mapの[${str}]は文字である必要があります`);
-    if (!(pattern instanceof RegExp)) throw new Error('pattern must be a RegExp');
-    if (!(map instanceof Map)) throw new Error('map must be a Map');
-    return str.replace(pattern, char => map.get(char) ?? char);
+	if (!_ch_checkString(str))
+		throw new Error(`_ch_replace_with_mapの[${str}]は文字である必要があります`);
+	if (!(pattern instanceof RegExp)) throw new Error('pattern must be a RegExp');
+	if (!(map instanceof Map)) throw new Error('map must be a Map');
+	return str.replace(pattern, (char) => map.get(char) ?? char);
 };
 
 /**
  * 文字列の中の各文字を半角カタカナに変換する関数
- * @param {string} str 変換対象の文字列 
+ * @param {string} str 変換対象の文字列
  * @returns {string} 可能な限り半角カタカナに変換した文字列
  */
 const convert_to_half_width_kana = (str = '') => {
-    if (!_ch_checkString(str)) return '';
-    const half_width_kana_pattern = _ch_buildPattern(_ch_halfWidthKanaMap.keys());
-    return _ch_replace_with_map(str, half_width_kana_pattern, _ch_halfWidthKanaMap);
+	if (!_ch_checkString(str)) return '';
+	const half_width_kana_pattern = _ch_buildPattern(_ch_halfWidthKanaMap.keys());
+	return _ch_replace_with_map(str, half_width_kana_pattern, _ch_halfWidthKanaMap);
 };
 
 /**
@@ -124,19 +260,19 @@ const convert_to_half_width_kana = (str = '') => {
  * @returns {string} 可能な限り全角カタカナに変換した文字列
  */
 const convert_to_full_width_kana = (str = '', hiragana_sw = true) => {
-    if (!_ch_checkString(str)) return '';
-    if (typeof hiragana_sw !== 'boolean') return '';
-    const hiraganaToKatakana = (str) => {
-        return str.replace(/[\u3041-\u3096]/g, char => 
-            String.fromCodePoint(char.charCodeAt(0) + 0x60)
-        );
-    };
-    const full_width_kana_pattern = _ch_buildPattern(_ch_full_width_kana_map.keys());
-    const turbidity_kana_pattern = _ch_buildPattern(_ch_turbidity_kana_map.keys());
-    let result = hiragana_sw ? hiraganaToKatakana(str) : str;
-    result = _ch_replace_with_map(result, full_width_kana_pattern, _ch_full_width_kana_map);
-    result = _ch_replace_with_map(result, turbidity_kana_pattern, _ch_turbidity_kana_map);
-    return result;
+	if (!_ch_checkString(str)) return '';
+	if (typeof hiragana_sw !== 'boolean') return '';
+	const hiraganaToKatakana = (str) => {
+		return str.replace(/[\u3041-\u3096]/g, (char) =>
+			String.fromCodePoint(char.charCodeAt(0) + 0x60)
+		);
+	};
+	const full_width_kana_pattern = _ch_buildPattern(_ch_full_width_kana_map.keys());
+	const turbidity_kana_pattern = _ch_buildPattern(_ch_turbidity_kana_map.keys());
+	let result = hiragana_sw ? hiraganaToKatakana(str) : str;
+	result = _ch_replace_with_map(result, full_width_kana_pattern, _ch_full_width_kana_map);
+	result = _ch_replace_with_map(result, turbidity_kana_pattern, _ch_turbidity_kana_map);
+	return result;
 };
 
 /**
@@ -146,26 +282,26 @@ const convert_to_full_width_kana = (str = '', hiragana_sw = true) => {
  * @returns {string} ひらがなに変換した文字列。エラー時は例外をスローします。
  */
 const convert_to_hiragana = (str = '', check = false) => {
-    if (!_ch_checkString(str)) return '';
-    if (typeof check !== 'boolean') return '';
-    if (!str) return '';
-    const katakanaToHiragana = (str) => {
-        return str.replace(/[\u30A1-\u30F6]/g, char => 
-            String.fromCodePoint(char.charCodeAt(0) - 0x60)
-        );
-    };
-    const full_width_kana = convert_to_full_width_kana(str);
-    const hiragana = katakanaToHiragana(full_width_kana);
-    if (check) {
-        const allow_symbol = ['ー', '・', 'ゝ', 'ゞ', '゛', '゜', '　'];
-        const hiragana_check = [...hiragana].every(char => 
-            (char >= 'ぁ' && char <= 'ん') || allow_symbol.includes(char)
-        );
-        if (!hiragana_check) {
-            throw new Error('ひらがな以外の文字が含まれています');
-        }
-    }
-    return hiragana;
+	if (!_ch_checkString(str)) return '';
+	if (typeof check !== 'boolean') return '';
+	if (!str) return '';
+	const katakanaToHiragana = (str) => {
+		return str.replace(/[\u30A1-\u30F6]/g, (char) =>
+			String.fromCodePoint(char.charCodeAt(0) - 0x60)
+		);
+	};
+	const full_width_kana = convert_to_full_width_kana(str);
+	const hiragana = katakanaToHiragana(full_width_kana);
+	if (check) {
+		const allow_symbol = ['ー', '・', 'ゝ', 'ゞ', '゛', '゜', '　'];
+		const hiragana_check = [...hiragana].every(
+			(char) => (char >= 'ぁ' && char <= 'ん') || allow_symbol.includes(char)
+		);
+		if (!hiragana_check) {
+			throw new Error('ひらがな以外の文字が含まれています');
+		}
+	}
+	return hiragana;
 };
 
 /**
@@ -174,21 +310,24 @@ const convert_to_hiragana = (str = '', check = false) => {
  * @returns {string} 半角文字に変換した文字列
  */
 const convert_to_single_byte_characters = (str = '') => {
-    if (!_ch_checkString(str)) return '';
-    if (!str) return '';
-    const hyphen_processed = str.replace(/[－‐‑–—−ー―]/g, '-');
-    const half_width_kana = convert_to_half_width_kana(hyphen_processed);
-    const single_byte_characters = [...half_width_kana].map((char) => {
-        const code = char.charCodeAt(0);
-        if (
-            (code >= 0xFF01 && code <= 0xFF5E) // 全角記号・英数字
-        ) {
-            return String.fromCodePoint(code - 0xFEE0);
-        }
-    if (char === '\u3000') return ' '; // 全角スペースを半角に
-        return char;
-    }).join('');
-    return single_byte_characters;
+	if (!_ch_checkString(str)) return '';
+	if (!str) return '';
+	const hyphen_processed = str.replace(/[－‐‑–—−ー―]/g, '-');
+	const half_width_kana = convert_to_half_width_kana(hyphen_processed);
+	const single_byte_characters = [...half_width_kana]
+		.map((char) => {
+			const code = char.charCodeAt(0);
+			if (
+				code >= 0xff01 &&
+				code <= 0xff5e // 全角記号・英数字
+			) {
+				return String.fromCodePoint(code - 0xfee0);
+			}
+			if (char === '\u3000') return ' '; // 全角スペースを半角に
+			return char;
+		})
+		.join('');
+	return single_byte_characters;
 };
 
 /**
@@ -197,25 +336,27 @@ const convert_to_single_byte_characters = (str = '') => {
  * @returns {string} 全角文字に変換した文字列
  */
 const convert_to_double_byte_characters = (str = '') => {
-    if (!_ch_checkString(str)) return '';
-    if (!str) return '';
-    const hyphen_processed = str.replace(/[‐‑–—−ー―]/g, '－');
-    const full_width_kana = convert_to_full_width_kana(hyphen_processed, false);
-    const double_byte_characters = [...full_width_kana].map((char) => {
-    if (char === '\\') return '￥'; // 半角バックスラッシュを全角円マークに
-    if (char === ' ') return '\u3000'; // 半角スペースを全角に
-        const code = char.charCodeAt(0);
-        if (
-            (code >= 0x21 && code <= 0x7E) || // 半角記号・英数字
-            (code >= 0x30 && code <= 0x39) || // 数字
-            (code >= 0x41 && code <= 0x5A) || // 英大文字
-            (code >= 0x61 && code <= 0x7A)    // 英小文字
-        ) {
-            return String.fromCodePoint(code + 0xFEE0);
-        }
-        return char;
-    }).join('');
-    return double_byte_characters;
+	if (!_ch_checkString(str)) return '';
+	if (!str) return '';
+	const hyphen_processed = str.replace(/[‐‑–—−ー―]/g, '－');
+	const full_width_kana = convert_to_full_width_kana(hyphen_processed, false);
+	const double_byte_characters = [...full_width_kana]
+		.map((char) => {
+			if (char === '\\') return '￥'; // 半角バックスラッシュを全角円マークに
+			if (char === ' ') return '\u3000'; // 半角スペースを全角に
+			const code = char.charCodeAt(0);
+			if (
+				(code >= 0x21 && code <= 0x7e) || // 半角記号・英数字
+				(code >= 0x30 && code <= 0x39) || // 数字
+				(code >= 0x41 && code <= 0x5a) || // 英大文字
+				(code >= 0x61 && code <= 0x7a) // 英小文字
+			) {
+				return String.fromCodePoint(code + 0xfee0);
+			}
+			return char;
+		})
+		.join('');
+	return double_byte_characters;
 };
 
 /**
@@ -224,15 +365,15 @@ const convert_to_double_byte_characters = (str = '') => {
  * @returns {string} メールアドレス文字（メールアドレスとして正しくない場合は空白を返す）
  */
 const convert_to_email_address = (email_address = '') => {
-    if (!_ch_checkString(email_address)) return '';
-    if (!email_address) return '';
-    // 前後空白除去
-    const trimmed = email_address.trim();
-    const single_byte_characters = convert_to_single_byte_characters(trimmed);
-    // 連続ドットや@直前・直後のドット禁止
-    if (/\.\.|^\.|\.@|@\.|\.$/.test(single_byte_characters)) return '';
-    const email_pattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    return email_pattern.test(single_byte_characters) ? single_byte_characters : '';
+	if (!_ch_checkString(email_address)) return '';
+	if (!email_address) return '';
+	// 前後空白除去
+	const trimmed = email_address.trim();
+	const single_byte_characters = convert_to_single_byte_characters(trimmed);
+	// 連続ドットや@直前・直後のドット禁止
+	if (/\.\.|^\.|\.@|@\.|\.$/.test(single_byte_characters)) return '';
+	const email_pattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+	return email_pattern.test(single_byte_characters) ? single_byte_characters : '';
 };
 
 /**
@@ -241,9 +382,10 @@ const convert_to_email_address = (email_address = '') => {
  * @returns {boolean} 半角数字のみ含まれる場合はtrue、それ以外はfalse
  */
 const check_single_byte_numbers = (str = '') => {
-    if ((typeof str !== 'string' && typeof str !== 'number') || str === null || str === undefined) return false;
-    const number_pattern = /^[0-9]+$/;
-    return number_pattern.test(String(str));
+	if ((typeof str !== 'string' && typeof str !== 'number') || str === null || str === undefined)
+		return false;
+	const number_pattern = /^[0-9]+$/;
+	return number_pattern.test(String(str));
 };
 
 /**
@@ -252,9 +394,9 @@ const check_single_byte_numbers = (str = '') => {
  * @returns {boolean} 半角カナ文字のみ含まれる場合はtrue、それ以外はfalse
  */
 const check_single_byte_kana = (str = '') => {
-    if (!_ch_checkString(str)) return false;
-    const kana_pattern = /^[\uFF61-\uFF9F]+$/;
-    return kana_pattern.test(str);
+	if (!_ch_checkString(str)) return false;
+	const kana_pattern = /^[\uFF61-\uFF9F]+$/;
+	return kana_pattern.test(str);
 };
 
 /**
@@ -265,28 +407,31 @@ const check_single_byte_kana = (str = '') => {
  * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
  */
 const toHalfWidthKana = (str = '', throwOnError = true) => {
-    if (!_ch_checkString(str)) throw new Error('変換対象は文字列である必要があります');
-    if (!str) throw new Error('変換対象の文字列が空です');
-    const halfWidthKanaPattern = _ch_buildPattern(_ch_halfWidthKanaMap.keys());
-    let errorChar = null;
-    const result = str.replace(halfWidthKanaPattern, char => _ch_halfWidthKanaMap.get(char) ?? char);
-    // 変換後に全角カタカナ・ひらがな・漢字・その他全角文字が残っていればエラー
-    for (const char of result) {
-        const code = char.charCodeAt(0);
-        if (
-            (code >= 0x4E00 && code <= 0x9FFF) || // 漢字
-            (code >= 0x3040 && code <= 0x309F) || // ひらがな
-            (code >= 0x30A0 && code <= 0x30FF) || // カタカナ
-            (code >= 0xFF00 && code <= 0xFFEF)    // その他全角
-        ) {
-            if (throwOnError) {
-                errorChar = char;
-                break;
-            }
-        }
-    }
-    if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
-    return result;
+	if (!_ch_checkString(str)) throw new Error('変換対象は文字列である必要があります');
+	if (!str) throw new Error('変換対象の文字列が空です');
+	const halfWidthKanaPattern = _ch_buildPattern(_ch_halfWidthKanaMap.keys());
+	let errorChar = null;
+	const result = str.replace(
+		halfWidthKanaPattern,
+		(char) => _ch_halfWidthKanaMap.get(char) ?? char
+	);
+	// 変換後に全角カタカナ・ひらがな・漢字・その他全角文字が残っていればエラー
+	for (const char of result) {
+		const code = char.charCodeAt(0);
+		if (
+			(code >= 0x4e00 && code <= 0x9fff) || // 漢字
+			(code >= 0x3040 && code <= 0x309f) || // ひらがな
+			(code >= 0x30a0 && code <= 0x30ff) || // カタカナ
+			(code >= 0xff00 && code <= 0xffef) // その他全角
+		) {
+			if (throwOnError) {
+				errorChar = char;
+				break;
+			}
+		}
+	}
+	if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
+	return result;
 };
 
 /**
@@ -297,38 +442,41 @@ const toHalfWidthKana = (str = '', throwOnError = true) => {
  * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
  */
 const toHalfWidth = (str = '', throwOnError = true) => {
-    if (!_ch_checkString(str)) throw new Error('変換対象は文字列である必要があります');
-    if (!str) throw new Error('変換対象の文字列が空です');
-    const hyphenProcessed = str.replace(/[－‐‑–—−ー―]/g, '-');
-    try {
-        const halfWidthKana = toHalfWidthKana(hyphenProcessed, false);
-        let errorChar = null;
-        const singleByteCharacters = [...halfWidthKana].map((char) => {
-            const code = char.charCodeAt(0);
-            // 半角英数字・記号・スペース・カナ以外は変換不能とみなす
-            if (
-                (code >= 0xFF01 && code <= 0xFF5E) // 全角記号・英数字
-            ) {
-                return String.fromCodePoint(code - 0xFEE0);
-            }
-            if (char === '\u3000') return ' '; // 全角スペースを半角に
-            // 変換後が全角カナ・ひらがな・漢字・その他全角文字の場合はエラーまたはそのまま
-            if (
-                (code >= 0x4E00 && code <= 0x9FFF) || // 漢字
-                (code >= 0x3040 && code <= 0x309F) || // ひらがな
-                (code >= 0x30A0 && code <= 0x30FF) || // カタカナ
-                (code >= 0xFF00 && code <= 0xFFEF)    // その他全角
-            ) {
-                if (throwOnError) errorChar = char;
-                // throwOnError=falseならそのまま返す
-            }
-            return char;
-        }).join('');
-        if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
-        return singleByteCharacters;
-    } catch (error) {
-        throw new Error(error.message);
-    }
+	if (!_ch_checkString(str)) throw new Error('変換対象は文字列である必要があります');
+	if (!str) throw new Error('変換対象の文字列が空です');
+	const hyphenProcessed = str.replace(/[－‐‑–—−ー―]/g, '-');
+	try {
+		const halfWidthKana = toHalfWidthKana(hyphenProcessed, false);
+		let errorChar = null;
+		const singleByteCharacters = [...halfWidthKana]
+			.map((char) => {
+				const code = char.charCodeAt(0);
+				// 半角英数字・記号・スペース・カナ以外は変換不能とみなす
+				if (
+					code >= 0xff01 &&
+					code <= 0xff5e // 全角記号・英数字
+				) {
+					return String.fromCodePoint(code - 0xfee0);
+				}
+				if (char === '\u3000') return ' '; // 全角スペースを半角に
+				// 変換後が全角カナ・ひらがな・漢字・その他全角文字の場合はエラーまたはそのまま
+				if (
+					(code >= 0x4e00 && code <= 0x9fff) || // 漢字
+					(code >= 0x3040 && code <= 0x309f) || // ひらがな
+					(code >= 0x30a0 && code <= 0x30ff) || // カタカナ
+					(code >= 0xff00 && code <= 0xffef) // その他全角
+				) {
+					if (throwOnError) errorChar = char;
+					// throwOnError=falseならそのまま返す
+				}
+				return char;
+			})
+			.join('');
+		if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
+		return singleByteCharacters;
+	} catch (error) {
+		throw new Error(error.message);
+	}
 };
 
 /**
@@ -338,17 +486,108 @@ const toHalfWidth = (str = '', throwOnError = true) => {
  * @throws {Error} 不正な場合は例外
  */
 const assertEmailAddress = (emailAddress = '') => {
-    // 簡易的なRFC5322準拠の正規表現（一般的な用途で十分）
-    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!_ch_checkString(emailAddress)) throw new Error('メールアドレスは文字列である必要があります');
-    if (!emailAddress) throw new Error('メールアドレスが空です');
-    const trimmed = emailAddress.trim();
-    try {
-        const singleByteCharacters = toHalfWidth(trimmed);
-        if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters)) throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
-        if (!emailPattern.test(singleByteCharacters)) throw new Error('メールアドレスの形式が正しくありません');
-        return singleByteCharacters;
-    } catch (error) {
-        throw new Error('`メールアドレスの形式が正しくありません: ${error.message}`');
-    }
+	// 簡易的なRFC5322準拠の正規表現（一般的な用途で十分）
+	const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+	if (!_ch_checkString(emailAddress)) throw new Error('メールアドレスは文字列である必要があります');
+	if (!emailAddress) throw new Error('メールアドレスが空です');
+	const trimmed = emailAddress.trim();
+	try {
+		const singleByteCharacters = toHalfWidth(trimmed);
+		if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters))
+			throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
+		if (!emailPattern.test(singleByteCharacters))
+			throw new Error('メールアドレスの形式が正しくありません');
+		return singleByteCharacters;
+	} catch (error) {
+		throw new Error(`メールアドレスの形式が正しくありません: ${error.message}`);
+	}
 };
+
+// --- グローバルへの公開 (kintone 等からアクセスできるようにするため) ---
+// 一部の環境ではトップレベルの `const` 宣言は `window` のプロパティとならない
+// ため、ここで明示的にグローバルオブジェクトにバインドします。
+(() => {
+	'use strict';
+	// 安全なグローバルオブジェクトの取得順を指定します。
+	// window -> self -> globalThis -> 最終手段で Function による取得
+	const g =
+		typeof window !== 'undefined'
+			? window
+			: typeof self !== 'undefined'
+				? self
+				: typeof globalThis !== 'undefined'
+					? globalThis
+					: Function('return this')();
+	// 公開したい識別子を列挙します（必要に応じて追加してください）
+	const names = [
+		'convert_to_hiragana',
+		'convert_to_double_byte_characters',
+		'convert_to_email_address',
+		'check_single_byte_numbers',
+		'check_single_byte_kana',
+		'convert_to_half_width_kana',
+		'convert_to_full_width_kana',
+		'convert_to_single_byte_characters',
+		'toHalfWidthKana',
+		'toHalfWidth',
+		'assertEmailAddress',
+	];
+
+	names.forEach(function (name) {
+		try {
+			// 直接参照して存在確認（ReferenceError を try/catch で吸収）
+			if (typeof g[name] === 'undefined') {
+				// 直接識別子を参照してグローバルに割り当てる
+				// 例: if (typeof convert_to_hiragana !== 'undefined') g.convert_to_hiragana = convert_to_hiragana;
+				switch (name) {
+					case 'convert_to_hiragana':
+						if (typeof convert_to_hiragana !== 'undefined')
+							g.convert_to_hiragana = convert_to_hiragana;
+						break;
+					case 'convert_to_double_byte_characters':
+						if (typeof convert_to_double_byte_characters !== 'undefined')
+							g.convert_to_double_byte_characters = convert_to_double_byte_characters;
+						break;
+					case 'convert_to_email_address':
+						if (typeof convert_to_email_address !== 'undefined')
+							g.convert_to_email_address = convert_to_email_address;
+						break;
+					case 'check_single_byte_numbers':
+						if (typeof check_single_byte_numbers !== 'undefined')
+							g.check_single_byte_numbers = check_single_byte_numbers;
+						break;
+					case 'check_single_byte_kana':
+						if (typeof check_single_byte_kana !== 'undefined')
+							g.check_single_byte_kana = check_single_byte_kana;
+						break;
+					case 'convert_to_half_width_kana':
+						if (typeof convert_to_half_width_kana !== 'undefined')
+							g.convert_to_half_width_kana = convert_to_half_width_kana;
+						break;
+					case 'convert_to_full_width_kana':
+						if (typeof convert_to_full_width_kana !== 'undefined')
+							g.convert_to_full_width_kana = convert_to_full_width_kana;
+						break;
+					case 'convert_to_single_byte_characters':
+						if (typeof convert_to_single_byte_characters !== 'undefined')
+							g.convert_to_single_byte_characters = convert_to_single_byte_characters;
+						break;
+					case 'toHalfWidthKana':
+						if (typeof toHalfWidthKana !== 'undefined') g.toHalfWidthKana = toHalfWidthKana;
+						break;
+					case 'toHalfWidth':
+						if (typeof toHalfWidth !== 'undefined') g.toHalfWidth = toHalfWidth;
+						break;
+					case 'assertEmailAddress':
+						if (typeof assertEmailAddress !== 'undefined')
+							g.assertEmailAddress = assertEmailAddress;
+						break;
+					default:
+						break;
+				}
+			}
+		} catch {
+			// 安全のため何もしない
+		}
+	});
+})();
