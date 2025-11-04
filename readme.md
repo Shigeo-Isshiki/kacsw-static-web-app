@@ -1,4 +1,5 @@
 # KACSW Static Web App
+![Prepare dist workflow](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/workflows/prepare-dist.yml/badge.svg)
 
 This repository is a small static web app used for building and testing
 JavaScript utilities for handling Japanese phone numbers, postal codes,
