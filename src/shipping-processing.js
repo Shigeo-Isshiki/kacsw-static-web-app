@@ -14,7 +14,7 @@ const _SP_SHIPPING_INQUIRY_URL_MAP = {
 	yamato: 'https://member.kms.kuronekoyamato.co.jp/parcel/detail?pno={trackingNumber}', // ヤマト運輸
 	japanpost:
 		'https://trackings.post.japanpost.jp/services/srv/search/direct?searchKind=S002&locale=ja&reqCodeNo1={trackingNumber}', // 日本郵便
-	sagawa: 'https://k2k.sagawa-exp.co.jp/p/web/okurijoinput.do?okurijoNo={trackingNumber}', // 佐川急便
+	sagawa: 'https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo={trackingNumber}', // 佐川急便
 };
 
 // ハイフン類を検出するための正規表現（全角・半角・ダッシュ類）
@@ -197,7 +197,7 @@ const getNextBusinessDay = (baseDate = new Date(), cutoffHour = 16, callback) =>
  *   - 文字列なら指定ラベルで表示
  *   - undefinedならデフォルト文言で表示
  *   - null/空文字ならボタン非表示（削除）
- *   ボタン押下時、公式サイト（ヤマト運輸・日本郵便）に遷移します。
+ *   ボタン押下時、公式サイト（ヤマト運輸・日本郵便・佐川急便）に遷移します。
  */
 const kintoneShippingInquiryButton = (spaceField, id, label, trackingNumber, carrier) => {
 	if (
