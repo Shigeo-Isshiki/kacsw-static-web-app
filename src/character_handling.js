@@ -406,7 +406,7 @@ const check_single_byte_kana = (str = '') => {
  * @returns {string} 可能な限り半角カタカナに変換した文字列
  * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
  */
-const toHalfWidthKana = (str = '', throwOnError = true) => {
+const _ch_toHalfWidthKana = (str = '', throwOnError = true) => {
 	if (!_ch_checkString(str)) throw new Error('変換対象は文字列である必要があります');
 	if (!str) throw new Error('変換対象の文字列が空です');
 	const halfWidthKanaPattern = _ch_buildPattern(_ch_halfWidthKanaMap.keys());
@@ -441,12 +441,16 @@ const toHalfWidthKana = (str = '', throwOnError = true) => {
  * @returns {string} 半角文字に変換した文字列
  * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
  */
-const toHalfWidth = (str = '', throwOnError = true) => {
+const _ch_toHalfWidth = (str = '', throwOnError = true) => {
 	if (!_ch_checkString(str)) throw new Error('変換対象は文字列である必要があります');
 	if (!str) throw new Error('変換対象の文字列が空です');
 	const hyphenProcessed = str.replace(/[－‐‑–—−ー―]/g, '-');
 	try {
-		const halfWidthKana = toHalfWidthKana(hyphenProcessed, false);
+		const halfWidthKana = (typeof _ch_toHalfWidthKana === 'function')
+			? _ch_toHalfWidthKana(hyphenProcessed, false)
+			: (typeof window !== 'undefined' && typeof window.toHalfWidthKana === 'function')
+				? window.toHalfWidthKana(hyphenProcessed, false)
+				: hyphenProcessed;
 		let errorChar = null;
 		const singleByteCharacters = [...halfWidthKana]
 			.map((char) => {
@@ -472,7 +476,7 @@ const toHalfWidth = (str = '', throwOnError = true) => {
 				return char;
 			})
 			.join('');
-		if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
+	if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
 		return singleByteCharacters;
 	} catch (error) {
 		throw new Error(error.message);
@@ -485,14 +489,18 @@ const toHalfWidth = (str = '', throwOnError = true) => {
  * @returns {string} 正常な場合は変換済みメールアドレス
  * @throws {Error} 不正な場合は例外
  */
-const assertEmailAddress = (emailAddress = '') => {
+const _ch_assertEmailAddress = (emailAddress = '') => {
 	// 簡易的なRFC5322準拠の正規表現（一般的な用途で十分）
 	const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 	if (!_ch_checkString(emailAddress)) throw new Error('メールアドレスは文字列である必要があります');
 	if (!emailAddress) throw new Error('メールアドレスが空です');
 	const trimmed = emailAddress.trim();
 	try {
-		const singleByteCharacters = toHalfWidth(trimmed);
+		const singleByteCharacters = (typeof _ch_toHalfWidth === 'function')
+			? _ch_toHalfWidth(trimmed)
+			: (typeof window !== 'undefined' && typeof window.toHalfWidth === 'function')
+				? window.toHalfWidth(trimmed)
+				: trimmed;
 		if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters))
 			throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
 		if (!emailPattern.test(singleByteCharacters))
@@ -573,14 +581,14 @@ const assertEmailAddress = (emailAddress = '') => {
 							g.convert_to_single_byte_characters = convert_to_single_byte_characters;
 						break;
 					case 'toHalfWidthKana':
-						if (typeof toHalfWidthKana !== 'undefined') g.toHalfWidthKana = toHalfWidthKana;
+						if (typeof _ch_toHalfWidthKana !== 'undefined') g.toHalfWidthKana = _ch_toHalfWidthKana;
 						break;
 					case 'toHalfWidth':
-						if (typeof toHalfWidth !== 'undefined') g.toHalfWidth = toHalfWidth;
+						if (typeof _ch_toHalfWidth !== 'undefined') g.toHalfWidth = _ch_toHalfWidth;
 						break;
 					case 'assertEmailAddress':
-						if (typeof assertEmailAddress !== 'undefined')
-							g.assertEmailAddress = assertEmailAddress;
+						if (typeof _ch_assertEmailAddress !== 'undefined')
+							g.assertEmailAddress = _ch_assertEmailAddress;
 						break;
 					default:
 						break;
