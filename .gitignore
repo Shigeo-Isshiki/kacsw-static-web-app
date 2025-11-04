@@ -1,3 +1,11 @@
+# Build output
+dist/
+
+# Node modules
+node_modules/
+
+# macOS
+.DS_Store
 node_modules/
 /test-results/
 
