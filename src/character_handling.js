@@ -3,6 +3,7 @@
  * @version 1.1.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_ch_)で始める
+<<<<<<< HEAD
 /* exported convert_to_hiragana, convert_to_double_byte_characters, convert_to_email_address, check_single_byte_numbers, check_single_byte_kana, assertEmailAddress */
 'use strict';
 /**
@@ -203,6 +204,208 @@ const _ch_convert_character_list = {
 		'ヲ゛': 'ヺ',
 	},
 };
+=======
+/* exported convert_to_hiragana, convert_to_double_byte_characters, convert_to_email_address, check_single_byte_numbers */
+	'use strict';
+	/**
+	 * 文字列が文字列型であることを確認する関数
+	 * @param {*} str - 確認する文字列
+	 * @returns {boolean} - 文字列である = true、文字でない = false
+	 */
+	const _ch_checkString = (str) => {
+		return typeof str === 'string' && str !== null && str !== undefined;
+	};
+	/**
+	 * 変換用の文字リスト
+	 * 各種文字の変換ルールを定義します。
+	 * ひらがな、カタカナ、濁点・半濁点の変換をサポートします。
+	 * @typedef {object} _ch_convert_character_list
+	 * @property {object} half_width_kana 全角カタカナから半角カタカナへの変換マップ
+	 * @property {object} full_width_kana 半角カタカナから全角カタカナへの変換マップ
+	 * @property {object} turbidity_kana 濁点・半濁点の変換マップ
+	 */
+	/** @type {_ch_convert_character_list} */
+	const _ch_convert_character_list = {
+		half_width_kana: {
+			ア: 'ｱ',
+			イ: 'ｲ',
+			ウ: 'ｳ',
+			エ: 'ｴ',
+			オ: 'ｵ',
+			カ: 'ｶ',
+			キ: 'ｷ',
+			ク: 'ｸ',
+			ケ: 'ｹ',
+			コ: 'ｺ',
+			サ: 'ｻ',
+			シ: 'ｼ',
+			ス: 'ｽ',
+			セ: 'ｾ',
+			ソ: 'ｿ',
+			タ: 'ﾀ',
+			チ: 'ﾁ',
+			ツ: 'ﾂ',
+			テ: 'ﾃ',
+			ト: 'ﾄ',
+			ナ: 'ﾅ',
+			ニ: 'ﾆ',
+			ヌ: 'ﾇ',
+			ネ: 'ﾈ',
+			ノ: 'ﾉ',
+			ハ: 'ﾊ',
+			ヒ: 'ﾋ',
+			フ: 'ﾌ',
+			ヘ: 'ﾍ',
+			ホ: 'ﾎ',
+			マ: 'ﾏ',
+			ミ: 'ﾐ',
+			ム: 'ﾑ',
+			メ: 'ﾒ',
+			モ: 'ﾓ',
+			ヤ: 'ﾔ',
+			ユ: 'ﾕ',
+			ヨ: 'ﾖ',
+			ラ: 'ﾗ',
+			リ: 'ﾘ',
+			ル: 'ﾙ',
+			レ: 'ﾚ',
+			ロ: 'ﾛ',
+			ワ: 'ﾜ',
+			ヲ: 'ｦ',
+			ン: 'ﾝ',
+			ガ: 'ｶﾞ',
+			ギ: 'ｷﾞ',
+			グ: 'ｸﾞ',
+			ゲ: 'ｹﾞ',
+			ゴ: 'ｺﾞ',
+			ザ: 'ｻﾞ',
+			ジ: 'ｼﾞ',
+			ズ: 'ｽﾞ',
+			ゼ: 'ｾﾞ',
+			ゾ: 'ｿﾞ',
+			ダ: 'ﾀﾞ',
+			ヂ: 'ﾁﾞ',
+			ヅ: 'ﾂﾞ',
+			デ: 'ﾃﾞ',
+			ド: 'ﾄﾞ',
+			バ: 'ﾊﾞ',
+			ビ: 'ﾋﾞ',
+			ブ: 'ﾌﾞ',
+			ベ: 'ﾍﾞ',
+			ボ: 'ﾎﾞ',
+			パ: 'ﾊﾟ',
+			ピ: 'ﾋﾟ',
+			プ: 'ﾌﾟ',
+			ペ: 'ﾍﾟ',
+			ポ: 'ﾎﾟ',
+			ヴ: 'ｳﾞ',
+			ヷ: 'ﾜﾞ',
+			ヺ: 'ｦﾞ',
+			ァ: 'ｧ',
+			ィ: 'ｨ',
+			ゥ: 'ｩ',
+			ェ: 'ｪ',
+			ォ: 'ｫ',
+			ッ: 'ｯ',
+			ャ: 'ｬ',
+			ュ: 'ｭ',
+			ョ: 'ｮ',
+			'゛': 'ﾞ',
+			'゜': 'ﾟ',
+			'　': ' ',
+		},
+		full_width_kana: {
+			ｱ: 'ア',
+			ｲ: 'イ',
+			ｳ: 'ウ',
+			ｴ: 'エ',
+			ｵ: 'オ',
+			ｶ: 'カ',
+			ｷ: 'キ',
+			ｸ: 'ク',
+			ｹ: 'ケ',
+			ｺ: 'コ',
+			ｻ: 'サ',
+			ｼ: 'シ',
+			ｽ: 'ス',
+			ｾ: 'セ',
+			ｿ: 'ソ',
+			ﾀ: 'タ',
+			ﾁ: 'チ',
+			ﾂ: 'ツ',
+			ﾃ: 'テ',
+			ﾄ: 'ト',
+			ﾅ: 'ナ',
+			ﾆ: 'ニ',
+			ﾇ: 'ヌ',
+			ﾈ: 'ネ',
+			ﾉ: 'ノ',
+			ﾊ: 'ハ',
+			ﾋ: 'ヒ',
+			ﾌ: 'フ',
+			ﾍ: 'ヘ',
+			ﾎ: 'ホ',
+			ﾏ: 'マ',
+			ﾐ: 'ミ',
+			ﾑ: 'ム',
+			ﾒ: 'メ',
+			ﾓ: 'モ',
+			ﾔ: 'ヤ',
+			ﾕ: 'ユ',
+			ﾖ: 'ヨ',
+			ﾗ: 'ラ',
+			ﾘ: 'リ',
+			ﾙ: 'ル',
+			ﾚ: 'レ',
+			ﾛ: 'ロ',
+			ﾜ: 'ワ',
+			ｦ: 'ヲ',
+			ﾝ: 'ン',
+			ｧ: 'ァ',
+			ｨ: 'ィ',
+			ｩ: 'ゥ',
+			ｪ: 'ェ',
+			ｫ: 'ォ',
+			ｯ: 'ッ',
+			ｬ: 'ャ',
+			ｭ: 'ュ',
+			ｮ: 'ョ',
+			ﾞ: '゛',
+			ﾟ: '゜',
+			' ': '　',
+		},
+		turbidity_kana: {
+			'カ゛': 'ガ',
+			'キ゛': 'ギ',
+			'ク゛': 'グ',
+			'ケ゛': 'ゲ',
+			'コ゛': 'ゴ',
+			'サ゛': 'ザ',
+			'シ゛': 'ジ',
+			'ス゛': 'ズ',
+			'セ゛': 'ゼ',
+			'ソ゛': 'ゾ',
+			'タ゛': 'ダ',
+			'チ゛': 'ヂ',
+			'ツ゛': 'ヅ',
+			'テ゛': 'デ',
+			'ト゛': 'ド',
+			'ハ゛': 'バ',
+			'ヒ゛': 'ビ',
+			'フ゛': 'ブ',
+			'ヘ゛': 'ベ',
+			'ホ゛': 'ボ',
+			'ハ゜': 'パ',
+			'ヒ゜': 'ピ',
+			'フ゜': 'プ',
+			'ヘ゜': 'ペ',
+			'ホ゜': 'ポ',
+			'ウ゛': 'ヴ',
+			'ワ゛': 'ヷ',
+			'ヲ゛': 'ヺ',
+		},
+	};
+>>>>>>> 85bbf408e84bb0fc7fcbb6315f1490e19957522a
 
 /**
  * イテラブルな文字列集合から正規表現パターンを構築する関数
@@ -477,6 +680,7 @@ const toHalfWidth = (str = '', throwOnError = true) => {
 			})
 			.join('');
 		if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
+<<<<<<< HEAD
 		return singleByteCharacters;
 	} catch (error) {
 		throw new Error(error.message);
@@ -520,3 +724,92 @@ if (typeof window !== 'undefined') {
 	window.check_single_byte_kana = check_single_byte_kana;
 	window.assertEmailAddress = assertEmailAddress;
 }
+=======
+		return result;
+	};
+
+	/**
+	 * 文字列の中の各文字を半角文字（英数字・記号・スペース含む）に変換する関数
+	 * @param {string} str 変換対象の文字列
+	 * @param {boolean} [throwOnError=true] 変換不能な文字があった場合にエラーを投げるかどうか
+	 * @returns {string} 半角文字に変換した文字列
+	 * @throws {Error} 変換不能な文字が含まれている場合（throwOnError=true時）
+	 */
+	const toHalfWidth = (str = '', throwOnError = true) => {
+		if (!_ch_checkString(str)) throw new Error('変換対象は文字列である必要があります');
+		if (!str) throw new Error('変換対象の文字列が空です');
+		const hyphenProcessed = str.replace(/[－‐‑–—−ー―]/g, '-');
+		try {
+			const halfWidthKana = toHalfWidthKana(hyphenProcessed, false);
+			let errorChar = null;
+			const singleByteCharacters = [...halfWidthKana]
+				.map((char) => {
+					const code = char.charCodeAt(0);
+					// 半角英数字・記号・スペース・カナ以外は変換不能とみなす
+					if (
+						code >= 0xff01 &&
+						code <= 0xff5e // 全角記号・英数字
+					) {
+						return String.fromCodePoint(code - 0xfee0);
+					}
+					if (char === '\u3000') return ' '; // 全角スペースを半角に
+					// 変換後が全角カナ・ひらがな・漢字・その他全角文字の場合はエラーまたはそのまま
+					if (
+						(code >= 0x4e00 && code <= 0x9fff) || // 漢字
+						(code >= 0x3040 && code <= 0x309f) || // ひらがな
+						(code >= 0x30a0 && code <= 0x30ff) || // カタカナ
+						(code >= 0xff00 && code <= 0xffef) // その他全角
+					) {
+						if (throwOnError) errorChar = char;
+						// throwOnError=falseならそのまま返す
+					}
+					return char;
+				})
+				.join('');
+			if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
+			return singleByteCharacters;
+		} catch (error) {
+			throw new Error(error.message);
+		}
+	};
+
+	/**
+	 * メールアドレスの表記を半角文字に変換し、RFC 5322に基づいた形式であるかを判定し、正しくない場合は例外を投げる関数
+	 * @param {string} emailAddress
+	 * @returns {string} 正常な場合は変換済みメールアドレス
+	 * @throws {Error} 不正な場合は例外
+	 */
+	const assertEmailAddress = (emailAddress = '') => {
+		// 簡易的なRFC5322準拠の正規表現（一般的な用途で十分）
+		const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+		if (!_ch_checkString(emailAddress))
+			throw new Error('メールアドレスは文字列である必要があります');
+		if (!emailAddress) throw new Error('メールアドレスが空です');
+		const trimmed = emailAddress.trim();
+		try {
+			const singleByteCharacters = toHalfWidth(trimmed);
+			if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters))
+				throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
+			if (!emailPattern.test(singleByteCharacters))
+				throw new Error('メールアドレスの形式が正しくありません');
+			return singleByteCharacters;
+		} catch (error) {
+			const _error = error;
+			throw new Error(
+				`メールアドレスの形式が正しくありません: ${_error && _error.message ? _error.message : ''}`
+			);
+		}
+	};
+
+	// 公開（定義が完了した後で一箇所にまとめて行う）
+	if (typeof window !== 'undefined') {
+		window.convert_to_half_width_kana‎ = convert_to_half_width_kana‎;
+		window.convert_to_full_width_kana‎‎ = convert_to_full_width_kana‎‎;
+		window.convert_to_hiragana = convert_to_hiragana;
+		window.convert_to_single_byte_characters‎ = convert_to_single_byte_characters‎;
+		window.convert_to_double_byte_characters = convert_to_double_byte_characters;
+		window.convert_to_email_address = convert_to_email_address;
+		window.check_single_byte_numbers = check_single_byte_numbers;
+		window.check_single_byte_kana = check_single_byte_kana;
+	}
+>>>>>>> 85bbf408e84bb0fc7fcbb6315f1490e19957522a
