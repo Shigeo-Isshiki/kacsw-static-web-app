@@ -1,5 +1,5 @@
 # KACSW Static Web App
-![Prepare dist workflow](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/workflows/prepare-dist.yml/badge.svg)
+![Prepare dist workflow](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/workflows/prepare-dist-clean.yml/badge.svg)
 
 This repository is a small static web app used for building and testing
 JavaScript utilities for handling Japanese phone numbers, postal codes,
@@ -23,7 +23,7 @@ This repo is used as a starter for a _very basic_ HTML web application using no 
 		- `getBank(input, callback)` はコールバック必須の非同期 API に変更しました（同期返却は廃止）。
 		- `getBank` がコールバックで返す `kana` は半角カタカナ化され、長音記号や類似ダッシュはすべて半角ハイフン `-` に正規化されます。
 	- 自動チェック用スクリプトを追加: `scripts/check-window-vm.js`（Node の VM 上での確認）、`scripts/puppeteer-check.js`（ヘッドレスブラウザでの確認）、`scripts/auto-check.js`（ファイル変更を監視して再実行）。
-	- CI ワークフローを追加/更新: `.github/workflows/prepare-dist.yml`（Prettier/ESLint/prepare:dist を実行して PR をブロックする設定）。
+	- CI ワークフローを追加/更新: `.github/workflows/prepare-dist-clean.yml`（Prettier/ESLint/prepare:dist を実行して PR をブロックする設定）。
 
 - ローカルでの推奨確認手順（開発者向け）:
 
