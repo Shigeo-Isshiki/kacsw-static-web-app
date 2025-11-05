@@ -813,7 +813,7 @@ const getBank = (bankCodeOrName, callback) => {
 				} catch {
 					kanaOut = _bt_toStr(b.kana);
 				}
-				_bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut });
+					_bt_invokeCallback(callback, null, { bankCode: b.code, bankName: b.name, bankKana: kanaOut });
 				return;
 			}
 			// node-style (err, res) が来た場合の保険（可能なら使わない前提）
@@ -854,7 +854,7 @@ const getBank = (bankCodeOrName, callback) => {
 			} catch {
 				kanaOut = _bt_toStr(b.kana);
 			}
-			_bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut });
+			_bt_invokeCallback(callback, null, { bankCode: b.code, bankName: b.name, bankKana: kanaOut });
 			return;
 		});
 		return;
@@ -879,7 +879,7 @@ const getBank = (bankCodeOrName, callback) => {
 			} catch {
 				kanaOut2 = _bt_toStr(b.kana);
 			}
-			_bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut2 });
+			_bt_invokeCallback(callback, null, { bankCode: b.code, bankName: b.name, bankKana: kanaOut2 });
 			return;
 		}
 		const err = arguments[0];
@@ -911,7 +911,7 @@ const getBank = (bankCodeOrName, callback) => {
 		} catch {
 			kanaOut2 = _bt_toStr(b.kana);
 		}
-		_bt_invokeCallback(callback, null, { code: b.code, name: b.name, kana: kanaOut2 });
+		_bt_invokeCallback(callback, null, { bankCode: b.code, bankName: b.name, bankKana: kanaOut2 });
 		return;
 	});
 	return;
