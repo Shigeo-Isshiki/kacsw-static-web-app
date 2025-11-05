@@ -274,9 +274,7 @@ const _bt_invokeCallback = (cb, err, res) => {
 		}
 	} catch (e) {
 		try {
-			_bt_safeLog(
-				'[BANK] _bt_invokeCallback error: ' + (e && e.message ? e.message : e)
-			);
+			_bt_safeLog('[BANK] _bt_invokeCallback error: ' + (e && e.message ? e.message : e));
 		} catch {}
 	}
 };
@@ -301,9 +299,7 @@ const _bt_buildPattern = (keys) => {
 		return new RegExp(escapedKeys.join('|'), 'g');
 	} catch (e) {
 		try {
-			_bt_safeLog(
-				'[BANK] _bt_buildPattern error: ' + (e && e.message ? e.message : e)
-			);
+			_bt_safeLog('[BANK] _bt_buildPattern error: ' + (e && e.message ? e.message : e));
 		} catch {}
 		return /(?:)/g;
 	}
@@ -462,21 +458,19 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 		const path = pathTemplate.replace('{code}', code);
 		const url = base + path;
 		const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
-	_bt_safeLog('[BANK] _bt_loadBankByCode: enter');
+		_bt_safeLog('[BANK] _bt_loadBankByCode: enter');
 		const abortController = (function () {
 			try {
 				if (typeof console !== 'undefined' && typeof console.debug === 'function')
-					console.debug(
-						'[BANK] _bt_loadBankByCode: attempting to create AbortController'
-					);
+					console.debug('[BANK] _bt_loadBankByCode: attempting to create AbortController');
 				return typeof AbortController !== 'undefined' ? new AbortController() : null;
 			} catch (e) {
 				try {
-						if (typeof console !== 'undefined' && typeof console.warn === 'function')
-							console.warn(
-								'[BANK] _bt_loadBankByCode: AbortController ctor threw',
-								e && e.message ? e.message : e
-							);
+					if (typeof console !== 'undefined' && typeof console.warn === 'function')
+						console.warn(
+							'[BANK] _bt_loadBankByCode: AbortController ctor threw',
+							e && e.message ? e.message : e
+						);
 				} catch {}
 				return null;
 			}
@@ -576,10 +570,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 			// signal を渡して試行
 			try {
 				if (typeof console !== 'undefined' && typeof console.debug === 'function')
-					console.debug(
-						'[BANK] _bt_loadBankByCode: attempting fetch with signal',
-						url
-					);
+					console.debug('[BANK] _bt_loadBankByCode: attempting fetch with signal', url);
 			} catch {}
 			_bt_safeLog('[BANK] _bt_loadBankByCode: attempting fetch with signal ' + url);
 			_bt_performFetch(
@@ -590,37 +581,32 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 			// signal を除いて再試行する
 			try {
 				try {
-						if (typeof console !== 'undefined' && typeof console.warn === 'function')
-							console.warn(
-								'[BANK] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal',
-								e && e.message ? e.message : e
-							);
+					if (typeof console !== 'undefined' && typeof console.warn === 'function')
+						console.warn(
+							'[BANK] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal',
+							e && e.message ? e.message : e
+						);
 				} catch {}
 				_bt_safeLog(
 					'[BANK] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal ' +
 						(e && e.message ? e.message : e)
 				);
 				if (typeof console !== 'undefined' && typeof console.debug === 'function')
-					console.debug(
-						'[BANK] _bt_loadBankByCode: attempting fetch without signal',
-						url
-					);
-				_bt_safeLog(
-					'[BANK] _bt_loadBankByCode: attempting fetch without signal ' + url
-				);
+					console.debug('[BANK] _bt_loadBankByCode: attempting fetch without signal', url);
+				_bt_safeLog('[BANK] _bt_loadBankByCode: attempting fetch without signal ' + url);
 				_bt_performFetch(fetch(url, { headers }));
 			} catch (e2) {
 				// 最悪同期的に fetch が失敗する場合はエラーハンドリングへ送る
 				try {
 					if (typeof console !== 'undefined' && typeof console.error === 'function')
-							console.error(
-								'[BANK] _bt_loadBankByCode: fetch without signal also threw',
-								e2 && e2.message ? e2.message : e2
-							);
+						console.error(
+							'[BANK] _bt_loadBankByCode: fetch without signal also threw',
+							e2 && e2.message ? e2.message : e2
+						);
 				} catch {}
 				_bt_safeLog(
 					'[BANK] _bt_loadBankByCode: fetch without signal also threw ' +
-							(e2 && e2.message ? e2.message : e2)
+						(e2 && e2.message ? e2.message : e2)
 				);
 				const err = { success: false, error: e2 && e2.message ? e2.message : String(e2) };
 				if (typeof callback === 'function') callback(err, null);
@@ -813,7 +799,11 @@ const getBank = (bankCodeOrName, callback) => {
 				} catch {
 					kanaOut = _bt_toStr(b.kana);
 				}
-					_bt_invokeCallback(callback, null, { bankCode: b.code, bankName: b.name, bankKana: kanaOut });
+				_bt_invokeCallback(callback, null, {
+					bankCode: b.code,
+					bankName: b.name,
+					bankKana: kanaOut,
+				});
 				return;
 			}
 			// node-style (err, res) が来た場合の保険（可能なら使わない前提）
@@ -879,7 +869,11 @@ const getBank = (bankCodeOrName, callback) => {
 			} catch {
 				kanaOut2 = _bt_toStr(b.kana);
 			}
-			_bt_invokeCallback(callback, null, { bankCode: b.code, bankName: b.name, bankKana: kanaOut2 });
+			_bt_invokeCallback(callback, null, {
+				bankCode: b.code,
+				bankName: b.name,
+				bankKana: kanaOut2,
+			});
 			return;
 		}
 		const err = arguments[0];
@@ -952,7 +946,8 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 		const perform = () =>
 			fetch(url, { signal: abortController ? abortController.signal : undefined })
 				.then((res) => {
-					if (!res.ok) return Promise.reject(new Error(`支店情報の取得に失敗しました（HTTP: ${res.status}）`));
+					if (!res.ok)
+						return Promise.reject(new Error(`支店情報の取得に失敗しました（HTTP: ${res.status}）`));
 					return res.json();
 				})
 				.then((j) => {
@@ -974,11 +969,13 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 				.catch((err) => {
 					let message = null;
 					try {
-						if (err && err.name === 'AbortError') message = '取得がタイムアウトしました（指定時間内に応答がありません）';
+						if (err && err.name === 'AbortError')
+							message = '取得がタイムアウトしました（指定時間内に応答がありません）';
 						else if (err && err.message) {
 							const m = String(err.message || err);
 							if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
-								message = '支店データの取得に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
+								message =
+									'支店データの取得に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
 							} else {
 								message = m;
 							}
@@ -1000,14 +997,18 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 	}
 
 	// 支店名検索: /banks/{bank_code}/branches/search.json?name={branch_name}
-	const url = apiBase.replace(/\/$/, '') + `/banks/${bankKey}/branches/search.json?name=` + encodeURIComponent(qRaw);
+	const url =
+		apiBase.replace(/\/$/, '') +
+		`/banks/${bankKey}/branches/search.json?name=` +
+		encodeURIComponent(qRaw);
 	const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
 	let timer = null;
 	if (abortController) timer = setTimeout(() => abortController.abort(), 5000);
 	try {
 		fetch(url, { signal: abortController ? abortController.signal : undefined })
 			.then((res) => {
-				if (!res.ok) return Promise.reject(new Error(`支店検索の実行に失敗しました（HTTP: ${res.status}）`));
+				if (!res.ok)
+					return Promise.reject(new Error(`支店検索の実行に失敗しました（HTTP: ${res.status}）`));
 				return res.json();
 			})
 			.then((arr) => {
@@ -1025,7 +1026,11 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 					try {
 						kanaOut = _bt_toHalfWidthKana(kanaOut, false);
 					} catch {}
-					const out = { branchCode: _bt_toStr(j.code).padStart(3, '0'), branchName: _bt_toStr(j.name), branchKana: kanaOut };
+					const out = {
+						branchCode: _bt_toStr(j.code).padStart(3, '0'),
+						branchName: _bt_toStr(j.name),
+						branchKana: kanaOut,
+					};
 					_bt_invokeCallback(callback, null, out);
 					return;
 				}
@@ -1041,12 +1046,20 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 					try {
 						kanaOut = _bt_toHalfWidthKana(kanaOut, false);
 					} catch {}
-					const out = { branchCode: _bt_toStr(j.code).padStart(3, '0'), branchName: _bt_toStr(j.name), branchKana: kanaOut };
+					const out = {
+						branchCode: _bt_toStr(j.code).padStart(3, '0'),
+						branchName: _bt_toStr(j.name),
+						branchKana: kanaOut,
+					};
 					_bt_invokeCallback(callback, null, out);
 					return;
 				}
 				if (exact.length > 1) {
-					_bt_invokeCallback(callback, { error: '検索結果が複数あります（完全一致の候補が複数見つかりました）' }, null);
+					_bt_invokeCallback(
+						callback,
+						{ error: '検索結果が複数あります（完全一致の候補が複数見つかりました）' },
+						null
+					);
 					return;
 				}
 				// 完全一致なし -> 特定不可
@@ -1055,11 +1068,13 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 			.catch((err) => {
 				let message = null;
 				try {
-					if (err && err.name === 'AbortError') message = '検索がタイムアウトしました（指定時間内に応答がありません）';
+					if (err && err.name === 'AbortError')
+						message = '検索がタイムアウトしました（指定時間内に応答がありません）';
 					else if (err && err.message) {
 						const m = String(err.message || err);
 						if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
-							message = '支店検索に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
+							message =
+								'支店検索に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
 						} else {
 							message = m;
 						}
