@@ -3,7 +3,7 @@
 // 公開 API (window.KACSW.bankTransfer):
 //  - getBank(input, callback)       // ※コールバック必須（同期返却は廃止）
 //                                     // 銀行コード or 銀行名を自動判定して非同期で返す
-//                                     // 戻り値の kana は半角カナに変換され、長音記号類は '-' に正規化されます
+//                                     // 成功時の戻り値は { bankCode, bankName, bankKana }（bankKana は半角カナ、長音類は '-' に正規化）
 //  - getBranch(bankCode, branch)    // 支店コード or 支店名で支店を返す
 //  - convertYucho(kigou, bangou)    // ゆうちょ記号/番号を全銀向け口座情報に変換（簡易）
 //  - generateZenginTransfer(records) // 簡易CSV形式の振込データ生成
@@ -776,7 +776,7 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 // そうでなければ名前で部分一致検索して配列を返す
 // -------------------------
 // getBank: kintone 向け single-arg コールバック専用版
-// 使い方: getBank('0138', (result) => { 成功: {code,name,kana} / 失敗: { error: '...' } })
+// 使い方: getBank('0138', (result) => { 成功: {bankCode,bankName,bankKana} / 失敗: { error: '...' } })
 const getBank = (bankCodeOrName, callback) => {
 	const s = _bt_toStr(bankCodeOrName).trim();
 	if (typeof callback !== 'function') {
