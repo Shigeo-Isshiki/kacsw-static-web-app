@@ -1,15 +1,14 @@
 // bank-transfer.js
 // 単一ファイルで提供する銀行振込ユーティリティ（kintone向け、callback専用）
-// 公開 API (window.KACSW.bankTransfer):
-//  - getBank(input, callback)       // ※コールバック必須（同期返却は廃止）
+// 公開 API (window.BANK):
+//  - getBank(bankCodeOrName, callback)       // ※コールバック必須（同期返却は廃止）
 //                                     // 銀行コード or 銀行名を自動判定して非同期で返す
 //                                     // 成功時の戻り値は { bankCode, bankName, bankKana }（bankKana は半角カナ、長音類は '-' に正規化）
-//  - getBranch(bankCode, branch)    // 支店コード or 支店名で支店を返す
+//  - getBranch(bankCode, branchCodeOrName, callback)    // 支店コード or 支店名で支店を返す（callback 必須、single-arg スタイル）
 //                                     // 成功時の戻り値は { branchCode, branchName, branchKana }（branchKana は半角カナ、長音類は '-' に正規化）
 //  - convertYucho(kigou, bangou)    // ゆうちょ記号/番号を全銀向け口座情報に変換（簡易）
 //  - generateZenginTransfer(records) // 簡易CSV形式の振込データ生成
 //  - loadBankByCode(bankCode, options?, callback) // BankKunスタイルの単一銀行取得（callbackのみ）
-//  - loadBankDataFromBankKun(apiBaseUrl, options?, callback) // 全件取得系（callbackのみ、オプションでパス調整可）
 
 // NOTE: このビルドでは Web API のみで検索を行うため、内部キャッシュは保持しません。
 // 以前は _BT_BANKS / _BT_BRANCHES をグローバルキャッシュとして保持していましたが
@@ -219,9 +218,9 @@ const _bt_toStr = (v) => (v == null ? '' : String(v));
 const _bt_safeLog = (msg) => {
 	try {
 		if (typeof window !== 'undefined') {
-			window.KACSW = window.KACSW || {};
-			window.KACSW._bt_debugLogs = window.KACSW._bt_debugLogs || [];
-			window.KACSW._bt_debugLogs.push(String(msg));
+			window.BANK = window.BANK || {};
+			window.BANK._bt_debugLogs = window.BANK._bt_debugLogs || [];
+			window.BANK._bt_debugLogs.push(String(msg));
 		}
 	} catch {}
 	try {
@@ -276,7 +275,7 @@ const _bt_invokeCallback = (cb, err, res) => {
 	} catch (e) {
 		try {
 			_bt_safeLog(
-				'[KACSW.bankTransfer] _bt_invokeCallback error: ' + (e && e.message ? e.message : e)
+				'[BANK] _bt_invokeCallback error: ' + (e && e.message ? e.message : e)
 			);
 		} catch {}
 	}
@@ -290,12 +289,12 @@ const _bt_invokeCallback = (cb, err, res) => {
 const _bt_buildPattern = (keys) => {
 	try {
 		if (!keys) {
-			_bt_safeLog('[KACSW.bankTransfer] _bt_buildPattern: keys is required');
+			_bt_safeLog('[BANK] _bt_buildPattern: keys is required');
 			return /(?:)/g;
 		}
 		const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 		if (!(keys && typeof keys[Symbol.iterator] === 'function')) {
-			_bt_safeLog('[KACSW.bankTransfer] _bt_buildPattern: keys must be an Iterable');
+			_bt_safeLog('[BANK] _bt_buildPattern: keys must be an Iterable');
 			return /(?:)/g;
 		}
 		const escapedKeys = [...keys].map(escapeRegExp);
@@ -303,7 +302,7 @@ const _bt_buildPattern = (keys) => {
 	} catch (e) {
 		try {
 			_bt_safeLog(
-				'[KACSW.bankTransfer] _bt_buildPattern error: ' + (e && e.message ? e.message : e)
+				'[BANK] _bt_buildPattern error: ' + (e && e.message ? e.message : e)
 			);
 		} catch {}
 		return /(?:)/g;
@@ -320,15 +319,15 @@ const _bt_buildPattern = (keys) => {
 const _bt_toFullWidthKatakana = (str = '', throwOnError = true) => {
 	try {
 		if (!_bt_checkString(str)) {
-			_bt_safeLog('[KACSW.bankTransfer] _bt_toFullWidthKatakana: input is not a string');
+			_bt_safeLog('[BANK] _bt_toFullWidthKatakana: input is not a string');
 			return str;
 		}
 		if (!_bt_checkBoolean(throwOnError)) {
-			_bt_safeLog('[KACSW.bankTransfer] _bt_toFullWidthKatakana: throwOnError is not boolean');
+			_bt_safeLog('[BANK] _bt_toFullWidthKatakana: throwOnError is not boolean');
 			return str;
 		}
 		if (!str) {
-			_bt_safeLog('[KACSW.bankTransfer] _bt_toFullWidthKatakana: input string is empty');
+			_bt_safeLog('[BANK] _bt_toFullWidthKatakana: input string is empty');
 			return str;
 		}
 		const fullWidthKanaPattern = _bt_buildPattern(_BT_FULL_WIDTH_KANA_MAP.keys());
@@ -355,7 +354,7 @@ const _bt_toFullWidthKatakana = (str = '', throwOnError = true) => {
 			}
 		}
 		if (errorChar) {
-			_bt_safeLog('[KACSW.bankTransfer] _bt_toFullWidthKatakana: invalid char ' + errorChar);
+			_bt_safeLog('[BANK] _bt_toFullWidthKatakana: invalid char ' + errorChar);
 			return str;
 		}
 		return work;
@@ -365,7 +364,7 @@ const _bt_toFullWidthKatakana = (str = '', throwOnError = true) => {
 		try {
 			if (typeof console !== 'undefined' && typeof console.warn === 'function')
 				console.warn(
-					'[KACSW.bankTransfer] _bt_toFullWidthKatakana fallback on error',
+					'[BANK] _bt_toFullWidthKatakana fallback on error',
 					e && e.message ? e.message : e
 				);
 		} catch {}
@@ -383,15 +382,15 @@ const _bt_toFullWidthKatakana = (str = '', throwOnError = true) => {
 const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
 	try {
 		if (!_bt_checkString(str)) {
-			_bt_safeLog('[KACSW.bankTransfer] _bt_toHalfWidthKana: input is not a string');
+			_bt_safeLog('[BANK] _bt_toHalfWidthKana: input is not a string');
 			return str;
 		}
 		if (!_bt_checkBoolean(throwOnError)) {
-			_bt_safeLog('[KACSW.bankTransfer] _bt_toHalfWidthKana: throwOnError is not boolean');
+			_bt_safeLog('[BANK] _bt_toHalfWidthKana: throwOnError is not boolean');
 			return str;
 		}
 		if (!str) {
-			_bt_safeLog('[KACSW.bankTransfer] _bt_toHalfWidthKana: input string is empty');
+			_bt_safeLog('[BANK] _bt_toHalfWidthKana: input string is empty');
 			return str;
 		}
 		// ひらがな→カタカナ変換を追加
@@ -424,7 +423,7 @@ const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
 			}
 		}
 		if (errorChar) {
-			_bt_safeLog('[KACSW.bankTransfer] _bt_toHalfWidthKana: invalid char ' + errorChar);
+			_bt_safeLog('[BANK] _bt_toHalfWidthKana: invalid char ' + errorChar);
 			return str;
 		}
 		return result;
@@ -432,7 +431,7 @@ const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
 		try {
 			if (typeof console !== 'undefined' && typeof console.warn === 'function')
 				console.warn(
-					'[KACSW.bankTransfer] _bt_toHalfWidthKana fallback on error',
+					'[BANK] _bt_toHalfWidthKana fallback on error',
 					e && e.message ? e.message : e
 				);
 		} catch {}
@@ -445,7 +444,7 @@ const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
 // - loadBankByCode('0001', options?, callback)
 // - callback(err, result)  result: { success:true, bank } or error
 // -------------------------
-// internal: _bt_loadBankByCode - not exposed to window.KACSW
+// internal: _bt_loadBankByCode - not exposed to window.BANK
 const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 	try {
 		if (typeof options === 'function') {
@@ -463,21 +462,21 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 		const path = pathTemplate.replace('{code}', code);
 		const url = base + path;
 		const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
-		_bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: enter');
+	_bt_safeLog('[BANK] _bt_loadBankByCode: enter');
 		const abortController = (function () {
 			try {
 				if (typeof console !== 'undefined' && typeof console.debug === 'function')
 					console.debug(
-						'[KACSW.bankTransfer] _bt_loadBankByCode: attempting to create AbortController'
+						'[BANK] _bt_loadBankByCode: attempting to create AbortController'
 					);
 				return typeof AbortController !== 'undefined' ? new AbortController() : null;
 			} catch (e) {
 				try {
-					if (typeof console !== 'undefined' && typeof console.warn === 'function')
-						console.warn(
-							'[KACSW.bankTransfer] _bt_loadBankByCode: AbortController ctor threw',
-							e && e.message ? e.message : e
-						);
+						if (typeof console !== 'undefined' && typeof console.warn === 'function')
+							console.warn(
+								'[BANK] _bt_loadBankByCode: AbortController ctor threw',
+								e && e.message ? e.message : e
+							);
 				} catch {}
 				return null;
 			}
@@ -486,19 +485,19 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 		try {
 			if (abortController && typeof abortController.abort === 'function') {
 				if (typeof console !== 'undefined' && typeof console.debug === 'function')
-					console.debug('[KACSW.bankTransfer] _bt_loadBankByCode: scheduling abort timer', timeout);
-				_bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: scheduling abort timer ' + timeout);
+					console.debug('[BANK] _bt_loadBankByCode: scheduling abort timer', timeout);
+				_bt_safeLog('[BANK] _bt_loadBankByCode: scheduling abort timer ' + timeout);
 				timer = setTimeout(() => {
 					try {
 						if (typeof console !== 'undefined' && typeof console.warn === 'function')
-							console.warn('[KACSW.bankTransfer] _bt_loadBankByCode: abort timer fired');
-						_bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: abort timer fired');
+							console.warn('[BANK] _bt_loadBankByCode: abort timer fired');
+						_bt_safeLog('[BANK] _bt_loadBankByCode: abort timer fired');
 						abortController.abort();
 					} catch (e) {
 						try {
 							if (typeof console !== 'undefined' && typeof console.warn === 'function')
 								console.warn(
-									'[KACSW.bankTransfer] _bt_loadBankByCode: abort failed',
+									'[BANK] _bt_loadBankByCode: abort failed',
 									e && e.message ? e.message : e
 								);
 						} catch {}
@@ -535,7 +534,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 							bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
 						} catch {}
 						try {
-							_bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: fetch success ' + bankObj.code);
+							_bt_safeLog('[BANK] _bt_loadBankByCode: fetch success ' + bankObj.code);
 						} catch {}
 						// キャッシュを保持しないため、受け取ったオブジェクトをそのまま返す
 						if (typeof callback === 'function') callback(bankObj);
@@ -578,11 +577,11 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 			try {
 				if (typeof console !== 'undefined' && typeof console.debug === 'function')
 					console.debug(
-						'[KACSW.bankTransfer] _bt_loadBankByCode: attempting fetch with signal',
+						'[BANK] _bt_loadBankByCode: attempting fetch with signal',
 						url
 					);
 			} catch {}
-			_bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: attempting fetch with signal ' + url);
+			_bt_safeLog('[BANK] _bt_loadBankByCode: attempting fetch with signal ' + url);
 			_bt_performFetch(
 				fetch(url, { headers, signal: abortController ? abortController.signal : undefined })
 			);
@@ -591,37 +590,37 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 			// signal を除いて再試行する
 			try {
 				try {
-					if (typeof console !== 'undefined' && typeof console.warn === 'function')
-						console.warn(
-							'[KACSW.bankTransfer] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal',
-							e && e.message ? e.message : e
-						);
+						if (typeof console !== 'undefined' && typeof console.warn === 'function')
+							console.warn(
+								'[BANK] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal',
+								e && e.message ? e.message : e
+							);
 				} catch {}
 				_bt_safeLog(
-					'[KACSW.bankTransfer] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal ' +
+					'[BANK] _bt_loadBankByCode: fetch with signal threw sync exception, retrying without signal ' +
 						(e && e.message ? e.message : e)
 				);
 				if (typeof console !== 'undefined' && typeof console.debug === 'function')
 					console.debug(
-						'[KACSW.bankTransfer] _bt_loadBankByCode: attempting fetch without signal',
+						'[BANK] _bt_loadBankByCode: attempting fetch without signal',
 						url
 					);
 				_bt_safeLog(
-					'[KACSW.bankTransfer] _bt_loadBankByCode: attempting fetch without signal ' + url
+					'[BANK] _bt_loadBankByCode: attempting fetch without signal ' + url
 				);
 				_bt_performFetch(fetch(url, { headers }));
 			} catch (e2) {
 				// 最悪同期的に fetch が失敗する場合はエラーハンドリングへ送る
 				try {
 					if (typeof console !== 'undefined' && typeof console.error === 'function')
-						console.error(
-							'[KACSW.bankTransfer] _bt_loadBankByCode: fetch without signal also threw',
-							e2 && e2.message ? e2.message : e2
-						);
+							console.error(
+								'[BANK] _bt_loadBankByCode: fetch without signal also threw',
+								e2 && e2.message ? e2.message : e2
+							);
 				} catch {}
 				_bt_safeLog(
-					'[KACSW.bankTransfer] _bt_loadBankByCode: fetch without signal also threw ' +
-						(e2 && e2.message ? e2.message : e2)
+					'[BANK] _bt_loadBankByCode: fetch without signal also threw ' +
+							(e2 && e2.message ? e2.message : e2)
 				);
 				const err = { success: false, error: e2 && e2.message ? e2.message : String(e2) };
 				if (typeof callback === 'function') callback(err, null);
@@ -632,7 +631,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 		try {
 			if (typeof console !== 'undefined' && typeof console.error === 'function')
 				console.error(
-					'[KACSW.bankTransfer] _bt_loadBankByCode: top-level sync error',
+					'[BANK] _bt_loadBankByCode: top-level sync error',
 					topErr && topErr.message ? topErr.message : topErr
 				);
 		} catch {}
@@ -700,7 +699,7 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 					bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
 				} catch {}
 				try {
-					_bt_safeLog('[KACSW.bankTransfer] _bt_searchBankByName: success ' + bankObj.code);
+					_bt_safeLog('[BANK] _bt_searchBankByName: success ' + bankObj.code);
 				} catch {}
 				if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
 				return;
@@ -1130,130 +1129,19 @@ const generateZenginTransfer = (records = []) => {
 	return lines.join('\n');
 };
 
-// -------------------------
-// 公開: BankKun から全件取得してキャッシュ更新（callback-only）
-// - apiBaseUrl: 例 'https://bank.teraren.com'
-// - options: { apiKey, timeout(ms)=5000, banksPath='/banks', branchesPath='/branches' }
-// - callback: function(err, result)
-// result: { success:true, loadedBanks, loadedBranches } or on error { success:false, error }
-// -------------------------
-const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
-	if (typeof options === 'function') {
-		callback = options;
-		options = {};
-	}
-	if (!apiBaseUrl) {
-		if (typeof callback === 'function')
-			callback({ success: false, error: 'apiBaseUrl required' }, null);
-		return;
-	}
-	const { apiKey, timeout = 5000, banksPath = '/banks', branchesPath = '/branches' } = options;
-	const base = apiBaseUrl.replace(/\/$/, '');
-	const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
-	const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
-	let timer = null;
-	if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
-
-	// ローカル変数に取得結果を保持し、グローバルキャッシュは更新しない
-	let localBanks = [];
-	let localBranches = {}; // { bankCode: [ { branchCode, name, kana } ] }
-
-	fetch(base + banksPath, { headers, signal: abortController ? abortController.signal : undefined })
-		.then((banksRes) => {
-			if (!banksRes.ok) return Promise.reject(new Error(`banks fetch failed: ${banksRes.status}`));
-			return banksRes.json();
-		})
-		.then((banksJson) => {
-			if (!Array.isArray(banksJson)) return Promise.reject(new Error('banks response not array'));
-			for (const b of banksJson) {
-				localBanks.push({
-					code: _bt_toStr(b.code).padStart(4, '0'),
-					name: _bt_toStr(b.name),
-					kana: (function () {
-						try {
-							return _bt_toHalfWidthKana(_bt_toStr(b.kana), false);
-						} catch {
-							return _bt_toStr(b.kana);
-						}
-					})(),
-				});
-			}
-			return fetch(base + branchesPath, {
-				headers,
-				signal: abortController ? abortController.signal : undefined,
-			});
-		})
-		.then((branchesRes) => {
-			if (!branchesRes.ok) {
-				const resObj = { success: true, loadedBanks: localBanks.length, loadedBranches: 0 };
-				if (typeof callback === 'function') callback(null, resObj);
-				return;
-			}
-			return branchesRes.json().then((branchesJson) => {
-				if (!Array.isArray(branchesJson)) return Promise.reject(new Error('branches response not array'));
-				for (const br of branchesJson) {
-					const bk = _bt_toStr(br.bankCode).padStart(4, '0');
-					if (!localBranches[bk]) localBranches[bk] = [];
-					localBranches[bk].push({
-						branchCode: _bt_toStr(br.branchCode).padStart(3, '0'),
-						name: _bt_toStr(br.name),
-						kana: (function () {
-							try {
-								return _bt_toHalfWidthKana(_bt_toStr(br.kana), false);
-							} catch {
-								return _bt_toStr(br.kana);
-							}
-						})(),
-					});
-				}
-				const resObj = {
-					success: true,
-					loadedBanks: localBanks.length,
-					loadedBranches: Object.keys(localBranches).reduce((acc, k) => acc + (localBranches[k] ? localBranches[k].length : 0), 0),
-				};
-				if (typeof callback === 'function') callback(null, resObj);
-			});
-		})
-		.catch((err) => {
-			let message = null;
-			try {
-				if (err && err.name === 'AbortError') {
-					message = '取得がタイムアウトしました（指定時間内に応答がありません）';
-				} else if (err && err.message) {
-					const m = String(err.message || err);
-					if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
-						message =
-							'銀行データの取得に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
-					} else {
-						message = m;
-					}
-				} else {
-					message = '銀行データ取得中に不明なエラーが発生しました';
-				}
-			} catch {
-				message = '銀行データ取得中にエラーが発生しました';
-			}
-			const e = { success: false, error: message };
-			if (typeof callback === 'function') callback(e, null);
-		})
-		.catch((err) => {
-			const e = { success: false, error: err && err.message ? err.message : String(err) };
-			if (typeof callback === 'function') callback(e, null);
-		})
-		.finally(() => {
-			if (timer) clearTimeout(timer);
-		});
-};
+// loadBankDataFromBankKun was removed from this build because the library no longer
+// performs a full fetch of all banks/branches. Consumers should request only the
+// specific bank/branch data they need via getBank / getBranch / loadBankByCode.
 
 // expose to window for kintone
 if (typeof window !== 'undefined') {
-	window.KACSW = window.KACSW || {};
-	window.KACSW.bankTransfer = window.KACSW.bankTransfer || {};
-	Object.assign(window.KACSW.bankTransfer, {
+	// Expose under a concise global name for consumers: window.BANK
+	// This build uses window.BANK as the primary namespace (full migration).
+	window.BANK = window.BANK || {};
+	Object.assign(window.BANK, {
 		getBank,
 		getBranch,
 		convertYucho,
 		generateZenginTransfer,
-		loadBankDataFromBankKun,
 	});
 }
