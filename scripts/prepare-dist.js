@@ -62,6 +62,32 @@ async function run() {
 			console.log('copied image directory');
 		}
 
+		// Ensure a favicon is present at the webroot (dist/favicon.ico).
+		// Browsers often request /favicon.ico automatically; if the repo does not
+		// provide one under src/image/favicon.ico, create a tiny default icon in dist
+		// to avoid 404 noise in CI (puppeteer / browser logs).
+		const srcFavicon = path.join(SRC, 'image', 'favicon.ico');
+		const destFavicon = path.join(DIST, 'favicon.ico');
+		if (await fs.pathExists(srcFavicon)) {
+			try {
+				await fs.copy(srcFavicon, destFavicon, { overwrite: true });
+				console.log('copied favicon from src/image/favicon.ico');
+			} catch (e) {
+				console.warn('warning: failed to copy favicon:', e && e.message ? e.message : e);
+			}
+		} else {
+			// Default: a minimal 1x1 transparent PNG encoded as base64. Writing it to
+			// dist/favicon.ico removes the 404; browsers accept PNG bytes as favicons.
+			const faviconBase64 =
+				'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==';
+			try {
+				await fs.writeFile(destFavicon, Buffer.from(faviconBase64, 'base64'));
+				console.log('wrote default dist/favicon.ico (1x1 PNG)');
+			} catch (e) {
+				console.warn('warning: failed to write default favicon:', e && e.message ? e.message : e);
+			}
+		}
+
 		console.log('prepare:dist finished');
 	} catch (err) {
 		console.error('prepare:dist failed:', err);
