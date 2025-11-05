@@ -928,7 +928,7 @@ const getBank = (bankCodeOrName, callback) => {
 // -------------------------
 // 公開: 支店取得（コールバック形式、single-arg スタイルに準拠）
 // getBranch(bankCode, branchCodeOrName, callback)
-// - bankCode: 銀行コード（数字または文字列）
+// - bankCode: 銀行コード（数字または文字列、4桁にpadStartされます）
 // - branchCodeOrName: 支店コード（数字）または支店名（文字列）
 // - callback: single-arg スタイルのコールバック（成功時は branch オブジェクト、失敗時は { error: '...' } ）
 const getBranch = (bankCode, branchCodeOrName, callback) => {
@@ -940,7 +940,6 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 		_bt_invokeCallback(callback, { error: '銀行コードが空です' }, null);
 		return;
 	}
-	// 親関数と使いやすさを優先して 4 桁にパディングする
 	const bankKey = bCodeRaw.padStart(4, '0');
 
 	const qRaw = _bt_toStr(branchCodeOrName).trim();
@@ -949,72 +948,128 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 		return;
 	}
 
-	// 検索ロジックを共通化
-	const searchInCache = () => {
-		const list = _BT_BRANCHES[bankKey] || [];
-		const q = qRaw.toLowerCase();
-		// まず支店コード（3桁）で完全一致を試す
-		if (/^[0-9]+$/.test(q)) {
-			const byCode = list.find((b) => _bt_toStr(b.branchCode) === q.padStart(3, '0'));
-			if (byCode) {
-				return { branchCode: _bt_toStr(byCode.branchCode), branchName: _bt_toStr(byCode.name), branchKana: _bt_toStr(byCode.kana) };
-			}
-		}
-		// 支店名の部分一致（支店カナは検索不要）
-		const candidates = list.filter((b) => _bt_toStr(b.name).toLowerCase().includes(q));
-		if (candidates.length === 0) return null;
-		if (candidates.length === 1) {
-			const c = candidates[0];
-			return { branchCode: _bt_toStr(c.branchCode), branchName: _bt_toStr(c.name), branchKana: _bt_toStr(c.kana) };
-		}
-		// 複数候補ある場合は完全一致を探す
-		const exact = candidates.find((b) => _bt_toStr(b.name).toLowerCase() === q);
-		if (exact) return { branchCode: _bt_toStr(exact.branchCode), branchName: _bt_toStr(exact.name), branchKana: _bt_toStr(exact.kana) };
-		// 特定できない
-		return { ambiguous: true, candidates: candidates.map((c) => _bt_toStr(c.name)) };
-	};
+	const apiBase = 'https://bank.teraren.com';
 
-	// 原則リモート（loadBankDataFromBankKun を呼んでキャッシュを更新してから検索）
+	// 支店コード検索: /banks/{bank_code}/branches/{branch_code}.json
+	if (/^[0-9]+$/.test(qRaw)) {
+		const branchCode = qRaw.padStart(3, '0');
+		const url = apiBase.replace(/\/$/, '') + `/banks/${bankKey}/branches/${branchCode}.json`;
+		const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+		let timer = null;
+		if (abortController) timer = setTimeout(() => abortController.abort(), 5000);
+		const perform = () =>
+			fetch(url, { signal: abortController ? abortController.signal : undefined })
+				.then((res) => {
+					if (!res.ok) return Promise.reject(new Error(`支店情報の取得に失敗しました（HTTP: ${res.status}）`));
+					return res.json();
+				})
+				.then((j) => {
+					if (!j) {
+						_bt_invokeCallback(callback, { error: '支店情報が空です' }, null);
+						return;
+					}
+					const out = {
+						branchCode: _bt_toStr(j.code).padStart(3, '0'),
+						branchName: _bt_toStr(j.name),
+						branchKana: _bt_toStr(j.kana),
+					};
+					_bt_invokeCallback(callback, null, out);
+				})
+				.catch((err) => {
+					let message = null;
+					try {
+						if (err && err.name === 'AbortError') message = '取得がタイムアウトしました（指定時間内に応答がありません）';
+						else if (err && err.message) {
+							const m = String(err.message || err);
+							if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
+								message = '支店データの取得に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
+							} else {
+								message = m;
+							}
+						} else message = '支店データ取得中に不明なエラーが発生しました';
+					} catch {
+						message = '支店データ取得中にエラーが発生しました';
+					}
+					_bt_invokeCallback(callback, { error: message }, null);
+				})
+				.finally(() => {
+					if (timer) clearTimeout(timer);
+				});
+		try {
+			perform();
+		} catch (e) {
+			_bt_invokeCallback(callback, { error: '支店データ取得中にエラーが発生しました' }, null);
+		}
+		return;
+	}
+
+	// 支店名検索: /banks/{bank_code}/branches/search.json?name={branch_name}
+	const url = apiBase.replace(/\/$/, '') + `/banks/${bankKey}/branches/search.json?name=` + encodeURIComponent(qRaw);
+	const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+	let timer = null;
+	if (abortController) timer = setTimeout(() => abortController.abort(), 5000);
 	try {
-		loadBankDataFromBankKun('https://bank.teraren.com', {}, function (err, res) {
-			// 取得に失敗してもキャッシュにフォールバックする
-			if (err) {
-				const fromCache = searchInCache();
-				if (fromCache && !fromCache.ambiguous) {
-					_bt_invokeCallback(callback, null, fromCache);
+		fetch(url, { signal: abortController ? abortController.signal : undefined })
+			.then((res) => {
+				if (!res.ok) return Promise.reject(new Error(`支店検索の実行に失敗しました（HTTP: ${res.status}）`));
+				return res.json();
+			})
+			.then((arr) => {
+				if (!Array.isArray(arr)) {
+					_bt_invokeCallback(callback, { error: '支店検索のレスポンス形式が不正です' }, null);
 					return;
 				}
-				if (fromCache && fromCache.ambiguous) {
-					_bt_invokeCallback(callback, { error: '支店が特定できません（候補が複数あります: ' + fromCache.candidates.join(', ') + ')' }, null);
+				if (arr.length === 0) {
+					_bt_invokeCallback(callback, { error: '該当する支店が見つかりませんでした' }, null);
 					return;
 				}
-				_bt_invokeCallback(callback, { error: '支店データの取得に失敗しました' }, null);
-				return;
-			}
-			// 正常に取得できた場合、_BT_BRANCHES が更新されているはず
-			const result = searchInCache();
-			if (!result) {
-				_bt_invokeCallback(callback, { error: '支店データが見つかりません' }, null);
-				return;
-			}
-			if (result.ambiguous) {
-				_bt_invokeCallback(callback, { error: '支店が特定できません（候補が複数あります: ' + result.candidates.join(', ') + ')' }, null);
-				return;
-			}
-			_bt_invokeCallback(callback, null, result);
-		});
+				if (arr.length === 1) {
+					const j = arr[0];
+					const out = { branchCode: _bt_toStr(j.code).padStart(3, '0'), branchName: _bt_toStr(j.name), branchKana: _bt_toStr(j.kana) };
+					_bt_invokeCallback(callback, null, out);
+					return;
+				}
+				// 複数件: 完全一致を探す（name / normalize.name をチェック）
+				const exact = arr.filter((j) => {
+					const n1 = _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : '').trim();
+					const n2 = _bt_toStr(j.name).trim();
+					return n1 === qRaw || n2 === qRaw;
+				});
+				if (exact.length === 1) {
+					const j = exact[0];
+					const out = { branchCode: _bt_toStr(j.code).padStart(3, '0'), branchName: _bt_toStr(j.name), branchKana: _bt_toStr(j.kana) };
+					_bt_invokeCallback(callback, null, out);
+					return;
+				}
+				if (exact.length > 1) {
+					_bt_invokeCallback(callback, { error: '検索結果が複数あります（完全一致の候補が複数見つかりました）' }, null);
+					return;
+				}
+				// 完全一致なし -> 特定不可
+				_bt_invokeCallback(callback, { error: '支店が特定できません（候補が複数あります）' }, null);
+			})
+			.catch((err) => {
+				let message = null;
+				try {
+					if (err && err.name === 'AbortError') message = '検索がタイムアウトしました（指定時間内に応答がありません）';
+					else if (err && err.message) {
+						const m = String(err.message || err);
+						if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
+							message = '支店検索に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
+						} else {
+							message = m;
+						}
+					} else message = '支店検索中に不明なエラーが発生しました';
+				} catch {
+					message = '支店検索中にエラーが発生しました';
+				}
+				_bt_invokeCallback(callback, { error: message }, null);
+			})
+			.finally(() => {
+				if (timer) clearTimeout(timer);
+			});
 	} catch (e) {
-		// 例外時はキャッシュにフォールバック
-		const fromCache = searchInCache();
-		if (fromCache && !fromCache.ambiguous) {
-			_bt_invokeCallback(callback, null, fromCache);
-			return;
-		}
-		if (fromCache && fromCache.ambiguous) {
-			_bt_invokeCallback(callback, { error: '支店が特定できません（候補が複数あります: ' + fromCache.candidates.join(', ') + ')' }, null);
-			return;
-		}
-		_bt_invokeCallback(callback, { error: '支店データ取得中にエラーが発生しました' }, null);
+		_bt_invokeCallback(callback, { error: '支店検索中に例外が発生しました' }, null);
 	}
 	return;
 };
