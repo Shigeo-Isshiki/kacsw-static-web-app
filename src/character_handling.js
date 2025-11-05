@@ -446,11 +446,12 @@ const _ch_toHalfWidth = (str = '', throwOnError = true) => {
 	if (!str) throw new Error('変換対象の文字列が空です');
 	const hyphenProcessed = str.replace(/[－‐‑–—−ー―]/g, '-');
 	try {
-		const halfWidthKana = (typeof _ch_toHalfWidthKana === 'function')
-			? _ch_toHalfWidthKana(hyphenProcessed, false)
-			: (typeof window !== 'undefined' && typeof window.toHalfWidthKana === 'function')
-				? window.toHalfWidthKana(hyphenProcessed, false)
-				: hyphenProcessed;
+		const halfWidthKana =
+			typeof _ch_toHalfWidthKana === 'function'
+				? _ch_toHalfWidthKana(hyphenProcessed, false)
+				: typeof window !== 'undefined' && typeof window.toHalfWidthKana === 'function'
+					? window.toHalfWidthKana(hyphenProcessed, false)
+					: hyphenProcessed;
 		let errorChar = null;
 		const singleByteCharacters = [...halfWidthKana]
 			.map((char) => {
@@ -476,7 +477,7 @@ const _ch_toHalfWidth = (str = '', throwOnError = true) => {
 				return char;
 			})
 			.join('');
-	if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
+		if (errorChar) throw new Error(`変換不能な文字が含まれています: ${errorChar}`);
 		return singleByteCharacters;
 	} catch (error) {
 		throw new Error(error.message);
@@ -496,11 +497,12 @@ const _ch_assertEmailAddress = (emailAddress = '') => {
 	if (!emailAddress) throw new Error('メールアドレスが空です');
 	const trimmed = emailAddress.trim();
 	try {
-		const singleByteCharacters = (typeof _ch_toHalfWidth === 'function')
-			? _ch_toHalfWidth(trimmed)
-			: (typeof window !== 'undefined' && typeof window.toHalfWidth === 'function')
-				? window.toHalfWidth(trimmed)
-				: trimmed;
+		const singleByteCharacters =
+			typeof _ch_toHalfWidth === 'function'
+				? _ch_toHalfWidth(trimmed)
+				: typeof window !== 'undefined' && typeof window.toHalfWidth === 'function'
+					? window.toHalfWidth(trimmed)
+					: trimmed;
 		if (/\.\.|^\.|\.@|@\.|\.$/.test(singleByteCharacters))
 			throw new Error('メールアドレスは連続ドットや@直前・直後のドットを含めることはできません');
 		if (!emailPattern.test(singleByteCharacters))
