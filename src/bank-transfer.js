@@ -801,8 +801,8 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 // -------------------------
 // getBank: kintone 向け single-arg コールバック専用版
 // 使い方: getBank('0138', (result) => { 成功: {code,name,kana} / 失敗: { error: '...' } })
-const getBank = (input, callback) => {
-	const s = _bt_toStr(input).trim();
+const getBank = (bankCodeOrName, callback) => {
+	const s = _bt_toStr(bankCodeOrName).trim();
 	if (typeof callback !== 'function') {
 		// 既存と同じくコールバック必須で早期返却（エラーオブジェクトを返す）
 		return { success: false, error: '第二引数はコールバック関数である必要があります' };
@@ -926,21 +926,97 @@ const getBank = (input, callback) => {
 };
 
 // -------------------------
-// 公開: 支店取得
-// -------------------------
-const getBranch = (bankCode, branchCodeOrName) => {
-	const bankKey = _bt_toStr(bankCode).padStart(4, '0');
-	const list = _BT_BRANCHES[bankKey] || [];
-	const q = _bt_toStr(branchCodeOrName).toLowerCase();
-	if (!q) return null;
-	const byCode = list.find((b) => _bt_toStr(b.branchCode) === q.padStart(3, '0'));
-	if (byCode) return byCode;
-	return (
-		list.find(
-			(b) =>
-				_bt_toStr(b.name).toLowerCase().includes(q) || _bt_toStr(b.kana).toLowerCase().includes(q)
-		) || null
-	);
+// 公開: 支店取得（コールバック形式、single-arg スタイルに準拠）
+// getBranch(bankCode, branchCodeOrName, callback)
+// - bankCode: 銀行コード（数字または文字列）
+// - branchCodeOrName: 支店コード（数字）または支店名（文字列）
+// - callback: single-arg スタイルのコールバック（成功時は branch オブジェクト、失敗時は { error: '...' } ）
+const getBranch = (bankCode, branchCodeOrName, callback) => {
+	if (typeof callback !== 'function') {
+		return { success: false, error: '第三引数はコールバック関数である必要があります' };
+	}
+	const bCodeRaw = _bt_toStr(bankCode).trim();
+	if (!bCodeRaw) {
+		_bt_invokeCallback(callback, { error: '銀行コードが空です' }, null);
+		return;
+	}
+	// 親関数と使いやすさを優先して 4 桁にパディングする
+	const bankKey = bCodeRaw.padStart(4, '0');
+
+	const qRaw = _bt_toStr(branchCodeOrName).trim();
+	if (!qRaw) {
+		_bt_invokeCallback(callback, { error: '検索語が空です' }, null);
+		return;
+	}
+
+	// 検索ロジックを共通化
+	const searchInCache = () => {
+		const list = _BT_BRANCHES[bankKey] || [];
+		const q = qRaw.toLowerCase();
+		// まず支店コード（3桁）で完全一致を試す
+		if (/^[0-9]+$/.test(q)) {
+			const byCode = list.find((b) => _bt_toStr(b.branchCode) === q.padStart(3, '0'));
+			if (byCode) {
+				return { branchCode: _bt_toStr(byCode.branchCode), branchName: _bt_toStr(byCode.name), branchKana: _bt_toStr(byCode.kana) };
+			}
+		}
+		// 支店名の部分一致（支店カナは検索不要）
+		const candidates = list.filter((b) => _bt_toStr(b.name).toLowerCase().includes(q));
+		if (candidates.length === 0) return null;
+		if (candidates.length === 1) {
+			const c = candidates[0];
+			return { branchCode: _bt_toStr(c.branchCode), branchName: _bt_toStr(c.name), branchKana: _bt_toStr(c.kana) };
+		}
+		// 複数候補ある場合は完全一致を探す
+		const exact = candidates.find((b) => _bt_toStr(b.name).toLowerCase() === q);
+		if (exact) return { branchCode: _bt_toStr(exact.branchCode), branchName: _bt_toStr(exact.name), branchKana: _bt_toStr(exact.kana) };
+		// 特定できない
+		return { ambiguous: true, candidates: candidates.map((c) => _bt_toStr(c.name)) };
+	};
+
+	// 原則リモート（loadBankDataFromBankKun を呼んでキャッシュを更新してから検索）
+	try {
+		loadBankDataFromBankKun('https://bank.teraren.com', {}, function (err, res) {
+			// 取得に失敗してもキャッシュにフォールバックする
+			if (err) {
+				const fromCache = searchInCache();
+				if (fromCache && !fromCache.ambiguous) {
+					_bt_invokeCallback(callback, null, fromCache);
+					return;
+				}
+				if (fromCache && fromCache.ambiguous) {
+					_bt_invokeCallback(callback, { error: '支店が特定できません（候補が複数あります: ' + fromCache.candidates.join(', ') + ')' }, null);
+					return;
+				}
+				_bt_invokeCallback(callback, { error: '支店データの取得に失敗しました' }, null);
+				return;
+			}
+			// 正常に取得できた場合、_BT_BRANCHES が更新されているはず
+			const result = searchInCache();
+			if (!result) {
+				_bt_invokeCallback(callback, { error: '支店データが見つかりません' }, null);
+				return;
+			}
+			if (result.ambiguous) {
+				_bt_invokeCallback(callback, { error: '支店が特定できません（候補が複数あります: ' + result.candidates.join(', ') + ')' }, null);
+				return;
+			}
+			_bt_invokeCallback(callback, null, result);
+		});
+	} catch (e) {
+		// 例外時はキャッシュにフォールバック
+		const fromCache = searchInCache();
+		if (fromCache && !fromCache.ambiguous) {
+			_bt_invokeCallback(callback, null, fromCache);
+			return;
+		}
+		if (fromCache && fromCache.ambiguous) {
+			_bt_invokeCallback(callback, { error: '支店が特定できません（候補が複数あります: ' + fromCache.candidates.join(', ') + ')' }, null);
+			return;
+		}
+		_bt_invokeCallback(callback, { error: '支店データ取得中にエラーが発生しました' }, null);
+	}
+	return;
 };
 
 // -------------------------
