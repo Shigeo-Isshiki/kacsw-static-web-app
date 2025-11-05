@@ -968,10 +968,14 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 						_bt_invokeCallback(callback, { error: '支店情報が空です' }, null);
 						return;
 					}
+					let kanaOut = _bt_toStr(j.kana);
+					try {
+						kanaOut = _bt_toHalfWidthKana(kanaOut, false);
+					} catch {}
 					const out = {
 						branchCode: _bt_toStr(j.code).padStart(3, '0'),
 						branchName: _bt_toStr(j.name),
-						branchKana: _bt_toStr(j.kana),
+						branchKana: kanaOut,
 					};
 					_bt_invokeCallback(callback, null, out);
 				})
@@ -1025,7 +1029,11 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 				}
 				if (arr.length === 1) {
 					const j = arr[0];
-					const out = { branchCode: _bt_toStr(j.code).padStart(3, '0'), branchName: _bt_toStr(j.name), branchKana: _bt_toStr(j.kana) };
+					let kanaOut = _bt_toStr(j.kana);
+					try {
+						kanaOut = _bt_toHalfWidthKana(kanaOut, false);
+					} catch {}
+					const out = { branchCode: _bt_toStr(j.code).padStart(3, '0'), branchName: _bt_toStr(j.name), branchKana: kanaOut };
 					_bt_invokeCallback(callback, null, out);
 					return;
 				}
@@ -1037,7 +1045,11 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 				});
 				if (exact.length === 1) {
 					const j = exact[0];
-					const out = { branchCode: _bt_toStr(j.code).padStart(3, '0'), branchName: _bt_toStr(j.name), branchKana: _bt_toStr(j.kana) };
+					let kanaOut = _bt_toStr(j.kana);
+					try {
+						kanaOut = _bt_toHalfWidthKana(kanaOut, false);
+					} catch {}
+					const out = { branchCode: _bt_toStr(j.code).padStart(3, '0'), branchName: _bt_toStr(j.name), branchKana: kanaOut };
 					_bt_invokeCallback(callback, null, out);
 					return;
 				}
