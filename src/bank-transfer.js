@@ -856,7 +856,15 @@ const getBank = (bankCodeOrName, callback) => {
 				return;
 			}
 			if (res && res.success === false) {
-				_bt_invokeCallback(callback, { error: res.error || '取得エラー' }, null);
+				_bt_invokeCallback(
+					callback,
+					{
+						error:
+							res.error ||
+							'銀行情報の取得に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。',
+					},
+					null
+				);
 				return;
 			}
 			if (!res.bank) {
@@ -909,7 +917,15 @@ const getBank = (bankCodeOrName, callback) => {
 			return;
 		}
 		if (!res || res.success === false) {
-			_bt_invokeCallback(callback, { error: res && res.error ? res.error : '検索エラー' }, null);
+			_bt_invokeCallback(
+				callback,
+				{
+					error:
+						(res && res.error) ||
+						'銀行名検索に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。',
+				},
+				null
+			);
 			return;
 		}
 		const b = res.bank;
