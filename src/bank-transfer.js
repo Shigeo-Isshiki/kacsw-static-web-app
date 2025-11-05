@@ -5,6 +5,7 @@
 //                                     // 銀行コード or 銀行名を自動判定して非同期で返す
 //                                     // 成功時の戻り値は { bankCode, bankName, bankKana }（bankKana は半角カナ、長音類は '-' に正規化）
 //  - getBranch(bankCode, branch)    // 支店コード or 支店名で支店を返す
+//                                     // 成功時の戻り値は { branchCode, branchName, branchKana }（branchKana は半角カナ、長音類は '-' に正規化）
 //  - convertYucho(kigou, bangou)    // ゆうちょ記号/番号を全銀向け口座情報に変換（簡易）
 //  - generateZenginTransfer(records) // 簡易CSV形式の振込データ生成
 //  - loadBankByCode(bankCode, options?, callback) // BankKunスタイルの単一銀行取得（callbackのみ）
@@ -922,7 +923,7 @@ const getBank = (bankCodeOrName, callback) => {
 // getBranch(bankCode, branchCodeOrName, callback)
 // - bankCode: 銀行コード（数字または文字列、4桁にpadStartされます）
 // - branchCodeOrName: 支店コード（数字）または支店名（文字列）
-// - callback: single-arg スタイルのコールバック（成功時は branch オブジェクト、失敗時は { error: '...' } ）
+// - callback: single-arg スタイルのコールバック（成功時は { branchCode, branchName, branchKana }、失敗時は { error: '...' } ）
 const getBranch = (bankCode, branchCodeOrName, callback) => {
 	if (typeof callback !== 'function') {
 		return { success: false, error: '第三引数はコールバック関数である必要があります' };
