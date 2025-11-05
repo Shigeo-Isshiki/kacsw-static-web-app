@@ -775,42 +775,50 @@ const getBank = (bankCodeOrName, callback) => {
 		return;
 	}
 
+	// 内部で一貫した出力を返すヘルパ
+	const _emitBank = (cb, err, bank) => {
+		if (err) {
+			_bt_invokeCallback(cb, err, null);
+			return;
+		}
+		if (!bank) {
+			_bt_invokeCallback(cb, { error: '銀行情報の取得結果が空です' }, null);
+			return;
+		}
+		// bank が { success:true, bank } の形で渡される可能性があるため対応
+		const b = bank && bank.bank ? bank.bank : bank;
+		let kanaOut = _bt_toStr(b.kana);
+		try {
+			kanaOut = _bt_toHalfWidthKana(kanaOut, false);
+		} catch {}
+		_bt_invokeCallback(cb, null, { bankCode: b.code, bankName: b.name, bankKana: kanaOut });
+	};
+
 	const digitsOnly = /^[0-9]+$/.test(s);
 
 	if (digitsOnly && s.length <= 4) {
 		const key = s.padStart(4, '0');
 		_bt_loadBankByCode(key, {}, function (/* flexible args from loader */) {
-			// 内部ローダーが single-arg を返す場合
+			// single-arg スタイル
 			if (arguments.length === 1) {
 				const out = arguments[0];
 				if (!out) {
-					_bt_invokeCallback(callback, { error: '銀行情報の取得結果が空です' }, null);
+					_emitBank(callback, { error: '銀行情報の取得結果が空です' }, null);
 					return;
 				}
 				if (out && out.error) {
-					_bt_invokeCallback(callback, out, null);
+					_emitBank(callback, out, null);
 					return;
 				}
-				// out が { success:true, bank } 形式の可能性にも対応
 				const b = out && out.bank ? out.bank : out;
-				let kanaOut = _bt_toStr(b.kana);
-				try {
-					kanaOut = _bt_toHalfWidthKana(kanaOut, false);
-				} catch {
-					kanaOut = _bt_toStr(b.kana);
-				}
-				_bt_invokeCallback(callback, null, {
-					bankCode: b.code,
-					bankName: b.name,
-					bankKana: kanaOut,
-				});
+				_emitBank(callback, null, b);
 				return;
 			}
-			// node-style (err, res) が来た場合の保険（可能なら使わない前提）
+			// node-style (err, res)
 			const err = arguments[0];
 			const res = arguments[1];
 			if (err) {
-				_bt_invokeCallback(
+				_emitBank(
 					callback,
 					{ error: err && err.error ? err.error : err && err.message ? err.message : String(err) },
 					null
@@ -818,11 +826,11 @@ const getBank = (bankCodeOrName, callback) => {
 				return;
 			}
 			if (!res) {
-				_bt_invokeCallback(callback, { error: '銀行情報の取得結果が空です' }, null);
+				_emitBank(callback, { error: '銀行情報の取得結果が空です' }, null);
 				return;
 			}
 			if (res && res.success === false) {
-				_bt_invokeCallback(
+				_emitBank(
 					callback,
 					{
 						error:
@@ -834,17 +842,10 @@ const getBank = (bankCodeOrName, callback) => {
 				return;
 			}
 			if (!res.bank) {
-				_bt_invokeCallback(callback, { error: '銀行データがレスポンスに含まれていません' }, null);
+				_emitBank(callback, { error: '銀行データがレスポンスに含まれていません' }, null);
 				return;
 			}
-			const b = res.bank;
-			let kanaOut = _bt_toStr(b.kana);
-			try {
-				kanaOut = _bt_toHalfWidthKana(kanaOut, false);
-			} catch {
-				kanaOut = _bt_toStr(b.kana);
-			}
-			_bt_invokeCallback(callback, null, { bankCode: b.code, bankName: b.name, bankKana: kanaOut });
+			_emitBank(callback, null, res.bank);
 			return;
 		});
 		return;
@@ -855,31 +856,21 @@ const getBank = (bankCodeOrName, callback) => {
 		if (arguments.length === 1) {
 			const out = arguments[0];
 			if (!out) {
-				_bt_invokeCallback(callback, { error: '検索結果が空です' }, null);
+				_emitBank(callback, { error: '検索結果が空です' }, null);
 				return;
 			}
 			if (out && out.error) {
-				_bt_invokeCallback(callback, out, null);
+				_emitBank(callback, out, null);
 				return;
 			}
 			const b = out && out.bank ? out.bank : out;
-			let kanaOut2 = _bt_toStr(b.kana);
-			try {
-				kanaOut2 = _bt_toHalfWidthKana(kanaOut2, false);
-			} catch {
-				kanaOut2 = _bt_toStr(b.kana);
-			}
-			_bt_invokeCallback(callback, null, {
-				bankCode: b.code,
-				bankName: b.name,
-				bankKana: kanaOut2,
-			});
+			_emitBank(callback, null, b);
 			return;
 		}
 		const err = arguments[0];
 		const res = arguments[1];
 		if (err) {
-			_bt_invokeCallback(
+			_emitBank(
 				callback,
 				{ error: err && err.error ? err.error : err && err.message ? err.message : String(err) },
 				null
@@ -887,7 +878,7 @@ const getBank = (bankCodeOrName, callback) => {
 			return;
 		}
 		if (!res || res.success === false) {
-			_bt_invokeCallback(
+			_emitBank(
 				callback,
 				{
 					error:
@@ -898,14 +889,7 @@ const getBank = (bankCodeOrName, callback) => {
 			);
 			return;
 		}
-		const b = res.bank;
-		let kanaOut2 = _bt_toStr(b.kana);
-		try {
-			kanaOut2 = _bt_toHalfWidthKana(kanaOut2, false);
-		} catch {
-			kanaOut2 = _bt_toStr(b.kana);
-		}
-		_bt_invokeCallback(callback, null, { bankCode: b.code, bankName: b.name, bankKana: kanaOut2 });
+		_emitBank(callback, null, res.bank);
 		return;
 	});
 	return;
