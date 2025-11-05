@@ -10,23 +10,9 @@
 //  - loadBankByCode(bankCode, options?, callback) // BankKunスタイルの単一銀行取得（callbackのみ）
 //  - loadBankDataFromBankKun(apiBaseUrl, options?, callback) // 全件取得系（callbackのみ、オプションでパス調整可）
 
-// --- 内部キャッシュ（プレフィックス _bt_ ）
-const _BT_BANKS = [
-	{ code: '0001', name: 'みずほ銀行', kana: 'ミズホギンコウ' },
-	{ code: '0005', name: '三菱UFJ銀行', kana: 'ミツビシUFJギンコウ' },
-	{ code: '0009', name: '三井住友銀行', kana: 'ミツイスミトモギンコウ' },
-	{ code: '9900', name: 'ゆうちょ銀行', kana: 'ユウチョギンコウ' },
-];
-
-const _BT_BRANCHES = {
-	'0001': [
-		{ branchCode: '001', name: '本店営業部', kana: 'ホンテンエイギョウブ' },
-		{ branchCode: '002', name: '渋谷支店', kana: 'シブヤシテン' },
-	],
-	9900: [{ branchCode: '001', name: 'ゆうちょ本店', kana: 'ユウチョホンテン' }],
-};
-
-// 内部キャッシュ（大文字スコープ）を使用します。
+// NOTE: このビルドでは Web API のみで検索を行うため、内部キャッシュは保持しません。
+// 以前は _BT_BANKS / _BT_BRANCHES をグローバルキャッシュとして保持していましたが
+// 設計をシンプルにするため削除しています。
 
 /**
  * 変換用の文字リスト
@@ -547,14 +533,10 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 						try {
 							bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
 						} catch {}
-						let idx = _BT_BANKS.findIndex((b) => {
-							return b.code === bankObj.code;
-						});
-						if (idx >= 0) _BT_BANKS[idx] = bankObj;
-						else _BT_BANKS.push(bankObj);
 						try {
 							_bt_safeLog('[KACSW.bankTransfer] _bt_loadBankByCode: fetch success ' + bankObj.code);
 						} catch {}
+						// キャッシュを保持しないため、受け取ったオブジェクトをそのまま返す
 						if (typeof callback === 'function') callback(bankObj);
 					})
 					.catch((err) => {
@@ -716,9 +698,6 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 				try {
 					bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
 				} catch {}
-				const idx = _BT_BANKS.findIndex((b) => b.code === bankObj.code);
-				if (idx >= 0) _BT_BANKS[idx] = bankObj;
-				else _BT_BANKS.push(bankObj);
 				try {
 					_bt_safeLog('[KACSW.bankTransfer] _bt_searchBankByName: success ' + bankObj.code);
 				} catch {}
@@ -745,9 +724,6 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 				try {
 					bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
 				} catch {}
-				const idx = _BT_BANKS.findIndex((b) => b.code === bankObj.code);
-				if (idx >= 0) _BT_BANKS[idx] = bankObj;
-				else _BT_BANKS.push(bankObj);
 				if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
 				return;
 			}
@@ -1177,6 +1153,10 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
 	let timer = null;
 	if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
 
+	// ローカル変数に取得結果を保持し、グローバルキャッシュは更新しない
+	let localBanks = [];
+	let localBranches = {}; // { bankCode: [ { branchCode, name, kana } ] }
+
 	fetch(base + banksPath, { headers, signal: abortController ? abortController.signal : undefined })
 		.then((banksRes) => {
 			if (!banksRes.ok) return Promise.reject(new Error(`banks fetch failed: ${banksRes.status}`));
@@ -1184,9 +1164,8 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
 		})
 		.then((banksJson) => {
 			if (!Array.isArray(banksJson)) return Promise.reject(new Error('banks response not array'));
-			_BT_BANKS.length = 0;
 			for (const b of banksJson) {
-				_BT_BANKS.push({
+				localBanks.push({
 					code: _bt_toStr(b.code).padStart(4, '0'),
 					name: _bt_toStr(b.name),
 					kana: (function () {
@@ -1205,19 +1184,16 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
 		})
 		.then((branchesRes) => {
 			if (!branchesRes.ok) {
-				const resObj = { success: true, loadedBanks: _BT_BANKS.length, loadedBranches: 0 };
+				const resObj = { success: true, loadedBanks: localBanks.length, loadedBranches: 0 };
 				if (typeof callback === 'function') callback(null, resObj);
 				return;
 			}
 			return branchesRes.json().then((branchesJson) => {
-				if (!Array.isArray(branchesJson))
-					return Promise.reject(new Error('branches response not array'));
-				// clear
-				for (const k in _BT_BRANCHES) delete _BT_BRANCHES[k];
+				if (!Array.isArray(branchesJson)) return Promise.reject(new Error('branches response not array'));
 				for (const br of branchesJson) {
 					const bk = _bt_toStr(br.bankCode).padStart(4, '0');
-					if (!_BT_BRANCHES[bk]) _BT_BRANCHES[bk] = [];
-					_BT_BRANCHES[bk].push({
+					if (!localBranches[bk]) localBranches[bk] = [];
+					localBranches[bk].push({
 						branchCode: _bt_toStr(br.branchCode).padStart(3, '0'),
 						name: _bt_toStr(br.name),
 						kana: (function () {
@@ -1231,11 +1207,8 @@ const loadBankDataFromBankKun = (apiBaseUrl, options = {}, callback) => {
 				}
 				const resObj = {
 					success: true,
-					loadedBanks: _BT_BANKS.length,
-					loadedBranches: Object.keys(_BT_BRANCHES).reduce(
-						(acc, k) => acc + (_BT_BRANCHES[k] ? _BT_BRANCHES[k].length : 0),
-						0
-					),
+					loadedBanks: localBanks.length,
+					loadedBranches: Object.keys(localBranches).reduce((acc, k) => acc + (localBranches[k] ? localBranches[k].length : 0), 0),
 				};
 				if (typeof callback === 'function') callback(null, resObj);
 			});
