@@ -1099,6 +1099,26 @@ const convertYucho = (kigou, bangou) => {
 	};
 };
 
+/**
+ * 入力を半角数字に正規化して7桁の0埋め口座番号文字列を返す
+ * - 全角数字（ＦＵＬＬＷＩＤＴＨ）も受け付ける
+ * - 空文字や数字以外の文字が含まれている場合は Error を投げる
+ * @param {string|number} input 入力（全角/半角可）
+ * @returns {string} 7桁の0埋めされた口座番号
+ * @throws {Error} 数字以外の文字が含まれる、あるいは空の場合
+ */
+const normalizeAccountNumber = (input) => {
+	const s = _bt_toStr(input).trim();
+	if (!s) throw new Error('口座番号が空です');
+	// 全角数字を半角に変換（U+FF10 - U+FF19）
+	const toHalfWidthDigits = (str) =>
+		str.replace(/[\uFF10-\uFF19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+	const normalized = toHalfWidthDigits(s).replace(/\s+/g, '');
+	if (!/^[0-9]+$/.test(normalized)) throw new Error('口座番号は数字のみである必要があります');
+	if (normalized.length > 7) throw new Error('口座番号が長すぎます（最大7桁）');
+	return normalized.padStart(7, '0');
+};
+
 // -------------------------
 // 公開: 振込データ（簡易CSV）
 // -------------------------
