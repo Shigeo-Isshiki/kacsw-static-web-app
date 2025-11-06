@@ -206,4 +206,36 @@ npm run prepare
 
 この挙動により、kintone 側では一貫した半角カタカナ/ASCII 表記で `kana` を扱うことができます。
 
+## API: エラー構造（Structured Error）
+
+`bank-transfer.js` の公開 API（例: `convertYucho`）は、エラー時に単純な文字列だけでなく、kintone 側でどのフィールドにエラーを表示すべきかを判断できるように「構造化エラー」を返します。下記は仕様の抜粋です。
+
+- 返却型: ErrorResult（オブジェクト）
+	- `error` (string) — エラー識別子または簡易メッセージ（互換性のため常に設定されます）
+	- `message` (string, optional) — ユーザー向けの説明文（日本語）
+	- `code` (string, optional) — 詳細なプログラム向けエラーコード（例: `kigou.not_5_digits`）
+	- `field` (string, optional) — エラー対象フィールド。主に以下のいずれかになります:
+		- `kigou` (ゆうちょ記号)
+		- `bangou` (ゆうちょ番号)
+		- `bank` (銀行情報の取得)
+		- `branch` (支店情報の取得)
+		- `both` (記号・番号の両方)
+		- `other` (その他/汎用)
+	- `details` (object, optional) — 開発者向けの追加情報（正規化後の値など）。
+
+例:
+
+```json
+{
+	"error": "invalid_format",
+	"code": "kigou.not_5_digits",
+	"field": "kigou",
+	"message": "記号は5桁の数字である必要があります",
+	"details": { "raw": "１２３", "normalized": "123" }
+}
+```
+
+kintone 側では `field` を見て該当フィールドにエラーメッセージを表示する実装が推奨されます（例: `app.record.setFieldError('記号フィールドコード', res.message)`）。
+
+
 ```

@@ -1,19 +1,80 @@
-// bank-transfer.js
-// 単一ファイルで提供する銀行振込ユーティリティ（kintone向け、callback専用）
-// 公開 API (window.BANK):
-//  - getBank(bankCodeOrName, callback)       // ※コールバック必須（同期返却は廃止）
-//                                     // 銀行コード or 銀行名を自動判定して非同期で返す
-//                                     // 成功時の戻り値は { bankCode, bankName, bankKana }（bankKana は半角カナ、長音類は '-' に正規化）
-//  - getBranch(bankCode, branchCodeOrName, callback)    // 支店コード or 支店名で支店を返す（callback 必須、single-arg スタイル）
-//                                     // 成功時の戻り値は { branchCode, branchName, branchKana }（branchKana は半角カナ、長音類は '-' に正規化）
-//  - convertYucho(kigou, bangou)    // ゆうちょ記号/番号を全銀向け口座情報に変換（簡易）
-//  - generateZenginTransfer(records) // 簡易CSV形式の振込データ生成
-//  - loadBankByCode(bankCode, options?, callback) // BankKunスタイルの単一銀行取得（callbackのみ）
+/**
+ * bank-transfer.js
+ * 銀行振込ユーティリティ（kintone向け、callback スタイル）
+ *
+ * Public API exposed on window.BANK:
+ *  - getBank(bankCodeOrName, callback)
+ *  - getBranch(bankCode, branchCodeOrName, callback)
+ *  - convertYucho(kigou, bangou, callback)
+ *  - generateZenginTransfer(records)
+ *  - loadBankByCode(bankCode, options?, callback)
+ *
+ * Notes:
+ *  - 全ての公開 API はコールバック（single-arg スタイルをサポート）で返します。
+ *  - 本ビルドは Web API による検索のみを行い、グローバルな内部キャッシュは保持しません。
+ */
+/**
+ * JSDoc typedefs: callback result shapes
+ *
+ * @typedef {object} BankResult
+ * @property {string} bankCode 4桁の銀行コード（例: '9900'）
+ * @property {string} bankName 銀行名（正規化済み）
+ * @property {string} bankKana 銀行名の半角カナ表記（長音は '-' に正規化）
+ *
+ * @typedef {object} BranchResult
+ * @property {string} branchCode 3桁の支店コード（例: '123'）
+ * @property {string} branchName 支店名
+ * @property {string} branchKana 支店名の半角カナ表記
+ *
+ * @typedef {object} ConvertYuchoResult
+ * @property {string} yuchoKigou 半角化済みのゆうちょ記号（5桁）
+ * @property {string} yuchoBangou accountType に応じ0埋めしたゆうちょ番号（'0'->6桁, '1'->8桁）
+ * @property {string} bankCode 銀行コード
+ * @property {string} bankName 銀行名
+ * @property {string} bankKana 銀行名（半角カナ）
+ * @property {string} branchCode 支店コード（3桁）
+ * @property {string} branchName 支店名
+ * @property {string} branchKana 支店名（半角カナ）
+ * @property {string} accountType ラベル（'当座'|'普通' 等）
+ * @property {string} accountNumber 全銀用7桁口座番号（0埋め済）
+ *
+ * @typedef {object} ErrorResult
+ * @property {string} error エラー識別子またはメッセージ
+ * @property {string} [message] 詳細メッセージ（任意）
+ * @property {string} [code] 構造化エラーコード（例: 'kigou.not_5_digits', 'bangou.empty'）
+ * @property {string} [field] エラー対象フィールド（'kigou'|'bangou'|'bank'|'branch'|'both'|'other'）
+ * @property {object} [details] 追加の開発者向け情報（オプション、正規化値など）
+ */
 
-// NOTE: このビルドでは Web API のみで検索を行うため、内部キャッシュは保持しません。
-// 以前は _BT_BANKS / _BT_BRANCHES をグローバルキャッシュとして保持していましたが
-// 設計をシンプルにするため削除しています。
+/**
+ * @callback BankCallback
+ * @param {BankResult|ErrorResult} result 成功時は BankResult、失敗時は ErrorResult
+ */
 
+/**
+ * @callback BranchCallback
+ * @param {BranchResult|ErrorResult} result 成功時は BranchResult、失敗時は ErrorResult
+ */
+
+/**
+ * @callback ConvertYuchoCallback
+ * @param {ConvertYuchoResult|ErrorResult} result 成功時は ConvertYuchoResult、失敗時は ErrorResult。
+ * エラー時の ErrorResult は上記の構造化エラー（code, field, details を含む場合がある）を返します。
+ */
+
+/**
+ * @callback LoadBankByCodeCallback
+ * @description internal loader callback: flexible signature supported by the loader.
+ * @param {...*} args - Either single-arg (BankResult|ErrorResult) or node-style (err, res)
+ */
+
+/* ============================================================================
+ * Internal: constants and conversion tables
+ *
+ * Rules:
+ *  - Items in this section are internal implementation details (do NOT export).
+ *  - Keep conversion maps and derived maps here; they are used by internal helpers.
+ * ============================================================================ */
 /**
  * 変換用の文字リスト
  * 各種文字の変換ルールを定義します。
@@ -246,6 +307,10 @@ const _bt_checkBoolean = (val) => {
 	return typeof val === 'boolean';
 };
 
+// 全角数字（U+FF10-U+FF19）を半角数字に変換するユーティリティ
+const _bt_toHalfWidthDigits = (str = '') =>
+	_bt_toStr(str).replace(/[\uFF10-\uFF19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+
 // callback 呼び出しの互換ヘルパ
 // - cb に宣言引数が 2 個以上ある場合は (err, res) シグネチャで呼ぶ
 // - そうでない場合は zip-code utils と同様に single-arg result を渡す
@@ -259,11 +324,37 @@ const _bt_invokeCallback = (cb, err, res) => {
 			// single-arg スタイル（成功時はオブジェクト、失敗時は { error: '...' }）
 			if (err) {
 				// err は { success:false, error: '...' } 形式で来る想定
-				const out =
-					err && err.error
-						? { error: err.error }
-						: { error: err && err.message ? err.message : String(err) };
-				cb(out);
+				// もし err が構造化オブジェクトであればそのまま透過する。文字列などの場合は既存互換でラップする。
+				if (typeof err === 'object' && err !== null) {
+					// Preserve structured error objects that may contain code/field/details
+					if (err.error || err.message || err.code || err.field || err.details) {
+						// Normalize: ensure both `error` (identifier) and `message` (human) exist
+						try {
+							if (!err.message) {
+								err.message = err.error ? String(err.error) : '';
+							}
+							if (!err.error) {
+								err.error = err.message ? String(err.message) : '';
+							}
+						} catch (e) {
+							// ignore normalization errors
+						}
+						cb(err);
+					} else {
+						// Unknown object: stringify into error/message properties
+						try {
+							const txt = JSON.stringify(err);
+							cb({ error: txt, message: txt });
+						} catch (e) {
+							const txt = String(err);
+							cb({ error: txt, message: txt });
+						}
+					}
+				} else {
+					// primitive (string/number/etc.) -> set both error and message to the string
+					const txt = err && err.message ? err.message : String(err);
+					cb({ error: txt, message: txt });
+				}
 			} else if (res) {
 				// res は { success:true, bank } 形式のことが多い -> zip-style の期待に合わせて bank オブジェクトを返す
 				if (res && res.bank) cb(res.bank);
@@ -276,6 +367,34 @@ const _bt_invokeCallback = (cb, err, res) => {
 		try {
 			_bt_safeLog('[BANK] _bt_invokeCallback error: ' + (e && e.message ? e.message : e));
 		} catch {}
+	}
+};
+
+/**
+ * Internal: enrich or normalize an error into the structured shape used by the SDK.
+ * If `err` already looks structured (has code/field), it is returned as-is.
+ * Otherwise, a new structured object is returned containing provided defaults.
+ * @param {*} err existing error (string/object)
+ * @param {object} defaults { code:string, field:string, message:string, details:object }
+ * @returns {object} structured error object
+ */
+const _bt_enrichError = (err, defaults = {}) => {
+	try {
+		if (err && typeof err === 'object') {
+			// If already structured, return as-is
+			if (err.code || err.field || err.details) return err;
+			// Construct structured object preserving err.error/message if present
+			const message = err.message || err.error || defaults.message || String(err);
+			return Object.assign({ error: err.error || message, message: message }, defaults, {
+				// details: merge existing details if any
+				details: Object.assign({}, defaults.details || {}, err.details || {}),
+			});
+		}
+		// primitive
+		const message = err && err.message ? err.message : err ? String(err) : defaults.message || '';
+		return Object.assign({ error: message, message: message }, defaults);
+	} catch (e) {
+		return Object.assign({ error: String(err || e), message: String(err || e) }, defaults);
 	}
 };
 
@@ -435,12 +554,19 @@ const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
 	}
 };
 
-// -------------------------
-// 公開: BankKun 単一銀行取得（/banks/{code}.json） callback-only
-// - loadBankByCode('0001', options?, callback)
-// - callback(err, result)  result: { success:true, bank } or error
-// -------------------------
-// internal: _bt_loadBankByCode - not exposed to window.BANK
+/**
+ * Internal: Load bank by code (BankKun style)
+ *
+ * Callback flexibility:
+ *  - single-arg success -> BankResult (or sometimes { success:true, bank: BankResult })
+ *  - single-arg failure -> ErrorResult
+ *  - node-style (err, res) is also accepted by internal callers
+ *
+ * @param {string} bankCode 銀行コード
+ * @param {object} [options] オプション
+ * @param {LoadBankByCodeCallback} callback flexible callback (single-arg or node-style)
+ * @private
+ */
 const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 	try {
 		if (typeof options === 'function') {
@@ -629,13 +755,13 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 	}
 };
 
-// -------------------------
-// internal: 銀行名で検索（BankKun の search API を使う）
-// URL: {apiBaseUrl}/banks/search.json?name={bank_name}
-// レスポンスは配列。複数件の場合は完全一致を探し、それが1件あればそれを採用。
-// それでも複数 or 完全一致なしの場合はエラーを返す。
-// callback(err, { success:true, bank }) または callback({ success:false, error }, null)
-// -------------------------
+/**
+ * Internal: Search bank by name (uses BankKun search API)
+ * @param {string} name 検索語
+ * @param {object} [options]
+ * @param {function} callback single-arg または node-style のコールバック
+ * @private
+ */
 const _bt_searchBankByName = (name, options = {}, callback) => {
 	if (typeof options === 'function') {
 		callback = options;
@@ -756,15 +882,65 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 		});
 };
 
-// -------------------------
-// 公開: 銀行取得（自動判定）
-// 入力が数字のみ（<=4桁）ならコード検索して単一オブジェクトまたは null を返す
-// そうでなければ名前で部分一致検索して配列を返す
-// -------------------------
-// getBank: kintone 向け single-arg コールバック専用版
-// 使い方: getBank('0138', (result) => { 成功: {bankCode,bankName,bankKana} / 失敗: { error: '...' } })
+/**
+ * Internal: ゆうちょ記号から支店コードと口座種別を決定するルール
+ * 成功時は { branchCode, accountType }、失敗時は { error, message } を返す
+ * @param {string|number} kigouRaw ゆうちょ記号（任意の形式）
+ * @returns {{branchCode:string,accountType:string}|{error:string,message:string}}
+ */
+const _bt_yuchoKigouToBranch = (kigouRaw) => {
+	// 正規化: 全角数字を半角に直し、数字以外を除去
+	const kigou = _bt_toHalfWidthDigits(_bt_toStr(kigouRaw)).replace(/[^0-9]/g, '');
+	// 前提: 記号は必ず5桁でなければならない（それ以外は処理不能）
+	if (!/^[0-9]{5}$/.test(kigou))
+		return {
+			error: 'invalid_format',
+			code: 'kigou.not_5_digits',
+			field: 'kigou',
+			message: '記号は5桁の数字である必要があります',
+			details: { raw: _bt_toStr(kigouRaw), normalized: kigou },
+		};
+
+	// 先頭桁ルール: 1桁目は 0 または 1 のみ許可
+	if (!/^[01]/.test(kigou.charAt(0)))
+		return {
+			error: 'invalid_format',
+			code: 'kigou.invalid_lead',
+			field: 'kigou',
+			message: '記号の先頭桁は0または1である必要があります',
+			details: { raw: _bt_toStr(kigouRaw), normalized: kigou },
+		};
+
+	// ルール専用: ユーザー指定の単一ルールのみを適用します。
+	// - 1桁目が 0 の場合: 支店コード = (2桁目)(3桁目) + '9'
+	// - 1桁目が 1 の場合: 支店コード = (2桁目)(3桁目) + '8'
+	// accountType は先頭桁をそのまま返します（後続の番号変換で利用するため）
+	const fd = kigou.charAt(0);
+	const accountType = String(fd);
+	const d2 = kigou.charAt(1);
+	const d3 = kigou.charAt(2);
+	// 先頭桁チェックは既に関数冒頭で行っているためここでは想定通り 0/1 のどちらか
+	const suffix = fd === '0' ? '9' : '8';
+	const branchCode = String((d2 || '0') + (d3 || '0') + suffix).padStart(3, '0');
+	return { branchCode: branchCode, accountType: accountType };
+};
+
+/* ============================================================================
+ * Public API (exports)
+ *
+ * Rules:
+ *  - Public functions must be declared after the internal helpers they depend on.
+ *  - Attach public symbols to `window.BANK` only at the end of this file.
+ * ============================================================================ */
+/**
+ * Public: getBank
+ * 銀行コード（4桁以内の数字）または銀行名で検索し、標準化された銀行オブジェクトをコールバックに返す。
+ * コールバックは single-arg スタイル（成功: オブジェクト、失敗: { error: '...' }）を想定します。
+ * @param {BankCallback} callback single-arg スタイルのコールバック
+ */
 const getBank = (bankCodeOrName, callback) => {
-	const s = _bt_toStr(bankCodeOrName).trim();
+	// 全角数字を半角化してからトリム（例: '１２３４' -> '1234'）
+	const s = _bt_toHalfWidthDigits(_bt_toStr(bankCodeOrName)).trim();
 	if (typeof callback !== 'function') {
 		// 既存と同じくコールバック必須で早期返却（エラーオブジェクトを返す）
 		return { success: false, error: '第二引数はコールバック関数である必要があります' };
@@ -895,24 +1071,27 @@ const getBank = (bankCodeOrName, callback) => {
 	return;
 };
 
-// -------------------------
-// 公開: 支店取得（コールバック形式、single-arg スタイルに準拠）
-// getBranch(bankCode, branchCodeOrName, callback)
-// - bankCode: 銀行コード（数字または文字列、4桁にpadStartされます）
-// - branchCodeOrName: 支店コード（数字）または支店名（文字列）
-// - callback: single-arg スタイルのコールバック（成功時は { branchCode, branchName, branchKana }、失敗時は { error: '...' } ）
+/**
+ * Public: getBranch
+ * 支店コードまたは支店名で支店情報を取得してコールバックに返す（single-arg スタイル）。
+ * @param {string} bankCode 銀行コード（数字または文字列、内部で4桁にパディング）
+ * @param {string} branchCodeOrName 支店コードまたは支店名
+ * @param {BranchCallback} callback single-arg スタイルのコールバック
+ */
 const getBranch = (bankCode, branchCodeOrName, callback) => {
 	if (typeof callback !== 'function') {
 		return { success: false, error: '第三引数はコールバック関数である必要があります' };
 	}
-	const bCodeRaw = _bt_toStr(bankCode).trim();
+	// 全角数字を半角化してから処理
+	const bCodeRaw = _bt_toHalfWidthDigits(_bt_toStr(bankCode)).trim();
 	if (!bCodeRaw) {
 		_bt_invokeCallback(callback, { error: '銀行コードが空です' }, null);
 		return;
 	}
 	const bankKey = bCodeRaw.padStart(4, '0');
 
-	const qRaw = _bt_toStr(branchCodeOrName).trim();
+	// 全角数字を半角化してから処理
+	const qRaw = _bt_toHalfWidthDigits(_bt_toStr(branchCodeOrName)).trim();
 	if (!qRaw) {
 		_bt_invokeCallback(callback, { error: '検索語が空です' }, null);
 		return;
@@ -1077,26 +1256,219 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 	return;
 };
 
-// -------------------------
-// 公開: ゆうちょ変換（簡易）
-// -------------------------
-const convertYucho = (kigou, bangou) => {
-	const k = _bt_toStr(kigou).replace(/[^0-9]/g, '');
-	const b = _bt_toStr(bangou).replace(/[^0-9]/g, '');
-	if (k.length < 1 || b.length < 1) {
-		return { error: 'invalid_format', message: '記号/番号の形式が不正です' };
+/**
+ * Public: convertYucho
+ * ゆうちょ記号/番号から全銀向けの口座情報へ変換してコールバックに返す。
+ * 戻り値（成功時）例:
+ * {
+ *   yuchoKigou,   // 半角化済みのゆうちょ記号
+ *   yuchoBangou,  // accountType に応じて先頭0埋めしたゆうちょ番号（'0' -> 6桁, '1' -> 8桁）
+ *   bankCode, bankName, bankKana,
+ *   branchCode, branchName, branchKana,
+ *   accountType, accountNumber
+ * }
+ * @param {string|number} kigou ゆうちょ記号
+ * @param {string|number} bangou ゆうちょ番号
+ * @param {ConvertYuchoCallback} callback single-arg スタイルのコールバック
+ */
+const convertYucho = (kigou, bangou, callback) => {
+	// callback 必須の非同期 API に変更
+	if (typeof callback !== 'function') {
+		return { success: false, error: '第三引数はコールバック関数である必要があります' };
 	}
+
+	// 全角数字を半角に直してから数字以外を除去
+	const k = _bt_toHalfWidthDigits(_bt_toStr(kigou)).replace(/[^0-9]/g, '');
+	const b = _bt_toHalfWidthDigits(_bt_toStr(bangou)).replace(/[^0-9]/g, '');
+	// 明確にどちらが不正か判別できるように field を付与して返す
+	const missingK = k.length < 1;
+	const missingB = b.length < 1;
+	if (missingK || missingB) {
+		const fld = missingK && missingB ? 'both' : missingK ? 'kigou' : 'bangou';
+		const code =
+			missingK && missingB ? 'kigou_and_bangou.empty' : missingK ? 'kigou.empty' : 'bangou.empty';
+		_bt_invokeCallback(
+			callback,
+			_bt_enrichError(null, {
+				error: 'invalid_format',
+				code: code,
+				field: fld,
+				message: '記号/番号の形式が不正です',
+				details: { rawKigou: _bt_toStr(kigou), rawBangou: _bt_toStr(bangou) },
+			}),
+			null
+		);
+		return;
+	}
+
+	// ベースとなる簡易変換結果
 	const bankCode = '9900';
-	const branchCode = k.padStart(5, '0').slice(0, 3);
-	const accountNumber = b.slice(-7).padStart(7, '0');
-	const accountType = 'ordinary';
-	return {
-		bankCode,
-		branchCode,
-		accountType,
-		accountNumber,
-		note: 'この変換は簡易実装です。全銀仕様に従い必ず確認してください。',
-	};
+
+	// 必ず getBank を呼んで銀行情報を取得し、その結果に基づいて支店検索を行う
+	try {
+		getBank(bankCode, (bankRes) => {
+			// bankRes がエラーならそのまま返す（構造化されていない場合は enrich する）
+			if (!bankRes || bankRes.error) {
+				_bt_invokeCallback(
+					callback,
+					_bt_enrichError(bankRes, {
+						code: 'bank.fetch_failed',
+						field: 'bank',
+						message: '銀行情報の取得に失敗しました',
+						details: { requestedBankCode: bankCode },
+					}),
+					null
+				);
+				return;
+			}
+
+			// ゆうちょ記号 -> 支店情報（branchCode / accountType）を算出（番号は別途正規化）
+			const conv = _bt_yuchoKigouToBranch(k);
+			if (!conv || conv.error) {
+				// conv の返却は既に構造化されている想定
+				_bt_invokeCallback(
+					callback,
+					_bt_enrichError(conv, {
+						code: conv && conv.code ? conv.code : 'kigou.convert_failed',
+						field: 'kigou',
+						message: conv && conv.message ? conv.message : '記号から支店への変換に失敗しました',
+						details: { rawKigou: _bt_toStr(kigou) },
+					}),
+					null
+				);
+				return;
+			}
+
+			// 口座番号の変換ルール（accountType により処理が異なる）
+			// - accountType === '0': ゆうちょ番号は最大6桁。先頭を0埋めして7桁にする。
+			// - accountType === '1': ゆうちょ番号は最大8桁で末尾が必ず '1'。8桁に0埋めしてから末尾を除いた先頭7桁を口座番号とする。
+			let acctNum = null;
+			const acctType = conv && conv.accountType ? String(conv.accountType) : '';
+			const rawNum = _bt_toStr(b).replace(/[^0-9]/g, '');
+			if (!rawNum) {
+				_bt_invokeCallback(
+					callback,
+					_bt_enrichError(null, {
+						error: 'invalid_account',
+						code: 'bangou.empty',
+						field: 'bangou',
+						message: 'ゆうちょ番号が空です',
+						details: { rawBangou: _bt_toStr(bangou) },
+					}),
+					null
+				);
+				return;
+			}
+			if (acctType === '0') {
+				if (rawNum.length > 6) {
+					_bt_invokeCallback(
+						callback,
+						_bt_enrichError(null, {
+							error: 'invalid_account',
+							code: 'bangou.too_long',
+							field: 'bangou',
+							message: 'ゆうちょ番号が長すぎます（最大6桁）',
+							details: { rawBangou: _bt_toStr(bangou), accountType: acctType },
+						}),
+						null
+					);
+					return;
+				}
+				acctNum = rawNum.padStart(7, '0');
+			} else if (acctType === '1') {
+				if (rawNum.length > 8) {
+					_bt_invokeCallback(
+						callback,
+						_bt_enrichError(null, {
+							error: 'invalid_account',
+							code: 'bangou.too_long',
+							field: 'bangou',
+							message: 'ゆうちょ番号が長すぎます（最大8桁）',
+							details: { rawBangou: _bt_toStr(bangou), accountType: acctType },
+						}),
+						null
+					);
+					return;
+				}
+				const padded8 = rawNum.padStart(8, '0');
+				// 仕様上末尾は '1' のはず。満たさない場合はエラーとする。
+				if (padded8.charAt(7) !== '1') {
+					_bt_invokeCallback(
+						callback,
+						_bt_enrichError(null, {
+							error: 'invalid_account_format',
+							code: 'bangou.must_end_with_1',
+							field: 'bangou',
+							message: 'ゆうちょ番号の末尾は1である必要があります',
+							details: { padded: padded8, rawBangou: _bt_toStr(bangou) },
+						}),
+						null
+					);
+					return;
+				}
+				acctNum = padded8.slice(0, 7);
+			} else {
+				_bt_invokeCallback(
+					callback,
+					_bt_enrichError(null, {
+						error: 'invalid_account_type',
+						code: 'kigou.unknown_account_type',
+						field: 'kigou',
+						message: '不明な口座種別です',
+						details: { accountType: acctType },
+					}),
+					null
+				);
+				return;
+			}
+
+			// 正規化されたゆうちょ記号/番号を先に含める
+			const yuchoKigou = k; // 半角化済みの記号
+			let yuchoBangou = null; // accountType に応じた0埋め（'0'->6桁, '1'->8桁）
+			if (acctType === '0') {
+				yuchoBangou = rawNum.padStart(6, '0');
+			} else if (acctType === '1') {
+				yuchoBangou = rawNum.padStart(8, '0');
+			}
+
+			const out = {
+				yuchoKigou: yuchoKigou,
+				yuchoBangou: yuchoBangou,
+				bankCode: bankRes.bankCode || bankCode,
+				bankName: bankRes.bankName || '',
+				bankKana: bankRes.bankKana || '',
+				branchCode: conv.branchCode,
+				branchName: '',
+				branchKana: '',
+				// 表示用の口座種別ラベルに変換して返す（内部処理では acctType を利用）
+				accountType: acctType === '0' ? '当座' : acctType === '1' ? '普通' : conv.accountType,
+				accountNumber: acctNum,
+			};
+
+			// 支店名/かなを取得（支店コード指定）
+			getBranch(out.bankCode, out.branchCode, (branchRes) => {
+				if (!branchRes || branchRes.error) {
+					// 支店が見つからない/エラーの場合はエラーを返す
+					_bt_invokeCallback(
+						callback,
+						_bt_enrichError(branchRes, {
+							code: 'branch.fetch_failed',
+							field: 'branch',
+							message: '支店情報の取得に失敗しました',
+							details: { bankCode: out.bankCode, branchCode: out.branchCode },
+						}),
+						null
+					);
+					return;
+				}
+				out.branchName = branchRes.branchName || out.branchName;
+				out.branchKana = branchRes.branchKana || out.branchKana;
+				_bt_invokeCallback(callback, null, out);
+			});
+		});
+	} catch (e) {
+		_bt_invokeCallback(callback, { error: e && e.message ? e.message : String(e) }, null);
+	}
 };
 
 /**
@@ -1110,18 +1482,19 @@ const convertYucho = (kigou, bangou) => {
 const normalizeAccountNumber = (input) => {
 	const s = _bt_toStr(input).trim();
 	if (!s) throw new Error('口座番号が空です');
-	// 全角数字を半角に変換（U+FF10 - U+FF19）
-	const toHalfWidthDigits = (str) =>
-		str.replace(/[\uFF10-\uFF19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
-	const normalized = toHalfWidthDigits(s).replace(/\s+/g, '');
+	// 全角数字を半角に変換（既存ユーティリティを利用）
+	const normalized = _bt_toHalfWidthDigits(s).replace(/\s+/g, '');
 	if (!/^[0-9]+$/.test(normalized)) throw new Error('口座番号は数字のみである必要があります');
 	if (normalized.length > 7) throw new Error('口座番号が長すぎます（最大7桁）');
 	return normalized.padStart(7, '0');
 };
 
-// -------------------------
-// 公開: 振込データ（簡易CSV）
-// -------------------------
+/**
+ * Public: generateZenginTransfer
+ * 簡易的な全銀フォーマットの CSV ライクな文字列を生成するユーティリティ
+ * @param {Array<object>} records
+ * @returns {string} CSV テキスト
+ */
 const generateZenginTransfer = (records = []) => {
 	const lines = [];
 	lines.push(
@@ -1160,8 +1533,8 @@ if (typeof window !== 'undefined') {
 	Object.assign(window.BANK, {
 		getBank,
 		getBranch,
+		normalizeAccountNumber,
 		convertYucho,
 		generateZenginTransfer,
-		normalizeAccountNumber,
 	});
 }
