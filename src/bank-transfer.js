@@ -1162,5 +1162,6 @@ if (typeof window !== 'undefined') {
 		getBranch,
 		convertYucho,
 		generateZenginTransfer,
+		normalizeAccountNumber,
 	});
 }
