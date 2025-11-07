@@ -518,6 +518,52 @@ const _bt_isAllowedHalfWidthString = (s) => {
 	return true;
 };
 
+/**
+ * Shift_JIS 相当のバイト長を簡易計算するヘルパ
+ * - ASCII (U+0000..U+007F) および半角カタカナ (U+FF61..U+FF9F) は 1 バイトとカウント
+ * - それ以外（全角カタカナ・ひらがな・漢字・全角英数等）は 2 バイトとカウント
+ * 注: 実際の Shift_JIS マッピングはさらに細かいが、振込名義の切り詰め用途での簡易実装です。
+ * @param {string} s
+ * @returns {number} 推定バイト長
+ */
+const _bt_sjisByteLength = (s) => {
+	if (!_bt_checkString(s) || s.length === 0) return 0;
+	let len = 0;
+	for (const ch of s) {
+		const cp = ch.codePointAt(0);
+		if (cp <= 0x7f) {
+			len += 1;
+		} else if (cp >= 0xff61 && cp <= 0xff9f) {
+			// 半角カナ
+			len += 1;
+		} else {
+			// それ以外は全角相当として 2 バイト
+			len += 2;
+		}
+	}
+	return len;
+};
+
+/**
+ * Shift_JIS のバイト長で切り詰める（最大バイト数までの先頭部分を返す）
+ * @param {string} s
+ * @param {number} maxBytes
+ * @returns {string}
+ */
+const _bt_sjisTruncate = (s, maxBytes) => {
+	if (!_bt_checkString(s) || maxBytes <= 0) return '';
+	let out = '';
+	let used = 0;
+	for (const ch of s) {
+		const cp = ch.codePointAt(0);
+		const add = cp <= 0x7f || (cp >= 0xff61 && cp <= 0xff9f) ? 1 : 2;
+		if (used + add > maxBytes) break;
+		out += ch;
+		used += add;
+	}
+	return out;
+};
+
 // callback 呼び出しの互換ヘルパ
 // - cb に宣言引数が 2 個以上ある場合は (err, res) シグネチャで呼ぶ
 // - そうでない場合は zip-code utils と同様に single-arg result を渡す
@@ -1794,7 +1840,11 @@ const normalizePayeeName = (input) => {
 	work = work.replace(/[a-z]/g, (c) => c.toUpperCase());
 
 	// 4) 検査
-	if (_bt_isAllowedHalfWidthString(work)) return work;
+	if (_bt_isAllowedHalfWidthString(work)) {
+		// 成功時は Shift_JIS 単位で先頭 30 バイトに切り詰めて返す
+		const truncated = _bt_sjisTruncate(work, 30);
+		return truncated;
+	}
 
 	// 5) 許容外文字の列挙して Error を投げる（normalizeAccountNumber と同様の挙動）
 	const invalidChars = [];
