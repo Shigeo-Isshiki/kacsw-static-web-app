@@ -1,4 +1,4 @@
 {
-  "json.schemaDownload.enable": false,
+  "json.schemaDownload.enable": true,
   "json.validate.enable": true
 }
