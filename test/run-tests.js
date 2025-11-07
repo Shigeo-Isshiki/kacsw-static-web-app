@@ -52,6 +52,8 @@ BANK.getBranch = (bankCode, branchCode, cb) => {
 
 // Load additional unit tests for normalizePayeeName
 const runNormalizePayeeTests = require('./normalize-payee.test.js');
+// Load header tests
+const runHeaderTests = require('./header.test.js');
 
 // Helper to call convertYucho and await result
 const callConvert = (kigou, bangou) =>
@@ -173,6 +175,12 @@ const callConvert = (kigou, bangou) =>
     const add = await runNormalizePayeeTests(BANK);
     if (add && add > 0) {
       console.error(`\n${add} normalize-payee TEST(S) FAILED`);
+      process.exitCode = 2;
+    }
+    // run header tests
+    const addHeader = await runHeaderTests(BANK);
+    if (addHeader && addHeader > 0) {
+      console.error(`\n${addHeader} header TEST(S) FAILED`);
       process.exitCode = 2;
     }
     // run additional tests if present
