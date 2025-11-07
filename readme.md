@@ -206,6 +206,48 @@ npm run prepare
 
 この挙動により、kintone 側では一貫した半角カタカナ/ASCII 表記で `kana` を扱うことができます。
 
+### VSCode の JSON スキーマ自動取得の切替（オン / オフ）
+
+開発中に VSCode が外部の JSON スキーマを自動取得しようとして一時的に取得できない場合、エディタ上にスキーマ取得エラーが表示されることがあります。
+以下は簡単な切替手順です。
+
+- ワークスペースで無効にする（推奨: オフライン時や外部スキーマの取得に問題がある場合）:
+
+	1. リポジトリルートに `.vscode/settings.json` を作成・編集します。
+	2. 次の設定を追加します（既にある場合は上書き/編集してください）:
+
+```json
+{
+	"json.schemaDownload.enable": false,
+	"json.validate.enable": true
+}
+```
+
+- ワークスペースで有効にする（オンライン環境で自動取得を許可する場合）:
+
+	- `.vscode/settings.json` の `json.schemaDownload.enable` を `true` に変更します。
+	- または VSCode の設定 UI（Preferences → Settings）で `json.schemaDownload.enable` を検索してトグルしてください。
+
+- ローカルのスキーマを使いたい場合（安定した検証が必要な場合）:
+
+	1. 必要なスキーマファイルをリポジトリ内の `./schemas/` 等に保存します。
+	2. `.vscode/settings.json` に `json.schemas` を追加してローカルファイルにマッピングします。例:
+
+```json
+{
+	"json.schemas": [
+		{
+			"fileMatch": ["/package.json"],
+			"url": "./schemas/package.json"
+		}
+	]
+}
+```
+
+これにより VSCode は外部フェッチの代わりにローカルスキーマを使って JSON を検証します。
+
+簡潔に言えば: ネットワーク環境や CI に依存せず安定して編集したければローカルスキーマを使い、問題がなければ自動取得を有効化しておく、という運用が便利です。
+
 ## API: エラー構造（Structured Error）
 
 `bank-transfer.js` の公開 API（例: `convertYucho`）は、エラー時に単純な文字列だけでなく、kintone 側でどのフィールドにエラーを表示すべきかを判断できるように「構造化エラー」を返します。下記は仕様の抜粋です。
