@@ -1894,64 +1894,274 @@ const generateZenginTransfer = (records = []) => {
 
 /**
  * 公開: generateHeader
- * ヘッダレコードを生成します（コールバック必須、single-arg スタイルで結果を返します）。
- * 生成ルールのデフォルトは固定幅フィールド（簡易仕様）です:
- *  'H' (1) + senderBankCode(4, zero-padded) + senderBranchCode(3, zero-padded)
- *  + fileDate(8, YYYYMMDD) + fileSeq(4, zero-padded) + senderName(30, SJIS先頭30バイトに切り詰めて右パディング)
  *
- * @param {object} meta ヘッダ情報 (senderBankCode, senderBranchCode, fileDate, fileSeq, senderName)
- * @param {function} callback 単一引数スタイルのコールバック
+ * 概要:
+ *  指定されたデータを元に全銀フォーマットのヘッダ行を生成します。関数は非同期で動作し、コールバック
+ *  （single-arg スタイル）で結果を返します。ヘッダは内部で番号（銀行番号/支店番号）から `getBank` / `getBranch`
+ *  を用いて仕向銀行名・仕向支店名を取得し、それらを正規化・切り詰めして所定のフィールド長に詰めます。
+ *
+ * 仕様（フィールド順・長さは SJIS 相当バイトでの固定長合計 120 バイト）:
+ *  - dataType: 1バイト 固定 '1'
+ *  - typeCode: 2バイト（数値2桁または内部マップキー）
+ *  - codeClass: 1バイト 固定 '0'
+ *  - requesterCode: 10バイト（依頼人コード、数字のみ、左ゼロ埋め。超過はエラー）
+ *  - requesterName: 40バイト（依頼人名、半角カナ化等を行い SJIS 相当で先頭30バイト相当を切り詰め、バイト単位で右パディング）
+ *  - tradeDate: 4バイト（MMDD 形式。Date オブジェクトまたは 'MMDD' 文字列を受け付ける。超過はエラー）
+ *  - fromBankNo: 4バイト（仕向銀行番号、数字、左ゼロ埋め。超過はエラー）
+ *  - fromBankName: 15バイト（fromBankNo から取得した銀行名を正規化・SJIS 切り詰め・右パディング）
+ *  - fromBranchNo: 3バイト（仕向支店番号、数字、左ゼロ埋め。超過はエラー）
+ *  - fromBranchName: 15バイト（fromBranchNo から取得した支店名を正規化・SJIS 切り詰め・右パディング）
+ *  - depositType: 1バイト（預金種目。マップまたは数字 1 桁で解決。指定が無ければ '9'）
+ *  - accountNumber: 7バイト（依頼人の口座番号、数字のみ、左ゼロ埋め。超過はエラー）
+ *  - dummy: 17バイト（スペース）
+ *
+ * コールバックの戻り値（single-arg スタイル）:
+ *  - 成功: { success: true, header: '<120-byte string>' }
+ *  - 失敗: { error: '<日本語の人向けエラーメッセージ>' }
+ *
+ * 注意:
+ *  - 銀行名／支店名は `fromBankNo` / `fromBranchNo` から取得するため、呼び出し側は名前を data に含める必要はありません。
+ *    取得失敗（未登録等）はユーザー向け日本語メッセージでエラーとして返ります。
+ *  - SJIS 相当バイト長の評価は本ファイル内の簡易ヘルパ `_bt_sjisByteLength` / `_bt_sjisTruncate` に従います。
+ *    本番で厳密な Shift_JIS バイト一致が必要な場合はエンコーディングライブラリの導入を検討してください。
+ *
+ * data オブジェクトの詳細（呼び出し時の例とフィールド説明）:
+ *  {
+ *    typeCode: '11' | '給与振込' | '総合振込' , // 種別コード。'11' のような 2 桁文字列か、内部マップのキーを指定できます
+ *    requesterCode: '123456',                  // 振込依頼人コード（数字）。内部で左ゼロ埋めして 10 バイト
+ *    requesterName: 'テスト依頼人',            // 振込依頼人名（文字列）。半角化->SJIS 切り詰め（40 バイト）
+ *    tradeDate: 'MMDD' | new Date(),           // 取組日。'1108' や Date を渡す
+ *    fromBankNo: '0123',                       // 仕向銀行番号（数字） — 名前は内部で取得
+ *    fromBranchNo: '001',                      // 仕向支店番号（数字） — 名前は内部で取得
+ *    depositType: '普通' | '1',                // 預金種目（キーまたは '1' 等の数字）
+ *    accountNumber: '1234567'                  // 依頼人の口座番号（数字）
+ *  }
+ *
+ * 呼び出し例:
+ *  BANK.generateHeader({
+ *    typeCode: '11', requesterCode: '123', requesterName: 'テスト', tradeDate: '1108',
+ *    fromBankNo: '0123', fromBranchNo: '001', depositType: '普通', accountNumber: '12345'
+ *  }, (res) => {
+ *    if (res && res.success) console.log('header:', res.header);
+ *    else console.error('error:', res && res.error);
+ *  });
+ *
+ * @param {object} data ヘッダ生成に必要な情報（上記参照）
+ * @param {function} callback single-arg スタイルのコールバック (result)
  */
-const generateHeader = (meta, callback) => {
+const generateHeader = (data, callback) => {
+	// data: {
+	//   typeCode, requesterCode, requesterName, tradeDate,
+	//   fromBankNo, fromBranchNo, depositType, accountNumber
+	// }
 	if (typeof callback !== 'function')
 		return { success: false, error: '第二引数はコールバック関数である必要があります' };
 	try {
-		if (!meta || typeof meta !== 'object') {
-			_bt_invokeCallback(
-				callback,
-				{ error: 'meta must be an object', code: 'meta.invalid', field: 'meta' },
-				null
-			);
+		if (!data || typeof data !== 'object') {
+			_bt_invokeCallback(callback, { error: 'データがオブジェクトである必要があります' }, null);
 			return;
 		}
-		const senderBankCode = _bt_toStr(meta.senderBankCode || '')
+
+		const TYPE_CODE_MAP = {
+			給与振込: '11',
+			賞与振込: '12',
+			総合振込: '21',
+		};
+		const DEPOSIT_TYPE_MAP = {
+			普通: '1',
+			普通預金: '1',
+			当座: '2',
+			当座預金: '2',
+		};
+
+		const dataType = '1';
+		const codeClass = '0';
+
+		// typeCode
+		let typeCodeRaw = _bt_toStr(data.typeCode || '').trim();
+		let typeCode = '';
+		if (/^[0-9]{2}$/.test(typeCodeRaw)) typeCode = typeCodeRaw;
+		else if (typeCodeRaw) {
+			const key = String(typeCodeRaw).toUpperCase();
+			if (TYPE_CODE_MAP[key]) typeCode = TYPE_CODE_MAP[key];
+		}
+		if (!/^[0-9]{2}$/.test(typeCode)) {
+			_bt_invokeCallback(callback, { error: '種別コードが不正です' }, null);
+			return;
+		}
+
+		// requesterCode (10バイト)
+		let requesterCode = _bt_toHalfWidthDigits(_bt_toStr(data.requesterCode || '')).replace(
+			/[^0-9]/g,
+			''
+		);
+		requesterCode = requesterCode.padStart(10, '0');
+		if (_bt_sjisByteLength(requesterCode) > 10) {
+			_bt_invokeCallback(callback, { error: '振込依頼人コードが長すぎます（最大10バイト）' }, null);
+			return;
+		}
+
+		// requesterName (40bytes, SJIS)
+		let requesterName = _bt_toStr(data.requesterName || '');
+		try {
+			requesterName = _bt_toHalfWidthKana(requesterName, false);
+		} catch (e) {}
+		let reqNameTrunc = _bt_sjisTruncate(requesterName, 40);
+		let reqNameBytes = _bt_sjisByteLength(reqNameTrunc);
+		if (reqNameBytes < 40) reqNameTrunc = reqNameTrunc + ' '.repeat(40 - reqNameBytes);
+
+		// trade date MMDD
+		let trade = '';
+		if (data.tradeDate instanceof Date) {
+			const m = String(data.tradeDate.getMonth() + 1).padStart(2, '0');
+			const d = String(data.tradeDate.getDate()).padStart(2, '0');
+			trade = m + d;
+		} else {
+			trade = _bt_toStr(data.tradeDate || '').replace(/[^0-9]/g, '');
+		}
+		if (!/^[0-9]{4}$/.test(trade)) {
+			_bt_invokeCallback(callback, { error: '取組日は MMDD 形式（4桁）で指定してください' }, null);
+			return;
+		}
+		if (_bt_sjisByteLength(trade) > 4) {
+			_bt_invokeCallback(callback, { error: '取組日のバイト長が長すぎます（最大4バイト）' }, null);
+			return;
+		}
+
+		// helper to prefer window.BANK stubs in tests
+		const _callGetBank = (code, cb) => {
+			try {
+				if (
+					typeof window !== 'undefined' &&
+					window.BANK &&
+					typeof window.BANK.getBank === 'function'
+				)
+					return window.BANK.getBank(code, cb);
+			} catch (e) {}
+			return getBank(code, cb);
+		};
+		const _callGetBranch = (bankCode, branch, cb) => {
+			try {
+				if (
+					typeof window !== 'undefined' &&
+					window.BANK &&
+					typeof window.BANK.getBranch === 'function'
+				)
+					return window.BANK.getBranch(bankCode, branch, cb);
+			} catch (e) {}
+			return getBranch(bankCode, branch, cb);
+		};
+
+		// 銀行/支店番号: 公称キーは `fromBankNo` / `fromBranchNo`（仕向を示す）です。
+		const rawBankNo = _bt_toStr(data.fromBankNo || '');
+		const rawBranchNo = _bt_toStr(data.fromBranchNo || '');
+
+		// fromBankNo (4 bytes)
+		const fromBankNo = _bt_toHalfWidthDigits(rawBankNo)
 			.replace(/[^0-9]/g, '')
 			.padStart(4, '0');
-		const senderBranchCode = _bt_toStr(meta.senderBranchCode || '')
+		if (_bt_sjisByteLength(fromBankNo) > 4) {
+			_bt_invokeCallback(callback, { error: '仕向銀行番号が長すぎます（最大4バイト）' }, null);
+			return;
+		}
+
+		// fromBranchNo (3 bytes)
+		const fromBranchNo = _bt_toHalfWidthDigits(rawBranchNo)
 			.replace(/[^0-9]/g, '')
 			.padStart(3, '0');
-		const fileDate = _bt_toStr(meta.fileDate || '').trim();
-		const fileSeq = _bt_toStr(meta.fileSeq || '')
-			.replace(/[^0-9]/g, '')
-			.padStart(4, '0');
-		let senderName = _bt_toStr(meta.senderName || '').trim();
-		// basic validation
-		if (!/^[0-9]{8}$/.test(fileDate)) {
-			_bt_invokeCallback(
-				callback,
-				{ error: 'fileDate must be YYYYMMDD', code: 'fileDate.invalid', field: 'fileDate' },
-				null
-			);
+		if (_bt_sjisByteLength(fromBranchNo) > 3) {
+			_bt_invokeCallback(callback, { error: '仕向支店番号が長すぎます（最大3バイト）' }, null);
 			return;
 		}
-		// senderName を半角カナ等に可能な限り変換し、SJIS 相当で 30 バイトに切り詰める
-		try {
-			senderName = _bt_toHalfWidthKana(senderName, false);
-		} catch (e) {
-			// フォールバック: 元の文字列を使う
+
+		// depositType -> depCode
+		let depRaw = _bt_toStr(data.depositType || '').trim();
+		let depCode = '';
+		if (/^[0-9]{1}$/.test(depRaw)) depCode = depRaw;
+		else if (DEPOSIT_TYPE_MAP && DEPOSIT_TYPE_MAP[depRaw]) depCode = DEPOSIT_TYPE_MAP[depRaw];
+		else depCode = '9';
+
+		// account number (7 bytes)
+		let acct = _bt_toHalfWidthDigits(_bt_toStr(data.accountNumber || ''))
+			.replace(/[^0-9]/g, '')
+			.padStart(7, '0');
+		if (_bt_sjisByteLength(acct) > 7) {
+			_bt_invokeCallback(callback, { error: '依頼人の口座番号が長すぎます（最大7バイト）' }, null);
+			return;
 		}
-		const nameTrunc = _bt_sjisTruncate(senderName, 30);
-		// 右パディング（スペース）で 30 バイトに揃える（簡易は文字数ベースでパディング）
-		let paddedName = nameTrunc;
-		if (paddedName.length < 30) paddedName = paddedName + ' '.repeat(30 - paddedName.length);
-		const headerLine = 'H' + senderBankCode + senderBranchCode + fileDate + fileSeq + paddedName;
-		_bt_invokeCallback(callback, null, { success: true, header: headerLine });
+
+		const dummy = ' '.repeat(17);
+
+		// resolve bank/branch names asynchronously
+		_callGetBank(fromBankNo, (bankRes) => {
+			if (!bankRes || bankRes.error) {
+				_bt_invokeCallback(callback, { error: '仕向銀行情報を取得できませんでした' }, null);
+				return;
+			}
+			const bankCodeForBranch = bankRes.bankCode || fromBankNo;
+			const resolvedBankName = _bt_toStr(bankRes.bankName || bankRes.name || '');
+			_callGetBranch(bankCodeForBranch, fromBranchNo, (branchRes) => {
+				if (!branchRes || branchRes.error) {
+					_bt_invokeCallback(callback, { error: '仕向支店情報を取得できませんでした' }, null);
+					return;
+				}
+				const resolvedBranchName = _bt_toStr(branchRes.branchName || branchRes.name || '');
+
+				// normalize and truncate/pad names
+				let toBankName = resolvedBankName;
+				let toBranchName = resolvedBranchName;
+				try {
+					toBankName = _bt_toHalfWidthKana(toBankName, false);
+				} catch (e) {}
+				let toBankNameTrunc = _bt_sjisTruncate(toBankName, 15);
+				let toBankNameBytes = _bt_sjisByteLength(toBankNameTrunc);
+				if (toBankNameBytes < 15)
+					toBankNameTrunc = toBankNameTrunc + ' '.repeat(15 - toBankNameBytes);
+
+				try {
+					toBranchName = _bt_toHalfWidthKana(toBranchName, false);
+				} catch (e) {}
+				let toBranchNameTrunc = _bt_sjisTruncate(toBranchName, 15);
+				let toBranchNameBytes = _bt_sjisByteLength(toBranchNameTrunc);
+				if (toBranchNameBytes < 15)
+					toBranchNameTrunc = toBranchNameTrunc + ' '.repeat(15 - toBranchNameBytes);
+
+				const parts = [
+					dataType,
+					typeCode,
+					codeClass,
+					requesterCode,
+					reqNameTrunc,
+					trade,
+					fromBankNo,
+					toBankNameTrunc,
+					fromBranchNo,
+					toBranchNameTrunc,
+					depCode,
+					acct,
+					dummy,
+				];
+				const line = parts.join('');
+				const totalBytes = _bt_sjisByteLength(line);
+				if (totalBytes !== 120) {
+					_bt_invokeCallback(
+						callback,
+						{
+							error:
+								'ヘッダの合計バイト長が 120 バイトではありません（現在: ' +
+								totalBytes +
+								' バイト）',
+						},
+						null
+					);
+					return;
+				}
+				_bt_invokeCallback(callback, null, { success: true, header: line });
+			});
+		});
+		return;
 	} catch (err) {
-		_bt_invokeCallback(
-			callback,
-			_bt_enrichError(err, { code: 'header.generate_failed', message: 'ヘッダ生成に失敗しました' }),
-			null
-		);
+		_bt_invokeCallback(callback, { error: 'ヘッダ生成に失敗しました' }, null);
 	}
 };
 
