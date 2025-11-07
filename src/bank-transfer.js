@@ -1908,5 +1908,71 @@ if (typeof window !== 'undefined') {
 		normalizeAccountNumber,
 		normalizePayeeName,
 		generateZenginTransfer,
+		/**
+		 * 公開: generateHeader
+		 * ヘッダレコードを生成します（コールバック必須、single-arg スタイルで結果を返します）。
+		 * 生成ルールのデフォルトは固定幅フィールド（簡易仕様）です:
+		 *  'H' (1) + senderBankCode(4, zero-padded) + senderBranchCode(3, zero-padded)
+		 *  + fileDate(8, YYYYMMDD) + fileSeq(4, zero-padded) + senderName(30, SJIS先頭30バイトに切り詰めて右パディング)
+		 *
+		 * @param {object} meta ヘッダ情報 (senderBankCode, senderBranchCode, fileDate, fileSeq, senderName)
+		 * @param {function} callback 単一引数スタイルのコールバック
+		 */
+		generateHeader: function (meta, callback) {
+			if (typeof callback !== 'function')
+				return { success: false, error: '第二引数はコールバック関数である必要があります' };
+			try {
+				if (!meta || typeof meta !== 'object') {
+					_bt_invokeCallback(
+						callback,
+						{ error: 'meta must be an object', code: 'meta.invalid', field: 'meta' },
+						null
+					);
+					return;
+				}
+				const senderBankCode = _bt_toStr(meta.senderBankCode || '')
+					.replace(/[^0-9]/g, '')
+					.padStart(4, '0');
+				const senderBranchCode = _bt_toStr(meta.senderBranchCode || '')
+					.replace(/[^0-9]/g, '')
+					.padStart(3, '0');
+				const fileDate = _bt_toStr(meta.fileDate || '').trim();
+				const fileSeq = _bt_toStr(meta.fileSeq || '')
+					.replace(/[^0-9]/g, '')
+					.padStart(4, '0');
+				let senderName = _bt_toStr(meta.senderName || '').trim();
+				// basic validation
+				if (!/^[0-9]{8}$/.test(fileDate)) {
+					_bt_invokeCallback(
+						callback,
+						{ error: 'fileDate must be YYYYMMDD', code: 'fileDate.invalid', field: 'fileDate' },
+						null
+					);
+					return;
+				}
+				// senderName を半角カナ等に可能な限り変換し、SJIS 相当で 30 バイトに切り詰める
+				try {
+					senderName = _bt_toHalfWidthKana(senderName, false);
+				} catch (e) {
+					// フォールバック: 元の文字列を使う
+				}
+				const nameTrunc = _bt_sjisTruncate(senderName, 30);
+				// 右パディング（スペース）で 30 バイトに揃える（簡易は文字数ベースでパディング）
+				let paddedName = nameTrunc;
+				if (paddedName.length < 30) paddedName = paddedName + ' '.repeat(30 - paddedName.length);
+				const headerLine =
+					'H' + senderBankCode + senderBranchCode + fileDate + fileSeq + paddedName;
+				_bt_invokeCallback(callback, null, { success: true, header: headerLine });
+			} catch (err) {
+				_bt_invokeCallback(
+					callback,
+					_bt_enrichError(err, {
+						code: 'header.generate_failed',
+						message: 'ヘッダ生成に失敗しました',
+					}),
+					null
+				);
+			}
+		},
 	});
 }
