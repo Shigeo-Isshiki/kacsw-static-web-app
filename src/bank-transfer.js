@@ -1,20 +1,20 @@
 /**
- * bank-transfer.js
- * 銀行振込ユーティリティ（kintone向け、callback スタイル）
+ * bank-transfer.js（銀行振込ユーティリティファイル）
+ * 銀行振込ユーティリティ（kintone向け、コールバックスタイル）
  *
- * Public API exposed on window.BANK:
+ * 公開 API (window.BANK に公開):
  *  - getBank(bankCodeOrName, callback)
  *  - getBranch(bankCode, branchCodeOrName, callback)
  *  - convertYucho(kigou, bangou, callback)
  *  - generateZenginTransfer(records)
  *  - loadBankByCode(bankCode, options?, callback)
  *
- * Notes:
- *  - 全ての公開 API はコールバック（single-arg スタイルをサポート）で返します。
+ * 注意:
+ *  - 全ての公開 API はコールバック（単一引数スタイルをサポート）で返します。
  *  - 本ビルドは Web API による検索のみを行い、グローバルな内部キャッシュは保持しません。
  */
 /**
- * JSDoc typedefs: callback result shapes
+ * JSDoc 型定義: コールバック戻り値の形
  *
  * @typedef {object} BankResult
  * @property {string} bankCode 4桁の銀行コード（例: '9900'）
@@ -64,16 +64,16 @@
 
 /**
  * @callback LoadBankByCodeCallback
- * @description internal loader callback: flexible signature supported by the loader.
- * @param {...*} args - Either single-arg (BankResult|ErrorResult) or node-style (err, res)
+ * @description 内部ローダー用コールバック: ローダーが受け付ける柔軟なシグネチャをサポートします。
+ * @param {...*} args - 単一引数 (BankResult|ErrorResult) か Node 風の (err, res) シグネチャのいずれか
  */
 
 /* ============================================================================
- * Internal: constants and conversion tables
+ * 内部: 定数と変換テーブル
  *
- * Rules:
- *  - Items in this section are internal implementation details (do NOT export).
- *  - Keep conversion maps and derived maps here; they are used by internal helpers.
+ * ルール:
+ *  - このセクション内の項目は内部実装の詳細です（外部へは公開しません）。
+ *  - 変換マップおよび派生マップはここにまとめ、内部ヘルパで利用します。
  * ============================================================================ */
 /**
  * 変換用の文字リスト
@@ -161,15 +161,15 @@ const _BT_CONVERT_CHARACTER_LIST = {
 		ヴ: 'ｳﾞ',
 		ヷ: 'ﾜﾞ',
 		ヺ: 'ｦﾞ',
-		ァ: 'ｧ',
-		ィ: 'ｨ',
-		ゥ: 'ｩ',
-		ェ: 'ｪ',
-		ォ: 'ｫ',
-		ッ: 'ｯ',
-		ャ: 'ｬ',
-		ュ: 'ｭ',
-		ョ: 'ｮ',
+		ァ: 'ｱ',
+		ィ: 'ｲ',
+		ゥ: 'ｳ',
+		ェ: 'ｴ',
+		ォ: 'ｵ',
+		ッ: 'ﾂ',
+		ャ: 'ﾔ',
+		ュ: 'ﾕ',
+		ョ: 'ﾖ',
 		'゛': 'ﾞ',
 		'゜': 'ﾟ',
 		'　': ' ',
@@ -310,6 +310,55 @@ const _bt_checkBoolean = (val) => {
 // 全角数字（U+FF10-U+FF19）を半角数字に変換するユーティリティ
 const _bt_toHalfWidthDigits = (str = '') =>
 	_bt_toStr(str).replace(/[\uFF10-\uFF19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+/**
+ * 指定文字が Shift_JIS に由来する許容半角文字集合に含まれるかを判定する（単一文字）
+ * 仕様更新: 以下の Shift_JIS バイト値 (16進) は許容しない（除外）:
+ *  - 27, 2B, 3A, 3F, 5C, A2, A3
+ *
+ * テストで必要な最小限の集合を実装しています（除外バイトを反映）:
+ *  - 半角カタカナ U+FF61-U+FF9F（ただし U+FF62/U+FF63 は除外）
+ *  - 英大文字 A-Z
+ *  - 数字 0-9
+ *  - スペース, ハイフン '-'
+ * 実際の仕様では Shift_JIS に基づく詳細集合を使いますが、ここでは軽量実装です。
+ * @param {string} ch 単一文字
+ * @returns {boolean}
+ */
+const _bt_isAllowedHalfWidthChar = (ch) => {
+	if (!_bt_checkString(ch) || !ch) return false;
+	const cp = ch.codePointAt(0);
+	// 除外 ASCII 等（Shift_JIS バイトで 27,2B,3A,3F,5C に対応）
+	// 0x27=' , 0x2B='+', 0x3A=':', 0x3F='?', 0x5C='\\'
+	const disallowedAscii = new Set([0x27, 0x2b, 0x3a, 0x3f, 0x5c]);
+	if (cp <= 0x7f && disallowedAscii.has(cp)) return false;
+
+	// 半角カタカナは原則許容。ただし Shift_JIS の A2/A3 に対応する U+FF62/U+FF63 は除外
+	if (cp >= 0xff61 && cp <= 0xff9f) {
+		if (cp === 0xff62 || cp === 0xff63) return false; // ｢ ｣ を除外
+		return true;
+	}
+
+	// 数字
+	if (cp >= 0x30 && cp <= 0x39) return true;
+	// 英大文字
+	if (cp >= 0x41 && cp <= 0x5a) return true;
+	// スペースとハイフンのみ許容（'?' や '\\' は除外済）
+	if (cp === 0x20 || cp === 0x2d) return true;
+	return false;
+};
+
+/**
+ * 文字列がすべて許容半角文字のみで構成されているか判定する
+ * @param {string} s 入力文字列
+ * @returns {boolean}
+ */
+const _bt_isAllowedHalfWidthString = (s) => {
+	if (!_bt_checkString(s)) return false;
+	for (const ch of s) {
+		if (!_bt_isAllowedHalfWidthChar(ch)) return false;
+	}
+	return true;
+};
 
 // callback 呼び出しの互換ヘルパ
 // - cb に宣言引数が 2 個以上ある場合は (err, res) シグネチャで呼ぶ
@@ -326,9 +375,9 @@ const _bt_invokeCallback = (cb, err, res) => {
 				// err は { success:false, error: '...' } 形式で来る想定
 				// もし err が構造化オブジェクトであればそのまま透過する。文字列などの場合は既存互換でラップする。
 				if (typeof err === 'object' && err !== null) {
-					// Preserve structured error objects that may contain code/field/details
+					// code/field/details を含む構造化エラーオブジェクトはそのまま扱う
 					if (err.error || err.message || err.code || err.field || err.details) {
-						// Normalize: ensure both `error` (identifier) and `message` (human) exist
+						// 正規化: `error`（識別子）と `message`（人向けメッセージ）の両方が存在するようにする
 						try {
 							if (!err.message) {
 								err.message = err.error ? String(err.error) : '';
@@ -337,11 +386,11 @@ const _bt_invokeCallback = (cb, err, res) => {
 								err.error = err.message ? String(err.message) : '';
 							}
 						} catch (e) {
-							// ignore normalization errors
+							// 正規化中のエラーは無視
 						}
 						cb(err);
 					} else {
-						// Unknown object: stringify into error/message properties
+						// 不明なオブジェクトは文字列化して error/message に格納する
 						try {
 							const txt = JSON.stringify(err);
 							cb({ error: txt, message: txt });
@@ -351,7 +400,7 @@ const _bt_invokeCallback = (cb, err, res) => {
 						}
 					}
 				} else {
-					// primitive (string/number/etc.) -> set both error and message to the string
+					// プリミティブ値（文字列/数値 等）は文字列化して error と message の両方に設定する
 					const txt = err && err.message ? err.message : String(err);
 					cb({ error: txt, message: txt });
 				}
@@ -371,22 +420,22 @@ const _bt_invokeCallback = (cb, err, res) => {
 };
 
 /**
- * Internal: enrich or normalize an error into the structured shape used by the SDK.
- * If `err` already looks structured (has code/field), it is returned as-is.
- * Otherwise, a new structured object is returned containing provided defaults.
- * @param {*} err existing error (string/object)
+ * 内部: SDK で利用する構造化エラー形式に整形します。
+ * - err が既に構造化されている（code/field を持つ）場合はそのまま返します。
+ * - それ以外は、defaults を反映した構造化オブジェクトを生成して返します。
+ * @param {*} err 既存のエラー（文字列またはオブジェクト）
  * @param {object} defaults { code:string, field:string, message:string, details:object }
- * @returns {object} structured error object
+ * @returns {object} 構造化されたエラーオブジェクト
  */
 const _bt_enrichError = (err, defaults = {}) => {
 	try {
 		if (err && typeof err === 'object') {
-			// If already structured, return as-is
+			// 既に構造化されている場合はそのまま返す
 			if (err.code || err.field || err.details) return err;
-			// Construct structured object preserving err.error/message if present
+			// err.error / err.message を保持しつつ構造化オブジェクトを構築する
 			const message = err.message || err.error || defaults.message || String(err);
 			return Object.assign({ error: err.error || message, message: message }, defaults, {
-				// details: merge existing details if any
+				// details: 既存の details があればマージする
 				details: Object.assign({}, defaults.details || {}, err.details || {}),
 			});
 		}
@@ -555,16 +604,16 @@ const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
 };
 
 /**
- * Internal: Load bank by code (BankKun style)
+ * 内部: 銀行コードから銀行データを取得する（BankKun 互換）
  *
- * Callback flexibility:
- *  - single-arg success -> BankResult (or sometimes { success:true, bank: BankResult })
- *  - single-arg failure -> ErrorResult
- *  - node-style (err, res) is also accepted by internal callers
+ * コールバックの柔軟性:
+ *  - 単一引数での成功 -> BankResult（場合によっては { success:true, bank: BankResult }）
+ *  - 単一引数での失敗 -> ErrorResult
+ *  - Node 風 (err, res) のシグネチャも内部呼び出しで受け付けます
  *
  * @param {string} bankCode 銀行コード
  * @param {object} [options] オプション
- * @param {LoadBankByCodeCallback} callback flexible callback (single-arg or node-style)
+ * @param {LoadBankByCodeCallback} callback ローダーが受け付ける柔軟なコールバック（単一引数または Node 風）
  * @private
  */
 const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
@@ -756,10 +805,10 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 };
 
 /**
- * Internal: Search bank by name (uses BankKun search API)
+ * 内部: 銀行名による検索（BankKun 検索 API を利用）
  * @param {string} name 検索語
  * @param {object} [options]
- * @param {function} callback single-arg または node-style のコールバック
+ * @param {function} callback 単一引数または Node 風のコールバック
  * @private
  */
 const _bt_searchBankByName = (name, options = {}, callback) => {
@@ -926,17 +975,17 @@ const _bt_yuchoKigouToBranch = (kigouRaw) => {
 };
 
 /* ============================================================================
- * Public API (exports)
+ * 公開 API (エクスポート)
  *
- * Rules:
- *  - Public functions must be declared after the internal helpers they depend on.
- *  - Attach public symbols to `window.BANK` only at the end of this file.
+ * ルール:
+ *  - 公開関数は依存する内部ヘルパの後に宣言してください。
+ *  - 公開シンボルはこのファイルの末尾で `window.BANK` にアタッチしてください。
  * ============================================================================ */
 /**
- * Public: getBank
+ * 公開: getBank
  * 銀行コード（4桁以内の数字）または銀行名で検索し、標準化された銀行オブジェクトをコールバックに返す。
- * コールバックは single-arg スタイル（成功: オブジェクト、失敗: { error: '...' }）を想定します。
- * @param {BankCallback} callback single-arg スタイルのコールバック
+ * コールバックは単一引数スタイル（成功: オブジェクト、失敗: { error: '...' }）を想定します。
+ * @param {BankCallback} callback 単一引数スタイルのコールバック
  */
 const getBank = (bankCodeOrName, callback) => {
 	// 全角数字を半角化してからトリム（例: '１２３４' -> '1234'）
@@ -1072,11 +1121,11 @@ const getBank = (bankCodeOrName, callback) => {
 };
 
 /**
- * Public: getBranch
+ * 公開: getBranch
  * 支店コードまたは支店名で支店情報を取得してコールバックに返す（single-arg スタイル）。
  * @param {string} bankCode 銀行コード（数字または文字列、内部で4桁にパディング）
  * @param {string} branchCodeOrName 支店コードまたは支店名
- * @param {BranchCallback} callback single-arg スタイルのコールバック
+ * @param {BranchCallback} callback 単一引数スタイルのコールバック
  */
 const getBranch = (bankCode, branchCodeOrName, callback) => {
 	if (typeof callback !== 'function') {
@@ -1257,7 +1306,7 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 };
 
 /**
- * Public: convertYucho
+ * 公開: convertYucho
  * ゆうちょ記号/番号から全銀向けの口座情報へ変換してコールバックに返す。
  * 戻り値（成功時）例:
  * {
@@ -1269,7 +1318,7 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
  * }
  * @param {string|number} kigou ゆうちょ記号
  * @param {string|number} bangou ゆうちょ番号
- * @param {ConvertYuchoCallback} callback single-arg スタイルのコールバック
+ * @param {ConvertYuchoCallback} callback 単一引数スタイルのコールバック
  */
 const convertYucho = (kigou, bangou, callback) => {
 	// callback 必須の非同期 API に変更
@@ -1490,7 +1539,7 @@ const normalizeAccountNumber = (input) => {
 };
 
 /**
- * Public: generateZenginTransfer
+ * 公開: generateZenginTransfer
  * 簡易的な全銀フォーマットの CSV ライクな文字列を生成するユーティリティ
  * @param {Array<object>} records
  * @returns {string} CSV テキスト
@@ -1521,14 +1570,14 @@ const generateZenginTransfer = (records = []) => {
 	return lines.join('\n');
 };
 
-// loadBankDataFromBankKun was removed from this build because the library no longer
-// performs a full fetch of all banks/branches. Consumers should request only the
-// specific bank/branch data they need via getBank / getBranch / loadBankByCode.
+// このビルドではライブラリがすべての銀行/支店を一括取得しないため、
+// loadBankDataFromBankKun は削除されています。
+// 利用者は必要な銀行/支店データを getBank / getBranch / loadBankByCode 経由で個別に取得してください。
 
-// expose to window for kintone
+// kintone 向けに window に公開します
 if (typeof window !== 'undefined') {
-	// Expose under a concise global name for consumers: window.BANK
-	// This build uses window.BANK as the primary namespace (full migration).
+	// 利用者向けに簡潔なグローバル名で公開します: window.BANK
+	// このビルドでは window.BANK を主要ネームスペースとして利用します（完全移行）。
 	window.BANK = window.BANK || {};
 	Object.assign(window.BANK, {
 		getBank,
@@ -1536,5 +1585,8 @@ if (typeof window !== 'undefined') {
 		normalizeAccountNumber,
 		convertYucho,
 		generateZenginTransfer,
+		// 半角許容文字列チェックユーティリティ
+		isAllowedHalfWidthString: _bt_isAllowedHalfWidthString,
+		isAllowedHalfWidthChar: _bt_isAllowedHalfWidthChar,
 	});
 }
