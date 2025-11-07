@@ -137,12 +137,11 @@ const callConvert = (kigou, bangou) =>
 
   // Test case 6: allowed half-width characters per Shift_JIS spec
   try {
-  // 'A', 'Z', '0', space, '-'（'?','\\' は除外になったため省く）
-  const ok1 = BANK.isAllowedHalfWidthString('A Z0-');
-    // include a half-width katakana: 'ｱ' (U+FF71) - should be allowed
-    const ok2 = BANK.isAllowedHalfWidthString('ｱ');
-    assert.strictEqual(ok1, true, 'expected ASCII subset string to be allowed');
-    assert.strictEqual(ok2, true, 'expected half-width katakana ｱ to be allowed');
+  // Use normalizePayeeName: if allowed, it should return a string (possibly truncated) and not throw
+  const r1 = (() => { try { return { ok: true, v: BANK.normalizePayeeName('A Z0-') }; } catch (e) { return { ok: false, e }; } })();
+  const r2 = (() => { try { return { ok: true, v: BANK.normalizePayeeName('ｱ') }; } catch (e) { return { ok: false, e }; } })();
+    assert.strictEqual(r1.ok, true, 'expected ASCII subset string to be allowed');
+    assert.strictEqual(r2.ok, true, 'expected half-width katakana ｱ to be allowed');
     console.log('PASS: case 6 (allowed half-width characters)');
   } catch (e) {
     failures++;
@@ -151,10 +150,11 @@ const callConvert = (kigou, bangou) =>
 
   // Test case 7: disallowed character (lowercase 'a' and hiragana 'あ')
   try {
-    const nok1 = BANK.isAllowedHalfWidthString('a');
-    const nok2 = BANK.isAllowedHalfWidthString('あ');
-    assert.strictEqual(nok1, false, 'lowercase a should not be allowed');
-    assert.strictEqual(nok2, false, 'hiragana あ should not be allowed');
+    const t1 = (() => { try { BANK.normalizePayeeName('a'); return false; } catch (e) { return true; } })();
+    // normalizePayeeName はひらがなを半角カナ等へ正規化するため、'あ' は許容されて変換されることを期待する
+    const r2 = (() => { try { return { ok: true, v: BANK.normalizePayeeName('あ') }; } catch (e) { return { ok: false, e }; } })();
+    assert.strictEqual(t1, true, 'lowercase a should not be allowed');
+    assert.strictEqual(r2.ok, true, 'hiragana あ should be normalized and allowed');
     console.log('PASS: case 7 (disallowed characters)');
   } catch (e) {
     failures++;

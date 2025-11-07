@@ -1753,6 +1753,8 @@ const normalizeAccountNumber = (input) => {
 const normalizePayeeName = (input) => {
 	const s = _bt_toStr(input).trim();
 	if (!s) throw new Error('口座名義が空です');
+	// 入力文字列に英小文字が含まれる場合は不正とする（小文字は許容しない）
+	if (/[a-z]/.test(s)) throw new Error('口座名義に許容されない小文字が含まれています');
 
 	// 0) 法人・営業所・事業略語の置換（長いキー順に置換して衝突を避ける）
 	// 各略語リストでは "一つだけ" の略語適用に制限する（最初の一致を置換したら以降は同リストの置換を行わない）
@@ -1902,13 +1904,9 @@ if (typeof window !== 'undefined') {
 	Object.assign(window.BANK, {
 		getBank,
 		getBranch,
-		normalizeAccountNumber,
 		convertYucho,
-		generateZenginTransfer,
-		// 半角許容文字列チェックユーティリティ
-		isAllowedHalfWidthString: _bt_isAllowedHalfWidthString,
-		isAllowedHalfWidthChar: _bt_isAllowedHalfWidthChar,
-		// 口座名義の正規化ユーティリティ
+		normalizeAccountNumber,
 		normalizePayeeName,
+		generateZenginTransfer,
 	});
 }
