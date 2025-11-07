@@ -271,7 +271,12 @@ const _BT_HALF_WIDTH_KANA_MAP = new Map(Object.entries(_BT_CONVERT_CHARACTER_LIS
 const _BT_FULL_WIDTH_KANA_MAP = new Map(Object.entries(_BT_CONVERT_CHARACTER_LIST.fullWidthKana));
 // 濁点・半濁点の変換テーブルから生成するマップ（各種変換処理で利用）
 const _BT_TURBIDITY_KANA_MAP = new Map(Object.entries(_BT_CONVERT_CHARACTER_LIST.turbidityKana));
-/** 法人略語マッピング @type {Object} */
+/**
+ * 法人略語変換用のリスト
+ * 漢字及び半角カナ文字から法人略語への変換をサポートします。
+ * @typedef {object} _BT_CORPORATE_ABBREVIATIONS_LIST
+ */
+/** @type {Object} */
 const _BT_CORPORATE_ABBREVIATIONS_LIST = {
 	株式会社: 'ｶ',
 	ｶﾌﾞｼｷｶﾞｲｼﾔ: 'ｶ',
@@ -348,12 +353,12 @@ const _BT_CORPORATE_ABBREVIATIONS_LIST = {
 	社会保険労務士法人: 'ﾛｳﾑ',
 	ｼﾔｶｲﾎｹﾝﾛｳﾑｼﾎｳｼﾞﾝ: 'ﾛｳﾑ',
 };
-/** 法人略語用正規表現 @type {RegExp} */
-const _BT_CORPORATE_ABBREVIATIONS_LIST_REG = new RegExp(
-	'(' + Object.keys(_BT_CORPORATE_ABBREVIATIONS_LIST).join('|') + ')',
-	''
-);
-/** 営業所マッピング @type {Object} */
+/**
+ * 営業所略語変換用のリスト
+ * 漢字及び半角カナ文字から営業所略語への変換をサポートします。
+ * @typedef {object} _BT_SALES_OFFICES_LIST
+ */
+/** @type {Object} */
 const _BT_SALES_OFFICES_LIST = {
 	営業所: 'ｴｲ',
 	ｴｲｷﾞﾖｳｼﾖ: 'ｴｲ',
@@ -362,12 +367,12 @@ const _BT_SALES_OFFICES_LIST = {
 	ｼﾕﾂﾁﾖｳｼﾖ: 'ｼﾕﾂ',
 	ｼﾕﾂﾁﾖｳｼﾞﾖ: 'ｼﾕﾂ',
 };
-/** 営業所用正規表現 @type {RegExp} */
-const _BT_SALES_OFFICES_LIST_REG = new RegExp(
-	'(' + Object.keys(_BT_SALES_OFFICES_LIST).join('|') + ')',
-	''
-);
-/** 事業マッピング @type {Object} */
+/**
+ * 事業略語変換用のリスト
+ * 漢字及び半角カナ文字から事業略語への変換をサポートします。
+ * @typedef {object} _BT_BUSINESS_LIST
+ */
+/** @type {Object} */
 const _BT_BUSINESS_LIST = {
 	国民健康保険団体連合会: 'ｺｸﾎﾚﾝ',
 	ｺｸﾐﾝｹﾝｺｳﾎｹﾝﾀﾞﾝﾀｲﾚﾝｺﾞｳｶｲ: 'ｺｸﾎﾚﾝ',
@@ -419,8 +424,6 @@ const _BT_BUSINESS_LIST = {
 	有限責任事業組合: 'ﾕｳｸﾐ',
 	ﾕｳｹﾞﾝｾｷﾆﾝｼﾞｷﾞﾖｳｸﾐｱｲ: 'ﾕｳｸﾐ',
 };
-/** 事業用正規表現 @type {RegExp} */
-const _BT_BUSINESS_LIST_REG = new RegExp('(' + Object.keys(_BT_BUSINESS_LIST).join('|') + ')', '');
 
 // 内部ユーティリティ
 const _bt_toStr = (v) => (v == null ? '' : String(v));
@@ -462,17 +465,22 @@ const _bt_toHalfWidthDigits = (str = '') =>
 	_bt_toStr(str).replace(/[\uFF10-\uFF19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
 /**
  * 指定文字が Shift_JIS に由来する許容半角文字集合に含まれるかを判定する（単一文字）
- * 仕様更新: 以下の Shift_JIS バイト値 (16進) は許容しない（除外）:
- *  - 27, 2B, 3A, 3F, 5C, A2, A3
  *
- * テストで必要な最小限の集合を実装しています（除外バイトを反映）:
- *  - 半角カタカナ U+FF61-U+FF9F（ただし U+FF62/U+FF63 は除外）
- *  - 英大文字 A-Z
- *  - 数字 0-9
- *  - スペース, ハイフン '-'
- * 実際の仕様では Shift_JIS に基づく詳細集合を使いますが、ここでは軽量実装です。
- * @param {string} ch 単一文字
- * @returns {boolean}
+ * 実装ノート / 仕様差分:
+ * - 除外される Shift_JIS バイト値（16進）:
+ *   27 (') , 2B (+) , 3A (:) , 3F (?) , 5C (\) , A2 , A3
+ *   上記は銀行振込で許容しないため除外しています。
+ * - 許容文字（軽量実装）:
+ *   - 半角カタカナ: U+FF61..U+FF9F（ただし U+FF62/U+FF63（「｢」「｣」）は除外）
+ *   - ASCII 数字: 0-9
+ *   - ASCII 大文字: A-Z
+ *   - 空白（U+0020）、ハイフン（'-'）、ピリオド（'.'）、および括弧 '(' / ')' を許容
+ *
+ * 注: 実際の厳密な仕様は Shift_JIS のバイト集合に基づきますが、テストと実装の簡潔性のため
+ *     必要最小限の集合をここで定義しています。必要に応じて拡張してください。
+ *
+ * @param {string} ch 単一文字（長さ1の文字列）
+ * @returns {boolean} 許容される文字であれば true、それ以外は false
  */
 const _bt_isAllowedHalfWidthChar = (ch) => {
 	if (!_bt_checkString(ch) || !ch) return false;
@@ -492,8 +500,8 @@ const _bt_isAllowedHalfWidthChar = (ch) => {
 	if (cp >= 0x30 && cp <= 0x39) return true;
 	// 英大文字
 	if (cp >= 0x41 && cp <= 0x5a) return true;
-	// スペースとハイフンのみ許容（'?' や '\\' は除外済）
-	if (cp === 0x20 || cp === 0x2d) return true;
+	// スペースとハイフン、ピリオド、括弧を許容（'?' や '\\' は除外済）
+	if (cp === 0x20 || cp === 0x2d || cp === 0x2e || cp === 0x28 || cp === 0x29) return true;
 	return false;
 };
 
@@ -1700,13 +1708,87 @@ const normalizePayeeName = (input) => {
 	const s = _bt_toStr(input).trim();
 	if (!s) throw new Error('口座名義が空です');
 
-	// 1) 全角数字を半角化
-	let work = _bt_toHalfWidthDigits(s);
+	// 0) 法人・営業所・事業略語の置換（長いキー順に置換して衝突を避ける）
+	// 各略語リストでは "一つだけ" の略語適用に制限する（最初の一致を置換したら以降は同リストの置換を行わない）
+	// `work` を try/catch の外で一度宣言しておくことで、後続処理から参照できるようにする
+	let work;
+	// 状態付き Replacer を用意（最初の一致のみを置換し、以降は no-op）
+	// options.parentheses が真の場合、置換位置に応じて括弧を付与するルールを適用する
+	const makeStatefulReplacer = (mapObj, options = {}) => {
+		const keys = Object.keys(mapObj || {}).sort((a, b) => b.length - a.length);
+		if (keys.length === 0) return (str) => str;
+		const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		// 最初の一致のみ置換するためにグローバルフラグは使わない
+		const pattern = new RegExp(keys.map(esc).join('|'));
+		let used = false;
+		return (str) => {
+			if (used) return str;
+			let replaced = false;
+			const res = str.replace(pattern, function (m, offset, whole) {
+				// callback signature: (match, offset, string) when no capture groups
+				replaced = true;
+				let rep = mapObj[m] || m;
+				if (options.parentheses) {
+					const start = offset === 0;
+					const end = offset + m.length === whole.length;
+					if (start && end) {
+						// 文字列全体が一致した場合は周囲を()で囲む
+						rep = '(' + rep + ')';
+					} else if (start) {
+						// 先頭にある場合は後ろに ')' を付ける
+						rep = rep + ')';
+					} else if (end) {
+						// 末尾にある場合は前に '(' を付ける
+						rep = '(' + rep;
+					} else {
+						// 中間にある場合は前後に () を付ける
+						rep = '(' + rep + ')';
+					}
+				}
+				return rep;
+			});
+			if (replaced) used = true;
+			return res;
+		};
+	};
+	let corpRepl, salesRepl, bizRepl;
+	try {
+		// 企業名・営業所の略語適用では位置に応じた括弧付与を行う
+		corpRepl = makeStatefulReplacer(_BT_CORPORATE_ABBREVIATIONS_LIST, { parentheses: true });
+		salesRepl = makeStatefulReplacer(_BT_SALES_OFFICES_LIST, { parentheses: true });
+		// 事業略語は括弧ルールを適用しない
+		bizRepl = makeStatefulReplacer(_BT_BUSINESS_LIST);
+		// 原文に含まれる漢字表記等を先に置換（各リストで最初に見つかった1件だけを置換する）
+		let pre = s;
+		pre = corpRepl(pre);
+		pre = salesRepl(pre);
+		pre = bizRepl(pre);
+		// 続く処理は pre を使う
+		// 1) 全角数字を半角化
+		work = _bt_toHalfWidthDigits(pre);
+	} catch (e) {
+		// 何らかの理由で置換が失敗したら、入力 s を起点に処理を続行
+		work = _bt_toHalfWidthDigits(s);
+	}
 	// 2) 半角化（かな・英数）の補助
 	try {
 		work = _bt_toHalfWidthKana(work, false);
 	} catch (e) {
 		// フォールバック: 元の work を使う
+	}
+	// 1b) 半角化後の表記（半角カナなど）に対しても略語置換を行う
+	try {
+		// 既に pre で作成した replacer があればそれを再利用し、
+		// pre で既に置換が行われていれば同リストの置換は no-op になる。
+		corpRepl =
+			corpRepl || makeStatefulReplacer(_BT_CORPORATE_ABBREVIATIONS_LIST, { parentheses: true });
+		salesRepl = salesRepl || makeStatefulReplacer(_BT_SALES_OFFICES_LIST, { parentheses: true });
+		bizRepl = bizRepl || makeStatefulReplacer(_BT_BUSINESS_LIST);
+		work = corpRepl(work);
+		work = salesRepl(work);
+		work = bizRepl(work);
+	} catch (e) {
+		// 無視
 	}
 	// 3) 英小文字は大文字化
 	work = work.replace(/[a-z]/g, (c) => c.toUpperCase());

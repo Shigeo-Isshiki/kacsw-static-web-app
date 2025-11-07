@@ -50,6 +50,9 @@ BANK.getBranch = (bankCode, branchCode, cb) => {
   cb(out);
 };
 
+// Load additional unit tests for normalizePayeeName
+const runNormalizePayeeTests = require('./normalize-payee.test.js');
+
 // Helper to call convertYucho and await result
 const callConvert = (kigou, bangou) =>
   new Promise((resolve) => {
@@ -163,6 +166,25 @@ const callConvert = (kigou, bangou) =>
     process.exitCode = 0;
   } else {
     console.error(`\n${failures} TEST(S) FAILED`);
+    process.exitCode = 2;
+  }
+  // run normalize-payee tests and add failures
+  try {
+    const add = await runNormalizePayeeTests(BANK);
+    if (add && add > 0) {
+      console.error(`\n${add} normalize-payee TEST(S) FAILED`);
+      process.exitCode = 2;
+    }
+    // run additional tests if present
+    if (typeof runNormalizePayeeTests.additional === 'function') {
+      const add2 = await runNormalizePayeeTests.additional(BANK);
+      if (add2 && add2 > 0) {
+        console.error(`\n${add2} normalize-payee additional TEST(S) FAILED`);
+        process.exitCode = 2;
+      }
+    }
+  } catch (e) {
+    console.error('normalize-payee tests crashed', e && e.message ? e.message : e);
     process.exitCode = 2;
   }
 })();
