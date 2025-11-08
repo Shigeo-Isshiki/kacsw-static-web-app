@@ -2010,6 +2010,62 @@ const normalizeAccountNumber = (input) => {
 };
 
 /**
+ * 公開: normalizeEdiInfo
+ *
+ * 概要:
+ *  EDI 情報を銀行提出用に正規化します。主な処理は次の通りです。
+ *   - 入力を文字列化してトリム
+ *   - 半角カナ化（長音等は内部ヘルパに従う）
+ *   - 必要に応じて SJIS 相当バイト長で切り詰め・右パディング
+ *
+ * @param {string} input EDI 情報の入力（任意）
+ * @param {object} [options] オプション
+ * @param {boolean} [options.padToBytes=false] true の場合は bytes に合わせて右パディングします
+ * @param {number} [options.bytes=20] padToBytes=true 時に用いるバイト長（デフォルト 20）
+ * @returns {string} 正規化された文字列（padToBytes=false の場合はトリムされた文字列、true の場合は指定バイト長に揃えた文字列）
+ */
+const normalizeEdiInfo = (input, options = {}) => {
+	const opt = Object.assign({ padToBytes: false, bytes: 20 }, options || {});
+	let s = _bt_toStr(input || '').trim();
+	try {
+		s = _bt_toHalfWidthKana(s, false);
+	} catch (e) {
+		// ignore and continue with raw string
+	}
+	// EDI 特有の禁止文字チェック: コンマは許容しない
+	if (/,|，/.test(s)) {
+		throw new Error('EDI情報にコンマ(, または ，)は使用できません');
+	}
+
+	// validate allowed characters similar to normalizePayeeName
+	if (typeof _bt_isAllowedHalfWidthString === 'function') {
+		if (!_bt_isAllowedHalfWidthString(s)) {
+			const invalidChars = [];
+			for (const ch of s) {
+				if (typeof _bt_isAllowedHalfWidthChar === 'function') {
+					if (!_bt_isAllowedHalfWidthChar(ch) && invalidChars.indexOf(ch) === -1)
+						invalidChars.push(ch);
+				} else {
+					if (ch && ch.charCodeAt(0) > 0x7f && invalidChars.indexOf(ch) === -1)
+						invalidChars.push(ch);
+				}
+			}
+			const msg =
+				'EDI情報に銀行振込で許容されない文字が含まれています: ' +
+				(invalidChars.length ? invalidChars.join(',') : '不明');
+			throw new Error(msg);
+		}
+	}
+
+	// truncate to requested byte length first
+	const truncated = _bt_sjisTruncate(s, opt.bytes);
+	if (!opt.padToBytes) return truncated;
+	const b = _bt_sjisByteLength(truncated);
+	if (b < opt.bytes) return truncated + ' '.repeat(opt.bytes - b);
+	return truncated;
+};
+
+/**
  * 公開: 口座名義（受取人名）を銀行振込で使える半角表記へ可能な限り正規化して返す
  * - 全角数字/英字/かな を可能な限り半角化し、大文字化等の正規化を行う
  * - 正規化後に `_bt_isAllowedHalfWidthString` で検査し、許容外文字が含まれる場合は構造化エラーを返す
@@ -2125,62 +2181,6 @@ const normalizePayeeName = (input) => {
 		(invalidChars.length ? invalidChars.join(',') : '不明');
 	// シンプルにメッセージだけを投げる（仕様に合わせる）
 	throw new Error(msg);
-};
-
-/**
- * 公開: normalizeEdiInfo
- *
- * 概要:
- *  EDI 情報を銀行提出用に正規化します。主な処理は次の通りです。
- *   - 入力を文字列化してトリム
- *   - 半角カナ化（長音等は内部ヘルパに従う）
- *   - 必要に応じて SJIS 相当バイト長で切り詰め・右パディング
- *
- * @param {string} input EDI 情報の入力（任意）
- * @param {object} [options] オプション
- * @param {boolean} [options.padToBytes=false] true の場合は bytes に合わせて右パディングします
- * @param {number} [options.bytes=20] padToBytes=true 時に用いるバイト長（デフォルト 20）
- * @returns {string} 正規化された文字列（padToBytes=false の場合はトリムされた文字列、true の場合は指定バイト長に揃えた文字列）
- */
-const normalizeEdiInfo = (input, options = {}) => {
-	const opt = Object.assign({ padToBytes: false, bytes: 20 }, options || {});
-	let s = _bt_toStr(input || '').trim();
-	try {
-		s = _bt_toHalfWidthKana(s, false);
-	} catch (e) {
-		// ignore and continue with raw string
-	}
-	// EDI 特有の禁止文字チェック: コンマは許容しない
-	if (/,|，/.test(s)) {
-		throw new Error('EDI情報にコンマ(, または ，)は使用できません');
-	}
-
-	// validate allowed characters similar to normalizePayeeName
-	if (typeof _bt_isAllowedHalfWidthString === 'function') {
-		if (!_bt_isAllowedHalfWidthString(s)) {
-			const invalidChars = [];
-			for (const ch of s) {
-				if (typeof _bt_isAllowedHalfWidthChar === 'function') {
-					if (!_bt_isAllowedHalfWidthChar(ch) && invalidChars.indexOf(ch) === -1)
-						invalidChars.push(ch);
-				} else {
-					if (ch && ch.charCodeAt(0) > 0x7f && invalidChars.indexOf(ch) === -1)
-						invalidChars.push(ch);
-				}
-			}
-			const msg =
-				'EDI情報に銀行振込で許容されない文字が含まれています: ' +
-				(invalidChars.length ? invalidChars.join(',') : '不明');
-			throw new Error(msg);
-		}
-	}
-
-	// truncate to requested byte length first
-	const truncated = _bt_sjisTruncate(s, opt.bytes);
-	if (!opt.padToBytes) return truncated;
-	const b = _bt_sjisByteLength(truncated);
-	if (b < opt.bytes) return truncated + ' '.repeat(opt.bytes - b);
-	return truncated;
 };
 
 /**
