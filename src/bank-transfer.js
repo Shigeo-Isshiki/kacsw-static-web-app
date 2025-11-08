@@ -2019,7 +2019,23 @@ const generateHeader = (data, callback) => {
 			const d = String(data.tradeDate.getDate()).padStart(2, '0');
 			trade = m + d;
 		} else {
-			trade = _bt_toStr(data.tradeDate || '').replace(/[^0-9]/g, '');
+			// Accept several common string formats:
+			// - 'MMDD' (e.g. '1108')
+			// - 'YYYYMMDD' (e.g. '20251108')
+			// - 'YYYY-MM-DD' or 'YYYY/MM/DD' (kintone date field)
+			let s = _bt_toStr(data.tradeDate || '').trim();
+			if (/^[0-9]{8}$/.test(s)) {
+				// YYYYMMDD -> extract MMDD
+				trade = s.substr(4, 2) + s.substr(6, 2);
+			} else if (
+				/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s) ||
+				/^[0-9]{4}\/[0-9]{2}\/[0-9]{2}$/.test(s)
+			) {
+				// YYYY-MM-DD or YYYY/MM/DD
+				trade = s.substr(5, 2) + s.substr(8, 2);
+			} else {
+				trade = s.replace(/[^0-9]/g, '');
+			}
 		}
 		if (!/^[0-9]{4}$/.test(trade)) {
 			_bt_invokeCallback(callback, { error: '取組日は MMDD 形式（4桁）で指定してください' }, null);
