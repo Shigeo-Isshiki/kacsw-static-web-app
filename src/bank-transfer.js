@@ -2222,7 +2222,8 @@ const generateHeader = (data, callback) => {
  * 次の銀行営業日を返すユーティリティ（コールバック形式）
  * 実装は `shipping-processing.js` の getNextBusinessDay を参考にしています。
  * - 土日、国民の祝日、年末年始（12/31〜1/3）を営業日から除外します。
- * - baseDate に時刻情報が含まれていて cutoffHour 以降であれば翌日を基準に検索します。
+ * - 指定日時を基点に常に「翌営業日」を返します。もし時刻情報が含まれ cutoffHour 以降であれば「翌々営業日」を返します。
+ *   （実装上は、cutoff 超過時は開始日をさらに +1 日して探索を行います）
  *   デフォルトの cutoffHour は銀行向けに 18 時に設定していますが、呼び出し時に上書き可能です。
  * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）。kintone の日付/日時文字列も受け付けます。
  * @param {number} [cutoffHour=18] 締め時刻（0-23）。銀行向けの既定値は最も厳しい 18 時に設定しています。
@@ -2254,10 +2255,11 @@ const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) =
 		throw new Error('基準日時は有効な日付である必要があります');
 	}
 
-	// 時刻情報があり cutoff を超えている場合は翌日を基準にする
-	if (hasTimeInfo && targetDate.getHours() >= cutoffHourNum) {
-		targetDate.setDate(targetDate.getDate() + 1);
-	}
+	// 基準日時に応じて探索開始日を決める:
+	// - 常に翌営業日を返すため、通常は +1 日から探索開始する
+	// - ただし時刻情報があり cutoff を超えている場合は翌々営業日を返すため +2 日から探索開始する
+	const initialOffset = hasTimeInfo && targetDate.getHours() >= cutoffHourNum ? 2 : 1;
+	targetDate.setDate(targetDate.getDate() + initialOffset);
 
 	// 内部: 国民の祝日判定（コールバック形式）
 	const _isNationalHoliday = (date, cb) => {
