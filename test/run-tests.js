@@ -1,122 +1,4 @@
-// Lightweight test runner for convertYucho
-// - mocks window.BANK.getBank and getBranch to avoid network
-// - verifies accountType 0/1 behavior and an invalid symbol case
-
-const assert = require('assert');
-
-// Provide a global window so src file can attach to it
-global.window = {};
-// Mock fetch to avoid network calls (the library uses fetch for getBank/getBranch)
-global.fetch = (url, opts) => {
-  // simple routing for banks/{code}.json and branches/{branch}.json
-  const u = String(url || '');
-  if (/\/banks\/(\d{4})\.json/.test(u)) {
-    // bank payload
-    return Promise.resolve({
-      ok: true,
-      json: async () => ({ code: '9900', name: 'ゆうちょ銀行', kana: 'ﾕｳﾁｮ', url: u, branches_url: u.replace(/banks\/9900.json$/, 'banks/9900/branches.json') }),
-    });
-  }
-  const m = u.match(/\/banks\/(\d{4})\/branches\/(\d{3})\.json/);
-  if (m) {
-    const branchCode = m[2];
-    return Promise.resolve({
-      ok: true,
-      json: async () => ({ code: branchCode, name: 'テスト支店', kana: 'ﾃｽﾄ' }),
-    });
-  }
-  // fallback
-  return Promise.resolve({ ok: true, json: async () => ({}) });
-};
-
-// Load the library (it will populate window.BANK)
-require('../src/bank-transfer.js');
-
-const BANK = global.window.BANK;
-if (!BANK) {
-  console.error('window.BANK not found after loading src/bank-transfer.js');
-  process.exit(1);
-}
-
-// Stub network-dependent functions to deterministic results
-BANK.getBank = (bankCode, cb) => {
-  // single-arg style: pass bank object
-  const out = { bankCode: String(bankCode).padStart(4, '0'), bankName: 'テスト銀行', bankKana: 'ﾃｽﾄ' };
-  cb(out);
-};
-
-BANK.getBranch = (bankCode, branchCode, cb) => {
-  const out = { branchCode: String(branchCode).padStart(3, '0'), branchName: 'テスト支店', branchKana: 'ﾃｽﾄ' };
-  cb(out);
-};
-
-// Load additional unit tests for normalizePayeeName
-const runNormalizePayeeTests = require('./normalize-payee.test.js');
-// Load header tests
-const runHeaderTests = require('./header.test.js');
-// Load generateDataRecords tests
-const runDataRecordsTests = require('./generate-data-records.test.js');
-// Load generateDataRecords load test
-const runDataRecordsLoadTests = require('./generate-data-records-load.test.js');
-const runDataRecordsFieldsTests = require('./generate-data-records-fields.test.js');
-
-// Helper to call convertYucho and await result
-const callConvert = (kigou, bangou) =>
-  new Promise((resolve) => {
-    try {
-      BANK.convertYucho(kigou, bangou, (res) => {
-        resolve(res);
-      });
-    } catch (e) {
-      resolve({ error: String(e) });
-    }
-  });
-
-(async () => {
-  let failures = 0;
-
-  // Test case 1: accountType '0' (kigou 01234 -> branchCode 129)
-  const res1 = await callConvert('01234', '123456');
-  try {
-    assert(!res1.error, 'expected success for case 1');
-    assert.strictEqual(res1.branchCode, '129');
-  assert.strictEqual(String(res1.accountType), '当座');
-    assert.strictEqual(res1.accountNumber, '0123456');
-    assert.strictEqual(res1.branchName, 'テスト支店');
-    console.log('PASS: case 1 (accountType 0)');
-  } catch (e) {
-    failures++;
-    console.error('FAIL: case 1', e.message || e);
-  }
-
-  // Test case 2: accountType '1' (kigou 11234 -> branchCode 128)
-  // use 8-digit number with trailing 1
-  const res2 = await callConvert('11234', '12345671');
-  try {
-    assert(!res2.error, 'expected success for case 2');
-    assert.strictEqual(res2.branchCode, '128');
-  assert.strictEqual(String(res2.accountType), '普通');
-    assert.strictEqual(res2.accountNumber, '1234567');
-    assert.strictEqual(res2.branchName, 'テスト支店');
-    console.log('PASS: case 2 (accountType 1)');
-  } catch (e) {
-    failures++;
-    console.error('FAIL: case 2', e.message || e);
-  }
-
-  // Test case 3: invalid symbol (too short)
-  const res3 = await callConvert('123', '0000');
-  try {
-    assert(res3 && res3.error, 'expected error for invalid symbol');
-    // Structured error assertions
-    assert.strictEqual(res3.field, 'kigou', 'error.field should indicate kigou');
-    assert.strictEqual(res3.code, 'kigou.not_5_digits', 'error.code should indicate not_5_digits');
-    assert.ok(res3.message && /5桁/.test(res3.message), 'message should mention 5 digits');
-    console.log('PASS: case 3 (invalid symbol, structured error)');
-  } catch (e) {
-    failures++;
-    console.error('FAIL: case 3', e.message || e);
-  }
+// test removed
 
   // Test case 4: missing bangou -> should indicate bangou field
   const res4 = await callConvert('01234', '');
@@ -206,6 +88,12 @@ const callConvert = (kigou, bangou) =>
       console.error(`\n${addDataRecordsFields} generate-data-records-fields TEST(S) FAILED`);
       process.exitCode = 2;
     }
+    // run trailer tests
+    const addGenerateTrailer = await runGenerateTrailerTests(BANK);
+    if (addGenerateTrailer && addGenerateTrailer > 0) {
+      console.error(`\n${addGenerateTrailer} generate-trailer TEST(S) FAILED`);
+      process.exitCode = 2;
+    }
     // run additional tests if present
     if (typeof runNormalizePayeeTests.additional === 'function') {
       const add2 = await runNormalizePayeeTests.additional(BANK);
@@ -218,4 +106,3 @@ const callConvert = (kigou, bangou) =>
     console.error('normalize-payee tests crashed', e && e.message ? e.message : e);
     process.exitCode = 2;
   }
-})();

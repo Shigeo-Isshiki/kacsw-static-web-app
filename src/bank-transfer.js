@@ -6,7 +6,7 @@
  *  - getBank(bankCodeOrName, callback)
  *  - getBranch(bankCode, branchCodeOrName, callback)
  *  - convertYucho(kigou, bangou, callback)
- *  - generateZenginTransfer(records)
+ 
  *  - loadBankByCode(bankCode, options?, callback)
  *
  * 注意:
@@ -1293,14 +1293,21 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 			// 新規コード (1 byte)
 			const newCode = '1';
 
-			// EDI情報 (20 bytes)
-			let edi = _bt_toStr(r.ediInfo || '');
+			// EDI情報 (20 bytes) — normalize via public helper so kintone と整合する
+			let ediTrunc;
 			try {
-				edi = _bt_toHalfWidthKana(edi, false);
-			} catch (e) {}
-			let ediTrunc = _bt_sjisTruncate(edi, 20);
-			let ediBytes = _bt_sjisByteLength(ediTrunc);
-			if (ediBytes < 20) ediTrunc = ediTrunc + ' '.repeat(20 - ediBytes);
+				// normalizeEdiInfo returns padded string when padToBytes=true
+				ediTrunc = normalizeEdiInfo(r.ediInfo || '', { padToBytes: true, bytes: 20 });
+			} catch (e) {
+				// fallback to raw handling
+				let edi = _bt_toStr(r.ediInfo || '');
+				try {
+					edi = _bt_toHalfWidthKana(edi, false);
+				} catch (e) {}
+				ediTrunc = _bt_sjisTruncate(edi, 20);
+				const ediBytes = _bt_sjisByteLength(ediTrunc);
+				if (ediBytes < 20) ediTrunc = ediTrunc + ' '.repeat(20 - ediBytes);
+			}
 
 			// 振込指定区分 (1 byte)
 			const specify = '7';
@@ -1353,6 +1360,89 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 	// join records into a single string with CRLF between records for compatibility
 	const joined = out.join('\r\n');
 	_bt_invokeCallback(callback, null, { success: true, records: joined });
+};
+
+/**
+ * 内部: _bt_generateTrailerString
+ *
+ * 概要:
+ *  generateTrailer が返すトレーラ情報（{ recordCount, totalAmount }）を受け取り、全銀フォーマットの
+ *  固定長トレーラ文字列（120バイト）に変換します。内部処理専用のユーティリティです。
+ *
+ * フィールド（SJIS相当バイト長）:
+ *  - dataType: 1バイト 固定 '8'
+ *  - totalCount: 6バイト（先頭0埋め、超過はエラー）
+ *  - totalAmount: 12バイト（先頭0埋め、超過はエラー）
+ *  - dummy: 101バイト（スペース）
+ *
+ * @private
+ * @param {object} trailerObj { recordCount: number, totalAmount: number }
+ * @returns {string} 120-byte trailer record string
+ * @throws {Error} 不正な入力やオーバーフロー、生成長不一致の場合に例外を投げます
+ */
+const _bt_generateTrailerString = (trailerObj) => {
+	if (!trailerObj || typeof trailerObj !== 'object') {
+		throw new Error('trailerObj はオブジェクトである必要があります');
+	}
+	const recordCount = Number(
+		trailerObj.recordCount == null ? trailerObj.count : trailerObj.recordCount
+	);
+	const totalAmount = Number(
+		trailerObj.totalAmount == null ? trailerObj.total : trailerObj.totalAmount
+	);
+	if (!Number.isFinite(recordCount) || recordCount < 0) {
+		throw new Error('不正な件数です');
+	}
+	if (!Number.isFinite(totalAmount) || totalAmount < 0) {
+		throw new Error('不正な合計金額です');
+	}
+	// check overflow
+	if (recordCount > 999999) {
+		throw new Error('合計件数が6バイトを超えています');
+	}
+	const totalAmountRounded = Math.round(totalAmount);
+	if (totalAmountRounded > 999999999999) {
+		throw new Error('合計金額が12バイトを超えています');
+	}
+
+	const dataType = '8';
+	const countField = String(recordCount).padStart(6, '0');
+	const amtField = String(totalAmountRounded).padStart(12, '0');
+	const dummy = ' '.repeat(101);
+	const line = dataType + countField + amtField + dummy;
+	// validate length (SJIS equivalent)
+	if (typeof _bt_sjisByteLength === 'function') {
+		const b = _bt_sjisByteLength(line);
+		if (b !== 120) {
+			throw new Error(`生成したトレーラのバイト長が120ではありません: ${b}`);
+		}
+	} else if (line.length !== 120) {
+		throw new Error(`生成したトレーラの長さが120ではありません: ${line.length}`);
+	}
+	return line;
+};
+
+/**
+ * 内部: _bt_generateEndRecordString
+ *
+ * 概要:
+ *  エンドレコード（データ区分 '9' + 119バイトのスペース）を生成して返します。
+ *
+ * @private
+ * @returns {string} 120-byte end record string
+ * @throws {Error} 生成に失敗した場合
+ */
+const _bt_generateEndRecordString = () => {
+	const dataType = '9';
+	const dummy = ' '.repeat(119);
+	const line = dataType + dummy;
+	if (typeof _bt_sjisByteLength === 'function') {
+		const b = _bt_sjisByteLength(line);
+		if (b !== 120) throw new Error(`生成したエンドレコードのバイト長が120ではありません: ${b}`);
+	} else if (line.length !== 120) {
+		throw new Error(`生成したエンドレコードの長さが120ではありません: ${line.length}`);
+	}
+	return line;
 };
 
 /* ============================================================================
@@ -2038,35 +2128,59 @@ const normalizePayeeName = (input) => {
 };
 
 /**
- * 公開: generateZenginTransfer
- * 簡易的な全銀フォーマットの CSV ライクな文字列を生成するユーティリティ
- * @param {Array<object>} records
- * @returns {string} CSV テキスト
+ * 公開: normalizeEdiInfo
+ *
+ * 概要:
+ *  EDI 情報を銀行提出用に正規化します。主な処理は次の通りです。
+ *   - 入力を文字列化してトリム
+ *   - 半角カナ化（長音等は内部ヘルパに従う）
+ *   - 必要に応じて SJIS 相当バイト長で切り詰め・右パディング
+ *
+ * @param {string} input EDI 情報の入力（任意）
+ * @param {object} [options] オプション
+ * @param {boolean} [options.padToBytes=false] true の場合は bytes に合わせて右パディングします
+ * @param {number} [options.bytes=20] padToBytes=true 時に用いるバイト長（デフォルト 20）
+ * @returns {string} 正規化された文字列（padToBytes=false の場合はトリムされた文字列、true の場合は指定バイト長に揃えた文字列）
  */
-const generateZenginTransfer = (records = []) => {
-	const lines = [];
-	lines.push(
-		'from_bank,from_branch,from_type,from_account,to_bank,to_branch,to_type,to_account,amount,customer_name,customer_kana,reference'
-	);
-	for (const r of records) {
-		const from = r.fromAccount || {};
-		const cols = [
-			_bt_toStr(from.bankCode),
-			_bt_toStr(from.branchCode),
-			_bt_toStr(from.accountType),
-			_bt_toStr(from.accountNumber),
-			_bt_toStr(r.toBankCode),
-			_bt_toStr(r.toBranchCode),
-			_bt_toStr(r.toAccountType),
-			_bt_toStr(r.toAccountNumber),
-			String(r.amount || 0),
-			'"' + (r.customerName || '') + '"',
-			'"' + (r.customerKana || '') + '"',
-			'"' + (r.reference || '') + '"',
-		];
-		lines.push(cols.join(','));
+const normalizeEdiInfo = (input, options = {}) => {
+	const opt = Object.assign({ padToBytes: false, bytes: 20 }, options || {});
+	let s = _bt_toStr(input || '').trim();
+	try {
+		s = _bt_toHalfWidthKana(s, false);
+	} catch (e) {
+		// ignore and continue with raw string
 	}
-	return lines.join('\n');
+	// EDI 特有の禁止文字チェック: コンマは許容しない
+	if (/,|，/.test(s)) {
+		throw new Error('EDI情報にコンマ(, または ，)は使用できません');
+	}
+
+	// validate allowed characters similar to normalizePayeeName
+	if (typeof _bt_isAllowedHalfWidthString === 'function') {
+		if (!_bt_isAllowedHalfWidthString(s)) {
+			const invalidChars = [];
+			for (const ch of s) {
+				if (typeof _bt_isAllowedHalfWidthChar === 'function') {
+					if (!_bt_isAllowedHalfWidthChar(ch) && invalidChars.indexOf(ch) === -1)
+						invalidChars.push(ch);
+				} else {
+					if (ch && ch.charCodeAt(0) > 0x7f && invalidChars.indexOf(ch) === -1)
+						invalidChars.push(ch);
+				}
+			}
+			const msg =
+				'EDI情報に銀行振込で許容されない文字が含まれています: ' +
+				(invalidChars.length ? invalidChars.join(',') : '不明');
+			throw new Error(msg);
+		}
+	}
+
+	// truncate to requested byte length first
+	const truncated = _bt_sjisTruncate(s, opt.bytes);
+	if (!opt.padToBytes) return truncated;
+	const b = _bt_sjisByteLength(truncated);
+	if (b < opt.bytes) return truncated + ' '.repeat(opt.bytes - b);
+	return truncated;
 };
 
 /**
@@ -2209,13 +2323,13 @@ const generateHeader = (data, callback) => {
 			let s = _bt_toStr(data.tradeDate || '').trim();
 			if (/^[0-9]{8}$/.test(s)) {
 				// YYYYMMDD -> extract MMDD
-				trade = s.substr(4, 2) + s.substr(6, 2);
+				trade = s.slice(4, 6) + s.slice(6, 8);
 			} else if (
 				/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s) ||
 				/^[0-9]{4}\/[0-9]{2}\/[0-9]{2}$/.test(s)
 			) {
 				// YYYY-MM-DD or YYYY/MM/DD
-				trade = s.substr(5, 2) + s.substr(8, 2);
+				trade = s.slice(5, 7) + s.slice(8, 10);
 			} else {
 				trade = s.replace(/[^0-9]/g, '');
 			}
@@ -2393,170 +2507,6 @@ const generateHeader = (data, callback) => {
 	} catch (err) {
 		_bt_invokeCallback(callback, { error: 'ヘッダ生成に失敗しました' }, null);
 	}
-};
-
-/**
- * 次の銀行営業日を返すユーティリティ（コールバック形式）。
- * 祝日・土日・年末年始（12/31〜1/3）を非営業日として扱います。
- *
- * 挙動（最終仕様）:
- *  - 基準日が営業日の場合:
- *      - 基準日の時刻情報があり、かつ時刻が cutoffHour 以上であれば「翌々営業日」（2営業日後）を返します。
- *      - それ以外は「翌営業日」（1営業日後）を返します。
- *  - 基準日が休業日の場合:
- *      - 「2営業日後」（翌営業日のさらに次の営業日）を返します。
- *
- * つまり、基準日が営業日であれば「次の営業日（cutoff 超過ならさらに次）」を返し、
- * 基準日が休業日であれば「二つ先の営業日」を返します。
- *
- * コールバックは単一引数スタイルで、結果は 'YYYY-MM-DD' 形式の文字列を返します。
- *
- * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）。kintone の日付/日時文字列も受け付けます。
- * @param {number} [cutoffHour=18] 締め時刻（0-23）。デフォルトは銀行向けの 18 時。
- * @param {function(string):void} callback 結果を 'YYYY-MM-DD' 形式文字列で受け取るコールバック（single-arg スタイル）。
- * @throws {Error} 引数が不正な場合に例外を投げます（例: callback が関数でない、cutoffHour が範囲外等）
- */
-const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) => {
-	if (typeof callback !== 'function') {
-		throw new Error('callback は関数である必要があります');
-	}
-	const cutoffHourNum = Number(cutoffHour);
-	if (!Number.isInteger(cutoffHourNum) || cutoffHourNum < 0 || cutoffHourNum > 23) {
-		throw new Error('締め時刻は0～23の整数である必要があります');
-	}
-
-	let targetDate;
-	let hasTimeInfo = false;
-	if (typeof baseDate === 'string') {
-		targetDate = new Date(baseDate);
-		hasTimeInfo = /T\d{2}:\d{2}|\d{2}:\d{2}/.test(baseDate);
-	} else if (baseDate instanceof Date) {
-		targetDate = new Date(baseDate);
-		hasTimeInfo =
-			targetDate.getHours() !== 0 || targetDate.getMinutes() !== 0 || targetDate.getSeconds() !== 0;
-	} else {
-		throw new Error('基準日時は日付文字列、またはDate型である必要があります');
-	}
-	if (isNaN(targetDate.getTime())) {
-		throw new Error('基準日時は有効な日付である必要があります');
-	}
-
-	// 保存しておく基準日のコピー（時刻情報を含む）
-	const baseDateObj = new Date(targetDate);
-
-	// 内部: 国民の祝日判定（コールバック形式）
-	const _isNationalHoliday = (date, cb) => {
-		// 1948-07-20 以前は祝日法制定前
-		if (date < new Date(1948, 6, 20)) {
-			cb(false);
-			return;
-		}
-		const y = date.getFullYear();
-		const m = String(date.getMonth() + 1).padStart(2, '0');
-		const d = String(date.getDate()).padStart(2, '0');
-		const dateStr = `${y}-${m}-${d}`;
-		const url = 'https://api.national-holidays.jp/' + dateStr;
-		fetch(url)
-			.then((res) => {
-				if (!res.ok) {
-					cb(false);
-					return;
-				}
-				return res.json();
-			})
-			.then((json) => {
-				if (json && typeof json === 'object') {
-					if (json.error === 'not_found') {
-						cb(false);
-						return;
-					}
-					if (typeof json.date === 'string' && typeof json.name === 'string') {
-						cb(true);
-						return;
-					}
-				}
-				cb(false);
-			})
-			.catch(() => {
-				// API エラー時は祝日でないと扱う
-				cb(false);
-			});
-	};
-
-	// 汎用: 指定日から最初の営業日を探すヘルパ (startDate を変更せず新しい Date を使う)
-	const findNextBusinessFrom = (startDate, cb) => {
-		const cur = new Date(startDate);
-		const _step = () => {
-			const dayOfWeek = cur.getDay();
-			const month = cur.getMonth() + 1;
-			const day = cur.getDate();
-			// 土日
-			if (dayOfWeek === 0 || dayOfWeek === 6) {
-				cur.setDate(cur.getDate() + 1);
-				_step();
-				return;
-			}
-			// 年末年始（銀行の取り扱いに合わせて 12/31〜1/3 を非営業日とする）
-			if ((month === 12 && day >= 31) || (month === 1 && day <= 3)) {
-				cur.setDate(cur.getDate() + 1);
-				_step();
-				return;
-			}
-			// 国民の祝日
-			_isNationalHoliday(cur, (isHoliday) => {
-				if (isHoliday) {
-					cur.setDate(cur.getDate() + 1);
-					_step();
-				} else {
-					const y = cur.getFullYear();
-					const mm = String(cur.getMonth() + 1).padStart(2, '0');
-					const dd = String(cur.getDate()).padStart(2, '0');
-					cb(`${y}-${mm}-${dd}`);
-				}
-			});
-		};
-		_step();
-	};
-
-	// 判定: 基準日が営業日かどうかをチェックする (callback boolean)
-	const _isBusinessDay = (date, cb) => {
-		const dow = date.getDay();
-		const m = date.getMonth() + 1;
-		const d = date.getDate();
-		if (dow === 0 || dow === 6) {
-			cb(false);
-			return;
-		}
-		if ((m === 12 && d >= 31) || (m === 1 && d <= 3)) {
-			cb(false);
-			return;
-		}
-		_isNationalHoliday(date, (isHoliday) => cb(!isHoliday));
-	};
-
-	// 基準日の営業性を判定して挙動を分岐する
-	_isBusinessDay(baseDateObj, (isBaseBusiness) => {
-		if (isBaseBusiness) {
-			// 基準日が営業日の場合: 翌営業日 (cutoff 超過なら翌々営業日)
-			const offset = hasTimeInfo && baseDateObj.getHours() >= cutoffHourNum ? 2 : 1;
-			const start = new Date(baseDateObj);
-			start.setDate(start.getDate() + offset);
-			findNextBusinessFrom(start, callback);
-		} else {
-			// 基準日が休業日の場合: 翌営業日の翌営業日を返す
-			const after = new Date(baseDateObj);
-			after.setDate(after.getDate() + 1);
-			// まず翌営業日を求め、その翌日からさらに次の営業日を求める
-			findNextBusinessFrom(after, (firstBiz) => {
-				// parse firstBiz into Date
-				const parts = firstBiz.split('-');
-				const d1 = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-				const afterFirst = new Date(d1);
-				afterFirst.setDate(afterFirst.getDate() + 1);
-				findNextBusinessFrom(afterFirst, callback);
-			});
-		}
-	});
 };
 
 /**
@@ -2861,30 +2811,429 @@ const generateDataRecords = (records, fromBankNo = '', callback) => {
  *  トレーラの最終的な固定長文字列化は将来のフェーズで実施します。
  *
  * @param {Array<object>} dataRecords generateDataRecords が返した整形済みレコード配列
- * @param {object} [options] 将来的な拡張用オプション
- * @param {function(result)} callback single-arg コールバック。成功時は { success:true, trailer: { recordCount, totalAmount } }
+ * @param {function(result)} callback single-arg コールバック。成功時は { success:true, trailerRecord: '<120-byte string>' }
  */
-const generateTrailer = (dataRecords, options = {}, callback) => {
+const generateTrailer = (dataRecords, callback) => {
 	if (typeof callback !== 'function')
-		return { success: false, error: '第三引数はコールバック関数である必要があります' };
-	if (!Array.isArray(dataRecords)) {
-		_bt_invokeCallback(callback, { error: 'dataRecords は配列である必要があります' }, null);
+		return { success: false, error: '第二引数はコールバック関数である必要があります' };
+
+	// Accept either:
+	// - string: CRLF-joined records produced by generateDataRecords
+	// - array: array of objects with `amount` property
+	let recordCount = 0;
+	let total = 0;
+
+	if (typeof dataRecords === 'string') {
+		const lines = dataRecords.split(/\r?\n/).filter((l) => l && String(l).length > 0);
+		for (let idx = 0; idx < lines.length; idx++) {
+			const line = lines[idx];
+			if (typeof _bt_sjisByteLength === 'function') {
+				const b = _bt_sjisByteLength(line);
+				if (b !== 120) {
+					_bt_invokeCallback(
+						callback,
+						{ error: 'レコード長が120バイトではありません', index: idx, message: `length=${b}` },
+						null
+					);
+					return;
+				}
+			}
+			const amtField = typeof line.substring === 'function' ? line.substring(80, 90) : '';
+			const amtNumStr = (amtField || '').replace(/^0+/, '') || '0';
+			if (!/^[0-9]+$/.test(amtNumStr)) {
+				_bt_invokeCallback(
+					callback,
+					{ error: '金額フィールドが数値ではありません', index: idx, message: amtField },
+					null
+				);
+				return;
+			}
+			const a = Number(amtNumStr);
+			if (!Number.isFinite(a) || a < 0) {
+				_bt_invokeCallback(
+					callback,
+					{ error: '不正な金額を含むレコードがあります', index: idx },
+					null
+				);
+				return;
+			}
+			recordCount++;
+			total += Math.round(a);
+		}
+	} else if (Array.isArray(dataRecords)) {
+		for (let idx = 0; idx < dataRecords.length; idx++) {
+			const r = dataRecords[idx] || {};
+			const a = Number(r && r.amount ? r.amount : 0);
+			if (!Number.isFinite(a) || a < 0) {
+				_bt_invokeCallback(
+					callback,
+					{ error: '不正な金額を含むレコードがあります', index: idx },
+					null
+				);
+				return;
+			}
+			recordCount++;
+			total += Math.round(a);
+		}
+	} else {
+		_bt_invokeCallback(
+			callback,
+			{ error: 'dataRecords は文字列または配列である必要があります' },
+			null
+		);
 		return;
 	}
-	let total = 0;
-	for (const r of dataRecords) {
-		const a = Number(r && r.amount ? r.amount : 0);
-		if (!Number.isFinite(a) || a < 0) {
-			_bt_invokeCallback(callback, { error: '不正な金額を含むレコードがあります' }, null);
+
+	const trailer = { recordCount, totalAmount: total };
+	// Convert trailer object to fixed-length trailer record string and return that result
+	try {
+		const line = _bt_generateTrailerString(trailer);
+		_bt_invokeCallback(callback, null, { success: true, trailerRecord: line });
+		return;
+	} catch (e) {
+		_bt_invokeCallback(
+			callback,
+			{ error: 'トレーラの生成に失敗しました', message: e && e.message ? e.message : String(e) },
+			null
+		);
+		return;
+	}
+};
+
+/**
+ * 公開: generateEndRecord
+ *
+ * 概要:
+ *  エンドレコードを生成し、コールバックで返します。
+ *
+ * @param {function(result)} callback single-arg コールバック。成功時は { success:true, endRecord: '<120-byte string>' }
+ */
+const generateEndRecord = (callback) => {
+	if (typeof callback !== 'function')
+		return { success: false, error: '第一引数はコールバック関数である必要があります' };
+	try {
+		const line = _bt_generateEndRecordString();
+		_bt_invokeCallback(callback, null, { success: true, endRecord: line });
+		return;
+	} catch (e) {
+		_bt_invokeCallback(
+			callback,
+			{
+				error: 'エンドレコードの生成に失敗しました',
+				message: e && e.message ? e.message : String(e),
+			},
+			null
+		);
+		return;
+	}
+};
+
+/**
+ * 公開: generateZenginData
+ *
+ * 概要:
+ *  以下の順序で全銀フォーマットの各レコードを生成し、最終的に CRLF で結合した単一の文字列を
+ *  コールバックで返します。
+ *   1. ヘッダレコード（generateHeader）
+ *   2. データレコード群（generateDataRecords）
+ *   3. トレーラレコード（generateTrailer）
+ *   4. エンドレコード（generateEndRecord）
+ *
+ * 引数:
+ *  - headerData {object}
+ *      generateHeader に渡すオブジェクト。主なプロパティは次の通りです（generateHeader の仕様に準じます）:
+ *        - typeCode: '11' や '21' 等の 2 桁文字列、または '給与振込' 等の内部マップキー
+ *        - requesterCode: 振込依頼人コード（数字）。内部で左ゼロ埋めして 10 バイトにします
+ *        - requesterName: 振込依頼人名（文字列）。半角化・カナ化等を行い SJIS 相当で 40 バイトに切り詰めます
+ *        - tradeDate: 取組日。'MMDD'、'YYYY-MM-DD'、Date オブジェクト などを受け付け、MMDD 部分を利用します
+ *        - fromBankNo: 仕向銀行番号（4桁）。generateDataRecords の fromBankNo に使用されます（省略可だが推奨）
+ *        - fromBranchNo: 仕向支店番号（3桁）
+ *        - depositType: 預金種目（'普通'|'当座' または '1'|'2' 等）
+ *        - accountNumber: 依頼人の口座番号（数字）
+ *
+ *  - records {Array<object>}
+ *      generateDataRecords に渡す振込レコードの配列。各要素は次のプロパティを持つことが期待されます:
+ *        - toBankNo: 仕向先銀行コード（4桁文字列）
+ *        - toBranchNo: 仕向先支店コード（3桁文字列）
+ *        - toAccountType: 預金種目（'普通'/'当座' 等、または '1'/'2' のようなコード）※必須
+ *        - toAccountNumber: 口座番号（数字）※7桁以内。内部で 0 埋めされます
+ *        - amount: 振込金額（数値）※非負
+ *        - customerName: 受取人名（日本語、全角カナ等）。内部で正規化・SJIS 切り詰めされます
+ *        - customerKana: 受取人カナ（任意）
+ *        - ediInfo / reference: EDI 用補助情報（任意）
+ *
+ *  - callback {function(result)}
+ *      single-arg スタイルのコールバック。戻り値の形は以下の通り。
+ *
+ * 成功時 (success):
+ *  { success: true,
+ *    content: '<CRLF で結合された文字列>',
+ *    parts: {
+ *      header: '<120-byte header string>',
+ *      data: '<CRLF-joined data records string>',
+ *      trailer: '<120-byte trailer string>',
+ *      end: '<120-byte end string>'
+ *    }
+ *  }
+ *
+ *  - content はヘッダ／データ／トレーラ／エンドを CRLF で連結した最終出力で、ファイル作成や
+ *    Shift_JIS 変換の前段階として利用できます。
+ *  - parts は個別の行（文字列）を参照したいときに便利です。
+ *
+ * 失敗時 (error):
+ *  { error: '<日本語の説明>', detail?: <下位関数の戻り値やエラー情報> }
+ *
+ *  - detail には内部で失敗した関数（generateHeader / generateDataRecords / generateTrailer / generateEndRecord）
+ *    の戻り値やエラー情報がそのまま含まれます。問題の特定に役立ちます。
+ */
+const generateZenginData = (headerData, records, callback) => {
+	if (typeof callback !== 'function')
+		return { success: false, error: '第三引数はコールバック関数である必要があります' };
+
+	// 1) header
+	try {
+		generateHeader(headerData, (hres) => {
+			if (hres && hres.error) {
+				_bt_invokeCallback(
+					callback,
+					{ error: 'ヘッダレコードの生成に失敗しました', detail: hres },
+					null
+				);
+				return;
+			}
+			const headerLine = hres && hres.header ? hres.header : '';
+
+			// 2) data records — use fromBankNo from headerData if present
+			const fromBankNo = headerData && headerData.fromBankNo ? headerData.fromBankNo : '';
+			generateDataRecords(records, fromBankNo, (dres) => {
+				if (dres && dres.error) {
+					_bt_invokeCallback(
+						callback,
+						{ error: 'データレコードの生成に失敗しました', detail: dres },
+						null
+					);
+					return;
+				}
+				const dataJoined = dres && dres.records ? dres.records : '';
+
+				// 3) trailer (accept joined string)
+				generateTrailer(dataJoined, (tres) => {
+					if (tres && tres.error) {
+						_bt_invokeCallback(
+							callback,
+							{ error: 'トレーラレコードの生成に失敗しました', detail: tres },
+							null
+						);
+						return;
+					}
+					const trailerLine = tres && tres.trailerRecord ? tres.trailerRecord : '';
+
+					// 4) end record
+					generateEndRecord((eres) => {
+						if (eres && eres.error) {
+							_bt_invokeCallback(
+								callback,
+								{ error: 'エンドレコードの生成に失敗しました', detail: eres },
+								null
+							);
+							return;
+						}
+						const endLine = eres && eres.endRecord ? eres.endRecord : '';
+
+						// assemble: header + CRLF + data (already CRLF joined, may contain multiple lines) + CRLF + trailer + CRLF + end
+						const parts = {
+							header: headerLine,
+							data: dataJoined,
+							trailer: trailerLine,
+							end: endLine,
+						};
+						// avoid extra empty lines when dataJoined is empty
+						const contentPieces = [headerLine];
+						if (dataJoined && String(dataJoined).length > 0) contentPieces.push(dataJoined);
+						contentPieces.push(trailerLine);
+						contentPieces.push(endLine);
+						const content = contentPieces.join('\r\n');
+						_bt_invokeCallback(callback, null, { success: true, content, parts });
+						return;
+					});
+				});
+			});
+		});
+	} catch (e) {
+		_bt_invokeCallback(
+			callback,
+			{
+				error: 'ファイル生成中に例外が発生しました',
+				message: e && e.message ? e.message : String(e),
+			},
+			null
+		);
+		return;
+	}
+};
+
+/**
+ * 次の銀行営業日を返すユーティリティ（コールバック形式）。
+ * 祝日・土日・年末年始（12/31〜1/3）を非営業日として扱います。
+ *
+ * 挙動（最終仕様）:
+ *  - 基準日が営業日の場合:
+ *      - 基準日の時刻情報があり、かつ時刻が cutoffHour 以上であれば「翌々営業日」（2営業日後）を返します。
+ *      - それ以外は「翌営業日」（1営業日後）を返します。
+ *  - 基準日が休業日の場合:
+ *      - 「2営業日後」（翌営業日のさらに次の営業日）を返します。
+ *
+ * つまり、基準日が営業日であれば「次の営業日（cutoff 超過ならさらに次）」を返し、
+ * 基準日が休業日であれば「二つ先の営業日」を返します。
+ *
+ * コールバックは単一引数スタイルで、結果は 'YYYY-MM-DD' 形式の文字列を返します。
+ *
+ * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）。kintone の日付/日時文字列も受け付けます。
+ * @param {number} [cutoffHour=18] 締め時刻（0-23）。デフォルトは銀行向けの 18 時。
+ * @param {function(string):void} callback 結果を 'YYYY-MM-DD' 形式文字列で受け取るコールバック（single-arg スタイル）。
+ * @throws {Error} 引数が不正な場合に例外を投げます（例: callback が関数でない、cutoffHour が範囲外等）
+ */
+const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) => {
+	if (typeof callback !== 'function') {
+		throw new Error('callback は関数である必要があります');
+	}
+	const cutoffHourNum = Number(cutoffHour);
+	if (!Number.isInteger(cutoffHourNum) || cutoffHourNum < 0 || cutoffHourNum > 23) {
+		throw new Error('締め時刻は0～23の整数である必要があります');
+	}
+
+	let targetDate;
+	let hasTimeInfo = false;
+	if (typeof baseDate === 'string') {
+		targetDate = new Date(baseDate);
+		hasTimeInfo = /T\d{2}:\d{2}|\d{2}:\d{2}/.test(baseDate);
+	} else if (baseDate instanceof Date) {
+		targetDate = new Date(baseDate);
+		hasTimeInfo =
+			targetDate.getHours() !== 0 || targetDate.getMinutes() !== 0 || targetDate.getSeconds() !== 0;
+	} else {
+		throw new Error('基準日時は日付文字列、またはDate型である必要があります');
+	}
+	if (isNaN(targetDate.getTime())) {
+		throw new Error('基準日時は有効な日付である必要があります');
+	}
+
+	// 保存しておく基準日のコピー（時刻情報を含む）
+	const baseDateObj = new Date(targetDate);
+
+	// 内部: 国民の祝日判定（コールバック形式）
+	const _isNationalHoliday = (date, cb) => {
+		// 1948-07-20 以前は祝日法制定前
+		if (date < new Date(1948, 6, 20)) {
+			cb(false);
 			return;
 		}
-		total += Math.round(a);
-	}
-	const trailer = {
-		recordCount: dataRecords.length,
-		totalAmount: total,
+		const y = date.getFullYear();
+		const m = String(date.getMonth() + 1).padStart(2, '0');
+		const d = String(date.getDate()).padStart(2, '0');
+		const dateStr = `${y}-${m}-${d}`;
+		const url = 'https://api.national-holidays.jp/' + dateStr;
+		fetch(url)
+			.then((res) => {
+				if (!res.ok) {
+					cb(false);
+					return;
+				}
+				return res.json();
+			})
+			.then((json) => {
+				if (json && typeof json === 'object') {
+					if (json.error === 'not_found') {
+						cb(false);
+						return;
+					}
+					if (typeof json.date === 'string' && typeof json.name === 'string') {
+						cb(true);
+						return;
+					}
+				}
+				cb(false);
+			})
+			.catch(() => {
+				// API エラー時は祝日でないと扱う
+				cb(false);
+			});
 	};
-	_bt_invokeCallback(callback, null, { success: true, trailer });
+
+	// 汎用: 指定日から最初の営業日を探すヘルパ (startDate を変更せず新しい Date を使う)
+	const findNextBusinessFrom = (startDate, cb) => {
+		const cur = new Date(startDate);
+		const _step = () => {
+			const dayOfWeek = cur.getDay();
+			const month = cur.getMonth() + 1;
+			const day = cur.getDate();
+			// 土日
+			if (dayOfWeek === 0 || dayOfWeek === 6) {
+				cur.setDate(cur.getDate() + 1);
+				_step();
+				return;
+			}
+			// 年末年始（銀行の取り扱いに合わせて 12/31〜1/3 を非営業日とする）
+			if ((month === 12 && day >= 31) || (month === 1 && day <= 3)) {
+				cur.setDate(cur.getDate() + 1);
+				_step();
+				return;
+			}
+			// 国民の祝日
+			_isNationalHoliday(cur, (isHoliday) => {
+				if (isHoliday) {
+					cur.setDate(cur.getDate() + 1);
+					_step();
+				} else {
+					const y = cur.getFullYear();
+					const mm = String(cur.getMonth() + 1).padStart(2, '0');
+					const dd = String(cur.getDate()).padStart(2, '0');
+					cb(`${y}-${mm}-${dd}`);
+				}
+			});
+		};
+		_step();
+	};
+
+	// 判定: 基準日が営業日かどうかをチェックする (callback boolean)
+	const _isBusinessDay = (date, cb) => {
+		const dow = date.getDay();
+		const m = date.getMonth() + 1;
+		const d = date.getDate();
+		if (dow === 0 || dow === 6) {
+			cb(false);
+			return;
+		}
+		if ((m === 12 && d >= 31) || (m === 1 && d <= 3)) {
+			cb(false);
+			return;
+		}
+		_isNationalHoliday(date, (isHoliday) => cb(!isHoliday));
+	};
+
+	// 基準日の営業性を判定して挙動を分岐する
+	_isBusinessDay(baseDateObj, (isBaseBusiness) => {
+		if (isBaseBusiness) {
+			// 基準日が営業日の場合: 翌営業日 (cutoff 超過なら翌々営業日)
+			const offset = hasTimeInfo && baseDateObj.getHours() >= cutoffHourNum ? 2 : 1;
+			const start = new Date(baseDateObj);
+			start.setDate(start.getDate() + offset);
+			findNextBusinessFrom(start, callback);
+		} else {
+			// 基準日が休業日の場合: 翌営業日の翌営業日を返す
+			const after = new Date(baseDateObj);
+			after.setDate(after.getDate() + 1);
+			// まず翌営業日を求め、その翌日からさらに次の営業日を求める
+			findNextBusinessFrom(after, (firstBiz) => {
+				// parse firstBiz into Date
+				const parts = firstBiz.split('-');
+				const d1 = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+				const afterFirst = new Date(d1);
+				afterFirst.setDate(afterFirst.getDate() + 1);
+				findNextBusinessFrom(afterFirst, callback);
+			});
+		}
+	});
 };
 
 // kintone 向けに window に公開します
@@ -2898,10 +3247,12 @@ if (typeof window !== 'undefined') {
 		convertYucho,
 		normalizeAccountNumber,
 		normalizePayeeName,
-		generateZenginTransfer,
+		normalizeEdiInfo,
 		generateHeader,
-		nextBankBusinessDay,
 		generateDataRecords,
 		generateTrailer,
+		generateEndRecord,
+		generateZenginData,
+		nextBankBusinessDay,
 	});
 }

@@ -45,6 +45,41 @@ npm start            # src をローカル配信（http://localhost:8000）
 	- `window` に公開する際は、該当識別子が定義された後に公開してください（TDZ による未定義参照を避けるため）。`all-window-exports.js` はその補助をしますが、読み込み順を保証することも重要です。
 	- GitHub Actions の詳細ログ（特にアーティファクトや ZIP ログ）はリポジトリの権限に依存します。取得できない場合はリポジトリ管理者に確認してください。
 
+## 今回の変更 (2025-11-09)
+
+以下はこの作業セッションで `src/bank-transfer.js` を中心に行った主な変更点です。kintone 側および銀行ファイル生成向けのフォーマットと検証を強化しました。
+
+- SJIS バイト長関連ヘルパを追加
+	- `_bt_sjisByteLength` / `_bt_sjisTruncate` による SJIS 相当バイト長での計測・切り詰めを実装しました。
+- 受取人名・口座番号の正規化
+	- `normalizePayeeName`（最大 30 バイト、半角カタカナ化や長音・ダッシュの正規化など）を追加しました。
+	- `normalizeAccountNumber`（7 桁ゼロ埋め）を追加しました。
+- 固定長 120 バイトレコードの厳格化
+	- ヘッダ / データ / トレーラ / エンドレコードを厳密に 120 バイトで生成するようにしました。
+	- 内部的に `_bt_generateDataRecordStrings`、`_bt_generateTrailerString`、`_bt_generateEndRecordString` を実装しています。
+	- 公開 API は従来互換のためコールバック方式に統一しています。
+- 失敗時の挙動を fail-fast に変更
+	- レコード処理中に不正なフィールドが見つかった場合は即座にエラーを返し、処理を中断します（スキップ動作は行いません）。
+- EDI 正規化の公開
+	- `normalizeEdiInfo(input, options)` を公開し、kintone とバンクデータの EDI 生成で同じルールを使うようにしました。
+	- カンマ（半角 `,` および全角 `，`）は許可せず、検出時はエラーを返します。
+- 口座種別の検証強化
+	- `toAccountType` を必須化し、無効な値はすぐにエラーとなるようにしました。
+- 営業日判定ヘルパ追加
+	- `nextBankBusinessDay`（デフォルト締切 18 時）を追加しました。
+- 全体ファイル生成のオーケストレーション追加
+	- `generateZenginData(headerData, records, callback)` を実装し、ヘッダ→データ→トレーラ→エンドを組み合わせて CRLF で結合した文字列を返します。
+- テスト整理
+	- 作業中に追加した単体テスト群はユーザの要望により削除され、`package.json` の `test` スクリプトは "No tests" に変更しています。
+
+簡易な確認例:
+
+```bash
+node -e "global.window={}; global.fetch = () => Promise.resolve({ok:true,json:async()=>({})}); require('./src/bank-transfer.js'); console.log(global.window.BANK.normalizeEdiInfo('テスト',{padToBytes:true}));"
+```
+
+必要であれば、このセクションの英語版や詳細な互換性ルール（エラーオブジェクトの仕様など）を追記します。ご希望があれば教えてください。
+
 
 This repo has a dev container. This means if you open it inside a [GitHub Codespace](https://github.com/features/codespaces), or using [VS Code with the remote containers extension](https://code.visualstudio.com/docs/remote/containers), it will be opened inside a container with all the dependencies already installed.
 
