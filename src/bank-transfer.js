@@ -1898,19 +1898,20 @@ const generateZenginTransfer = (records = []) => {
  * 概要:
  *  指定されたデータを元に全銀フォーマットのヘッダ行を生成します。関数は非同期で動作し、コールバック
  *  （single-arg スタイル）で結果を返します。ヘッダは内部で番号（銀行番号/支店番号）から `getBank` / `getBranch`
- *  を用いて仕向銀行名・仕向支店名を取得し、それらを正規化・切り詰めして所定のフィールド長に詰めます。
+ *  を用いて仕向銀行・支店のカナ名を取得し、カナ名（`bankKana` / `branchKana`）のみを正規化・切り詰めして所定のフィールド長に詰めます。
  *
  * 仕様（フィールド順・長さは SJIS 相当バイトでの固定長合計 120 バイト）:
  *  - dataType: 1バイト 固定 '1'
  *  - typeCode: 2バイト（数値2桁または内部マップキー）
  *  - codeClass: 1バイト 固定 '0'
  *  - requesterCode: 10バイト（依頼人コード、数字のみ、左ゼロ埋め。超過はエラー）
- *  - requesterName: 40バイト（依頼人名、半角カナ化等を行い SJIS 相当で先頭30バイト相当を切り詰め、バイト単位で右パディング）
+ *  - requesterName: 40バイト（依頼人名、半角カナ化等を行い SJIS 相当で 40 バイトに切り詰め、バイト単位で右パディング）
  *  - tradeDate: 4バイト（MMDD 形式。Date オブジェクトまたは 'MMDD' 文字列を受け付ける。超過はエラー）
  *  - fromBankNo: 4バイト（仕向銀行番号、数字、左ゼロ埋め。超過はエラー）
- *  - fromBankName: 15バイト（fromBankNo から取得した銀行名を正規化・SJIS 切り詰め・右パディング）
+ *  - fromBankName: 15バイト（fromBankNo から取得した銀行のカナ名 `bankKana` のみを使用して正規化・SJIS 切り詰め・右パディング。存在しない場合はエラー）
  *  - fromBranchNo: 3バイト（仕向支店番号、数字、左ゼロ埋め。超過はエラー）
- *  - fromBranchName: 15バイト（fromBranchNo から取得した支店名を正規化・SJIS 切り詰め・右パディング）
+ *  - fromBranchName: 15バイト（fromBranchNo から取得した支店のカナ名 `branchKana` のみを使用して正規化・SJIS 切り詰め・右パディング。
+ *      ただし仕向銀行番号が '9900'（ゆうちょ銀行）の場合は支店情報取得をスキップし、空文字を使用して組み立てます）
  *  - depositType: 1バイト（預金種目。マップまたは数字 1 桁で解決。指定が無ければ '9'）
  *  - accountNumber: 7バイト（依頼人の口座番号、数字のみ、左ゼロ埋め。超過はエラー）
  *  - dummy: 17バイト（スペース）
@@ -1920,8 +1921,8 @@ const generateZenginTransfer = (records = []) => {
  *  - 失敗: { error: '<日本語の人向けエラーメッセージ>' }
  *
  * 注意:
- *  - 銀行名／支店名は `fromBankNo` / `fromBranchNo` から取得するため、呼び出し側は名前を data に含める必要はありません。
- *    取得失敗（未登録等）はユーザー向け日本語メッセージでエラーとして返ります。
+ *  - 銀行名／支店名は `fromBankNo` / `fromBranchNo` から取得します。ヘッダには必ずカナ名（`bankKana` / `branchKana`）のみを使用します。
+ *    `bankKana` / `branchKana` が取得できない場合はエラーを返します（ただし `fromBankNo === '9900'` の場合は支店カナ未取得を許容し、支店欄は空文字になります）。
  *  - SJIS 相当バイト長の評価は本ファイル内の簡易ヘルパ `_bt_sjisByteLength` / `_bt_sjisTruncate` に従います。
  *    本番で厳密な Shift_JIS バイト一致が必要な場合はエンコーディングライブラリの導入を検討してください。
  *
@@ -1931,8 +1932,9 @@ const generateZenginTransfer = (records = []) => {
  *    requesterCode: '123456',                  // 振込依頼人コード（数字）。内部で左ゼロ埋めして 10 バイト
  *    requesterName: 'テスト依頼人',            // 振込依頼人名（文字列）。半角化->SJIS 切り詰め（40 バイト）
  *    tradeDate: 'MMDD' | new Date(),           // 取組日。'1108' や Date を渡す
- *    fromBankNo: '0123',                       // 仕向銀行番号（数字） — 名前は内部で取得
- *    fromBranchNo: '001',                      // 仕向支店番号（数字） — 名前は内部で取得
+ *    fromBankNo: '0123',                       // 仕向銀行番号（数字） — 銀行のカナ名 (bankKana) を内部で取得し必須
+ *    fromBranchNo: '001',                      // 仕向支店番号（数字） — 支店のカナ名 (branchKana) を内部で取得し原則必須
+ *                                              // （ただし fromBankNo が '9900' の場合は支店取得をスキップ）
  *    depositType: '普通' | '1',                // 預金種目（キーまたは '1' 等の数字）
  *    accountNumber: '1234567'                  // 依頼人の口座番号（数字）
  *  }
