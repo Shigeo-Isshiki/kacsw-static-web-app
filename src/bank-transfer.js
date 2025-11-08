@@ -2308,8 +2308,8 @@ const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) =
 			findBusinessDay();
 			return;
 		}
-		// 年末年始（12/29〜1/4）
-		if ((month === 12 && day >= 29) || (month === 1 && day <= 4)) {
+		// 年末年始（銀行の取り扱いに合わせて 12/31〜1/3 を非営業日とする）
+		if ((month === 12 && day >= 31) || (month === 1 && day <= 3)) {
 			targetDate.setDate(targetDate.getDate() + 1);
 			findBusinessDay();
 			return;
