@@ -2099,12 +2099,21 @@ const generateHeader = (data, callback) => {
 				return;
 			}
 			const bankCodeForBranch = bankRes.bankCode || fromBankNo;
-			const resolvedBankName = _bt_toStr(bankRes.bankName || bankRes.name || '');
+			// ヘッダで使用するのは厳密にカナ名 (bankKana) のみ
+			const resolvedBankKana = _bt_toStr(bankRes.bankKana || '');
+			if (!resolvedBankKana) {
+				_bt_invokeCallback(
+					callback,
+					{ error: '仕向銀行のカナ名(bankKana)が取得できませんでした' },
+					null
+				);
+				return;
+			}
 
 			// 共通の組立処理（支店名が確定したら呼ぶ）
 			const _assembleWithBranch = (resolvedBranchName) => {
-				// normalize and truncate/pad names
-				let toBankName = resolvedBankName;
+				// ヘッダではカナを使う
+				let toBankName = resolvedBankKana;
 				let toBranchName = resolvedBranchName || '';
 				try {
 					toBankName = _bt_toHalfWidthKana(toBankName, false);
@@ -2167,8 +2176,16 @@ const generateHeader = (data, callback) => {
 					_bt_invokeCallback(callback, { error: '仕向支店情報を取得できませんでした' }, null);
 					return;
 				}
-				const resolvedBranchName = _bt_toStr(branchRes.branchName || branchRes.name || '');
-				_assembleWithBranch(resolvedBranchName);
+				const resolvedBranchKana = _bt_toStr(branchRes.branchKana || '');
+				if (!resolvedBranchKana) {
+					_bt_invokeCallback(
+						callback,
+						{ error: '仕向支店のカナ名(branchKana)が取得できませんでした' },
+						null
+					);
+					return;
+				}
+				_assembleWithBranch(resolvedBranchKana);
 			});
 		});
 		return;
