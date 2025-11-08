@@ -2218,6 +2218,118 @@ const generateHeader = (data, callback) => {
 	}
 };
 
+/**
+ * 次の銀行営業日を返すユーティリティ（コールバック形式）
+ * 実装は `shipping-processing.js` の getNextBusinessDay を参考にしています。
+ * - 土日、国民の祝日、年末年始（12/29〜1/4）を営業日から除外します。
+ * - baseDate に時刻情報が含まれていて cutoffHour 以降であれば翌日を基準に検索します。
+ * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）。kintone の日付/日時文字列も受け付けます。
+ * @param {number} [cutoffHour=16] 締め時刻（0-23）
+ * @param {(businessDay: string) => void} callback 結果を 'YYYY-MM-DD' 形式文字列で返します
+ * @throws {Error} 引数が不正な場合に例外を投げます
+ */
+const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 16, callback) => {
+	if (typeof callback !== 'function') {
+		throw new Error('callback は関数である必要があります');
+	}
+	const cutoffHourNum = Number(cutoffHour);
+	if (!Number.isInteger(cutoffHourNum) || cutoffHourNum < 0 || cutoffHourNum > 23) {
+		throw new Error('締め時刻は0～23の整数である必要があります');
+	}
+
+	let targetDate;
+	let hasTimeInfo = false;
+	if (typeof baseDate === 'string') {
+		targetDate = new Date(baseDate);
+		hasTimeInfo = /T\d{2}:\d{2}|\d{2}:\d{2}/.test(baseDate);
+	} else if (baseDate instanceof Date) {
+		targetDate = new Date(baseDate);
+		hasTimeInfo =
+			targetDate.getHours() !== 0 || targetDate.getMinutes() !== 0 || targetDate.getSeconds() !== 0;
+	} else {
+		throw new Error('基準日時は日付文字列、またはDate型である必要があります');
+	}
+	if (isNaN(targetDate.getTime())) {
+		throw new Error('基準日時は有効な日付である必要があります');
+	}
+
+	// 時刻情報があり cutoff を超えている場合は翌日を基準にする
+	if (hasTimeInfo && targetDate.getHours() >= cutoffHourNum) {
+		targetDate.setDate(targetDate.getDate() + 1);
+	}
+
+	// 内部: 国民の祝日判定（コールバック形式）
+	const _isNationalHoliday = (date, cb) => {
+		// 1948-07-20 以前は祝日法制定前
+		if (date < new Date(1948, 6, 20)) {
+			cb(false);
+			return;
+		}
+		const y = date.getFullYear();
+		const m = String(date.getMonth() + 1).padStart(2, '0');
+		const d = String(date.getDate()).padStart(2, '0');
+		const dateStr = `${y}-${m}-${d}`;
+		const url = 'https://api.national-holidays.jp/' + dateStr;
+		fetch(url)
+			.then((res) => {
+				if (!res.ok) {
+					cb(false);
+					return;
+				}
+				return res.json();
+			})
+			.then((json) => {
+				if (json && typeof json === 'object') {
+					if (json.error === 'not_found') {
+						cb(false);
+						return;
+					}
+					if (typeof json.date === 'string' && typeof json.name === 'string') {
+						cb(true);
+						return;
+					}
+				}
+				cb(false);
+			})
+			.catch(() => {
+				// API エラー時は祝日でないと扱う
+				cb(false);
+			});
+	};
+
+	// 再帰で営業日を探す
+	const findBusinessDay = () => {
+		const dayOfWeek = targetDate.getDay();
+		const month = targetDate.getMonth() + 1;
+		const day = targetDate.getDate();
+		// 土日
+		if (dayOfWeek === 0 || dayOfWeek === 6) {
+			targetDate.setDate(targetDate.getDate() + 1);
+			findBusinessDay();
+			return;
+		}
+		// 年末年始（12/29〜1/4）
+		if ((month === 12 && day >= 29) || (month === 1 && day <= 4)) {
+			targetDate.setDate(targetDate.getDate() + 1);
+			findBusinessDay();
+			return;
+		}
+		// 国民の祝日
+		_isNationalHoliday(targetDate, (isHoliday) => {
+			if (isHoliday) {
+				targetDate.setDate(targetDate.getDate() + 1);
+				findBusinessDay();
+			} else {
+				const y = targetDate.getFullYear();
+				const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+				const dd = String(targetDate.getDate()).padStart(2, '0');
+				callback(`${y}-${mm}-${dd}`);
+			}
+		});
+	};
+	findBusinessDay();
+};
+
 // このビルドではライブラリがすべての銀行/支店を一括取得しないため、
 // loadBankDataFromBankKun は削除されています。
 // 利用者は必要な銀行/支店データを getBank / getBranch / loadBankByCode 経由で個別に取得してください。
@@ -2235,5 +2347,6 @@ if (typeof window !== 'undefined') {
 		normalizePayeeName,
 		generateZenginTransfer,
 		generateHeader,
+		nextBankBusinessDay,
 	});
 }
