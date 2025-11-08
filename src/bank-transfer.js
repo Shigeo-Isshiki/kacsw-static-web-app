@@ -2221,8 +2221,9 @@ const generateHeader = (data, callback) => {
 /**
  * 次の銀行営業日を返すユーティリティ（コールバック形式）
  * 実装は `shipping-processing.js` の getNextBusinessDay を参考にしています。
- * - 土日、国民の祝日、年末年始（12/29〜1/4）を営業日から除外します。
+ * - 土日、国民の祝日、年末年始（12/31〜1/3）を営業日から除外します。
  * - baseDate に時刻情報が含まれていて cutoffHour 以降であれば翌日を基準に検索します。
+ *   デフォルトの cutoffHour は銀行向けに 18 時に設定していますが、呼び出し時に上書き可能です。
  * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）。kintone の日付/日時文字列も受け付けます。
  * @param {number} [cutoffHour=18] 締め時刻（0-23）。銀行向けの既定値は最も厳しい 18 時に設定しています。
  * @param {(businessDay: string) => void} callback 結果を 'YYYY-MM-DD' 形式文字列で返します
