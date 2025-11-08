@@ -2224,11 +2224,11 @@ const generateHeader = (data, callback) => {
  * - 土日、国民の祝日、年末年始（12/29〜1/4）を営業日から除外します。
  * - baseDate に時刻情報が含まれていて cutoffHour 以降であれば翌日を基準に検索します。
  * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）。kintone の日付/日時文字列も受け付けます。
- * @param {number} [cutoffHour=16] 締め時刻（0-23）
+ * @param {number} [cutoffHour=18] 締め時刻（0-23）。銀行向けの既定値は最も厳しい 18 時に設定しています。
  * @param {(businessDay: string) => void} callback 結果を 'YYYY-MM-DD' 形式文字列で返します
  * @throws {Error} 引数が不正な場合に例外を投げます
  */
-const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 16, callback) => {
+const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) => {
 	if (typeof callback !== 'function') {
 		throw new Error('callback は関数である必要があります');
 	}
