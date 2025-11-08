@@ -53,6 +53,48 @@ module.exports = function (BANK) {
   }
 
   try {
+    // kintone 日付フィールド形式 (YYYY-MM-DD) を受け付けること
+    const data2 = {
+      typeCode: '11',
+      requesterCode: '123',
+      requesterName: 'テスト依頼人',
+      tradeDate: '2025-11-08',
+      toBankNo: '123',
+      toBranchNo: '5',
+      depositType: '普通',
+      accountNumber: '12345'
+    };
+    let res2 = null;
+    BANK.generateHeader(data2, (r) => { res2 = r; });
+    if (!res2 || res2.error) {
+      console.error('FAIL: header accept YYYY-MM-DD');
+      failures++;
+    } else {
+      // check SJIS-equivalent byte length
+      const sjisByteLength = (str) => {
+        if (!str) return 0;
+        let len = 0;
+        for (const ch of str) {
+          const cp = ch.codePointAt(0);
+          if (cp <= 0x7f) len += 1;
+          else if (cp >= 0xff61 && cp <= 0xff9f) len += 1;
+          else len += 2;
+        }
+        return len;
+      };
+      if (sjisByteLength(res2.header) !== 120) {
+        console.error('FAIL: header YYYY-MM-DD produced wrong byte length', sjisByteLength(res2.header));
+        failures++;
+    } else {
+        console.log('PASS: header accept YYYY-MM-DD');
+      }
+    }
+  } catch (e) {
+    console.error('ERROR in header tests YYYY-MM-DD', e && e.message ? e.message : e);
+    failures++;
+  }
+
+  try {
     // tradeDate invalid
   let errRes = null;
   BANK.generateHeader({ typeCode: '11', requesterCode: '1', requesterName: 'A', tradeDate: '11' }, (r) => { errRes = r; });
