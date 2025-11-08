@@ -2100,16 +2100,12 @@ const generateHeader = (data, callback) => {
 			}
 			const bankCodeForBranch = bankRes.bankCode || fromBankNo;
 			const resolvedBankName = _bt_toStr(bankRes.bankName || bankRes.name || '');
-			_callGetBranch(bankCodeForBranch, fromBranchNo, (branchRes) => {
-				if (!branchRes || branchRes.error) {
-					_bt_invokeCallback(callback, { error: '仕向支店情報を取得できませんでした' }, null);
-					return;
-				}
-				const resolvedBranchName = _bt_toStr(branchRes.branchName || branchRes.name || '');
 
+			// 共通の組立処理（支店名が確定したら呼ぶ）
+			const _assembleWithBranch = (resolvedBranchName) => {
 				// normalize and truncate/pad names
 				let toBankName = resolvedBankName;
-				let toBranchName = resolvedBranchName;
+				let toBranchName = resolvedBranchName || '';
 				try {
 					toBankName = _bt_toHalfWidthKana(toBankName, false);
 				} catch (e) {}
@@ -2157,6 +2153,22 @@ const generateHeader = (data, callback) => {
 					return;
 				}
 				_bt_invokeCallback(callback, null, { success: true, header: line });
+			};
+
+			// ゆうちょ銀行（9900）は、支店情報が口座記号の一部で渡されることがあるため
+			// 支店データの取得をスキップして空の支店名で組み立てます。
+			if (fromBankNo === '9900') {
+				_assembleWithBranch('');
+				return;
+			}
+
+			_callGetBranch(bankCodeForBranch, fromBranchNo, (branchRes) => {
+				if (!branchRes || branchRes.error) {
+					_bt_invokeCallback(callback, { error: '仕向支店情報を取得できませんでした' }, null);
+					return;
+				}
+				const resolvedBranchName = _bt_toStr(branchRes.branchName || branchRes.name || '');
+				_assembleWithBranch(resolvedBranchName);
 			});
 		});
 		return;
