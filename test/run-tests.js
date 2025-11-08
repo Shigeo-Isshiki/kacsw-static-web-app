@@ -54,6 +54,11 @@ BANK.getBranch = (bankCode, branchCode, cb) => {
 const runNormalizePayeeTests = require('./normalize-payee.test.js');
 // Load header tests
 const runHeaderTests = require('./header.test.js');
+// Load generateDataRecords tests
+const runDataRecordsTests = require('./generate-data-records.test.js');
+// Load generateDataRecords load test
+const runDataRecordsLoadTests = require('./generate-data-records-load.test.js');
+const runDataRecordsFieldsTests = require('./generate-data-records-fields.test.js');
 
 // Helper to call convertYucho and await result
 const callConvert = (kigou, bangou) =>
@@ -181,6 +186,24 @@ const callConvert = (kigou, bangou) =>
     const addHeader = await runHeaderTests(BANK);
     if (addHeader && addHeader > 0) {
       console.error(`\n${addHeader} header TEST(S) FAILED`);
+      process.exitCode = 2;
+    }
+    // run data-records tests
+    const addDataRecords = await runDataRecordsTests(BANK);
+    if (addDataRecords && addDataRecords > 0) {
+      console.error(`\n${addDataRecords} generate-data-records TEST(S) FAILED`);
+      process.exitCode = 2;
+    }
+    // run data-records load tests
+    const addDataRecordsLoad = await runDataRecordsLoadTests(BANK);
+    if (addDataRecordsLoad && addDataRecordsLoad > 0) {
+      console.error(`\n${addDataRecordsLoad} generate-data-records-load TEST(S) FAILED`);
+      process.exitCode = 2;
+    }
+    // run data-records field tests
+    const addDataRecordsFields = await runDataRecordsFieldsTests(BANK);
+    if (addDataRecordsFields && addDataRecordsFields > 0) {
+      console.error(`\n${addDataRecordsFields} generate-data-records-fields TEST(S) FAILED`);
       process.exitCode = 2;
     }
     // run additional tests if present

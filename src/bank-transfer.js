@@ -1178,6 +1178,183 @@ const _bt_yuchoKigouToBranch = (kigouRaw) => {
 	return { branchCode: branchCode, accountType: accountType };
 };
 
+/**
+ * 内部: _bt_generateDataRecordStrings
+ *
+ * 整形済みのデータレコード配列を受け取り、各レコードを全銀データレコード（120バイト：SJIS相当）に
+ * 変換します。外部 API としては公開せず内部処理専用のユーティリティです。
+ * 不正なレコードがある場合は fail-fast（処理中断）し、即座にコールバックにエラーを返します。
+ *
+ * @private
+ * @param {Array<object>} dataRecords 整形済みレコード配列
+ * @param {function(result)} callback single-arg コールバック。成功時は {
+ *   success:true, records: string[], skipped: Array<{index:number, reason:string}>
+ * }
+ */
+const _bt_generateDataRecordStrings = (dataRecords, callback) => {
+	if (typeof callback !== 'function')
+		return { success: false, error: '第二引数はコールバック関数である必要があります' };
+	if (!Array.isArray(dataRecords)) {
+		_bt_invokeCallback(callback, { error: 'dataRecords は配列である必要があります' }, null);
+		return;
+	}
+	const out = [];
+	const skipped = [];
+
+	for (let i = 0; i < dataRecords.length; i++) {
+		const r = dataRecords[i] || {};
+		try {
+			// data type
+			const dataType = '2'; // 1 byte
+
+			// 被仕向銀行番号 (4 bytes)
+			const toBankNo = _bt_toStr(r.toBankNo || '')
+				.replace(/[^0-9]/g, '')
+				.padStart(4, '0');
+			if (!/^[0-9]{4}$/.test(toBankNo)) {
+				_bt_invokeCallback(callback, { error: '被仕向銀行番号が不正', index: i }, null);
+				return;
+			}
+
+			// 被仕向銀行名 (15 bytes)
+			let toBankName = _bt_toStr(r.toBankKana || r.toBankName || '');
+			try {
+				toBankName = _bt_toHalfWidthKana(toBankName, false);
+			} catch (e) {}
+			let toBankNameTrunc = _bt_sjisTruncate(toBankName, 15);
+			let toBankNameBytes = _bt_sjisByteLength(toBankNameTrunc);
+			if (toBankNameBytes < 15)
+				toBankNameTrunc = toBankNameTrunc + ' '.repeat(15 - toBankNameBytes);
+
+			// 被仕向支店番号 (3 bytes)
+			const toBranchNo = _bt_toStr(r.toBranchNo || '')
+				.replace(/[^0-9]/g, '')
+				.padStart(3, '0');
+			const originBankNo = _bt_toStr(r.originBankNo || '');
+			if (!(originBankNo === '9900' && toBankNo === '9900')) {
+				if (!/^[0-9]{3}$/.test(toBranchNo)) {
+					_bt_invokeCallback(callback, { error: '被仕向支店番号が不正', index: i }, null);
+					return;
+				}
+			}
+
+			// 被仕向支店名 (15 bytes) — yucho-yucho の場合は空白15バイト
+			let toBranchNameTrunc = '';
+			if (originBankNo === '9900' && toBankNo === '9900') {
+				toBranchNameTrunc = ' '.repeat(15);
+			} else {
+				let toBranchName = _bt_toStr(r.toBranchKana || r.toBranchName || '');
+				try {
+					toBranchName = _bt_toHalfWidthKana(toBranchName, false);
+				} catch (e) {}
+				toBranchNameTrunc = _bt_sjisTruncate(toBranchName, 15);
+				let toBranchBytes = _bt_sjisByteLength(toBranchNameTrunc);
+				if (toBranchBytes < 15)
+					toBranchNameTrunc = toBranchNameTrunc + ' '.repeat(15 - toBranchBytes);
+			}
+
+			// 手形交換所番号 (4 bytes) — スペース
+			const clearing = ' '.repeat(4);
+
+			// 預金種目 (1 byte)
+			const dep = _bt_toStr(r.depositType || '9').charAt(0) || '9';
+
+			// 口座番号 (7 bytes)
+			const acct = _bt_toStr(r.accountNumber || '')
+				.replace(/[^0-9]/g, '')
+				.padStart(7, '0');
+			if (_bt_sjisByteLength(acct) > 7) {
+				_bt_invokeCallback(callback, { error: '口座番号が長すぎる', index: i }, null);
+				return;
+			}
+
+			// 受取人名 (30 bytes)
+			let cust = _bt_toStr(r.customerName || '');
+			try {
+				cust = _bt_toHalfWidthKana(cust, false);
+			} catch (e) {}
+			let custTrunc = _bt_sjisTruncate(cust, 30);
+			let custBytes = _bt_sjisByteLength(custTrunc);
+			if (custBytes < 30) custTrunc = custTrunc + ' '.repeat(30 - custBytes);
+
+			// 振込金額 (10 bytes) — 数値、小数は想定外。
+			const amtNum = Number(r.amount || 0);
+			if (!Number.isFinite(amtNum) || amtNum < 0) {
+				_bt_invokeCallback(callback, { error: '金額が不正', index: i }, null);
+				return;
+			}
+			const amtStr = String(Math.round(amtNum));
+			if (amtStr.length > 10) {
+				_bt_invokeCallback(callback, { error: '振込金額が10桁を超える', index: i }, null);
+				return;
+			}
+			const amtField = amtStr.padStart(10, '0');
+
+			// 新規コード (1 byte)
+			const newCode = '1';
+
+			// EDI情報 (20 bytes)
+			let edi = _bt_toStr(r.ediInfo || '');
+			try {
+				edi = _bt_toHalfWidthKana(edi, false);
+			} catch (e) {}
+			let ediTrunc = _bt_sjisTruncate(edi, 20);
+			let ediBytes = _bt_sjisByteLength(ediTrunc);
+			if (ediBytes < 20) ediTrunc = ediTrunc + ' '.repeat(20 - ediBytes);
+
+			// 振込指定区分 (1 byte)
+			const specify = '7';
+
+			// 識別表示 (1 byte)
+			const ident = 'Y';
+
+			// ダミー (7 bytes)
+			const dummy = ' '.repeat(7);
+
+			const parts = [
+				dataType,
+				toBankNo,
+				toBankNameTrunc,
+				toBranchNo,
+				toBranchNameTrunc,
+				clearing,
+				dep,
+				acct,
+				custTrunc,
+				amtField,
+				newCode,
+				ediTrunc,
+				specify,
+				ident,
+				dummy,
+			];
+
+			const line = parts.join('');
+			const totalBytes = _bt_sjisByteLength(line);
+			if (totalBytes !== 120) {
+				_bt_invokeCallback(
+					callback,
+					{ error: `生成バイト長が120ではない（${totalBytes}）`, index: i },
+					null
+				);
+				return;
+			}
+			out.push(line);
+		} catch (e) {
+			_bt_invokeCallback(
+				callback,
+				{ error: '例外: ' + (e && e.message ? e.message : String(e)), index: i },
+				null
+			);
+			return;
+		}
+	}
+
+	// join records into a single string with CRLF between records for compatibility
+	const joined = out.join('\r\n');
+	_bt_invokeCallback(callback, null, { success: true, records: joined });
+};
+
 /* ============================================================================
  * 公開 API (エクスポート)
  *
@@ -2219,16 +2396,25 @@ const generateHeader = (data, callback) => {
 };
 
 /**
- * 次の銀行営業日を返すユーティリティ（コールバック形式）
- * 実装は `shipping-processing.js` の getNextBusinessDay を参考にしています。
- * - 土日、国民の祝日、年末年始（12/31〜1/3）を営業日から除外します。
- * - 指定日時を基点に常に「翌営業日」を返します。もし時刻情報が含まれ cutoffHour 以降であれば「翌々営業日」を返します。
- *   （実装上は、cutoff 超過時は開始日をさらに +1 日して探索を行います）
- *   デフォルトの cutoffHour は銀行向けに 18 時に設定していますが、呼び出し時に上書き可能です。
+ * 次の銀行営業日を返すユーティリティ（コールバック形式）。
+ * 祝日・土日・年末年始（12/31〜1/3）を非営業日として扱います。
+ *
+ * 挙動（最終仕様）:
+ *  - 基準日が営業日の場合:
+ *      - 基準日の時刻情報があり、かつ時刻が cutoffHour 以上であれば「翌々営業日」（2営業日後）を返します。
+ *      - それ以外は「翌営業日」（1営業日後）を返します。
+ *  - 基準日が休業日の場合:
+ *      - 「2営業日後」（翌営業日のさらに次の営業日）を返します。
+ *
+ * つまり、基準日が営業日であれば「次の営業日（cutoff 超過ならさらに次）」を返し、
+ * 基準日が休業日であれば「二つ先の営業日」を返します。
+ *
+ * コールバックは単一引数スタイルで、結果は 'YYYY-MM-DD' 形式の文字列を返します。
+ *
  * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）。kintone の日付/日時文字列も受け付けます。
- * @param {number} [cutoffHour=18] 締め時刻（0-23）。銀行向けの既定値は最も厳しい 18 時に設定しています。
- * @param {(businessDay: string) => void} callback 結果を 'YYYY-MM-DD' 形式文字列で返します
- * @throws {Error} 引数が不正な場合に例外を投げます
+ * @param {number} [cutoffHour=18] 締め時刻（0-23）。デフォルトは銀行向けの 18 時。
+ * @param {function(string):void} callback 結果を 'YYYY-MM-DD' 形式文字列で受け取るコールバック（single-arg スタイル）。
+ * @throws {Error} 引数が不正な場合に例外を投げます（例: callback が関数でない、cutoffHour が範囲外等）
  */
 const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) => {
 	if (typeof callback !== 'function') {
@@ -2255,11 +2441,8 @@ const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) =
 		throw new Error('基準日時は有効な日付である必要があります');
 	}
 
-	// 基準日時に応じて探索開始日を決める:
-	// - 常に翌営業日を返すため、通常は +1 日から探索開始する
-	// - ただし時刻情報があり cutoff を超えている場合は翌々営業日を返すため +2 日から探索開始する
-	const initialOffset = hasTimeInfo && targetDate.getHours() >= cutoffHourNum ? 2 : 1;
-	targetDate.setDate(targetDate.getDate() + initialOffset);
+	// 保存しておく基準日のコピー（時刻情報を含む）
+	const baseDateObj = new Date(targetDate);
 
 	// 内部: 国民の祝日判定（コールバック形式）
 	const _isNationalHoliday = (date, cb) => {
@@ -2300,42 +2483,409 @@ const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) =
 			});
 	};
 
-	// 再帰で営業日を探す
-	const findBusinessDay = () => {
-		const dayOfWeek = targetDate.getDay();
-		const month = targetDate.getMonth() + 1;
-		const day = targetDate.getDate();
-		// 土日
-		if (dayOfWeek === 0 || dayOfWeek === 6) {
-			targetDate.setDate(targetDate.getDate() + 1);
-			findBusinessDay();
-			return;
-		}
-		// 年末年始（銀行の取り扱いに合わせて 12/31〜1/3 を非営業日とする）
-		if ((month === 12 && day >= 31) || (month === 1 && day <= 3)) {
-			targetDate.setDate(targetDate.getDate() + 1);
-			findBusinessDay();
-			return;
-		}
-		// 国民の祝日
-		_isNationalHoliday(targetDate, (isHoliday) => {
-			if (isHoliday) {
-				targetDate.setDate(targetDate.getDate() + 1);
-				findBusinessDay();
-			} else {
-				const y = targetDate.getFullYear();
-				const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
-				const dd = String(targetDate.getDate()).padStart(2, '0');
-				callback(`${y}-${mm}-${dd}`);
+	// 汎用: 指定日から最初の営業日を探すヘルパ (startDate を変更せず新しい Date を使う)
+	const findNextBusinessFrom = (startDate, cb) => {
+		const cur = new Date(startDate);
+		const _step = () => {
+			const dayOfWeek = cur.getDay();
+			const month = cur.getMonth() + 1;
+			const day = cur.getDate();
+			// 土日
+			if (dayOfWeek === 0 || dayOfWeek === 6) {
+				cur.setDate(cur.getDate() + 1);
+				_step();
+				return;
 			}
-		});
+			// 年末年始（銀行の取り扱いに合わせて 12/31〜1/3 を非営業日とする）
+			if ((month === 12 && day >= 31) || (month === 1 && day <= 3)) {
+				cur.setDate(cur.getDate() + 1);
+				_step();
+				return;
+			}
+			// 国民の祝日
+			_isNationalHoliday(cur, (isHoliday) => {
+				if (isHoliday) {
+					cur.setDate(cur.getDate() + 1);
+					_step();
+				} else {
+					const y = cur.getFullYear();
+					const mm = String(cur.getMonth() + 1).padStart(2, '0');
+					const dd = String(cur.getDate()).padStart(2, '0');
+					cb(`${y}-${mm}-${dd}`);
+				}
+			});
+		};
+		_step();
 	};
-	findBusinessDay();
+
+	// 判定: 基準日が営業日かどうかをチェックする (callback boolean)
+	const _isBusinessDay = (date, cb) => {
+		const dow = date.getDay();
+		const m = date.getMonth() + 1;
+		const d = date.getDate();
+		if (dow === 0 || dow === 6) {
+			cb(false);
+			return;
+		}
+		if ((m === 12 && d >= 31) || (m === 1 && d <= 3)) {
+			cb(false);
+			return;
+		}
+		_isNationalHoliday(date, (isHoliday) => cb(!isHoliday));
+	};
+
+	// 基準日の営業性を判定して挙動を分岐する
+	_isBusinessDay(baseDateObj, (isBaseBusiness) => {
+		if (isBaseBusiness) {
+			// 基準日が営業日の場合: 翌営業日 (cutoff 超過なら翌々営業日)
+			const offset = hasTimeInfo && baseDateObj.getHours() >= cutoffHourNum ? 2 : 1;
+			const start = new Date(baseDateObj);
+			start.setDate(start.getDate() + offset);
+			findNextBusinessFrom(start, callback);
+		} else {
+			// 基準日が休業日の場合: 翌営業日の翌営業日を返す
+			const after = new Date(baseDateObj);
+			after.setDate(after.getDate() + 1);
+			// まず翌営業日を求め、その翌日からさらに次の営業日を求める
+			findNextBusinessFrom(after, (firstBiz) => {
+				// parse firstBiz into Date
+				const parts = firstBiz.split('-');
+				const d1 = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+				const afterFirst = new Date(d1);
+				afterFirst.setDate(afterFirst.getDate() + 1);
+				findNextBusinessFrom(afterFirst, callback);
+			});
+		}
+	});
 };
 
-// このビルドではライブラリがすべての銀行/支店を一括取得しないため、
-// loadBankDataFromBankKun は削除されています。
-// 利用者は必要な銀行/支店データを getBank / getBranch / loadBankByCode 経由で個別に取得してください。
+/**
+ * 公開: generateDataRecords
+ *
+ * 概要:
+ *  入力の振込レコード配列を非同期に処理し、各レコードを検証・正規化した上で
+ *  全銀フォーマットの固定長データレコード文字列（1レコードあたり SJIS 相当で 120 バイト）に変換して
+ *  コールバックで返します。
+ *
+ * 主な処理内容:
+ *  - 各レコードの項目正規化（口座番号: `normalizeAccountNumber`、受取人名: `normalizePayeeName`）
+ *  - 被仕向銀行/支店情報の取得（`getBank` / `getBranch` を内部呼び出し）
+ *  - 預金種目のマッピング（日本語ラベルや数字を内部マップにより 1 桁コードへ変換）
+ *  - 金額の丸め（小数は四捨五入ではなく Math.round で整数化）
+ *  - EDI 情報、受取人名等を SJIS 相当バイト長で切り詰め / 右パディングしてフィールド化
+ *  - ゆうちょ銀行同士（originBankNo === '9900' && toBankNo === '9900'）の場合は被仕向支店取得をスキップし、
+ *    支店名欄は空白で埋める（仕様に合わせた扱い）
+ *
+ * エラーハンドリング（重要）:
+ *  - 本関数は fail-fast（最初の致命的エラーで処理を中止）方式を採用します。
+ *    各レコードの検証・正規化、銀行/支店取得、あるいは固定長文字列化の各段階で致命的な
+ *    エラーが発生した場合、即座に処理を中止しコールバックにエラーオブジェクトを返します。
+ *  - 全体的な呼び出しエラー（引数不正、API 呼び出し失敗など）は single-arg スタイルでエラーオブジェクトを返します。
+ *
+ * コールバック戻り値（single-arg スタイル）:
+ *  - 成功: { success: true, records: Array<string> }
+ *    - records: 全銀フォーマット（120バイト相当）の文字列配列（全件が正常に生成された場合）
+ *  - 失敗: { error: '<日本語の説明>', index?: <number>, message?: '<詳細>' }
+ *
+ * 入力レコードの期待される形（例）:
+ *  {
+ *    toBankNo: '0001',         // 被仕向銀行コード（数字）
+ *    toBranchNo: '001',        // 被仕向支店コード（数字）
+ *    toAccountType: '普通',     // 必須: 預金種目（例: '普通','当座','貯蓄' または '1'/'2' 等の1桁コード）
+ *    toAccountNumber: '12345', // 口座番号（全角/半角混在可）
+ *    amount: 1000,             // 振込金額（数値）
+ *    customerName: 'ヤマダタロウ', // 受取人名
+ *    ediInfo: '任意のEDI情報',  // 任意（20バイトに切り詰め）
+ *    reference: '振込依頼メモ'   // 任意の参照/備考
+ *  }
+ *
+ * 注意点:
+ *  - 本関数は最終的に固定長文字列を返すため、外部からはデータレコード文字列を直接受け取れます。
+ *  - 内部で `normalizePayeeName` / `normalizeAccountNumber` を利用します。これらが例外を投げる場合は
+ *    そのレコードがスキップされるか、呼び出しエラーとして返却されます。
+ *  - 預金種目（toAccountType）は必須です。'普通'/'当座'/'貯蓄' 等のラベル、または '1'/'2' のような
+ *    1桁のコードを指定してください。不明な値が与えられた場合はエラーになります。
+ *
+ * @param {Array<object>} records 入力振込レコードの配列（上記の期待形式を参照）
+ * @param {string} [fromBankNo] 仕向（依頼人側）金融機関コード。ゆうちょ同士判定のため内部で '9900' と比較します。
+ * @param {function(result)} callback single-arg スタイルのコールバック。成功時に { success:true, records, skipped } を返します。
+ *
+ * 使い方の例:
+ *
+ * // 1) 最も簡単な使い方 — 生成した文字列を行で分割して扱う
+ * window.BANK.generateDataRecords(records, '0001', (res) => {
+ *   if (res && res.error) {
+ *     console.error('生成失敗', res);
+ *     return;
+ *   }
+ *   // 正常時: res.records は CRLF で結合された単一の文字列を返します
+ *   const joined = res.records; // "line1\r\nline2\r\n..."
+ *   const lines = joined.split(/\r?\n/); // 各行（120バイト相当）を配列として扱える
+ *   // たとえばダウンロード用に1行目を確認
+ *   console.log('1行目長さ(SJIS換算):', lines[0].length, lines[0]);
+ * });
+ *
+ * // 2) 銀行提出用に Shift_JIS に変換してブラウザでダウンロード
+ * // （Encoding.js 等を事前に読み込んでいることを想定）
+ * window.BANK.generateDataRecords(records, '0001', (res) => {
+ *   if (res && res.error) { alert('エラー: ' + res.error); return; }
+ *   const content = res.records; // CRLF で結合された文字列
+ *   // Encoding.js を使って SJIS に変換
+ *   // const sjisArray = Encoding.convert(Encoding.stringToCode(content), 'SJIS', 'UNICODE');
+ *   // const uint8 = new Uint8Array(sjisArray);
+ *   // const blob = new Blob([uint8], { type: 'text/plain' });
+ *   // ダウンロード処理は Blob をリンク経由で発火させます
+ * });
+ *
+ * // 3) kintone にファイルとして保存する例（ファイルアップロード -> レコード作成）
+ * // - file upload: k/v1/file.json を使って fileKey を取得
+ * // - record create: 取得した fileKey をファイルフィールドに割り当てて /k/v1/record を呼ぶ
+ * window.BANK.generateDataRecords(records, '0001', async (res) => {
+ *   if (res && res.error) { console.error(res); return; }
+ *   const content = res.records;
+ *   // ここで必要なら SJIS 変換して Blob を作成
+ *   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+	 // const form = new FormData(); form.append('file', blob, 'zengin.txt');
+ *   // const uploadRes = await kintone.api(kintone.api.url('/k/v1/file', true), 'POST', form);
+ *   // const fileKey = uploadRes.fileKey;
+ *   // const body = { app: kintone.app.getId(), record: { ZENGIN_FILE: { value: [{ fileKey }] } } };
+ *   // await kintone.api(kintone.api.url('/k/v1/record', true), 'POST', body);
+ * });
+ */
+const generateDataRecords = (records, fromBankNo = '', callback) => {
+	if (typeof callback !== 'function')
+		return { success: false, error: '第三引数はコールバック関数である必要があります' };
+	if (!Array.isArray(records)) {
+		_bt_invokeCallback(callback, { error: 'records は配列である必要があります' }, null);
+		return;
+	}
+	const originBankNo = _bt_toStr(fromBankNo || '').padStart(4, '0');
+	const out = [];
+
+	// helper to prefer window.BANK stubs in tests
+	const _callGetBank = (code, cb) => {
+		try {
+			if (typeof window !== 'undefined' && window.BANK && typeof window.BANK.getBank === 'function')
+				return window.BANK.getBank(code, cb);
+		} catch (e) {}
+		return getBank(code, cb);
+	};
+	const _callGetBranch = (bankCode, branch, cb) => {
+		try {
+			if (
+				typeof window !== 'undefined' &&
+				window.BANK &&
+				typeof window.BANK.getBranch === 'function'
+			)
+				return window.BANK.getBranch(bankCode, branch, cb);
+		} catch (e) {}
+		return getBranch(bankCode, branch, cb);
+	};
+
+	// deposit type map (slightly extended compared to header)
+	const DEPOSIT_TYPE_MAP_LOCAL = {
+		普通: '1',
+		普通預金: '1',
+		当座: '2',
+		当座預金: '2',
+		貯蓄: '4',
+		貯蓄預金: '4',
+	};
+
+	let idx = 0;
+	const processNext = () => {
+		if (idx >= records.length) {
+			// 生成した整形済みレコードを固定長文字列に変換して返す
+			_bt_generateDataRecordStrings(out, callback);
+			return;
+		}
+		const i = idx++;
+		const r = records[i] || {};
+		try {
+			const toBankNo = _bt_toHalfWidthDigits(_bt_toStr(r.toBankNo || ''))
+				.replace(/[^0-9]/g, '')
+				.padStart(4, '0');
+			const toBranchNo = _bt_toHalfWidthDigits(_bt_toStr(r.toBranchNo || ''))
+				.replace(/[^0-9]/g, '')
+				.padStart(3, '0');
+			const accountNumber = normalizeAccountNumber(r.toAccountNumber || r.accountNumber || '');
+			const amountNum = Number(r.amount || 0);
+			if (!Number.isFinite(amountNum) || amountNum < 0) throw new Error('金額が不正です');
+			let customerNameRaw = _bt_toStr(r.customerName || r.customerKana || '');
+			let customerName;
+			try {
+				customerName = normalizePayeeName(customerNameRaw);
+			} catch (e) {
+				_bt_invokeCallback(
+					callback,
+					{
+						error: '受取人名の正規化に失敗しました',
+						message: e && e.message ? e.message : String(e),
+						index: i,
+					},
+					null
+				);
+				return;
+			}
+			// depositType conversion
+			// toAccountType は必須とする（'普通'/'当座'/'貯蓄' などのラベル、または '1'/'2' の1桁コード）
+			let depRaw = _bt_toStr(
+				r.toAccountType || r.depositType || r.toDepositType || r.deposit || ''
+			).trim();
+			if (!depRaw) {
+				_bt_invokeCallback(
+					callback,
+					{ error: '預金種目(toAccountType)が指定されていません', index: i },
+					null
+				);
+				return;
+			}
+			let depCode = '';
+			if (/^[0-9]{1}$/.test(depRaw)) depCode = depRaw;
+			else if (depRaw && DEPOSIT_TYPE_MAP_LOCAL[depRaw]) depCode = DEPOSIT_TYPE_MAP_LOCAL[depRaw];
+			else {
+				_bt_invokeCallback(
+					callback,
+					{ error: '預金種目が不明です', message: depRaw, index: i },
+					null
+				);
+				return;
+			}
+
+			// perform bank lookup
+			_callGetBank(toBankNo, (bankRes) => {
+				if (!bankRes || bankRes.error) {
+					_bt_invokeCallback(
+						callback,
+						{
+							error: '被仕向銀行情報を取得できませんでした',
+							message: bankRes && bankRes.error ? bankRes.error : undefined,
+							index: i,
+						},
+						null
+					);
+					return;
+				}
+				const bankCodeForBranch = bankRes.bankCode || toBankNo;
+				const resolvedBankKana = _bt_toStr(bankRes.bankKana || '');
+				if (!resolvedBankKana) {
+					_bt_invokeCallback(
+						callback,
+						{ error: '被仕向銀行のカナ名(bankKana)が取得できませんでした', index: i },
+						null
+					);
+					return;
+				}
+				// if both origin and destination are yucho (9900), skip branch lookup
+				if (originBankNo === '9900' && toBankNo === '9900') {
+					const rec = {
+						_seq: i + 1,
+						toBankNo,
+						toBranchNo,
+						toBankKana: _bt_toHalfWidthKana(resolvedBankKana, false),
+						toBranchKana: '',
+						ediInfo: _bt_toStr(r.ediInfo || ''),
+						depositType: depCode,
+						accountNumber,
+						amount: Math.round(amountNum),
+						customerName,
+						reference: _bt_toStr(r.reference || r.remark || r.description || ''),
+					};
+					if (originBankNo) rec.originBankNo = originBankNo;
+					out.push(rec);
+					processNext();
+					return;
+				}
+				// otherwise fetch branch
+				_callGetBranch(bankCodeForBranch, toBranchNo, (branchRes) => {
+					if (!branchRes || branchRes.error) {
+						_bt_invokeCallback(
+							callback,
+							{
+								error: '被仕向支店情報を取得できませんでした',
+								message: branchRes && branchRes.error ? branchRes.error : undefined,
+								index: i,
+							},
+							null
+						);
+						return;
+					}
+					const resolvedBranchKana = _bt_toStr(branchRes.branchKana || '');
+					if (!resolvedBranchKana) {
+						_bt_invokeCallback(
+							callback,
+							{ error: '被仕向支店のカナ名(branchKana)が取得できませんでした', index: i },
+							null
+						);
+						return;
+					}
+					const rec = {
+						_seq: i + 1,
+						toBankNo,
+						toBranchNo,
+						toBankKana: _bt_toHalfWidthKana(resolvedBankKana, false),
+						toBranchKana: _bt_toHalfWidthKana(resolvedBranchKana, false),
+						ediInfo: _bt_toStr(r.ediInfo || ''),
+						depositType: depCode,
+						accountNumber,
+						amount: Math.round(amountNum),
+						customerName,
+						reference: _bt_toStr(r.reference || r.remark || r.description || ''),
+					};
+					if (originBankNo) rec.originBankNo = originBankNo;
+					out.push(rec);
+					processNext();
+				});
+			});
+		} catch (e) {
+			_bt_invokeCallback(
+				callback,
+				{
+					error: 'レコードの処理に失敗しました',
+					message: e && e.message ? e.message : String(e),
+					index: i,
+				},
+				null
+			);
+			return;
+		}
+	};
+	processNext();
+};
+
+/**
+ * 公開: generateTrailer
+ *
+ * 概要:
+ *  整形済みのデータレコード配列からトレーラ情報（件数・合計金額等）を生成します。
+ *  トレーラの最終的な固定長文字列化は将来のフェーズで実施します。
+ *
+ * @param {Array<object>} dataRecords generateDataRecords が返した整形済みレコード配列
+ * @param {object} [options] 将来的な拡張用オプション
+ * @param {function(result)} callback single-arg コールバック。成功時は { success:true, trailer: { recordCount, totalAmount } }
+ */
+const generateTrailer = (dataRecords, options = {}, callback) => {
+	if (typeof callback !== 'function')
+		return { success: false, error: '第三引数はコールバック関数である必要があります' };
+	if (!Array.isArray(dataRecords)) {
+		_bt_invokeCallback(callback, { error: 'dataRecords は配列である必要があります' }, null);
+		return;
+	}
+	let total = 0;
+	for (const r of dataRecords) {
+		const a = Number(r && r.amount ? r.amount : 0);
+		if (!Number.isFinite(a) || a < 0) {
+			_bt_invokeCallback(callback, { error: '不正な金額を含むレコードがあります' }, null);
+			return;
+		}
+		total += Math.round(a);
+	}
+	const trailer = {
+		recordCount: dataRecords.length,
+		totalAmount: total,
+	};
+	_bt_invokeCallback(callback, null, { success: true, trailer });
+};
 
 // kintone 向けに window に公開します
 if (typeof window !== 'undefined') {
@@ -2351,5 +2901,7 @@ if (typeof window !== 'undefined') {
 		generateZenginTransfer,
 		generateHeader,
 		nextBankBusinessDay,
+		generateDataRecords,
+		generateTrailer,
 	});
 }
