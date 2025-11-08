@@ -1906,7 +1906,13 @@ const generateZenginTransfer = (records = []) => {
  *  - codeClass: 1バイト 固定 '0'
  *  - requesterCode: 10バイト（依頼人コード、数字のみ、左ゼロ埋め。超過はエラー）
  *  - requesterName: 40バイト（依頼人名、半角カナ化等を行い SJIS 相当で 40 バイトに切り詰め、バイト単位で右パディング）
- *  - tradeDate: 4バイト（MMDD 形式。Date オブジェクトまたは 'MMDD' 文字列を受け付ける。超過はエラー）
+ *  - tradeDate: 4バイト（MMDD 形式）。以下の形式を受け付け、内部で MMDD 部分を抽出します:
+ *      - Date オブジェクト（例: new Date(2025, 10, 8)）
+ *      - 'MMDD'（例: '1108'）
+ *      - 'YYYY-MM-DD'（kintone の日付フィールド形式、例: '2025-11-08'）
+ *      - 'YYYY/MM/DD'（例: '2025/11/08'）
+ *      - 'YYYYMMDD'（例: '20251108'）
+ *    いずれの場合も MMDD を取り出して 4 バイトに詰めます。超過はエラー
  *  - fromBankNo: 4バイト（仕向銀行番号、数字、左ゼロ埋め。超過はエラー）
  *  - fromBankName: 15バイト（fromBankNo から取得した銀行のカナ名 `bankKana` のみを使用して正規化・SJIS 切り詰め・右パディング。存在しない場合はエラー）
  *  - fromBranchNo: 3バイト（仕向支店番号、数字、左ゼロ埋め。超過はエラー）
