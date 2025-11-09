@@ -304,7 +304,7 @@ require('./src/bank-transfer.js');
 const headerData = {
   typeCode: '11',
   requesterCode: '12345',
-  requesterName: 'テスト会社',
+  requesterName: 'テストカイシャ',
   tradeDate: '20251109',
   fromBankNo: '0001',
   fromBranchNo: '001',
