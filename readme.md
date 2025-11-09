@@ -11,10 +11,13 @@ and other helpers.
 
 主なドキュメント:
 
+- 銀行振込ユーティリティ（使い方リファレンス） — `src/bank-transfer.js` の仕様、正規化ルール、EDI（振込ファイル）生成のサンプルを含みます。
+	- ドキュメント: [銀行振込ユーティリティ 使い方リファレンス — docs/bank-transfer.md](./docs/bank-transfer.md)
 - CSV ビルダー（使い方リファレンス） — `src/csv-builder.js` のスキーマ仕様、`map` / `mapMode` の挙動、formatter の実例などを含みます。
 	- ドキュメント: [CSV ビルダー 使い方リファレンス — docs/csv-builder.md](./docs/csv-builder.md)
 - その他のライブラリ — `bank-transfer` や `phone-utils` の使い方ドキュメントは追って追加します（coming soon）。
 
+銀行振込データ作成機能を利用する場合はまず上記の 銀行振込ユーティリティリファレンスを参照してください。
 CSV 機能を利用する場合はまず上記の CSV ビルダーリファレンスを参照してください。
 
 # Vanilla JavaScript App
