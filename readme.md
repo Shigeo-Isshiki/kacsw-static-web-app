@@ -5,6 +5,12 @@ This repository is a small static web app used for building and testing
 JavaScript utilities for handling Japanese phone numbers, postal codes,
 and other helpers.
 
+## CSV ビルダーモジュールのドキュメント
+
+`src/csv-builder.js` の詳しいスキーマ仕様と利用例はドキュメントに分離しています。すぐに試せるサンプルや map/mapMode の例などを含むので、CSV 機能を使う場合はこちらを参照してください:
+
+[docs/csv-builder.md](./docs/csv-builder.md)
+
 # Vanilla JavaScript App
 
 [Azure Static Web Apps](https://docs.microsoft.com/azure/static-web-apps/overview) allows you to easily build JavaScript apps in minutes. Use this repo with the [quickstart](https://docs.microsoft.com/azure/static-web-apps/getting-started?tabs=vanilla-javascript) to build and customize a new static site.
