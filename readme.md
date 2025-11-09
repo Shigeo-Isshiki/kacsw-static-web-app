@@ -5,11 +5,17 @@ This repository is a small static web app used for building and testing
 JavaScript utilities for handling Japanese phone numbers, postal codes,
 and other helpers.
 
-## CSV ビルダーモジュールのドキュメント
+## ドキュメントとリファレンス
 
-`src/csv-builder.js` の詳しいスキーマ仕様と利用例はドキュメントに分離しています。すぐに試せるサンプルや map/mapMode の例などを含むので、CSV 機能を使う場合はこちらを参照してください:
+このリポジトリで公開しているユーティリティについて、使い方やスキーマ仕様、実用サンプルをまとめた「使い方リファレンス」は `docs/` に格納しています。今後さらにモジュールが増えることを想定して、モジュールごとの参照をここに一覧化していきます。
 
-[docs/csv-builder.md](./docs/csv-builder.md)
+主なドキュメント:
+
+- CSV ビルダー（使い方リファレンス） — `src/csv-builder.js` のスキーマ仕様、`map` / `mapMode` の挙動、formatter の実例などを含みます。
+	- ドキュメント: [CSV ビルダー 使い方リファレンス — docs/csv-builder.md](./docs/csv-builder.md)
+- その他のライブラリ — `bank-transfer` や `phone-utils` の使い方ドキュメントは追って追加します（coming soon）。
+
+CSV 機能を利用する場合はまず上記の CSV ビルダーリファレンスを参照してください。
 
 # Vanilla JavaScript App
 

@@ -14,58 +14,25 @@
  *  - 本ビルドは Web API による検索のみを行い、グローバルな内部キャッシュは保持しません。
  */
 /**
- * JSDoc 型定義: コールバック戻り値の形
+ * JSDoc 型定義（簡潔）
+ * 詳細なフィールド定義は `docs/bank-transfer.md` を参照してください。
  *
  * @typedef {object} BankResult
- * @property {string} bankCode 4桁の銀行コード（例: '9900'）
- * @property {string} bankName 銀行名（正規化済み）
- * @property {string} bankKana 銀行名の半角カナ表記（長音は '-' に正規化）
- *
  * @typedef {object} BranchResult
- * @property {string} branchCode 3桁の支店コード（例: '123'）
- * @property {string} branchName 支店名
- * @property {string} branchKana 支店名の半角カナ表記
- *
  * @typedef {object} ConvertYuchoResult
- * @property {string} yuchoKigou 半角化済みのゆうちょ記号（5桁）
- * @property {string} yuchoBangou accountType に応じ0埋めしたゆうちょ番号（'0'->6桁, '1'->8桁）
- * @property {string} bankCode 銀行コード
- * @property {string} bankName 銀行名
- * @property {string} bankKana 銀行名（半角カナ）
- * @property {string} branchCode 支店コード（3桁）
- * @property {string} branchName 支店名
- * @property {string} branchKana 支店名（半角カナ）
- * @property {string} accountType ラベル（'当座'|'普通' 等）
- * @property {string} accountNumber 全銀用7桁口座番号（0埋め済）
- *
  * @typedef {object} ErrorResult
- * @property {string} error エラー識別子またはメッセージ
- * @property {string} [message] 詳細メッセージ（任意）
- * @property {string} [code] 構造化エラーコード（例: 'kigou.not_5_digits', 'bangou.empty'）
- * @property {string} [field] エラー対象フィールド（'kigou'|'bangou'|'bank'|'branch'|'both'|'other'）
- * @property {object} [details] 追加の開発者向け情報（オプション、正規化値など）
- */
-
-/**
+ *
  * @callback BankCallback
- * @param {BankResult|ErrorResult} result 成功時は BankResult、失敗時は ErrorResult
- */
-
-/**
+ * @param {BankResult|ErrorResult} result
+ *
  * @callback BranchCallback
- * @param {BranchResult|ErrorResult} result 成功時は BranchResult、失敗時は ErrorResult
- */
-
-/**
+ * @param {BranchResult|ErrorResult} result
+ *
  * @callback ConvertYuchoCallback
- * @param {ConvertYuchoResult|ErrorResult} result 成功時は ConvertYuchoResult、失敗時は ErrorResult。
- * エラー時の ErrorResult は上記の構造化エラー（code, field, details を含む場合がある）を返します。
- */
-
-/**
+ * @param {ConvertYuchoResult|ErrorResult} result
+ *
  * @callback LoadBankByCodeCallback
- * @description 内部ローダー用コールバック: ローダーが受け付ける柔軟なシグネチャをサポートします。
- * @param {...*} args - 単一引数 (BankResult|ErrorResult) か Node 風の (err, res) シグネチャのいずれか
+ * @param {...*} args
  */
 
 /* ============================================================================
@@ -75,14 +42,11 @@
  *  - このセクション内の項目は内部実装の詳細です（外部へは公開しません）。
  *  - 変換マップおよび派生マップはここにまとめ、内部ヘルパで利用します。
  * ============================================================================ */
-/**
- * 変換用の文字リスト
- * 各種文字の変換ルールを定義します。
- * ひらがな、カタカナ、濁点・半濁点の変換をサポートします。
- * @typedef {object} _BT_CONVERT_CHARACTER_LIST
- * @property {object} halfWidthKana 全角カタカナから半角カタカナへの変換マップ
- * @property {object} fullWidthKana 半角カタカナから全角カタカナへの変換マップ
- * @property {object} turbidityKana 濁点・半濁点の変換マップ
+/** @typedef {object} _BT_CONVERT_CHARACTER_LIST
+ *  @property {object} halfWidthKana 全角カタカナ→半角カナマップ
+ *  @property {object} fullWidthKana 半角カナ→全角カナマップ
+ *  @property {object} turbidityKana 濁点/半濁点マップ
+ *  @private
  */
 /** @type {_BT_CONVERT_CHARACTER_LIST} */
 const _BT_CONVERT_CHARACTER_LIST = {
@@ -425,10 +389,21 @@ const _BT_BUSINESS_LIST = {
 	ﾕｳｹﾞﾝｾｷﾆﾝｼﾞｷﾞﾖｳｸﾐｱｲ: 'ﾕｳｸﾐ',
 };
 
-// 内部ユーティリティ
+//　内部: 共通ユーティリティ関数群
+/**
+ * 内部: 値を文字列化します（null/undefined は空文字に）。
+ * @private
+ * @param {*} v 任意の値
+ * @returns {string}
+ */
 const _bt_toStr = (v) => (v == null ? '' : String(v));
 
-// 安全なログ貯め: kintone 等で console が捕まらない場合に備えて
+/**
+ * 内部: 安全にログを残すユーティリティ。
+ * - ブラウザ環境では window.BANK._bt_debugLogs にも保存し、console.debug が使える場合は出力します。
+ * @private
+ * @param {*} msg ログメッセージ
+ */
 const _bt_safeLog = (msg) => {
 	try {
 		if (typeof window !== 'undefined') {
@@ -460,27 +435,20 @@ const _bt_checkBoolean = (val) => {
 	return typeof val === 'boolean';
 };
 
-// 全角数字（U+FF10-U+FF19）を半角数字に変換するユーティリティ
+/**
+ * 全角数字（U+FF10-U+FF19）を半角数字に変換するユーティリティ。
+ * @private
+ * @param {string} [str=''] 入力文字列
+ * @returns {string} 半角化された文字列
+ */
 const _bt_toHalfWidthDigits = (str = '') =>
 	_bt_toStr(str).replace(/[\uFF10-\uFF19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+
+/** 指定文字が銀行振込で許容される半角文字集合に含まれるか判定する（内部ユーティリティ）。 */
 /**
- * 指定文字が Shift_JIS に由来する許容半角文字集合に含まれるかを判定する（単一文字）
- *
- * 実装ノート / 仕様差分:
- * - 除外される Shift_JIS バイト値（16進）:
- *   27 (') , 2B (+) , 3A (:) , 3F (?) , 5C (\) , A2 , A3
- *   上記は銀行振込で許容しないため除外しています。
- * - 許容文字（軽量実装）:
- *   - 半角カタカナ: U+FF61..U+FF9F（ただし U+FF62/U+FF63（「｢」「｣」）は除外）
- *   - ASCII 数字: 0-9
- *   - ASCII 大文字: A-Z
- *   - 空白（U+0020）、ハイフン（'-'）、ピリオド（'.'）、および括弧 '(' / ')' を許容
- *
- * 注: 実際の厳密な仕様は Shift_JIS のバイト集合に基づきますが、テストと実装の簡潔性のため
- *     必要最小限の集合をここで定義しています。必要に応じて拡張してください。
- *
- * @param {string} ch 単一文字（長さ1の文字列）
- * @returns {boolean} 許容される文字であれば true、それ以外は false
+ * @private
+ * @param {string} ch 単一文字
+ * @returns {boolean} 許容される文字であれば true
  */
 const _bt_isAllowedHalfWidthChar = (ch) => {
 	if (!_bt_checkString(ch) || !ch) return false;
@@ -564,9 +532,13 @@ const _bt_sjisTruncate = (s, maxBytes) => {
 	return out;
 };
 
-// callback 呼び出しの互換ヘルパ
-// - cb に宣言引数が 2 個以上ある場合は (err, res) シグネチャで呼ぶ
-// - そうでない場合は zip-code utils と同様に single-arg result を渡す
+/** 内部: _bt_invokeCallback — Node 風 / single-arg 両対応のコールバック互換ヘルパ。 */
+/**
+ * @private
+ * @param {Function} cb コールバック関数
+ * @param {*} err エラー情報（構造化オブジェクトまたはプリミティブ）
+ * @param {*} res 成功時の結果
+ */
 const _bt_invokeCallback = (cb, err, res) => {
 	try {
 		if (typeof cb !== 'function') return;
@@ -623,13 +595,12 @@ const _bt_invokeCallback = (cb, err, res) => {
 	}
 };
 
+/** 内部: _bt_enrichError — エラーオブジェクト/値を SDK で使う構造化エラーに変換します。 */
 /**
- * 内部: SDK で利用する構造化エラー形式に整形します。
- * - err が既に構造化されている（code/field を持つ）場合はそのまま返します。
- * - それ以外は、defaults を反映した構造化オブジェクトを生成して返します。
- * @param {*} err 既存のエラー（文字列またはオブジェクト）
- * @param {object} defaults { code:string, field:string, message:string, details:object }
- * @returns {object} 構造化されたエラーオブジェクト
+ * @private
+ * @param {*} err 既存のエラー（文字列/オブジェクト等）
+ * @param {object} [defaults] デフォルト値（例: { code, field, message, details }）
+ * @returns {object} 構造化されたエラーオブジェクト（error, message, code?, field?, details? を含む）
  */
 const _bt_enrichError = (err, defaults = {}) => {
 	try {
@@ -807,17 +778,11 @@ const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
 	}
 };
 
+/** 内部: _bt_loadBankByCode — 銀行コードから銀行データを取得する内部ローダー（BankKun 互換）。 */
 /**
- * 内部: 銀行コードから銀行データを取得する（BankKun 互換）
- *
- * コールバックの柔軟性:
- *  - 単一引数での成功 -> BankResult（場合によっては { success:true, bank: BankResult }）
- *  - 単一引数での失敗 -> ErrorResult
- *  - Node 風 (err, res) のシグネチャも内部呼び出しで受け付けます
- *
  * @param {string} bankCode 銀行コード
- * @param {object} [options] オプション
- * @param {LoadBankByCodeCallback} callback ローダーが受け付ける柔軟なコールバック（単一引数または Node 風）
+ * @param {object} [options] オプション（{ apiBaseUrl, apiKey, timeout, pathTemplate } 等）
+ * @param {LoadBankByCodeCallback} callback 単一引数または Node 風のシグネチャを受け付けるコールバック
  * @private
  */
 const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
@@ -1178,18 +1143,11 @@ const _bt_yuchoKigouToBranch = (kigouRaw) => {
 	return { branchCode: branchCode, accountType: accountType };
 };
 
+/** 内部: _bt_generateDataRecordStrings — 整形済みデータレコード配列を全銀120バイトレコード文字列に変換する内部ユーティリティ。 */
 /**
- * 内部: _bt_generateDataRecordStrings
- *
- * 整形済みのデータレコード配列を受け取り、各レコードを全銀データレコード（120バイト：SJIS相当）に
- * 変換します。外部 API としては公開せず内部処理専用のユーティリティです。
- * 不正なレコードがある場合は fail-fast（処理中断）し、即座にコールバックにエラーを返します。
- *
  * @private
  * @param {Array<object>} dataRecords 整形済みレコード配列
- * @param {function(result)} callback single-arg コールバック。成功時は {
- *   success:true, records: string[], skipped: Array<{index:number, reason:string}>
- * }
+ * @param {function(result)} callback single-arg スタイルのコールバック（成功: { success:true, records: string[], skipped: Array<{index:number, reason:string}> }）
  */
 const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 	if (typeof callback !== 'function')
@@ -1362,23 +1320,12 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 	_bt_invokeCallback(callback, null, { success: true, records: joined });
 };
 
+/** 内部: _bt_generateTrailerString — トレーラ情報を全銀フォーマットの固定長文字列に変換します（内部ユーティリティ）。 */
 /**
- * 内部: _bt_generateTrailerString
- *
- * 概要:
- *  generateTrailer が返すトレーラ情報（{ recordCount, totalAmount }）を受け取り、全銀フォーマットの
- *  固定長トレーラ文字列（120バイト）に変換します。内部処理専用のユーティリティです。
- *
- * フィールド（SJIS相当バイト長）:
- *  - dataType: 1バイト 固定 '8'
- *  - totalCount: 6バイト（先頭0埋め、超過はエラー）
- *  - totalAmount: 12バイト（先頭0埋め、超過はエラー）
- *  - dummy: 101バイト（スペース）
- *
  * @private
  * @param {object} trailerObj { recordCount: number, totalAmount: number }
  * @returns {string} 120-byte trailer record string
- * @throws {Error} 不正な入力やオーバーフロー、生成長不一致の場合に例外を投げます
+ * @throws {Error} 不正な入力やオーバーフロー時に投げられます
  */
 const _bt_generateTrailerString = (trailerObj) => {
 	if (!trailerObj || typeof trailerObj !== 'object') {
@@ -1452,11 +1399,10 @@ const _bt_generateEndRecordString = () => {
  *  - 公開関数は依存する内部ヘルパの後に宣言してください。
  *  - 公開シンボルはこのファイルの末尾で `window.BANK` にアタッチしてください。
  * ============================================================================ */
+/** 公開: getBank — 銀行コード/銀行名で検索し結果をコールバックで返します（詳細: docs/bank-transfer.md）。 */
 /**
- * 公開: getBank
- * 銀行コード（4桁以内の数字）または銀行名で検索し、標準化された銀行オブジェクトをコールバックに返す。
- * コールバックは単一引数スタイル（成功: オブジェクト、失敗: { error: '...' }）を想定します。
- * @param {BankCallback} callback 単一引数スタイルのコールバック
+ * @param {string} bankCodeOrName 銀行コードまたは銀行名
+ * @param {BankCallback} callback single-arg スタイルのコールバック
  */
 const getBank = (bankCodeOrName, callback) => {
 	// 全角数字を半角化してからトリム（例: '１２３４' -> '1234'）
@@ -1591,12 +1537,11 @@ const getBank = (bankCodeOrName, callback) => {
 	return;
 };
 
+/** 公開: getBranch — 支店コード/支店名で検索し結果をコールバックで返します（詳細: docs/bank-transfer.md）。 */
 /**
- * 公開: getBranch
- * 支店コードまたは支店名で支店情報を取得してコールバックに返す（single-arg スタイル）。
- * @param {string} bankCode 銀行コード（数字または文字列、内部で4桁にパディング）
+ * @param {string} bankCode 銀行コード
  * @param {string} branchCodeOrName 支店コードまたは支店名
- * @param {BranchCallback} callback 単一引数スタイルのコールバック
+ * @param {BranchCallback} callback single-arg スタイルのコールバック
  */
 const getBranch = (bankCode, branchCodeOrName, callback) => {
 	if (typeof callback !== 'function') {
@@ -1776,20 +1721,11 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 	return;
 };
 
+/** 公開: convertYucho — ゆうちょ記号/番号を全銀向け口座情報に正規化してコールバックで返します（詳細: docs/bank-transfer.md）。 */
 /**
- * 公開: convertYucho
- * ゆうちょ記号/番号から全銀向けの口座情報へ変換してコールバックに返す。
- * 戻り値（成功時）例:
- * {
- *   yuchoKigou,   // 半角化済みのゆうちょ記号
- *   yuchoBangou,  // accountType に応じて先頭0埋めしたゆうちょ番号（'0' -> 6桁, '1' -> 8桁）
- *   bankCode, bankName, bankKana,
- *   branchCode, branchName, branchKana,
- *   accountType, accountNumber
- * }
  * @param {string|number} kigou ゆうちょ記号
  * @param {string|number} bangou ゆうちょ番号
- * @param {ConvertYuchoCallback} callback 単一引数スタイルのコールバック
+ * @param {ConvertYuchoCallback} callback single-arg スタイルのコールバック
  */
 const convertYucho = (kigou, bangou, callback) => {
 	// callback 必須の非同期 API に変更
@@ -2009,20 +1945,11 @@ const normalizeAccountNumber = (input) => {
 	return normalized.padStart(7, '0');
 };
 
+/** 公開: normalizeEdiInfo — EDI 補助情報を銀行提出向けに簡易正規化します（詳細: docs/bank-transfer.md）。 */
 /**
- * 公開: normalizeEdiInfo
- *
- * 概要:
- *  EDI 情報を銀行提出用に正規化します。主な処理は次の通りです。
- *   - 入力を文字列化してトリム
- *   - 半角カナ化（長音等は内部ヘルパに従う）
- *   - 必要に応じて SJIS 相当バイト長で切り詰め・右パディング
- *
- * @param {string} input EDI 情報の入力（任意）
+ * @param {string} input 入力文字列
  * @param {object} [options] オプション
- * @param {boolean} [options.padToBytes=false] true の場合は bytes に合わせて右パディングします
- * @param {number} [options.bytes=20] padToBytes=true 時に用いるバイト長（デフォルト 20）
- * @returns {string} 正規化された文字列（padToBytes=false の場合はトリムされた文字列、true の場合は指定バイト長に揃えた文字列）
+ * @returns {string} 正規化された文字列
  */
 const normalizeEdiInfo = (input, options = {}) => {
 	const opt = Object.assign({ padToBytes: false, bytes: 20 }, options || {});
@@ -2065,13 +1992,10 @@ const normalizeEdiInfo = (input, options = {}) => {
 	return truncated;
 };
 
+/** 公開: normalizePayeeName — 受取人名を銀行振込向けに正規化して返します（詳細: docs/bank-transfer.md）。 */
 /**
- * 公開: 口座名義（受取人名）を銀行振込で使える半角表記へ可能な限り正規化して返す
- * - 全角数字/英字/かな を可能な限り半角化し、大文字化等の正規化を行う
- * - 正規化後に `_bt_isAllowedHalfWidthString` で検査し、許容外文字が含まれる場合は構造化エラーを返す
  * @param {string} input 口座名義
- * @returns {object} 成功時: { success:true, value: '<normalized>' }
- *                   失敗時: ErrorResult 相当のオブジェクト（code, field, message, details を含む）
+ * @returns {string} 正規化された口座名義
  */
 const normalizePayeeName = (input) => {
 	const s = _bt_toStr(input).trim();
@@ -2183,70 +2107,10 @@ const normalizePayeeName = (input) => {
 	throw new Error(msg);
 };
 
+/** 公開: generateHeader — 全銀ヘッダレコードを生成してコールバックで返します（詳細: docs/bank-transfer.md）。 */
 /**
- * 公開: generateHeader
- *
- * 概要:
- *  指定されたデータを元に全銀フォーマットのヘッダ行を生成します。関数は非同期で動作し、コールバック
- *  （single-arg スタイル）で結果を返します。ヘッダは内部で番号（銀行番号/支店番号）から `getBank` / `getBranch`
- *  を用いて仕向銀行・支店のカナ名を取得し、カナ名（`bankKana` / `branchKana`）のみを正規化・切り詰めして所定のフィールド長に詰めます。
- *
- * 仕様（フィールド順・長さは SJIS 相当バイトでの固定長合計 120 バイト）:
- *  - dataType: 1バイト 固定 '1'
- *  - typeCode: 2バイト（数値2桁または内部マップキー）
- *  - codeClass: 1バイト 固定 '0'
- *  - requesterCode: 10バイト（依頼人コード、数字のみ、左ゼロ埋め。超過はエラー）
- *  - requesterName: 40バイト（依頼人名、半角カナ化等を行い SJIS 相当で 40 バイトに切り詰め、バイト単位で右パディング）
- *  - tradeDate: 4バイト（MMDD 形式）。以下の形式を受け付け、内部で MMDD 部分を抽出します:
- *      - Date オブジェクト（例: new Date(2025, 10, 8)）
- *      - 'MMDD'（例: '1108'）
- *      - 'YYYY-MM-DD'（kintone の日付フィールド形式、例: '2025-11-08'）
- *      - 'YYYY/MM/DD'（例: '2025/11/08'）
- *      - 'YYYYMMDD'（例: '20251108'）
- *    いずれの場合も MMDD を取り出して 4 バイトに詰めます。超過はエラー
- *  - fromBankNo: 4バイト（仕向銀行番号、数字、左ゼロ埋め。超過はエラー）
- *  - fromBankName: 15バイト（fromBankNo から取得した銀行のカナ名 `bankKana` のみを使用して正規化・SJIS 切り詰め・右パディング。存在しない場合はエラー）
- *  - fromBranchNo: 3バイト（仕向支店番号、数字、左ゼロ埋め。超過はエラー）
- *  - fromBranchName: 15バイト（fromBranchNo から取得した支店のカナ名 `branchKana` のみを使用して正規化・SJIS 切り詰め・右パディング。
- *      ただし仕向銀行番号が '9900'（ゆうちょ銀行）の場合は支店情報取得をスキップし、空文字を使用して組み立てます）
- *  - depositType: 1バイト（預金種目。マップまたは数字 1 桁で解決。指定が無ければ '9'）
- *  - accountNumber: 7バイト（依頼人の口座番号、数字のみ、左ゼロ埋め。超過はエラー）
- *  - dummy: 17バイト（スペース）
- *
- * コールバックの戻り値（single-arg スタイル）:
- *  - 成功: { success: true, header: '<120-byte string>' }
- *  - 失敗: { error: '<日本語の人向けエラーメッセージ>' }
- *
- * 注意:
- *  - 銀行名／支店名は `fromBankNo` / `fromBranchNo` から取得します。ヘッダには必ずカナ名（`bankKana` / `branchKana`）のみを使用します。
- *    `bankKana` / `branchKana` が取得できない場合はエラーを返します（ただし `fromBankNo === '9900'` の場合は支店カナ未取得を許容し、支店欄は空文字になります）。
- *  - SJIS 相当バイト長の評価は本ファイル内の簡易ヘルパ `_bt_sjisByteLength` / `_bt_sjisTruncate` に従います。
- *    本番で厳密な Shift_JIS バイト一致が必要な場合はエンコーディングライブラリの導入を検討してください。
- *
- * data オブジェクトの詳細（呼び出し時の例とフィールド説明）:
- *  {
- *    typeCode: '11' | '給与振込' | '総合振込' , // 種別コード。'11' のような 2 桁文字列か、内部マップのキーを指定できます
- *    requesterCode: '123456',                  // 振込依頼人コード（数字）。内部で左ゼロ埋めして 10 バイト
- *    requesterName: 'テスト依頼人',            // 振込依頼人名（文字列）。半角化->SJIS 切り詰め（40 バイト）
- *    tradeDate: 'MMDD' | new Date(),           // 取組日。'1108' や Date を渡す
- *    fromBankNo: '0123',                       // 仕向銀行番号（数字） — 銀行のカナ名 (bankKana) を内部で取得し必須
- *    fromBranchNo: '001',                      // 仕向支店番号（数字） — 支店のカナ名 (branchKana) を内部で取得し原則必須
- *                                              // （ただし fromBankNo が '9900' の場合は支店取得をスキップ）
- *    depositType: '普通' | '1',                // 預金種目（キーまたは '1' 等の数字）
- *    accountNumber: '1234567'                  // 依頼人の口座番号（数字）
- *  }
- *
- * 呼び出し例:
- *  BANK.generateHeader({
- *    typeCode: '11', requesterCode: '123', requesterName: 'テスト', tradeDate: '1108',
- *    fromBankNo: '0123', fromBranchNo: '001', depositType: '普通', accountNumber: '12345'
- *  }, (res) => {
- *    if (res && res.success) console.log('header:', res.header);
- *    else console.error('error:', res && res.error);
- *  });
- *
- * @param {object} data ヘッダ生成に必要な情報（上記参照）
- * @param {function} callback single-arg スタイルのコールバック (result)
+ * @param {object} data ヘッダ生成用データ
+ * @param {function(result)} callback single-arg スタイルのコールバック
  */
 const generateHeader = (data, callback) => {
 	// data: {
@@ -2508,99 +2372,12 @@ const generateHeader = (data, callback) => {
 		_bt_invokeCallback(callback, { error: 'ヘッダ生成に失敗しました' }, null);
 	}
 };
-
+/** 公開: generateDataRecords — 振込明細配列から全銀データレコード文字列を生成します（詳細: docs/bank-transfer.md）。 */
+/** 公開: generateDataRecords — 振込明細配列から全銀データレコード文字列を生成します（詳細: docs/bank-transfer.md）。 */
 /**
- * 公開: generateDataRecords
- *
- * 概要:
- *  入力の振込レコード配列を非同期に処理し、各レコードを検証・正規化した上で
- *  全銀フォーマットの固定長データレコード文字列（1レコードあたり SJIS 相当で 120 バイト）に変換して
- *  コールバックで返します。
- *
- * 主な処理内容:
- *  - 各レコードの項目正規化（口座番号: `normalizeAccountNumber`、受取人名: `normalizePayeeName`）
- *  - 被仕向銀行/支店情報の取得（`getBank` / `getBranch` を内部呼び出し）
- *  - 預金種目のマッピング（日本語ラベルや数字を内部マップにより 1 桁コードへ変換）
- *  - 金額の丸め（小数は四捨五入ではなく Math.round で整数化）
- *  - EDI 情報、受取人名等を SJIS 相当バイト長で切り詰め / 右パディングしてフィールド化
- *  - ゆうちょ銀行同士（originBankNo === '9900' && toBankNo === '9900'）の場合は被仕向支店取得をスキップし、
- *    支店名欄は空白で埋める（仕様に合わせた扱い）
- *
- * エラーハンドリング（重要）:
- *  - 本関数は fail-fast（最初の致命的エラーで処理を中止）方式を採用します。
- *    各レコードの検証・正規化、銀行/支店取得、あるいは固定長文字列化の各段階で致命的な
- *    エラーが発生した場合、即座に処理を中止しコールバックにエラーオブジェクトを返します。
- *  - 全体的な呼び出しエラー（引数不正、API 呼び出し失敗など）は single-arg スタイルでエラーオブジェクトを返します。
- *
- * コールバック戻り値（single-arg スタイル）:
- *  - 成功: { success: true, records: Array<string> }
- *    - records: 全銀フォーマット（120バイト相当）の文字列配列（全件が正常に生成された場合）
- *  - 失敗: { error: '<日本語の説明>', index?: <number>, message?: '<詳細>' }
- *
- * 入力レコードの期待される形（例）:
- *  {
- *    toBankNo: '0001',         // 被仕向銀行コード（数字）
- *    toBranchNo: '001',        // 被仕向支店コード（数字）
- *    toAccountType: '普通',     // 必須: 預金種目（例: '普通','当座','貯蓄' または '1'/'2' 等の1桁コード）
- *    toAccountNumber: '12345', // 口座番号（全角/半角混在可）
- *    amount: 1000,             // 振込金額（数値）
- *    customerName: 'ヤマダタロウ', // 受取人名
- *    ediInfo: '任意のEDI情報',  // 任意（20バイトに切り詰め）
- *    reference: '振込依頼メモ'   // 任意の参照/備考
- *  }
- *
- * 注意点:
- *  - 本関数は最終的に固定長文字列を返すため、外部からはデータレコード文字列を直接受け取れます。
- *  - 内部で `normalizePayeeName` / `normalizeAccountNumber` を利用します。これらが例外を投げる場合は
- *    そのレコードがスキップされるか、呼び出しエラーとして返却されます。
- *  - 預金種目（toAccountType）は必須です。'普通'/'当座'/'貯蓄' 等のラベル、または '1'/'2' のような
- *    1桁のコードを指定してください。不明な値が与えられた場合はエラーになります。
- *
- * @param {Array<object>} records 入力振込レコードの配列（上記の期待形式を参照）
- * @param {string} [fromBankNo] 仕向（依頼人側）金融機関コード。ゆうちょ同士判定のため内部で '9900' と比較します。
- * @param {function(result)} callback single-arg スタイルのコールバック。成功時に { success:true, records, skipped } を返します。
- *
- * 使い方の例:
- *
- * // 1) 最も簡単な使い方 — 生成した文字列を行で分割して扱う
- * window.BANK.generateDataRecords(records, '0001', (res) => {
- *   if (res && res.error) {
- *     console.error('生成失敗', res);
- *     return;
- *   }
- *   // 正常時: res.records は CRLF で結合された単一の文字列を返します
- *   const joined = res.records; // "line1\r\nline2\r\n..."
- *   const lines = joined.split(/\r?\n/); // 各行（120バイト相当）を配列として扱える
- *   // たとえばダウンロード用に1行目を確認
- *   console.log('1行目長さ(SJIS換算):', lines[0].length, lines[0]);
- * });
- *
- * // 2) 銀行提出用に Shift_JIS に変換してブラウザでダウンロード
- * // （Encoding.js 等を事前に読み込んでいることを想定）
- * window.BANK.generateDataRecords(records, '0001', (res) => {
- *   if (res && res.error) { alert('エラー: ' + res.error); return; }
- *   const content = res.records; // CRLF で結合された文字列
- *   // Encoding.js を使って SJIS に変換
- *   // const sjisArray = Encoding.convert(Encoding.stringToCode(content), 'SJIS', 'UNICODE');
- *   // const uint8 = new Uint8Array(sjisArray);
- *   // const blob = new Blob([uint8], { type: 'text/plain' });
- *   // ダウンロード処理は Blob をリンク経由で発火させます
- * });
- *
- * // 3) kintone にファイルとして保存する例（ファイルアップロード -> レコード作成）
- * // - file upload: k/v1/file.json を使って fileKey を取得
- * // - record create: 取得した fileKey をファイルフィールドに割り当てて /k/v1/record を呼ぶ
- * window.BANK.generateDataRecords(records, '0001', async (res) => {
- *   if (res && res.error) { console.error(res); return; }
- *   const content = res.records;
- *   // ここで必要なら SJIS 変換して Blob を作成
- *   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-	 // const form = new FormData(); form.append('file', blob, 'zengin.txt');
- *   // const uploadRes = await kintone.api(kintone.api.url('/k/v1/file', true), 'POST', form);
- *   // const fileKey = uploadRes.fileKey;
- *   // const body = { app: kintone.app.getId(), record: { ZENGIN_FILE: { value: [{ fileKey }] } } };
- *   // await kintone.api(kintone.api.url('/k/v1/record', true), 'POST', body);
- * });
+ * @param {Array<object>} records 振込明細の配列
+ * @param {string} [fromBankNo] 仕向金融機関コード
+ * @param {function(result)} callback single-arg スタイルのコールバック
  */
 const generateDataRecords = (records, fromBankNo = '', callback) => {
 	if (typeof callback !== 'function')
@@ -2803,15 +2580,10 @@ const generateDataRecords = (records, fromBankNo = '', callback) => {
 	processNext();
 };
 
+/** 公開: generateTrailer — データレコード配列からトレーラ集計を生成してコールバックで返します（詳細: docs/bank-transfer.md）。 */
 /**
- * 公開: generateTrailer
- *
- * 概要:
- *  整形済みのデータレコード配列からトレーラ情報（件数・合計金額等）を生成します。
- *  トレーラの最終的な固定長文字列化は将来のフェーズで実施します。
- *
- * @param {Array<object>} dataRecords generateDataRecords が返した整形済みレコード配列
- * @param {function(result)} callback single-arg コールバック。成功時は { success:true, trailerRecord: '<120-byte string>' }
+ * @param {Array|String} dataRecords dataRecords 配列または CRLF で結合された文字列
+ * @param {function(result)} callback single-arg スタイルのコールバック
  */
 const generateTrailer = (dataRecords, callback) => {
 	if (typeof callback !== 'function')
@@ -2900,13 +2672,9 @@ const generateTrailer = (dataRecords, callback) => {
 	}
 };
 
+/** 公開: generateEndRecord — エンドレコードを生成してコールバックで返します（詳細: docs/bank-transfer.md）。 */
 /**
- * 公開: generateEndRecord
- *
- * 概要:
- *  エンドレコードを生成し、コールバックで返します。
- *
- * @param {function(result)} callback single-arg コールバック。成功時は { success:true, endRecord: '<120-byte string>' }
+ * @param {function(result)} callback single-arg スタイルのコールバック
  */
 const generateEndRecord = (callback) => {
 	if (typeof callback !== 'function')
@@ -2928,63 +2696,11 @@ const generateEndRecord = (callback) => {
 	}
 };
 
+/** 公開: generateZenginData — ヘッダ/データ/トレーラ/エンドを組み合わせた全銀ファイル文字列を生成します（詳細: docs/bank-transfer.md）。 */
 /**
- * 公開: generateZenginData
- *
- * 概要:
- *  以下の順序で全銀フォーマットの各レコードを生成し、最終的に CRLF で結合した単一の文字列を
- *  コールバックで返します。
- *   1. ヘッダレコード（generateHeader）
- *   2. データレコード群（generateDataRecords）
- *   3. トレーラレコード（generateTrailer）
- *   4. エンドレコード（generateEndRecord）
- *
- * 引数:
- *  - headerData {object}
- *      generateHeader に渡すオブジェクト。主なプロパティは次の通りです（generateHeader の仕様に準じます）:
- *        - typeCode: '11' や '21' 等の 2 桁文字列、または '給与振込' 等の内部マップキー
- *        - requesterCode: 振込依頼人コード（数字）。内部で左ゼロ埋めして 10 バイトにします
- *        - requesterName: 振込依頼人名（文字列）。半角化・カナ化等を行い SJIS 相当で 40 バイトに切り詰めます
- *        - tradeDate: 取組日。'MMDD'、'YYYY-MM-DD'、Date オブジェクト などを受け付け、MMDD 部分を利用します
- *        - fromBankNo: 仕向銀行番号（4桁）。generateDataRecords の fromBankNo に使用されます（省略可だが推奨）
- *        - fromBranchNo: 仕向支店番号（3桁）
- *        - depositType: 預金種目（'普通'|'当座' または '1'|'2' 等）
- *        - accountNumber: 依頼人の口座番号（数字）
- *
- *  - records {Array<object>}
- *      generateDataRecords に渡す振込レコードの配列。各要素は次のプロパティを持つことが期待されます:
- *        - toBankNo: 仕向先銀行コード（4桁文字列）
- *        - toBranchNo: 仕向先支店コード（3桁文字列）
- *        - toAccountType: 預金種目（'普通'/'当座' 等、または '1'/'2' のようなコード）※必須
- *        - toAccountNumber: 口座番号（数字）※7桁以内。内部で 0 埋めされます
- *        - amount: 振込金額（数値）※非負
- *        - customerName: 受取人名（日本語、全角カナ等）。内部で正規化・SJIS 切り詰めされます
- *        - customerKana: 受取人カナ（任意）
- *        - ediInfo / reference: EDI 用補助情報（任意）
- *
- *  - callback {function(result)}
- *      single-arg スタイルのコールバック。戻り値の形は以下の通り。
- *
- * 成功時 (success):
- *  { success: true,
- *    content: '<CRLF で結合された文字列>',
- *    parts: {
- *      header: '<120-byte header string>',
- *      data: '<CRLF-joined data records string>',
- *      trailer: '<120-byte trailer string>',
- *      end: '<120-byte end string>'
- *    }
- *  }
- *
- *  - content はヘッダ／データ／トレーラ／エンドを CRLF で連結した最終出力で、ファイル作成や
- *    Shift_JIS 変換の前段階として利用できます。
- *  - parts は個別の行（文字列）を参照したいときに便利です。
- *
- * 失敗時 (error):
- *  { error: '<日本語の説明>', detail?: <下位関数の戻り値やエラー情報> }
- *
- *  - detail には内部で失敗した関数（generateHeader / generateDataRecords / generateTrailer / generateEndRecord）
- *    の戻り値やエラー情報がそのまま含まれます。問題の特定に役立ちます。
+ * @param {object} headerData ヘッダ生成用データ
+ * @param {Array<object>} records 振込明細配列
+ * @param {function(result)} callback single-arg スタイルのコールバック
  */
 const generateZenginData = (headerData, records, callback) => {
 	if (typeof callback !== 'function')
@@ -3072,26 +2788,11 @@ const generateZenginData = (headerData, records, callback) => {
 	}
 };
 
+/** 公開: nextBankBusinessDay — 次の銀行営業日を計算してコールバックで返します（詳細: docs/bank-transfer.md）。 */
 /**
- * 次の銀行営業日を返すユーティリティ（コールバック形式）。
- * 祝日・土日・年末年始（12/31〜1/3）を非営業日として扱います。
- *
- * 挙動（最終仕様）:
- *  - 基準日が営業日の場合:
- *      - 基準日の時刻情報があり、かつ時刻が cutoffHour 以上であれば「翌々営業日」（2営業日後）を返します。
- *      - それ以外は「翌営業日」（1営業日後）を返します。
- *  - 基準日が休業日の場合:
- *      - 「2営業日後」（翌営業日のさらに次の営業日）を返します。
- *
- * つまり、基準日が営業日であれば「次の営業日（cutoff 超過ならさらに次）」を返し、
- * 基準日が休業日であれば「二つ先の営業日」を返します。
- *
- * コールバックは単一引数スタイルで、結果は 'YYYY-MM-DD' 形式の文字列を返します。
- *
- * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）。kintone の日付/日時文字列も受け付けます。
- * @param {number} [cutoffHour=18] 締め時刻（0-23）。デフォルトは銀行向けの 18 時。
- * @param {function(string):void} callback 結果を 'YYYY-MM-DD' 形式文字列で受け取るコールバック（single-arg スタイル）。
- * @throws {Error} 引数が不正な場合に例外を投げます（例: callback が関数でない、cutoffHour が範囲外等）
+ * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）
+ * @param {number} [cutoffHour=18] 締め時刻（0-23）
+ * @param {function(string):void} callback 結果を 'YYYY-MM-DD' 形式で受け取るコールバック（single-arg）
  */
 const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) => {
 	if (typeof callback !== 'function') {
