@@ -146,6 +146,58 @@
 
 ---
 
+## buildRow / buildCSV の `data` 引数について
+
+`buildRow` と `buildCSV` の第2引数（`data` / `dataArray`）の取り方と注意点をまとめます。
+
+- buildRow(schema, data, options)
+  - `data` は単一のレコードオブジェクトを渡します。
+  - スキーマの `key` はオブジェクト上のプロパティ名またはドットパス（例: `user.name`）を指定できます。
+  - 該当プロパティが存在しない場合は、スキーマで `default` を指定していればその値（または `default(record)`）が使われ、未指定なら空文字列が出力されます。
+  - 例:
+
+```js
+const schema = [
+  { key: 'id', label: 'ID' },
+  { key: 'user.name', label: '氏名' },
+  { key: 'score', label: '得点', default: (rec) => rec.user && rec.user.defaultScore ? rec.user.defaultScore : 0 }
+];
+const rec = { id: 1, user: { name: '佐藤' } };
+console.log(window.CSV.buildRow(schema, rec)); // -> "1,佐藤,0"
+```
+
+- buildCSV(schema, dataArray, options)
+  - `dataArray` にはレコードの配列を渡します。単一レコードを渡したい場合は配列でラップするか、`buildCSV` は非配列を単一要素配列として扱います（内部で `Array.isArray` チェックをしています）。
+  - `options.header` を `true` にすると、スキーマの `label`（または `key`）によるヘッダ行が先頭に挿入されます。
+  - 例:
+
+```js
+const rows = [
+  { id: 1, user: { name: '佐藤' }, score: 10 },
+  { id: 2, user: { name: '鈴木' } } // score は default が使われる
+];
+console.log(window.CSV.buildCSV(schema, rows, { header: true }));
+// -> "ID,氏名,得点\n1,佐藤,10\n2,鈴木,0"
+```
+
+### ネストと配列インデックス
+
+ドットパスはネストしたオブジェクトを辿るのに使えます。配列の要素にアクセスする際はインデックスを指定できます（例: `items.0.name`）。存在しない経路を辿ると `undefined` となり、`default` があればそちらが使われます。
+
+```js
+const schema2 = [ { key: 'items.0.name', label: '第1商品' } ];
+console.log(window.CSV.buildRow(schema2, { items: [{ name: 'りんご' }] })); // -> "りんご"
+```
+
+### 型とフォーマットの関係
+
+`buildRow` / `buildCSV` はスキーマの `type`（`date` / `number` / `string`）や `format` を見て簡易整形を行いますが、より細かい整形（小数桁数、通貨記号付加など）は `formatter` を使って明示的に文字列を返すのが安全です。
+
+### map の適用タイミング
+
+データは内部で次の流れで処理されます: 取得した raw 値 -> `map` を適用 -> (`mapFinal` がある場合はそのまま最終出力) -> `formatter` があれば適用 -> `type`/`format` による簡易整形 -> CSV エスケープ。したがって `map` の戻り値に `type`/`format` を適用したい場合は `mapFinal: false`（デフォルト）にしてください。
+
+
 必要ならこのドキュメントにサンプルコードや追加の変換パターン（日時の細かい扱い、複雑な map のユースケースなど）を追記できます。
 
 ## Try it — 短いサンプル
