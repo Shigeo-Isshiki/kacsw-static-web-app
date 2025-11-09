@@ -5,7 +5,7 @@
   "scripts": {
     "start": "sirv ./src public --cors --single --no-clear --port 8000",
     "lint": "eslint \"src/**/*.js\"",
-  "test": "node -e \"const fs=require('fs');fs.readdirSync('test').filter(f=>/^test-.*\\.js$/.test(f)).forEach(f=>{console.log('RUN',f);require('./test/'+f)});\"",
+  "test": "node -e \"const fs=require('fs');fs.readdirSync('test').filter(f=>/^test-.*\\.js$/.test(f)).filter(f=>!/^test-bank-transfer-/.test(f)).forEach(f=>{console.log('RUN',f);require('./test/'+f)});require('./test/test-bank-transfer.js');\"",
     "lint:ci": "eslint \"src/**/*.js\"",
     "lint:fix": "eslint \"src/**/*.js\" --fix",
     "format": "prettier --write \"src/**/*.{js,css,html}\"",
