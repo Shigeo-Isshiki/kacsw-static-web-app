@@ -228,15 +228,29 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
-### `generateHeader` / `generateDataRecords` / `generateTrailer` / `generateEndRecord`
+#### `generateHeader` / `generateDataRecords` / `generateTrailer` / `generateEndRecord`
 
-これらは `generateZenginData` の下位関数で、個別に利用することも可能です。
-- generateHeader(headerData, callback)
-  - headerData の必須プロパティは上記参照。戻り値は `{ header: '<120バイト文字列>' }`。
-- generateDataRecords(records, fromBankNo, callback)
-  - records は上記参照。戻り値は `{ data: '<CRLFで結合されたデータ行>' }`。
-- generateTrailer(summaryData, callback) / generateEndRecord(callback)
-  - トレーラ・エンドはファイル全体の合計や集計を元に 120 バイト行を生成します。
+これらは `generateZenginData` の下位関数で、個別に利用することも可能です。ここでは各関数を簡潔に説明します。
+
+##### `generateHeader(headerData, callback)`
+- 概要: ヘッダ（120バイト固定長行）を生成します。デバッグや個別検査で `header` 部分だけ欲しい場合に使います。
+- 戻り値（コールバック）: `{ header: '<120バイト文字列>' }`
+- 例: `window.BANK.generateHeader(headerData, res => console.log(res.header));`
+
+##### `generateDataRecords(records, fromBankNo, callback)`
+- 概要: `records` 配列からデータ行群（CRLFで結合）を生成します。`fromBankNo` があると仕向銀行情報を参照します。
+- 戻り値（コールバック）: `{ data: '<CRLFで結合されたデータ行>' }`
+- 例: `window.BANK.generateDataRecords(records, '0001', res => console.log(res.data));`
+
+##### `generateTrailer(summaryData, callback)`
+- 概要: ファイルの合計等を元にトレーラ（120バイト固定長行）を作成します。
+- 戻り値（コールバック）: `{ trailer: '<120バイト文字列>' }`
+- 例: `window.BANK.generateTrailer(summary, res => console.log(res.trailer));`
+
+##### `generateEndRecord(callback)`
+- 概要: ファイルの終端を示すエンドレコード行（120バイト固定長）を生成します。
+- 戻り値（コールバック）: `{ end: '<120バイト文字列>' }`
+- 例: `window.BANK.generateEndRecord(res => console.log(res.end));`
 
 ---
 
