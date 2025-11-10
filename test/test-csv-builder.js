@@ -165,4 +165,22 @@ try {
   process.exitCode = 2;
 }
 
+// ----- test-csv-fixed-column (integrated) -----
+try {
+  const schemaFixed = [
+    { key: 'id', label: 'ID' },
+    { label: '注記', default: 'N/A' }, // fixed column (no key)
+    { key: 'amount', label: '金額', type: 'number' },
+  ];
+  const rowsFixed = [{ id: 'A1', amount: 100 }];
+  const csvFixed = buildCSV(schemaFixed, rowsFixed, { header: true });
+  const linesFixed = csvFixed.split('\n');
+  eq(linesFixed[0], 'ID,注記,金額', 'fixed column header mismatch');
+  eq(linesFixed[1], 'A1,N/A,100', 'fixed column row value mismatch');
+  console.log('PASS: test-csv-fixed-column');
+} catch (e) {
+  console.error('FAIL: test-csv-fixed-column', e && e.message ? e.message : e);
+  process.exitCode = 2;
+}
+
 console.log('ALL CSV TESTS INVOKED');
