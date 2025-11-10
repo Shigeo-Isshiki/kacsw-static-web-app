@@ -59,7 +59,7 @@
 
 ## 公開関数の引数詳細
 
-### getBank(bankCodeOrName, callback)
+### `getBank(bankCodeOrName, callback)`
 
 概要:
 - 銀行コード（4桁）または銀行名の一部/全体を与えて銀行情報を検索します。
@@ -90,7 +90,7 @@ window.BANK.getBank('横浜', (res) => { console.log(res); });
 
 ---
 
-### getBranch(bankCode, branchCodeOrName, callback)
+### `getBranch(bankCode, branchCodeOrName, callback)`
 
 概要:
 - 指定した銀行コード内で支店を検索します。支店コード（3桁）または支店名（部分一致）で検索できます。
@@ -122,7 +122,7 @@ window.BANK.getBranch('0005', '横浜', (res) => { console.log(res); });
 
 ---
 
-### convertYucho(kigou, bangou, callback)
+### `convertYucho(kigou, bangou, callback)`
 
 概要:
 - ゆうちょ口座（記号 + 番号）を全銀フォーマットで扱える形に正規化・変換します。ゆうちょ口座は預金種別により桁長が異なるため、適切に変換します。
@@ -167,7 +167,7 @@ window.BANK.convertYucho('12345','1234567',(res)=>{ console.log(res); });
 
 ---
 
-### nextBankBusinessDay(baseDate, cutoffHour, callback)
+### `nextBankBusinessDay(baseDate, cutoffHour, callback)`
 
 概要:
 - 指定日時から次の銀行営業日を計算し、結果をコールバックで返します。内部で土日・年末年始・国民の祝日判定（外部 API を利用）を行います。
@@ -191,7 +191,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
-### generateZenginData(headerData, records, callback)
+### `generateZenginData(headerData, records, callback)`
 
 概要:
 - ヘッダ・データ群・トレーラ・エンドを順に生成して、CRLF で結合した文字列を `content` として返します。
@@ -228,7 +228,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
-### generateHeader / generateDataRecords / generateTrailer / generateEndRecord
+### `generateHeader` / `generateDataRecords` / `generateTrailer` / `generateEndRecord`
 
 これらは `generateZenginData` の下位関数で、個別に利用することも可能です。
 - generateHeader(headerData, callback)
@@ -240,7 +240,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
-### normalizeEdiInfo(input, options)
+### `normalizeEdiInfo(input, options)`
 
 - `normalizeEdiInfo(input, options)`
   - EDI 向け補助情報を銀行提出向けに簡易正規化するヘルパです。
@@ -254,7 +254,9 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
     - 許容外文字が含まれている場合はエラーを投げます。
     - 指定されたバイト長で切り詰め（SJIS 相当）し、`padToBytes` が true の場合は右側をスペースで埋めた文字列を返します。
 
-### normalizePayeeName(name)
+---
+
+### `normalizePayeeName(name)`
 
 - `normalizePayeeName(name)`
   - 受取人名を全銀フォーマット向けに正規化するヘルパです。実装に沿った詳細な処理順は次の通りです。
@@ -321,7 +323,9 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
  - 重要: `normalizePayeeName` は英小文字を含む入力を即時にエラーとします（例: "yamada"）。
  - 多くの日本語の氏名（漢字を含む）をそのまま渡すと、最終的に許容半角文字に変換されずエラーになります。API を呼ぶ側では可能なら `customerKana`（カナ表記）を優先して渡してください。
 
-### normalizeAccountNumber(input)
+---
+
+### `normalizeAccountNumber(input)`
 
 - `normalizeAccountNumber(input)`
   - 入力を半角数字に正規化して7桁の0埋め口座番号文字列を返します（実装上は幅固定で 7 桁になります）。
