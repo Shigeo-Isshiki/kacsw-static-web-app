@@ -8,17 +8,16 @@
 
 - 概要
 - 公開 API サマリ
- - 公開 API サマリ
- - 公開関数の引数詳細
-   - `getBank(bankCodeOrName, callback)`
-   - `getBranch(bankCode, branchCodeOrName, callback)`
-   - `convertYucho(kigou, bangou, callback)`
-   - `generateZenginData(headerData, records, callback)`
-   - `generateHeader(headerData, callback)`
-   - `generateDataRecords(records, fromBankNo, callback)`
-   - `normalizeEdiInfo(input, options)` の用途
-   - `normalizePayeeName(name)`
-   - `normalizeAccountNumber(input)`
+- 公開関数の引数詳細
+  - `getBank(bankCodeOrName, callback)`
+  - `getBranch(bankCode, branchCodeOrName, callback)`
+  - `convertYucho(kigou, bangou, callback)`
+  - `generateZenginData(headerData, records, callback)`
+  - `generateHeader(headerData, callback)`
+  - `generateDataRecords(records, fromBankNo, callback)`
+  - `normalizeEdiInfo(input, options)`
+  - `normalizePayeeName(name)`
+  - `normalizeAccountNumber(input)`
 - エラー形式
 - 実例
 - 注意事項 / エッジケース
@@ -41,18 +40,18 @@
 
 ## 公開 API サマリ
 
-- getBank(bankCodeOrName, callback)
-- getBranch(bankCode, branchCodeOrName, callback)
-- convertYucho(kigou, bangou, callback)
-- generateHeader(headerData, callback)
-- generateDataRecords(records, fromBankNo, callback)
-- generateTrailer(summaryData, callback)
-- generateEndRecord(callback)
-- generateZenginData(headerData, records, callback)
-- normalizeEdiInfo(input, options)
-- normalizePayeeName(name, options)
-- normalizeAccountNumber(number, width)
-- nextBankBusinessDay(baseDate, cutoffHour, callback)
+- `getBank(bankCodeOrName, callback)`
+- `getBranch(bankCode, branchCodeOrName, callback)`
+- `convertYucho(kigou, bangou, callback)`
+- `generateHeader(headerData, callback)`
+- `generateDataRecords(records, fromBankNo, callback)`
+- `generateTrailer(summaryData, callback)`
+- `generateEndRecord(callback)`
+- `generateZenginData(headerData, records, callback)`
+- `normalizeEdiInfo(input, options)`
+- `normalizePayeeName(name)`
+- `normalizeAccountNumber(input)`
+- `nextBankBusinessDay(baseDate, cutoffHour, callback)`
 
 （各関数はコールバック単一引数スタイルを基本にしています。Node 風の (err, res) も互換的に扱える場合があります）
 
@@ -241,7 +240,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
-### normalizeEdiInfo
+### normalizeEdiInfo(input, options)
 
 - `normalizeEdiInfo(input, options)`
   - EDI 向け補助情報を銀行提出向けに簡易正規化するヘルパです。
@@ -255,7 +254,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
     - 許容外文字が含まれている場合はエラーを投げます。
     - 指定されたバイト長で切り詰め（SJIS 相当）し、`padToBytes` が true の場合は右側をスペースで埋めた文字列を返します。
 
-### normalizePayeeName
+### normalizePayeeName(name)
 
 - `normalizePayeeName(name)`
   - 受取人名を全銀フォーマット向けに正規化するヘルパです。実装に沿った詳細な処理順は次の通りです。
@@ -322,7 +321,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
  - 重要: `normalizePayeeName` は英小文字を含む入力を即時にエラーとします（例: "yamada"）。
  - 多くの日本語の氏名（漢字を含む）をそのまま渡すと、最終的に許容半角文字に変換されずエラーになります。API を呼ぶ側では可能なら `customerKana`（カナ表記）を優先して渡してください。
 
-### normalizeAccountNumber
+### normalizeAccountNumber(input)
 
 - `normalizeAccountNumber(input)`
   - 入力を半角数字に正規化して7桁の0埋め口座番号文字列を返します（実装上は幅固定で 7 桁になります）。
