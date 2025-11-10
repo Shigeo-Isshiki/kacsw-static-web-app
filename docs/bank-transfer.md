@@ -8,6 +8,7 @@
 
 - 概要
 - 公開 API サマリ
+ - 公開 API サマリ
  - 公開関数の引数詳細
    - `getBank(bankCodeOrName, callback)`
    - `getBranch(bankCode, branchCodeOrName, callback)`
@@ -188,6 +189,8 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
   console.log(resDate); // '2026-01-05' など（YYYY-MM-DD 形式）
 });
 ```
+
+---
 
 ### generateZenginData(headerData, records, callback)
 
