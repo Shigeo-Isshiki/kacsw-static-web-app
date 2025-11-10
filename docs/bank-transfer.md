@@ -9,15 +9,15 @@
 - 概要
 - 公開 API サマリ
 - 公開関数の引数詳細
-  - `getBank(bankCodeOrName, callback)`
-  - `getBranch(bankCode, branchCodeOrName, callback)`
-  - `convertYucho(kigou, bangou, callback)`
-  - `generateZenginData(headerData, records, callback)`
-  - `generateHeader(headerData, callback)`
-  - `generateDataRecords(records, fromBankNo, callback)`
-  - `normalizeEdiInfo(input, options)`
-  - `normalizePayeeName(name)`
-  - `normalizeAccountNumber(input)`
+  - [`getBank(bankCodeOrName, callback)`](#getBank)
+  - [`getBranch(bankCode, branchCodeOrName, callback)`](#getBranch)
+  - [`convertYucho(kigou, bangou, callback)`](#convertYucho)
+  - [`generateZenginData(headerData, records, callback)`](#generateZenginData)
+  - [`generateHeader(headerData, callback)`](#generateHeader)
+  - [`generateDataRecords(records, fromBankNo, callback)`](#generateDataRecords)
+  - [`normalizeEdiInfo(input, options)`](#normalizeEdiInfo)
+  - [`normalizePayeeName(name)`](#normalizePayeeName)
+  - [`normalizeAccountNumber(input)`](#normalizeAccountNumber)
 - エラー形式
 - 実例
 - 注意事項 / エッジケース
@@ -59,6 +59,7 @@
 
 ## 公開関数の引数詳細
 
+<a id="getBank"></a>
 ### `getBank(bankCodeOrName, callback)`
 
 概要:
@@ -90,6 +91,7 @@ window.BANK.getBank('横浜', (res) => { console.log(res); });
 
 ---
 
+<a id="getBranch"></a>
 ### `getBranch(bankCode, branchCodeOrName, callback)`
 
 概要:
@@ -122,6 +124,7 @@ window.BANK.getBranch('0005', '横浜', (res) => { console.log(res); });
 
 ---
 
+<a id="convertYucho"></a>
 ### `convertYucho(kigou, bangou, callback)`
 
 概要:
@@ -167,6 +170,7 @@ window.BANK.convertYucho('12345','1234567',(res)=>{ console.log(res); });
 
 ---
 
+<a id="nextBankBusinessDay"></a>
 ### `nextBankBusinessDay(baseDate, cutoffHour, callback)`
 
 概要:
@@ -191,6 +195,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
+<a id="generateZenginData"></a>
 ### `generateZenginData(headerData, records, callback)`
 
 概要:
@@ -228,25 +233,30 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
+<a id="generateHelpers"></a>
 #### `generateHeader` / `generateDataRecords` / `generateTrailer` / `generateEndRecord`
 
 これらは `generateZenginData` の下位関数で、個別に利用することも可能です。ここでは各関数を簡潔に説明します。
 
+<a id="generateHeader"></a>
 ##### `generateHeader(headerData, callback)`
 - 概要: ヘッダ（120バイト固定長行）を生成します。デバッグや個別検査で `header` 部分だけ欲しい場合に使います。
 - 戻り値（コールバック）: `{ header: '<120バイト文字列>' }`
 - 例: `window.BANK.generateHeader(headerData, res => console.log(res.header));`
 
+<a id="generateDataRecords"></a>
 ##### `generateDataRecords(records, fromBankNo, callback)`
 - 概要: `records` 配列からデータ行群（CRLFで結合）を生成します。`fromBankNo` があると仕向銀行情報を参照します。
 - 戻り値（コールバック）: `{ data: '<CRLFで結合されたデータ行>' }`
 - 例: `window.BANK.generateDataRecords(records, '0001', res => console.log(res.data));`
 
+<a id="generateTrailer"></a>
 ##### `generateTrailer(summaryData, callback)`
 - 概要: ファイルの合計等を元にトレーラ（120バイト固定長行）を作成します。
 - 戻り値（コールバック）: `{ trailer: '<120バイト文字列>' }`
 - 例: `window.BANK.generateTrailer(summary, res => console.log(res.trailer));`
 
+<a id="generateEndRecord"></a>
 ##### `generateEndRecord(callback)`
 - 概要: ファイルの終端を示すエンドレコード行（120バイト固定長）を生成します。
 - 戻り値（コールバック）: `{ end: '<120バイト文字列>' }`
@@ -254,6 +264,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
+<a id="normalizeEdiInfo"></a>
 ### `normalizeEdiInfo(input, options)`
 
 - `normalizeEdiInfo(input, options)`
@@ -270,6 +281,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
+<a id="normalizePayeeName"></a>
 ### `normalizePayeeName(name)`
 
 - `normalizePayeeName(name)`
@@ -339,6 +351,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
+<a id="normalizeAccountNumber"></a>
 ### `normalizeAccountNumber(input)`
 
 - `normalizeAccountNumber(input)`
