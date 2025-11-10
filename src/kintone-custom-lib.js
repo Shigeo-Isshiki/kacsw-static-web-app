@@ -641,6 +641,10 @@ if (typeof window !== 'undefined') {
 		window.notifyWarning = typeof notifyWarning !== 'undefined' ? notifyWarning : undefined;
 	} catch {}
 	try {
+		window.setHeaderMenuSpaceButton =
+			typeof setHeaderMenuSpaceButton !== 'undefined' ? setHeaderMenuSpaceButton : undefined;
+	} catch {}
+	try {
 		window.setRecordValues = typeof setRecordValues !== 'undefined' ? setRecordValues : undefined;
 	} catch {}
 	try {
@@ -654,9 +658,5 @@ if (typeof window !== 'undefined') {
 	try {
 		window.setSpaceFieldText =
 			typeof setSpaceFieldText !== 'undefined' ? setSpaceFieldText : undefined;
-	} catch {}
-	try {
-		window.setHeaderMenuSpaceButton =
-			typeof setHeaderMenuSpaceButton !== 'undefined' ? setHeaderMenuSpaceButton : undefined;
 	} catch {}
 }
