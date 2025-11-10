@@ -8,11 +8,16 @@
 
 - 概要
 - 公開 API サマリ
-- 主要関数の引数詳細
-  - `generateZenginData(headerData, records, callback)`
-  - `generateHeader(headerData, callback)`
-  - `generateDataRecords(records, fromBankNo, callback)`
-  - `normalizeEdiInfo(input, options)` の用途
+ - 公開関数の引数詳細
+   - `getBank(bankCodeOrName, callback)`
+   - `getBranch(bankCode, branchCodeOrName, callback)`
+   - `convertYucho(kigou, bangou, callback)`
+   - `generateZenginData(headerData, records, callback)`
+   - `generateHeader(headerData, callback)`
+   - `generateDataRecords(records, fromBankNo, callback)`
+   - `normalizeEdiInfo(input, options)` の用途
+   - `normalizePayeeName(name)`
+   - `normalizeAccountNumber(input)`
 - エラー形式
 - 実例
 - 注意事項 / エッジケース
@@ -233,7 +238,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
-## normalizeEdiInfo
+### normalizeEdiInfo
 
 - `normalizeEdiInfo(input, options)`
   - EDI 向け補助情報を銀行提出向けに簡易正規化するヘルパです。
@@ -247,9 +252,9 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
     - 許容外文字が含まれている場合はエラーを投げます。
     - 指定されたバイト長で切り詰め（SJIS 相当）し、`padToBytes` が true の場合は右側をスペースで埋めた文字列を返します。
 
-## normalizePayeeName
+### normalizePayeeName
 
- - normalizePayeeName(name)
+- `normalizePayeeName(name)`
   - 受取人名を全銀フォーマット向けに正規化するヘルパです。実装に沿った詳細な処理順は次の通りです。
     1. 入力を文字列化して前後の空白を除去。空文字なら Error を投げる。
     2. 入力文字列に ASCII の小文字（a–z）が含まれる場合は即座に Error を投げる（小文字は許容されません）。
