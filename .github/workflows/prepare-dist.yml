@@ -1,4 +1,5 @@
 name: Prepare dist and package
+# editor-refresh: touched to force language-server/editor diagnostics refresh
 
 on:
   push:
