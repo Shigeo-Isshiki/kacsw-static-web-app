@@ -8,11 +8,16 @@
 
 - 概要
 - 公開 API サマリ
-- 主要関数の引数詳細
-  - `generateZenginData(headerData, records, callback)`
-  - `generateHeader(headerData, callback)`
-  - `generateDataRecords(records, fromBankNo, callback)`
-  - `normalizeEdiInfo(input, options)` の用途
+- 公開関数の引数詳細
+  - [`getBank(bankCodeOrName, callback)`](#getBank)
+  - [`getBranch(bankCode, branchCodeOrName, callback)`](#getBranch)
+  - [`convertYucho(kigou, bangou, callback)`](#convertYucho)
+  - [`generateZenginData(headerData, records, callback)`](#generateZenginData)
+  - [`generateHeader(headerData, callback)`](#generateHeader)
+  - [`generateDataRecords(records, fromBankNo, callback)`](#generateDataRecords)
+  - [`normalizeEdiInfo(input, options)`](#normalizeEdiInfo)
+  - [`normalizePayeeName(name)`](#normalizePayeeName)
+  - [`normalizeAccountNumber(input)`](#normalizeAccountNumber)
 - エラー形式
 - 実例
 - 注意事項 / エッジケース
@@ -35,26 +40,27 @@
 
 ## 公開 API サマリ
 
-- getBank(bankCodeOrName, callback)
-- getBranch(bankCode, branchCodeOrName, callback)
-- convertYucho(kigou, bangou, callback)
-- generateHeader(headerData, callback)
-- generateDataRecords(records, fromBankNo, callback)
-- generateTrailer(summaryData, callback)
-- generateEndRecord(callback)
-- generateZenginData(headerData, records, callback)
-- normalizeEdiInfo(input, options)
-- normalizePayeeName(name, options)
-- normalizeAccountNumber(number, width)
-- nextBankBusinessDay(baseDate, cutoffHour, callback)
+- `getBank(bankCodeOrName, callback)`
+- `getBranch(bankCode, branchCodeOrName, callback)`
+- `convertYucho(kigou, bangou, callback)`
+- `generateHeader(headerData, callback)`
+- `generateDataRecords(records, fromBankNo, callback)`
+- `generateTrailer(summaryData, callback)`
+- `generateEndRecord(callback)`
+- `generateZenginData(headerData, records, callback)`
+- `normalizeEdiInfo(input, options)`
+- `normalizePayeeName(name)`
+- `normalizeAccountNumber(input)`
+- `nextBankBusinessDay(baseDate, cutoffHour, callback)`
 
 （各関数はコールバック単一引数スタイルを基本にしています。Node 風の (err, res) も互換的に扱える場合があります）
 
 ---
 
-## 主要関数の引数詳細
+## 公開関数の引数詳細
 
-### getBank(bankCodeOrName, callback)
+<a id="getBank"></a>
+### `getBank(bankCodeOrName, callback)`
 
 概要:
 - 銀行コード（4桁）または銀行名の一部/全体を与えて銀行情報を検索します。
@@ -66,6 +72,12 @@
 戻り値（コールバックに渡すオブジェクトの例）:
 - 成功: `{ bankCode: '0001', bankName: 'みどり銀行', bankKana: 'ﾐﾄﾞﾘｷﾞﾝｺｳ' }`
 - 失敗: `{ error: 'not_found', message: '銀行が見つかりません', code: 'bank.not_found' }`
+
+戻り値オブジェクトの各プロパティ（成功時）:
+
+- `bankCode` (string) — 銀行コード（4桁、例: "0001"）。全銀フォーマット用にゼロ埋め済みのコードが返ります。
+- `bankName` (string) — 取得した銀行の表示名（API の元データそのまま）。注: 出力に漢字や全角文字が含まれるため、振込ファイルなどバイト制約のある用途では `bankKana` を利用するか別途正規化してください。
+- `bankKana` (string) — 銀行名のかな表記を半角カタカナに正規化した文字列（例: `ﾐﾄﾞﾘｷﾞﾝｺｳ`）。全銀ファイルなどで文字種制約がある場合はこちらを使うことを推奨します。
 
 挙動・注意点:
 - 引数が数値（または数字文字列）かつ 4 桁の場合はコード検索を優先します。
@@ -79,7 +91,8 @@ window.BANK.getBank('横浜', (res) => { console.log(res); });
 
 ---
 
-### getBranch(bankCode, branchCodeOrName, callback)
+<a id="getBranch"></a>
+### `getBranch(bankCode, branchCodeOrName, callback)`
 
 概要:
 - 指定した銀行コード内で支店を検索します。支店コード（3桁）または支店名（部分一致）で検索できます。
@@ -93,6 +106,12 @@ window.BANK.getBank('横浜', (res) => { console.log(res); });
 - 成功: `{ branchCode: '123', branchName: '本店営業部', branchKana: 'ﾎﾝﾃﾝｴｲｷﾞｮｳﾌﾞ' }`
 - 失敗: `{ error: 'branch_not_found', message: '支店が見つかりません', code: 'branch.not_found' }`
 
+戻り値オブジェクトの各プロパティ（成功時）:
+
+- `branchCode` (string) — 支店コード（3桁、例: "123"）。ゼロ埋め済みのコードが返ります。
+- `branchName` (string) — 取得した支店の表示名（API の元データそのまま）。漢字や全角文字が含まれる場合があります。
+- `branchKana` (string) — 支店名のかな表記を半角カタカナに正規化した文字列（例: `ﾎﾝﾃﾝｴｲｷﾞｮｳﾌﾞ`）。全銀ファイルでの使用はこちらを推奨します。
+
 挙動・注意点:
 - `bankCode` が存在しない場合は早期にエラーを返します。
 - 部分一致で複数候補が見つかる場合は代表候補を返します。詳細な候補リストが必要な場合は将来的に別 API を提供する可能性があります。
@@ -105,7 +124,8 @@ window.BANK.getBranch('0005', '横浜', (res) => { console.log(res); });
 
 ---
 
-### convertYucho(kigou, bangou, callback)
+<a id="convertYucho"></a>
+### `convertYucho(kigou, bangou, callback)`
 
 概要:
 - ゆうちょ口座（記号 + 番号）を全銀フォーマットで扱える形に正規化・変換します。ゆうちょ口座は預金種別により桁長が異なるため、適切に変換します。
@@ -119,6 +139,26 @@ window.BANK.getBranch('0005', '横浜', (res) => { console.log(res); });
 - 成功: `{ yuchoKigou:'12345', yuchoBangou:'0123456', bankCode:'9900', bankName:'ゆうちょ銀行', branchCode:'000', accountType:'普通', accountNumber:'0012345' }`
 - 失敗: `{ error:'invalid_format', message:'記号が5桁である必要があります', code:'kigou.not_5_digits', field:'kigou' }`
 
+戻り値オブジェクトの各プロパティ（成功時）:
+
+- `yuchoKigou` (string) — 入力から半角化・正規化されたゆうちょ記号（例: `"12345"`）。
+- `yuchoBangou` (string) — ゆうちょ番号を預金種目に応じて0埋めした値（例: `"0123456"` または `"00123456"` のように、内部で扱いやすい桁数に整形）。
+- `bankCode` (string) — 変換先の銀行コード（ゆうちょの場合は `"9900"`）。
+- `bankName` (string) — 銀行の表示名（API 由来）。振込ファイルで直接使う場合は文字種に注意が必要です（下の `bankKana` を推奨）。
+- `bankKana` (string) — 銀行名を半角カタカナに正規化した文字列（例: `ﾕｳﾁｮｷﾞﾝｺｳ`）。全銀フォーマットのフィールドに入れる文字列は通常こちらを利用します。
+- `branchCode` (string) — 算出された支店コード（3桁、ゼロ埋め済み）。
+- `branchName` (string) — 支店の表示名（取得に成功した場合にセットされます）。
+- `branchKana` (string) — 支店名を半角カタカナに正規化した文字列（取得に成功した場合にセットされます）。
+- `accountType` (string) — 表示用の預金種別ラベル（`'当座'` または `'普通'` 等）。
+- `accountNumber` (string) — 全銀向けに0埋めされた7桁の口座番号（例: `"0012345"`）。
+
+注意: 実際の全銀ファイルを生成する際は、漢字を含む `bankName`/`branchName` よりも `bankKana`/`branchKana` を使用して半角カタカナで出力するのが一般的です。以下の成功例では `bankName` を半角カタカナ表記に合わせた例を示します。
+
+成功例（現実に合わせた表記）:
+```json
+{ "yuchoKigou":"12345", "yuchoBangou":"0123456", "bankCode":"9900", "bankName":"ﾕｳﾁｮｷﾞﾝｺｳ", "bankKana":"ﾕｳﾁｮｷﾞﾝｺｳ", "branchCode":"000", "accountType":"普通", "accountNumber":"0012345" }
+```
+
 挙動・注意点:
 - 入力の数字がミスフォーマット（全角数字やハイフン混入等）の場合は内部で半角化・除去処理を行いますが、ルール外の値はエラーになります。
 - 戻り値には全銀向けに整形した `accountNumber`（7 桁ゼロ埋め）や、対応する銀行コード/支店コードが含まれる場合があります（外部 API 依存）。
@@ -130,7 +170,8 @@ window.BANK.convertYucho('12345','1234567',(res)=>{ console.log(res); });
 
 ---
 
-### nextBankBusinessDay(baseDate, cutoffHour, callback)
+<a id="nextBankBusinessDay"></a>
+### `nextBankBusinessDay(baseDate, cutoffHour, callback)`
 
 概要:
 - 指定日時から次の銀行営業日を計算し、結果をコールバックで返します。内部で土日・年末年始・国民の祝日判定（外部 API を利用）を行います。
@@ -152,7 +193,10 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 });
 ```
 
-### generateZenginData(headerData, records, callback)
+---
+
+<a id="generateZenginData"></a>
+### `generateZenginData(headerData, records, callback)`
 
 概要:
 - ヘッダ・データ群・トレーラ・エンドを順に生成して、CRLF で結合した文字列を `content` として返します。
@@ -189,27 +233,58 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ---
 
-### generateHeader / generateDataRecords / generateTrailer / generateEndRecord
+<a id="generateHelpers"></a>
+#### `generateHeader` / `generateDataRecords` / `generateTrailer` / `generateEndRecord`
 
-これらは `generateZenginData` の下位関数で、個別に利用することも可能です。
-- generateHeader(headerData, callback)
-  - headerData の必須プロパティは上記参照。戻り値は `{ header: '<120バイト文字列>' }`。
-- generateDataRecords(records, fromBankNo, callback)
-  - records は上記参照。戻り値は `{ data: '<CRLFで結合されたデータ行>' }`。
-- generateTrailer(summaryData, callback) / generateEndRecord(callback)
-  - トレーラ・エンドはファイル全体の合計や集計を元に 120 バイト行を生成します。
+これらは `generateZenginData` の下位関数で、個別に利用することも可能です。ここでは各関数を簡潔に説明します。
+
+<a id="generateHeader"></a>
+##### `generateHeader(headerData, callback)`
+- 概要: ヘッダ（120バイト固定長行）を生成します。デバッグや個別検査で `header` 部分だけ欲しい場合に使います。
+- 戻り値（コールバック）: `{ header: '<120バイト文字列>' }`
+- 例: `window.BANK.generateHeader(headerData, res => console.log(res.header));`
+
+<a id="generateDataRecords"></a>
+##### `generateDataRecords(records, fromBankNo, callback)`
+- 概要: `records` 配列からデータ行群（CRLFで結合）を生成します。`fromBankNo` があると仕向銀行情報を参照します。
+- 戻り値（コールバック）: `{ data: '<CRLFで結合されたデータ行>' }`
+- 例: `window.BANK.generateDataRecords(records, '0001', res => console.log(res.data));`
+
+<a id="generateTrailer"></a>
+##### `generateTrailer(summaryData, callback)`
+- 概要: ファイルの合計等を元にトレーラ（120バイト固定長行）を作成します。
+- 戻り値（コールバック）: `{ trailer: '<120バイト文字列>' }`
+- 例: `window.BANK.generateTrailer(summary, res => console.log(res.trailer));`
+
+<a id="generateEndRecord"></a>
+##### `generateEndRecord(callback)`
+- 概要: ファイルの終端を示すエンドレコード行（120バイト固定長）を生成します。
+- 戻り値（コールバック）: `{ end: '<120バイト文字列>' }`
+- 例: `window.BANK.generateEndRecord(res => console.log(res.end));`
 
 ---
 
-## normalizeEdiInfo
+<a id="normalizeEdiInfo"></a>
+### `normalizeEdiInfo(input, options)`
 
-- normalizeEdiInfo(input, options)
-  - EDI 向け補助情報を整形するためのヘルパです。`input` は文字列または object を受け付け、内部で許可文字・長さチェックを行います。
-  - オブジェクトを渡した場合は許可されたフィールドのみ抽出して文字列化します。戻り値は正規化済み文字列またはエラー情報を含むオブジェクトです。
+- `normalizeEdiInfo(input, options)`
+  - EDI 向け補助情報を銀行提出向けに簡易正規化するヘルパです。
+  - 引数:
+    - `input` (string) — 入力文字列（全角かな等を含む文字列）。実装上は文字列を受け取り、内部で半角カタカナ化や禁止文字チェックを行います。
+    - `options` (object, optional) — オプション。サポートするキー:
+      - `padToBytes` (boolean) — true の場合、返却文字列を `bytes` 長になるようにスペースでパディングします（デフォルト false）。
+      - `bytes` (number) — `padToBytes` が true のときのバイト長（SJIS 相当で計測、デフォルト 20）。
+  - 挙動:
+    - 入力は内部で半角カタカナ化され、コンマ（`','` / '，'）はエラーになります。
+    - 許容外文字が含まれている場合はエラーを投げます。
+    - 指定されたバイト長で切り詰め（SJIS 相当）し、`padToBytes` が true の場合は右側をスペースで埋めた文字列を返します。
 
-## normalizePayeeName
+---
 
- - normalizePayeeName(name)
+<a id="normalizePayeeName"></a>
+### `normalizePayeeName(name)`
+
+- `normalizePayeeName(name)`
   - 受取人名を全銀フォーマット向けに正規化するヘルパです。実装に沿った詳細な処理順は次の通りです。
     1. 入力を文字列化して前後の空白を除去。空文字なら Error を投げる。
     2. 入力文字列に ASCII の小文字（a–z）が含まれる場合は即座に Error を投げる（小文字は許容されません）。
@@ -228,7 +303,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
   - 戻り値: 正規化済み文字列（半角カナ等、SJIS の先頭 30 バイトに切り詰め）か、検査に失敗した場合は Error を投げます。
   - 注記: 実装では `options` 引数は受け取らないため、前節の例にある `truncateBytes` 等のオプション指定は無効です。
   
-### 具体例 (置換)
+#### 具体例 (置換)
 
 以下は `normalizePayeeName` が行う典型的な置換の例です。左が入力、右が正規化後の出力です（オプションにより多少異なる場合があります）。
 
@@ -271,14 +346,23 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 ```
 
 注: 実際の出力は入力の文字種（漢字/かな）、内部マップ定義、及び文字列長により変わります。
- - 重要: `normalizePayeeName` は英小文字を含む入力を即時にエラーとします（例: "yamada"）。
- - 多くの日本語の氏名（漢字を含む）をそのまま渡すと、最終的に許容半角文字に変換されずエラーになります。API を呼ぶ側では可能なら `customerKana`（カナ表記）を優先して渡してください。
+- 重要: `normalizePayeeName` は英小文字を含む入力を即時にエラーとします（例: "yamada"）。
+- 多くの日本語の氏名（漢字を含む）をそのまま渡すと、最終的に許容半角文字に変換されずエラーになります。API を呼ぶ側では可能なら `customerKana`（カナ表記）を優先して渡してください。
 
-## normalizeAccountNumber
+---
 
-- normalizeAccountNumber(number, width)
-  - 指定幅に合わせて左ゼロ埋めして返します（例: 7 → '0001234'）。
-  - 入力は数値または数字を含む文字列を想定しており、非数字文字は除去されます。幅より長い場合の扱いはオプションによりエラーまたは切り捨てになります。
+<a id="normalizeAccountNumber"></a>
+### `normalizeAccountNumber(input)`
+
+- `normalizeAccountNumber(input)`
+  - 入力を半角数字に正規化して7桁の0埋め口座番号文字列を返します（実装上は幅固定で 7 桁になります）。
+  - 引数:
+    - `input` (string|number) — 全角数字やハイフン等を含む入力を受け付けます。
+  - 挙動:
+    - 全角数字は半角に変換され、数字以外の文字が含まれている場合はエラーになります。
+    - 入力が空の場合はエラーを投げます。
+    - 入力が7桁を超える場合はエラーになります（最大7桁）。
+    - 正常時は7桁に左ゼロ埋めした文字列を返します（例: `"1234"` → `"0001234"`）。
 
 ---
 
