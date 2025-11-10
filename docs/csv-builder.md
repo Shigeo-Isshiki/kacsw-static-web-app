@@ -122,6 +122,29 @@ console.log(buildCSV(schema, rows, { header:true }));
 - `mapFinal` (boolean)
   - `true` を指定すると、map の戻り値をそのまま最終出力とし、その後の `formatter` / `type` / `format` の処理をスキップします。
 
+### 固定列（`key` を省略して固定値やデフォルトを出力する）
+
+配列形式のスキーマでは、各要素で `key` を省略することができます。`key` がない（または `null`）場合、内部でデータから値を取得せず `default` / `mapDefault` / `map` などにフォールバックします。固定の文字列や計算結果を1列に常に出力したいときに便利です。
+
+例:
+
+```js
+const schema = [
+  { key: 'id', label: 'ID' },
+  { label: '注記', default: 'N/A' }, // key を書かない -> data から取らない固定列
+  { key: 'amount', label: '金額', type: 'number' }
+];
+
+CSV.buildCSV(schema, [{ id:'A1', amount:100 }], { header:true });
+// ヘッダ: ID,注記,金額
+// 行:   A1,N/A,100
+```
+
+注意:
+- オブジェクト形式のスキーマ（`{ key: {...} }` 形式）ではプロパティ名が `key` に相当するため、`key` を省略する使い方は配列形式でのみ推奨します。
+- ヘッダを空にしたいだけなら `label: ''` を明示する方が分かりやすいです。
+- `map` を利用する場合、`raw` が `undefined` になる点に留意し、必要なら `mapDefault` を指定してください。
+
 ---
 
 ## 内部の処理フロー（短く）
