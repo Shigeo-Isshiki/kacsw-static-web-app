@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Try to find node in common paths
+export PATH="/c/Program Files/nodejs:$PATH"
+export PATH="/c/Program Files (x86)/nodejs:$PATH"
+export PATH="/usr/local/bin:$PATH"
+
+# Check if npx is available, if not skip linting
+if command -v npx >/dev/null 2>&1; then
+    npx lint-staged
+else
+    echo "Warning: npx not found, skipping lint-staged"
+    exit 0
+fi
