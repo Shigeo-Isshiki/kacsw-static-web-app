@@ -1,21 +1,41 @@
-{
-  "name": "kintone-customize",
-  "version": "0.1.0",
-  "description": "kintoneアプリ用のJavaScriptカスタマイズプロジェクト",
-  "type": "module",
-  "main": "dist/customize.js",
-  "scripts": {
-    "build": "rollup -c",
-    "lint": "eslint \"src/**/*.{js,jsx}\"",
-    "format": "prettier --write \"src/**/*.{js,jsx,json,md}\""
-  },
-  "devDependencies": {
-    "@rollup/plugin-commonjs": "^24.1.0",
-    "@rollup/plugin-node-resolve": "^15.3.1",
-    "eslint": "^8.57.1",
-    "eslint-config-prettier": "^9.1.2",
-    "eslint-plugin-prettier": "^5.5.4",
-    "prettier": "^3.6.2",
-    "rollup": "^3.29.5"
-  }
+﻿{
+    "$schema":  "https://json.schemastore.org/package.json",
+    "name":  "kacsw-static-web-app",
+    "version":  "1.0.0",
+    "scripts":  {
+                    "start":  "sirv ./src public --cors --single --no-clear --port 8000",
+                    "lint":  "eslint \"src/**/*.js\"",
+                    "test":  "node -e \"const fs=require(\u0027fs\u0027);fs.readdirSync(\u0027test\u0027).filter(f=\u003e/^test-.*\\.js$/.test(f)).filter(f=\u003e!/^test-bank-transfer-/.test(f)).forEach(f=\u003e{console.log(\u0027RUN\u0027,f);require(\u0027./test/\u0027+f)});require(\u0027./test/test-bank-transfer.js\u0027);\"",
+                    "lint:ci":  "eslint \"src/**/*.js\"",
+                    "lint:fix":  "eslint \"src/**/*.js\" --fix",
+                    "format":  "prettier --write \"src/**/*.{js,css,html}\"",
+                    "prepare:dist":  "node scripts/prepare-dist.js",
+                    "ci-check":  "npm run prepare:dist \u0026\u0026 node scripts/check-window-vm.js \u0026\u0026 node scripts/puppeteer-check.js",
+                    "zip":  "cd dist \u0026\u0026 zip -r ../package.zip .",
+                    "auto-check":  "node scripts/auto-check.js",
+                    "prepare":  "husky install"
+                },
+    "lint-staged":  {
+                        "src/**/*.{js,css,html}":  [
+                                                       "prettier --write",
+                                                       "eslint --fix"
+                                                   ]
+                    },
+    "devDependencies":  {
+                            "esbuild":  "^0.25.11",
+                            "eslint":  "^9.38.0",
+                            "eslint-config-prettier":  "^10.1.8",
+                            "eslint-plugin-prettier":  "^5.5.4",
+                            "husky":  "^8.0.0",
+                            "lint-staged":  "^16.2.6",
+                            "prettier":  "^3.6.2",
+                            "puppeteer":  "^24.27.0",
+                            "sirv":  "^3.0.2",
+                            "sirv-cli":  "^3.0.1",
+                            "chokidar":  "^3.5.3",
+                            "fs-extra":  "^11.1.1"
+                        },
+    "engines":  {
+                    "node":  "\u003e=14"
+                }
 }

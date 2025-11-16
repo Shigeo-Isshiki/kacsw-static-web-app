@@ -1,11 +1,13 @@
-{
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
-  },
-  "files.exclude": {
-    "node_modules": true,
-    "dist": true
-  }
+﻿{
+    "editor.formatOnSave":  true,
+    "files.exclude":  {
+                          "node_modules":  true,
+                          "dist":  true
+                      },
+    "json.schemaDownload.enable":  false,
+    "json.validate.enable":  true,
+    "editor.defaultFormatter":  "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave":  {
+                                     "source.fixAll.eslint":  true
+                                 }
 }
