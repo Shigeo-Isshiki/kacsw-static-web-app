@@ -23,7 +23,7 @@
 **シグネチャ**:
 
 ```js
-buildRow(schema, data, options = {})
+buildRow(schema, data, (options = {}));
 ```
 
 **引数**:
@@ -44,8 +44,8 @@ buildRow(schema, data, options = {})
 **例**:
 
 ```js
-const schema = [ { key: 'id' }, { key: 'name' } ];
-console.log(buildRow(schema, { id:1, name:'山田' })); // "1,山田"
+const schema = [{ key: 'id' }, { key: 'name' }];
+console.log(buildRow(schema, { id: 1, name: '山田' })); // "1,山田"
 ```
 
 **注意点**:
@@ -59,7 +59,7 @@ console.log(buildRow(schema, { id:1, name:'山田' })); // "1,山田"
 **シグネチャ**:
 
 ```js
-buildCSV(schema, dataArray, options = {})
+buildCSV(schema, dataArray, (options = {}));
 ```
 
 **引数**:
@@ -78,8 +78,11 @@ buildCSV(schema, dataArray, options = {})
 **例**:
 
 ```js
-const rows = [ { id:1, name:'山田' }, { id:2, name:'鈴木' } ];
-console.log(buildCSV(schema, rows, { header:true }));
+const rows = [
+	{ id: 1, name: '山田' },
+	{ id: 2, name: '鈴木' },
+];
+console.log(buildCSV(schema, rows, { header: true }));
 // "id,name\n1,山田\n2,鈴木"
 ```
 
@@ -130,17 +133,18 @@ console.log(buildCSV(schema, rows, { header:true }));
 
 ```js
 const schema = [
-  { key: 'id', label: 'ID' },
-  { label: '注記', default: 'N/A' }, // key を書かない -> data から取らない固定列
-  { key: 'amount', label: '金額', type: 'number' }
+	{ key: 'id', label: 'ID' },
+	{ label: '注記', default: 'N/A' }, // key を書かない -> data から取らない固定列
+	{ key: 'amount', label: '金額', type: 'number' },
 ];
 
-CSV.buildCSV(schema, [{ id:'A1', amount:100 }], { header:true });
+CSV.buildCSV(schema, [{ id: 'A1', amount: 100 }], { header: true });
 // ヘッダ: ID,注記,金額
 // 行:   A1,N/A,100
 ```
 
 注意:
+
 - オブジェクト形式のスキーマ（`{ key: {...} }` 形式）ではプロパティ名が `key` に相当するため、`key` を省略する使い方は配列形式でのみ推奨します。
 - ヘッダを空にしたいだけなら `label: ''` を明示する方が分かりやすいです。
 - `map` を利用する場合、`raw` が `undefined` になる点に留意し、必要なら `mapDefault` を指定してください。
@@ -152,6 +156,7 @@ CSV.buildCSV(schema, [{ id:'A1', amount:100 }], { header:true });
 配列形式の `schema` を使うと、配列内の要素の並び順がそのまま CSV の列順になります。内部実装ではスキーマを正規化した配列（内部変数 `norm`）を先頭から順に処理して各セルを組み立てるためです。
 
 ポイント:
+
 - 明示的に列の順序を指定したい場合は配列形式を使ってください（推奨）。
 - オブジェクト形式のスキーマ（`{ key: {...} }`）を使うと `Object.keys()` の返す順序（通常はプロパティの挿入順）に依存します。プラットフォームや JS 実装の違いで予期せぬ順序になる可能性を避けたい場合は配列を使ってください。
 
@@ -160,13 +165,12 @@ CSV.buildCSV(schema, [{ id:'A1', amount:100 }], { header:true });
 ```js
 // 推奨: 配列形式で明示的に順序を指定
 const schema = [
-  { key: 'id', label: 'ID' },
-  { key: 'name', label: '氏名' },
-  { key: 'amount', label: '金額' }
+	{ key: 'id', label: 'ID' },
+	{ key: 'name', label: '氏名' },
+	{ key: 'amount', label: '金額' },
 ];
 // 出力列順 = ID, 氏名, 金額
 ```
-
 
 ## 内部の処理フロー（短く）
 
@@ -191,13 +195,13 @@ raw 値取得 -> map 適用 -> (mapFinal?) -> formatter -> type/format -> escape
 ```html
 <script src="src/csv-builder.js"></script>
 <script>
-  const schema = [
-    { key:'id', label:'ID' },
-    { key:'name', label:'氏名' },
-    { key:'birth', label:'生年月日', type:'date', format:'YYYY/MM/DD' }
-  ];
-  const rows = [ { id:1, name:'山田', birth:'19800115' } ];
-  console.log(window.CSV.buildCSV(schema, rows, { header:true }));
+	const schema = [
+		{ key: 'id', label: 'ID' },
+		{ key: 'name', label: '氏名' },
+		{ key: 'birth', label: '生年月日', type: 'date', format: 'YYYY/MM/DD' },
+	];
+	const rows = [{ id: 1, name: '山田', birth: '19800115' }];
+	console.log(window.CSV.buildCSV(schema, rows, { header: true }));
 </script>
 ```
 
@@ -207,17 +211,17 @@ raw 値取得 -> map 適用 -> (mapFinal?) -> formatter -> type/format -> escape
 global.window = global;
 require('./src/csv-builder.js');
 const schema = [
-  { key:'amount', label:'金額', formatter: (v)=> v==null?'':`¥${Number(v).toFixed(2)}` }
+	{ key: 'amount', label: '金額', formatter: (v) => (v == null ? '' : `¥${Number(v).toFixed(2)}`) },
 ];
-console.log(window.CSV.buildCSV(schema, [{ amount:123.456 }], { header:true }));
+console.log(window.CSV.buildCSV(schema, [{ amount: 123.456 }], { header: true }));
 ```
 
 ### 3) Map と mapDefault の例
 
 ```js
-const m = new Map([['りんご','A01']]);
-const schema = [ { key:'product', map:m, mapDefault:'UNKNOWN' } ];
-console.log(buildRow(schema, { product:'ばなな' })); // -> 'UNKNOWN'
+const m = new Map([['りんご', 'A01']]);
+const schema = [{ key: 'product', map: m, mapDefault: 'UNKNOWN' }];
+console.log(buildRow(schema, { product: 'ばなな' })); // -> 'UNKNOWN'
 ```
 
 ---
