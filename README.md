@@ -17,6 +17,9 @@ and other helpers.
 	- ドキュメント: [CSV ビルダー 使い方リファレンス — docs/csv-builder.md](./docs/csv-builder.md)
 - その他のライブラリ — `bank-transfer` や `phone-utils` の使い方ドキュメントは追って追加します（coming soon）。
 
+	- 日付ユーティリティ（使い方リファレンス） — `src/date-utils.js` の仕様、和暦/漢数字変換、利用例を含みます。
+		- ドキュメント: [日付ユーティリティ 使い方リファレンス — docs/date-utils.md](./docs/date-utils.md)
+
 銀行振込データ作成機能を利用する場合はまず上記の 銀行振込ユーティリティリファレンスを参照してください。
 CSV 機能を利用する場合はまず上記の CSV ビルダーリファレンスを参照してください。
 
