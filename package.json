@@ -18,24 +18,44 @@
     "lint-staged":  {
                         "src/**/*.{js,css,html}":  [
                                                        "prettier --write",
-                                                       "eslint --fix"
-                                                   ]
-                    },
-    "devDependencies":  {
-                            "esbuild":  "^0.25.11",
-                            "eslint":  "^9.38.0",
-                            "eslint-config-prettier":  "^10.1.8",
-                            "eslint-plugin-prettier":  "^5.5.4",
-                            "husky":  "^8.0.0",
-                            "lint-staged":  "^16.2.6",
-                            "prettier":  "^3.6.2",
-                            "puppeteer":  "^24.27.0",
-                            "sirv":  "^3.0.2",
-                            "sirv-cli":  "^3.0.1",
-                            "chokidar":  "^3.5.3",
-                            "fs-extra":  "^11.1.1"
-                        },
-    "engines":  {
-                    "node":  "\u003e=14"
-                }
-}
+                                                    {
+                                                        "$schema": "https://json.schemastore.org/package.json",
+                                                        "name": "kacsw-static-web-app",
+                                                        "version": "1.0.0",
+                                                        "scripts": {
+                                                            "start": "sirv ./src public --cors --single --no-clear --port 8000",
+                                                            "lint": "eslint \"src/**/*.js\"",
+                                                            "test": "node -e \"const fs=require('fs');fs.readdirSync('test').filter(f=>/^test-.*\\.js$/.test(f)).filter(f=>!/^test-bank-transfer-/.test(f)).forEach(f=>{console.log('RUN',f);require('./test/'+f)});require('./test/test-bank-transfer.js');\"",
+                                                            "lint:ci": "eslint \"src/**/*.js\"",
+                                                            "lint:fix": "eslint \"src/**/*.js\" --fix",
+                                                            "format": "prettier --write \"src/**/*.{js,css,html}\"",
+                                                            "prepare:dist": "node scripts/prepare-dist.js",
+                                                            "ci-check": "npm run prepare:dist && node scripts/check-window-vm.js && node scripts/puppeteer-check.js",
+                                                            "zip": "cd dist && zip -r ../package.zip .",
+                                                            "auto-check": "node scripts/auto-check.js",
+                                                            "prepare": "husky install"
+                                                        },
+                                                        "lint-staged": {
+                                                            "src/**/*.{js,css,html}": [
+                                                                "prettier --write",
+                                                                "eslint --fix"
+                                                            ]
+                                                        },
+                                                        "devDependencies": {
+                                                            "esbuild": "^0.25.11",
+                                                            "eslint": "^9.38.0",
+                                                            "eslint-config-prettier": "^10.1.8",
+                                                            "eslint-plugin-prettier": "^5.5.4",
+                                                            "husky": "^8.0.0",
+                                                            "lint-staged": "^16.2.6",
+                                                            "prettier": "^3.6.2",
+                                                            "puppeteer": "^24.27.0",
+                                                            "sirv": "^3.0.2",
+                                                            "sirv-cli": "^3.0.1",
+                                                            "chokidar": "^3.5.3",
+                                                            "fs-extra": "^11.1.1"
+                                                        },
+                                                        "engines": {
+                                                            "node": ">=14"
+                                                        }
+                                                    }
