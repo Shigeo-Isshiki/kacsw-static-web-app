@@ -2966,3 +2966,26 @@ if (typeof window !== 'undefined') {
 		nextBankBusinessDay,
 	});
 }
+
+// CommonJS export for Node/test environments
+try {
+	if (typeof module !== 'undefined' && module && module.exports) {
+		module.exports =
+			typeof window !== 'undefined' && window.BANK
+				? window.BANK
+				: {
+						getBank,
+						getBranch,
+						convertYucho,
+						normalizeAccountNumber,
+						normalizePayeeName,
+						normalizeEdiInfo,
+						generateHeader,
+						generateDataRecords,
+						generateTrailer,
+						generateEndRecord,
+						generateZenginData,
+						nextBankBusinessDay,
+					};
+	}
+} catch (e) {}

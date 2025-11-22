@@ -31,6 +31,10 @@ const _DU_KANJI_NUM = {
 	千: 1000,
 };
 
+// Note: Exports will be added once all functions are defined (file end).
+
+// (グローバル公開 / CommonJS export はファイル末尾で行います)
+
 // NOTE: 一時的にトップレベルで未定義の内部変数を参照してしまうブロックを削除しました。
 // 必要な外部公開はファイル末尾でまとめて行います。
 
@@ -299,20 +303,23 @@ const convertToYear = (date) => {
 		if (m) return parseInt(m[1], 10);
 	}
 
-	// 公開: kintone 等から参照されることがあるユーティリティをグローバルに露出
-	if (typeof window !== 'undefined') {
-		try {
-			window.convertToSeireki =
-				typeof convertToSeireki !== 'undefined' ? convertToSeireki : undefined;
-		} catch {}
-		try {
-			window.convertToEra = typeof convertToEra !== 'undefined' ? convertToEra : undefined;
-		} catch {}
-		try {
-			window.convertToYear = typeof convertToYear !== 'undefined' ? convertToYear : undefined;
-		} catch {}
-		// _DU_ERAS は内部データのため非公開化
-	}
-
 	throw new Error('不正な入力形式です');
 };
+
+// Expose as a namespaced object similar to other modules (window.DATE_UTILS)
+// Expose using the same simple pattern as other modules (window.DATE)
+if (typeof window !== 'undefined') {
+	window.DATE = window.DATE || {};
+	Object.assign(window.DATE, {
+		convertToSeireki,
+		convertToEra,
+		convertToYear,
+	});
+}
+
+// CommonJS export for Node/test environments
+try {
+	if (typeof module !== 'undefined' && module && module.exports) {
+		module.exports = { convertToSeireki, convertToEra, convertToYear };
+	}
+} catch (e) {}

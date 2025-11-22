@@ -261,3 +261,10 @@ if (typeof window !== 'undefined') {
 	});
 }
 // end
+
+// CommonJS export for Node/test environments
+try {
+	if (typeof module !== 'undefined' && module && module.exports) {
+		module.exports = { buildRow, buildCSV };
+	}
+} catch (e) {}

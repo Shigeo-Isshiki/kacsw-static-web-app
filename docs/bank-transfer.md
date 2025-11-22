@@ -29,6 +29,7 @@
 `src/bank-transfer.js` は kintone やブラウザ上で動作する銀行振込関連のユーティリティ群です。公開 API は `window.BANK` に付与されています（ロード後に `window.BANK = ...`）。
 
 主に次を提供します:
+
 - 銀行・支店名の検索（`getBank`, `getBranch`）
 - ゆうちょ変換（`convertYucho`）
 - 全銀フォーマット（Zengin）用のレコード生成（`generateZenginData` など）
@@ -60,16 +61,20 @@
 ## 公開関数の引数詳細
 
 <a id="getBank"></a>
+
 ### `getBank(bankCodeOrName, callback)`
 
 概要:
+
 - 銀行コード（4桁）または銀行名の一部/全体を与えて銀行情報を検索します。
 
 引数:
+
 - `bankCodeOrName` (string|number) — 銀行コード（例: '0001'）または検索文字列（例: '横浜'）。必須。
 - `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `BankResult`、失敗時は `ErrorResult` を返します。
 
 戻り値（コールバックに渡すオブジェクトの例）:
+
 - 成功: `{ bankCode: '0001', bankName: 'みどり銀行', bankKana: 'ﾐﾄﾞﾘｷﾞﾝｺｳ' }`
 - 失敗: `{ error: 'not_found', message: '銀行が見つかりません', code: 'bank.not_found' }`
 
@@ -80,29 +85,39 @@
 - `bankKana` (string) — 銀行名のかな表記を半角カタカナに正規化した文字列（例: `ﾐﾄﾞﾘｷﾞﾝｺｳ`）。全銀ファイルなどで文字種制約がある場合はこちらを使うことを推奨します。
 
 挙動・注意点:
+
 - 引数が数値（または数字文字列）かつ 4 桁の場合はコード検索を優先します。
 - 部分一致検索を行う場合は複数候補が返ることがあり、その場合は内部で最良候補を選んで返します（必要ならクライアント側で絞り込んでください）。
 
 例:
+
 ```js
-window.BANK.getBank('0005', (res) => { console.log(res); });
-window.BANK.getBank('横浜', (res) => { console.log(res); });
+window.BANK.getBank('0005', (res) => {
+	console.log(res);
+});
+window.BANK.getBank('横浜', (res) => {
+	console.log(res);
+});
 ```
 
 ---
 
 <a id="getBranch"></a>
+
 ### `getBranch(bankCode, branchCodeOrName, callback)`
 
 概要:
+
 - 指定した銀行コード内で支店を検索します。支店コード（3桁）または支店名（部分一致）で検索できます。
 
 引数:
+
 - `bankCode` (string|number) — 銀行コード（4桁）。必須。
 - `branchCodeOrName` (string|number) — 支店コード（3桁）または検索文字列。必須。
 - `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `BranchResult`、失敗時は `ErrorResult` を返します。
 
 戻り値の例:
+
 - 成功: `{ branchCode: '123', branchName: '本店営業部', branchKana: 'ﾎﾝﾃﾝｴｲｷﾞｮｳﾌﾞ' }`
 - 失敗: `{ error: 'branch_not_found', message: '支店が見つかりません', code: 'branch.not_found' }`
 
@@ -113,29 +128,39 @@ window.BANK.getBank('横浜', (res) => { console.log(res); });
 - `branchKana` (string) — 支店名のかな表記を半角カタカナに正規化した文字列（例: `ﾎﾝﾃﾝｴｲｷﾞｮｳﾌﾞ`）。全銀ファイルでの使用はこちらを推奨します。
 
 挙動・注意点:
+
 - `bankCode` が存在しない場合は早期にエラーを返します。
 - 部分一致で複数候補が見つかる場合は代表候補を返します。詳細な候補リストが必要な場合は将来的に別 API を提供する可能性があります。
 
 例:
+
 ```js
-window.BANK.getBranch('0005', '123', (res) => { console.log(res); });
-window.BANK.getBranch('0005', '横浜', (res) => { console.log(res); });
+window.BANK.getBranch('0005', '123', (res) => {
+	console.log(res);
+});
+window.BANK.getBranch('0005', '横浜', (res) => {
+	console.log(res);
+});
 ```
 
 ---
 
 <a id="convertYucho"></a>
+
 ### `convertYucho(kigou, bangou, callback)`
 
 概要:
+
 - ゆうちょ口座（記号 + 番号）を全銀フォーマットで扱える形に正規化・変換します。ゆうちょ口座は預金種別により桁長が異なるため、適切に変換します。
 
 引数:
+
 - `kigou` (string|number) — ゆうちょ記号（例: '12345'）。必須。
 - `bangou` (string|number) — ゆうちょ番号（例: '1234567'）。必須。
 - `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `ConvertYuchoResult`、失敗時は `ErrorResult` を返します。
 
 戻り値の例:
+
 - 成功: `{ yuchoKigou:'12345', yuchoBangou:'0123456', bankCode:'9900', bankName:'ゆうちょ銀行', branchCode:'000', accountType:'普通', accountNumber:'0012345' }`
 - 失敗: `{ error:'invalid_format', message:'記号が5桁である必要があります', code:'kigou.not_5_digits', field:'kigou' }`
 
@@ -155,53 +180,75 @@ window.BANK.getBranch('0005', '横浜', (res) => { console.log(res); });
 注意: 実際の全銀ファイルを生成する際は、漢字を含む `bankName`/`branchName` よりも `bankKana`/`branchKana` を使用して半角カタカナで出力するのが一般的です。以下の成功例では `bankName` を半角カタカナ表記に合わせた例を示します。
 
 成功例（現実に合わせた表記）:
+
 ```json
-{ "yuchoKigou":"12345", "yuchoBangou":"0123456", "bankCode":"9900", "bankName":"ﾕｳﾁｮｷﾞﾝｺｳ", "bankKana":"ﾕｳﾁｮｷﾞﾝｺｳ", "branchCode":"000", "accountType":"普通", "accountNumber":"0012345" }
+{
+	"yuchoKigou": "12345",
+	"yuchoBangou": "0123456",
+	"bankCode": "9900",
+	"bankName": "ﾕｳﾁｮｷﾞﾝｺｳ",
+	"bankKana": "ﾕｳﾁｮｷﾞﾝｺｳ",
+	"branchCode": "000",
+	"accountType": "普通",
+	"accountNumber": "0012345"
+}
 ```
 
 挙動・注意点:
+
 - 入力の数字がミスフォーマット（全角数字やハイフン混入等）の場合は内部で半角化・除去処理を行いますが、ルール外の値はエラーになります。
 - 戻り値には全銀向けに整形した `accountNumber`（7 桁ゼロ埋め）や、対応する銀行コード/支店コードが含まれる場合があります（外部 API 依存）。
 
 例:
+
 ```js
-window.BANK.convertYucho('12345','1234567',(res)=>{ console.log(res); });
+window.BANK.convertYucho('12345', '1234567', (res) => {
+	console.log(res);
+});
 ```
 
 ---
 
 <a id="nextBankBusinessDay"></a>
+
 ### `nextBankBusinessDay(baseDate, cutoffHour, callback)`
 
 概要:
+
 - 指定日時から次の銀行営業日を計算し、結果をコールバックで返します。内部で土日・年末年始・国民の祝日判定（外部 API を利用）を行います。
 
 引数:
+
 - `baseDate` (Date|string) — 基準日時。Date オブジェクトまたは解析可能な日付文字列を受け付けます。省略時は現在日時を使用します。
 - `cutoffHour` (number) — 当日の締切時刻（0-23、省略時は 18）。基準時刻がこの時刻以降であれば 翌営業日のさらに次 を返す挙動になります。
 - `callback` (function(resultDateString)) — single-arg スタイルのコールバック。結果は 'YYYY-MM-DD' 形式の文字列で渡されます。
 
 挙動・注意点:
+
 - 祝日判定は内部で外部 API を参照します（ネットワークエラー時は祝日扱いとしないフェールソフトの挙動）。
 - 関数はコールバック方式で結果を返すため、同期的な戻り値はありません。必ず `callback` を渡してください。
 
 例:
+
 ```js
 const d = new Date('2025-12-31T19:00:00');
 window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
-  console.log(resDate); // '2026-01-05' など（YYYY-MM-DD 形式）
+	console.log(resDate); // '2026-01-05' など（YYYY-MM-DD 形式）
 });
 ```
 
 ---
 
 <a id="generateZenginData"></a>
+
 ### `generateZenginData(headerData, records, callback)`
 
 概要:
+
 - ヘッダ・データ群・トレーラ・エンドを順に生成して、CRLF で結合した文字列を `content` として返します。
 
 引数:
+
 - headerData (object)
   - typeCode: string — 全銀の種別コード（例: '11' または内部識別子 '給与振込' 等）。必須。
   - requesterCode: string|number — 振込依頼人コード。内部で左ゼロ埋めして 10 バイトにします。
@@ -228,36 +275,46 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 エラー時の形式は下で示します（ErrorResult 構造）。
 
 備考:
+
 - `content` は CRLF で結合された文字列です。Shift_JIS 変換やファイル出力は呼び出し側で行ってください。
 - `parts` は個別レコード（120 バイト固定長）の断片が返るため、デバッグや個別検査に便利です。
 
 ---
 
 <a id="generateHelpers"></a>
+
 #### `generateHeader` / `generateDataRecords` / `generateTrailer` / `generateEndRecord`
 
 これらは `generateZenginData` の下位関数で、個別に利用することも可能です。ここでは各関数を簡潔に説明します。
 
 <a id="generateHeader"></a>
+
 ##### `generateHeader(headerData, callback)`
+
 - 概要: ヘッダ（120バイト固定長行）を生成します。デバッグや個別検査で `header` 部分だけ欲しい場合に使います。
 - 戻り値（コールバック）: `{ header: '<120バイト文字列>' }`
 - 例: `window.BANK.generateHeader(headerData, res => console.log(res.header));`
 
 <a id="generateDataRecords"></a>
+
 ##### `generateDataRecords(records, fromBankNo, callback)`
+
 - 概要: `records` 配列からデータ行群（CRLFで結合）を生成します。`fromBankNo` があると仕向銀行情報を参照します。
 - 戻り値（コールバック）: `{ data: '<CRLFで結合されたデータ行>' }`
 - 例: `window.BANK.generateDataRecords(records, '0001', res => console.log(res.data));`
 
 <a id="generateTrailer"></a>
+
 ##### `generateTrailer(summaryData, callback)`
+
 - 概要: ファイルの合計等を元にトレーラ（120バイト固定長行）を作成します。
 - 戻り値（コールバック）: `{ trailer: '<120バイト文字列>' }`
 - 例: `window.BANK.generateTrailer(summary, res => console.log(res.trailer));`
 
 <a id="generateEndRecord"></a>
+
 ##### `generateEndRecord(callback)`
+
 - 概要: ファイルの終端を示すエンドレコード行（120バイト固定長）を生成します。
 - 戻り値（コールバック）: `{ end: '<120バイト文字列>' }`
 - 例: `window.BANK.generateEndRecord(res => console.log(res.end));`
@@ -265,6 +322,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 ---
 
 <a id="normalizeEdiInfo"></a>
+
 ### `normalizeEdiInfo(input, options)`
 
 - `normalizeEdiInfo(input, options)`
@@ -282,6 +340,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 ---
 
 <a id="normalizePayeeName"></a>
+
 ### `normalizePayeeName(name, options)`
 
 - `normalizePayeeName(name)`
@@ -305,7 +364,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
     - `skipAbbreviation` (boolean) — `true` を渡すと、法人略語・営業所略語・事業略語の自動置換（内部マップによる強制適用）をスキップします。
       - デフォルトは `false`（従来どおり略語置換を行う）。
       - kintone など呼び出し側から金融機関固有の表記を優先したい場合はこのオプションを `true` にして呼び出してください。
-  
+
 #### 具体例 (置換)
 
 以下は `normalizePayeeName` が行う典型的な置換の例です。左が入力、右が正規化後の出力です（オプションにより多少異なる場合があります）。
@@ -349,12 +408,14 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 ```
 
 注: 実際の出力は入力の文字種（漢字/かな）、内部マップ定義、及び文字列長により変わります。
+
 - 重要: `normalizePayeeName` は英小文字を含む入力を即時にエラーとします（例: "yamada"）。
 - 多くの日本語の氏名（漢字を含む）をそのまま渡すと、最終的に許容半角文字に変換されずエラーになります。API を呼ぶ側では可能なら `customerKana`（カナ表記）を優先して渡してください。
 
 ---
 
 <a id="normalizeAccountNumber"></a>
+
 ### `normalizeAccountNumber(input)`
 
 - `normalizeAccountNumber(input)`
@@ -383,7 +444,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 
 ## 実例: generateZenginData の利用
 
-```js
+````js
 // Node / テスト環境の例
 global.window = global;
 require('./src/bank-transfer.js');
@@ -422,15 +483,17 @@ window.BANK.generateZenginData(headerData, records, (res) => {
 先頭 4 行（CRLF 区切り、各行は 120 バイト固定長）:
 
 ```text
-1: 11100000012345ﾃｽﾄ会社                                 11090001ﾐｽﾞﾎｷﾞﾝｺｳ      001ﾄｳｷﾖｳ          11234567                 
-2: 20005ﾐﾂﾋﾞｼﾕ-ｴﾌｼﾞｴｲｷﾞ123ﾖｺﾊﾏﾅｶﾔﾏ           11234567ﾔﾏﾀﾞ ﾀﾛｳ                      00000010001                    7Y       
-3: 8000001000000001000                                                                                                      
-4: 9                                                                                                                       
-```
+1: 11100000012345ﾃｽﾄ会社                                 11090001ﾐｽﾞﾎｷﾞﾝｺｳ      001ﾄｳｷﾖｳ          11234567
+2: 20005ﾐﾂﾋﾞｼﾕ-ｴﾌｼﾞｴｲｷﾞ123ﾖｺﾊﾏﾅｶﾔﾏ           11234567ﾔﾏﾀﾞ ﾀﾛｳ                      00000010001                    7Y
+3: 8000001000000001000
+4: 9
+````
 
 注:
+
 - 上記はサンプル入力に対する一例です。`header.parts` と `parts.data` に分割して個別に検査できます。
 - 実際の出力は入力データ（口座種別や口座番号、依頼人名）や内部の銀行データ取得の成否により変わります。
+
 ```
 
 ---
@@ -444,3 +507,4 @@ window.BANK.generateZenginData(headerData, records, (res) => {
 ---
 
 必要なら、この文書を英語版に翻訳したり、`generateZenginData` の各下位関数に対するJSON スキーマを追加できます。ご希望があれば続けて対応します。
+```
