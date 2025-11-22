@@ -13,7 +13,8 @@
 		"ci-check": "npm run prepare:dist && node scripts/check-window-vm.js && node scripts/puppeteer-check.js",
 		"zip": "cd dist && zip -r ../package.zip .",
 		"auto-check": "node scripts/auto-check.js",
-		"prepare": "husky install"
+		"prepare": "husky install",
+		"build": "npm run prepare:dist"
 	},
 	"lint-staged": {
 		"src/**/*.{js,css,html}": [
