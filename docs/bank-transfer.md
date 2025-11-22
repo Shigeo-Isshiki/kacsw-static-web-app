@@ -48,8 +48,8 @@
 - `generateTrailer(summaryData, callback)`
 - `generateEndRecord(callback)`
 - `generateZenginData(headerData, records, callback)`
-- `normalizeEdiInfo(input, options)`
-- `normalizePayeeName(name)`
+  - `normalizeEdiInfo(input, options)`
+  - `normalizePayeeName(name, options)`
 - `normalizeAccountNumber(input)`
 - `nextBankBusinessDay(baseDate, cutoffHour, callback)`
 
@@ -282,7 +282,7 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 ---
 
 <a id="normalizePayeeName"></a>
-### `normalizePayeeName(name)`
+### `normalizePayeeName(name, options)`
 
 - `normalizePayeeName(name)`
   - 受取人名を全銀フォーマット向けに正規化するヘルパです。実装に沿った詳細な処理順は次の通りです。
@@ -301,7 +301,10 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
   - 引数:
     - `name` (string) — 元の受取人名
   - 戻り値: 正規化済み文字列（半角カナ等、SJIS の先頭 30 バイトに切り詰め）か、検査に失敗した場合は Error を投げます。
-  - 注記: 実装では `options` 引数は受け取らないため、前節の例にある `truncateBytes` 等のオプション指定は無効です。
+  - 注記: 実装はオプション引数を受け取るようになりました。現時点でサポートするキー:
+    - `skipAbbreviation` (boolean) — `true` を渡すと、法人略語・営業所略語・事業略語の自動置換（内部マップによる強制適用）をスキップします。
+      - デフォルトは `false`（従来どおり略語置換を行う）。
+      - kintone など呼び出し側から金融機関固有の表記を優先したい場合はこのオプションを `true` にして呼び出してください。
   
 #### 具体例 (置換)
 

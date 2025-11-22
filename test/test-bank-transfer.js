@@ -94,6 +94,23 @@ try {
   process.exitCode = 2;
 }
 
+// ---------------------- normalizePayeeName skipAbbreviation test ----------------------
+try {
+  // 全てカタカナで入力すると、略語マップの半角カナキーにマッチして
+  // 通常は略語置換が適用されるが、skipAbbreviation:true の場合は適用されないはず
+  const src = 'カブシキガイシャテスト';
+  const def = BANK.normalizePayeeName(src);
+  const skipped = BANK.normalizePayeeName(src, { skipAbbreviation: true });
+  assert.notStrictEqual(def, skipped, '略語適用時とスキップ時で出力が変わること');
+  // デフォルトでは括弧が付与されるが、skipped には括弧が含まれていないことを確認
+  assert.ok(/\(|\)/.test(def), 'デフォルトの出力には括弧が含まれていること');
+  assert.ok(!/\(|\)/.test(skipped), 'skipAbbreviation 出力に括弧が含まれていないこと');
+  console.log('PASS: normalizePayeeName skipAbbreviation disables abbreviation replacements');
+} catch (e) {
+  console.error('FAIL: normalizePayeeName skipAbbreviation', e && e.message ? e.message : e);
+  process.exitCode = 2;
+}
+
 // ---------------------- normalizeEdiInfo tests ----------------------
 try {
   const e1 = BANK.normalizeEdiInfo('TEST');
