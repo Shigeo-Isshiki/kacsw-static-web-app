@@ -1997,11 +1997,14 @@ const normalizeEdiInfo = (input, options = {}) => {
  * @param {string} input 口座名義
  * @returns {string} 正規化された口座名義
  */
-const normalizePayeeName = (input) => {
+const normalizePayeeName = (input, options = {}) => {
 	const s = _bt_toStr(input).trim();
 	if (!s) throw new Error('口座名義が空です');
 	// 入力文字列に英小文字が含まれる場合は不正とする（小文字は許容しない）
 	if (/[a-z]/.test(s)) throw new Error('口座名義に許容されない小文字が含まれています');
+	// オプション: 略語処理をスキップする場合は呼び出し側から
+	// { skipAbbreviation: true } を渡すことで略語の強制適用を無効化できる。
+	const skipAbbrev = options && options.skipAbbreviation === true;
 
 	// 0) 法人・営業所・事業略語の置換（長いキー順に置換して衝突を避ける）
 	// 各略語リストでは "一つだけ" の略語適用に制限する（最初の一致を置換したら以降は同リストの置換を行わない）
@@ -2048,19 +2051,24 @@ const normalizePayeeName = (input) => {
 	};
 	let corpRepl, salesRepl, bizRepl;
 	try {
-		// 企業名・営業所の略語適用では位置に応じた括弧付与を行う
-		corpRepl = makeStatefulReplacer(_BT_CORPORATE_ABBREVIATIONS_LIST, { parentheses: true });
-		salesRepl = makeStatefulReplacer(_BT_SALES_OFFICES_LIST, { parentheses: true });
-		// 事業略語は括弧ルールを適用しない
-		bizRepl = makeStatefulReplacer(_BT_BUSINESS_LIST);
-		// 原文に含まれる漢字表記等を先に置換（各リストで最初に見つかった1件だけを置換する）
-		let pre = s;
-		pre = corpRepl(pre);
-		pre = salesRepl(pre);
-		pre = bizRepl(pre);
-		// 続く処理は pre を使う
-		// 1) 全角数字を半角化
-		work = _bt_toHalfWidthDigits(pre);
+		if (!skipAbbrev) {
+			// 企業名・営業所の略語適用では位置に応じた括弧付与を行う
+			corpRepl = makeStatefulReplacer(_BT_CORPORATE_ABBREVIATIONS_LIST, { parentheses: true });
+			salesRepl = makeStatefulReplacer(_BT_SALES_OFFICES_LIST, { parentheses: true });
+			// 事業略語は括弧ルールを適用しない
+			bizRepl = makeStatefulReplacer(_BT_BUSINESS_LIST);
+			// 原文に含まれる漢字表記等を先に置換（各リストで最初に見つかった1件だけを置換する）
+			let pre = s;
+			pre = corpRepl(pre);
+			pre = salesRepl(pre);
+			pre = bizRepl(pre);
+			// 続く処理は pre を使う
+			// 1) 全角数字を半角化
+			work = _bt_toHalfWidthDigits(pre);
+		} else {
+			// 略語処理をスキップする場合は原文をそのまま次段へ渡す
+			work = _bt_toHalfWidthDigits(s);
+		}
 	} catch (e) {
 		// 何らかの理由で置換が失敗したら、入力 s を起点に処理を続行
 		work = _bt_toHalfWidthDigits(s);
@@ -2073,15 +2081,16 @@ const normalizePayeeName = (input) => {
 	}
 	// 1b) 半角化後の表記（半角カナなど）に対しても略語置換を行う
 	try {
-		// 既に pre で作成した replacer があればそれを再利用し、
-		// pre で既に置換が行われていれば同リストの置換は no-op になる。
-		corpRepl =
-			corpRepl || makeStatefulReplacer(_BT_CORPORATE_ABBREVIATIONS_LIST, { parentheses: true });
-		salesRepl = salesRepl || makeStatefulReplacer(_BT_SALES_OFFICES_LIST, { parentheses: true });
-		bizRepl = bizRepl || makeStatefulReplacer(_BT_BUSINESS_LIST);
-		work = corpRepl(work);
-		work = salesRepl(work);
-		work = bizRepl(work);
+		// 半角化後の表記にも略語置換を行うが、呼び出しオプションでスキップ可能
+		if (!skipAbbrev) {
+			corpRepl =
+				corpRepl || makeStatefulReplacer(_BT_CORPORATE_ABBREVIATIONS_LIST, { parentheses: true });
+			salesRepl = salesRepl || makeStatefulReplacer(_BT_SALES_OFFICES_LIST, { parentheses: true });
+			bizRepl = bizRepl || makeStatefulReplacer(_BT_BUSINESS_LIST);
+			work = corpRepl(work);
+			work = salesRepl(work);
+			work = bizRepl(work);
+		}
 	} catch (e) {
 		// 無視
 	}
@@ -2957,3 +2966,26 @@ if (typeof window !== 'undefined') {
 		nextBankBusinessDay,
 	});
 }
+
+// CommonJS export for Node/test environments
+try {
+	if (typeof module !== 'undefined' && module && module.exports) {
+		module.exports =
+			typeof window !== 'undefined' && window.BANK
+				? window.BANK
+				: {
+						getBank,
+						getBranch,
+						convertYucho,
+						normalizeAccountNumber,
+						normalizePayeeName,
+						normalizeEdiInfo,
+						generateHeader,
+						generateDataRecords,
+						generateTrailer,
+						generateEndRecord,
+						generateZenginData,
+						nextBankBusinessDay,
+					};
+	}
+} catch (e) {}

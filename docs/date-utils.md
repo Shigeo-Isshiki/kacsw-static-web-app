@@ -32,7 +32,7 @@
 - 元号漢字（明治/大正/昭和/平成/令和）→イニシャル（M/T/S/H/R）変換
 - 日付区切りの正規化（年/月/日 を `-` 区切りに統一）
 
-ブラウザ環境では、読み込み後に `window.convertToSeireki`, `window.convertToEra`, `window.convertToYear` として利用可能です（`src` ファイル末尾で付与されます）。
+ブラウザ環境では、読み込み後に `window.DATE` 名前空間経由で利用可能です（`src` ファイル末尾で付与されます）。
 
 ---
 
@@ -139,21 +139,21 @@ convertToYear('2025'); // -> 2025
 ```html
 <script src="src/date-utils.js"></script>
 <script>
-  console.log(window.convertToSeireki('令和元年5月1日'));
+  console.log(window.DATE.convertToSeireki('令和元年5月1日'));
   // -> '2019-05-01'
-  console.log(window.convertToEra('2025-10-14'));
+  console.log(window.DATE.convertToEra('2025-10-14'));
   // -> { kanji: '令和7年', initial: 'R07', initialOnly: 'R', numberOnly: '07' }
-  console.log(window.convertToYear('R1'));
+  console.log(window.DATE.convertToYear('R1'));
   // -> 2019
 </script>
 ```
 
 ### Node / テスト環境での利用
 ```js
-global.window = global;
-require('./src/date-utils.js');
-console.log(convertToSeireki('H1/1/8')); // '1989-01-08'
-console.log(convertToEra('1989-01-08')); // { kanji: '平成1年', initial: 'H01', ... }
+// CommonJS 形式でエクスポートしています
+const DATE = require('./src/date-utils.js');
+console.log(DATE.convertToSeireki('H1/1/8')); // '1989-01-08'
+console.log(DATE.convertToEra('1989-01-08')); // { kanji: '平成1年', initial: 'H01', ... }
 ```
 
 ---
