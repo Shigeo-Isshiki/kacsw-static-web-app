@@ -311,6 +311,10 @@ window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
 - 戻り値（コールバック）: `{ trailer: '<120バイト文字列>' }`
 - 例: `window.BANK.generateTrailer(summary, res => console.log(res.trailer));`
 
+- 挙動・注意点:
+  - トレーラの「合計件数（record count）」の算出は、振込明細のうち **振込金額が 0 円のレコードを件数に含めない** 挙動に変更されました。つまり、金額が 0 の明細は合計金額（total amount）には影響しませんが、件数にはカウントされません。
+  - 引数 `dataRecords` は CRLF 結合文字列（`generateDataRecords` の出力）またはオブジェクト配列の両方を受け付けますが、どちらの場合も 0 円レコードは件数計上の対象外となります。
+
 <a id="generateEndRecord"></a>
 
 ##### `generateEndRecord(callback)`
