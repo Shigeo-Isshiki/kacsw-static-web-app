@@ -27,6 +27,7 @@
 - `convertToYear`: 様々な入力から西暦年（数値）だけを抽出します。
 
 このライブラリは内部で次のような前処理・正規化を行います:
+
 - 全角数字→半角、全角英字→半角英字の変換
 - 漢数字（元・一〜千）→数値変換（概ね 1〜3999 相当）
 - 元号漢字（明治/大正/昭和/平成/令和）→イニシャル（M/T/S/H/R）変換
@@ -47,26 +48,33 @@
 ## 各関数の引数詳細
 
 <a id="convertToSeireki"></a>
+
 ### `convertToSeireki(date)`
 
 概要:
+
 - 和暦表記（例: "令和元年5月1日"）、元号イニシャルを含む表記（例: "R1-5-1"）、西暦表記（"2025-10-14"）や `Date` オブジェクトなど、様々な入力を受け取り、`YYYY-MM-DD` 形式の文字列を返します。
 
 引数:
+
 - `date` (string | Date) — 解析対象。例: "令和元年5月1日", "H1/1/8", "2025-10-14", Date
 
 戻り値:
+
 - 成功: `string` — `'YYYY-MM-DD'` 形式（例: `'2019-05-01'`）
 
 例外:
+
 - `Error` を投げます（例: 不正な形式、存在しない日付など）。
 
 挙動の要点:
+
 - 全角数字や漢数字を半角に変換し、漢数字は内部で数値に変換されます（例: '元' -> 1）。
 - 元号は内部の `_DU_ERAS` テーブル（令和/平成/昭和/大正/明治）を用いて変換されます。元年は `1` として扱われます。
 - 日付が部分的（例: 元号+年のみ）で表現される場合、月／日はデフォルトで `1` とみなされることがあります（関数内部での粘り強い再試行ロジックにより最善解を探します）。
 
 例:
+
 ```js
 convertToSeireki('令和元年5月1日'); // -> '2019-05-01'
 convertToSeireki('H1-1-8'); // -> '1989-01-08'
@@ -76,49 +84,61 @@ convertToSeireki(new Date('2025-10-14')); // -> '2025-10-14'
 ---
 
 <a id="convertToEra"></a>
+
 ### `convertToEra(date)`
 
 概要:
+
 - 指定した日付を和暦に変換し、複数形式で返します。内部で `convertToSeireki` を用いて正規化した後、定義済みの元号テーブルから該当元号を決定します。
 
 引数:
+
 - `date` (Date | string) — Date オブジェクトまたは `convertToSeireki` で解釈可能な文字列。
 
 戻り値 (object):
+
 - `kanji` (string) — 元号と年を漢字表記で返す（例: "令和7年", 元年は "令和元年"）。
 - `initial` (string) — 元号イニシャル＋2桁年（例: "R07"、元年は "R01"）。
 - `initialOnly` (string) — イニシャルのみ（例: "R"）。
 - `numberOnly` (string) — 元号年の2桁表記（例: "07"、元年は "01"）。
 
 例:
+
 ```js
 convertToEra('2025-10-14');
 // -> { kanji: '令和7年', initial: 'R07', initialOnly: 'R', numberOnly: '07' }
 ```
 
 例外:
+
 - 明治以前の日付や解析不能な形式では `Error` を投げます。
 
 ---
 
 <a id="convertToYear"></a>
+
 ### `convertToYear(date)`
 
 概要:
+
 - 様々な入力から西暦年（整数）だけを取り出します。`Date` オブジェクト、和暦文字列、元号イニシャル表記、4 桁の西暦文字列などに対応します。
 
 引数:
+
 - `date` (string | Date) — 例: "令和元年5月1日", "R1/5/1", "2019-05-01", "2025", Date
 
 戻り値:
+
 - 成功: `number` — 西暦年（例: `2019`）
 
 挙動の要点:
+
 - まず `Date` オブジェクトであればそのまま年を返します。
 - 文字列の場合は `convertToSeireki` によりフル日付解釈を試み、失敗した場合は日付補完（"1日" 付加など）を試みます。
 - それでも解釈できない場合は元号イニシャル＋年のパターンや文字列中の4桁を探すフォールバックを行います。
 
 例:
+
 ```js
 convertToYear(new Date('2025-10-14')); // -> 2025
 convertToYear('令和1年'); // -> 2019
@@ -136,19 +156,21 @@ convertToYear('2025'); // -> 2025
 ## 実例
 
 ### ブラウザ環境での利用
+
 ```html
 <script src="src/date-utils.js"></script>
 <script>
-  console.log(window.DATE.convertToSeireki('令和元年5月1日'));
-  // -> '2019-05-01'
-  console.log(window.DATE.convertToEra('2025-10-14'));
-  // -> { kanji: '令和7年', initial: 'R07', initialOnly: 'R', numberOnly: '07' }
-  console.log(window.DATE.convertToYear('R1'));
-  // -> 2019
+	console.log(window.DATE.convertToSeireki('令和元年5月1日'));
+	// -> '2019-05-01'
+	console.log(window.DATE.convertToEra('2025-10-14'));
+	// -> { kanji: '令和7年', initial: 'R07', initialOnly: 'R', numberOnly: '07' }
+	console.log(window.DATE.convertToYear('R1'));
+	// -> 2019
 </script>
 ```
 
 ### Node / テスト環境での利用
+
 ```js
 // CommonJS 形式でエクスポートしています
 const DATE = require('./src/date-utils.js');
@@ -169,6 +191,7 @@ console.log(DATE.convertToEra('1989-01-08')); // { kanji: '平成1年', initial:
 ---
 
 ## 参照
+
 - 実装ソース: `src/date-utils.js`
 
 必要があれば、さらに具体的なユースケース（例えば kintone レコードのフィールドからの変換例や、別ライブラリとの組合せ例）をこのドキュメントに追加します。

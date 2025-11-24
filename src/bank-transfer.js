@@ -2638,7 +2638,11 @@ const generateTrailer = (dataRecords, callback) => {
 				);
 				return;
 			}
-			recordCount++;
+			// 振込金額が 0 のレコードは合計金額には含めるが件数には含めない仕様に変更
+			// （要件: 0円は1件に数えない）
+			if (a !== 0) {
+				recordCount++;
+			}
 			total += Math.round(a);
 		}
 	} else if (Array.isArray(dataRecords)) {
@@ -2653,7 +2657,10 @@ const generateTrailer = (dataRecords, callback) => {
 				);
 				return;
 			}
-			recordCount++;
+			// 仕様: 金額が0円のレコードは件数に含めない
+			if (a !== 0) {
+				recordCount++;
+			}
 			total += Math.round(a);
 		}
 	} else {
