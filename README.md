@@ -18,6 +18,8 @@ and other helpers.
   - ドキュメント: [CSV ビルダー 使い方リファレンス — docs/csv-builder.md](./docs/csv-builder.md)
 - 日付ユーティリティ（使い方リファレンス） — `src/date-utils.js` の仕様、和暦/漢数字変換、利用例を含みます。
   - ドキュメント: [日付ユーティリティ 使い方リファレンス — docs/date-utils.md](./docs/date-utils.md)
+- kintone カスタムユーティリティ（使い方リファレンス） — `src/kintone-custom-lib.js` の公開ヘルパー（notify / setSpaceField / setRecordValues など）、サニタイズやダイアログ生成の振る舞いをまとめています。
+  - ドキュメント: [kintone カスタムライブラリ 使い方リファレンス — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md)
 - その他のライブラリ — `phone-utils` の使い方ドキュメントは追って追加します（coming soon）。
 
 銀行振込データ作成機能を利用する場合はまず上記の 銀行振込ユーティリティリファレンスを参照してください。
