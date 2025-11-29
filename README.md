@@ -22,6 +22,9 @@ and other helpers.
   - ドキュメント: [kintone カスタムライブラリ 使い方リファレンス — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md)
 - その他のライブラリ — `phone-utils` の使い方ドキュメントは追って追加します（coming soon）。
 
+- 電話番号ユーティリティ（使い方リファレンス） — `src/phone-utils.js` の仕様、正規化・判定ルール、使用例を含みます。
+  - ドキュメント: [電話番号ユーティリティ 使い方リファレンス — docs/phone-utils.md](./docs/phone-utils.md)
+
 銀行振込データ作成機能を利用する場合はまず上記の 銀行振込ユーティリティリファレンスを参照してください。
 CSV 機能を利用する場合はまず上記の CSV ビルダーリファレンスを参照してください。
 
