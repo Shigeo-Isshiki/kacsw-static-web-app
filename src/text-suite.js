@@ -107,6 +107,7 @@ const _TS_CONVERT_CHARACTER_LIST = {
 		'゛': 'ﾞ',
 		'゜': 'ﾟ',
 		'　': ' ',
+		ー: 'ｰ',
 	},
 	fullWidthKana: {
 		ｱ: 'ア',
@@ -167,6 +168,7 @@ const _TS_CONVERT_CHARACTER_LIST = {
 		ﾞ: '゛',
 		ﾟ: '゜',
 		' ': '　',
+		ｰ: 'ー',
 	},
 	turbidityKana: {
 		'カ゛': 'ガ',
@@ -300,7 +302,7 @@ const toFullWidthKatakana = (str = '', throwOnError = true) => {
 	for (const char of work) {
 		const code = char.charCodeAt(0);
 		// allowedValuesに含まれるか、全角カタカナ範囲なら許容
-		if (!allowedValues.includes(char) && !(code >= 0x30a1 && code <= 0x30fa)) {
+		if (!allowedValues.includes(char) && !(code >= 0x30a1 && code <= 0x30fc)) {
 			if (throwOnError) {
 				errorChar = char;
 				break;
@@ -387,8 +389,8 @@ const toFullWidthHiragana = (str = '', throwOnError = true) => {
 	// 変換後にひらがな以外が残っていればエラー
 	for (const char of work) {
 		const code = char.charCodeAt(0);
-		// ひらがなUnicode範囲、または全角スペースなら許容
-		if (!(code >= 0x3041 && code <= 0x3096) && char !== '\u3000') {
+		// ひらがなUnicode範囲、全角スペース、または長音符（ー）を許容
+		if (!(code >= 0x3041 && code <= 0x3096) && char !== '\u3000' && char !== '\u30FC') {
 			if (throwOnError) {
 				errorChar = char;
 				break;
