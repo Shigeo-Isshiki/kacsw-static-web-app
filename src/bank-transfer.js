@@ -2450,7 +2450,8 @@ const generateDataRecords = (records, fromBankNo = '', callback) => {
 			let customerNameRaw = _bt_toStr(r.customerName || r.customerKana || '');
 			let customerName;
 			try {
-				customerName = normalizePayeeName(customerNameRaw);
+				// generateDataRecords の文脈では法人略語を詰めない（データ作成前にすでに略語として処理されているか、略語として処理すべきでない場合があるか不明なため、省略処理を無効化）
+				customerName = normalizePayeeName(customerNameRaw, { skipAbbreviation: true });
 			} catch (e) {
 				_bt_invokeCallback(
 					callback,
