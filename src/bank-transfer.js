@@ -863,8 +863,8 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 						let bankObj = {
 							code: _bt_toStr(j.code).padStart(4, '0'),
 							name: _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name),
-							// Use the API's `kana` field preferentially; fall back to normalize.kana if absent
-							kana: _bt_toStr(j.kana || (j.normalize && j.normalize.kana ? j.normalize.kana : '')),
+							// Use the API's `kana` field only; do NOT fall back to normalize.kana
+							kana: _bt_toStr(j.kana || ''),
 							url: _bt_toStr(j.url || url),
 							branches_url: _bt_toStr(j.branches_url || base + `/banks/${code}/branches.json`),
 						};
@@ -1020,8 +1020,8 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 				const bankObj = {
 					code: _bt_toStr(j.code).padStart(4, '0'),
 					name: _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name),
-					// Prefer j.kana over normalize.kana as the source for bankKana
-					kana: _bt_toStr(j.kana || (j.normalize && j.normalize.kana ? j.normalize.kana : '')),
+					// Use j.kana only; do not use normalize.kana as a fallback
+					kana: _bt_toStr(j.kana || ''),
 					url: _bt_toStr(j.url || url),
 					branches_url: _bt_toStr(
 						j.branches_url || base + `/banks/${_bt_toStr(j.code).padStart(4, '0')}/branches.json`
@@ -1047,7 +1047,7 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 				const bankObj = {
 					code: _bt_toStr(j.code).padStart(4, '0'),
 					name: _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name),
-					kana: _bt_toStr(j.kana || (j.normalize && j.normalize.kana ? j.normalize.kana : '')),
+					kana: _bt_toStr(j.kana || ''),
 					url: _bt_toStr(j.url || url),
 					branches_url: _bt_toStr(
 						j.branches_url || base + `/banks/${_bt_toStr(j.code).padStart(4, '0')}/branches.json`
