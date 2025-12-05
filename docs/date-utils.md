@@ -10,7 +10,7 @@
 - 公開 API サマリ
 - 各関数の引数詳細
   - [`convertToSeireki(date)`](#convertToSeireki)
-    - [`convertToEra(date)`](#convertToEra)
+  - [`convertToEra(date)`](#convertToEra)
   - [`convertToYear(date)`](#convertToYear)
   - [`convertToYearMonth(date)`](#convertToYearMonth)
 - エラー形式
