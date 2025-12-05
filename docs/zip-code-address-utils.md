@@ -59,6 +59,7 @@ API ベース URL: `https://digital-address.app`
 **注意**: すべての API 呼び出しは非同期でコールバックを利用します。
 
 <a id="checkZipCodeExists"></a>
+
 ### `checkZipCodeExists(zipCode, callback)`
 
 - 引数:
@@ -76,6 +77,7 @@ API ベース URL: `https://digital-address.app`
 ---
 
 <a id="formatZipCode"></a>
+
 ### `formatZipCode(zipCode, callback)`
 
 - 引数:
@@ -86,21 +88,22 @@ API ベース URL: `https://digital-address.app`
   - 入力を正規化した上で API を問い合わせます。APIが該当データを返せば、内部で次のように `result` を決定します。
 
 - `result` の形（必ず明記）:
-  - 成功（数字7桁）: `{ zipCode: '123-4567' }`  // 表示用にハイフンを追加
-  - 成功（英数字混在／数字以外の7桁）: `{ zipCode: 'A1B2C3D' }`  // 正規化済み7文字をそのまま返す
+  - 成功（数字7桁）: `{ zipCode: '123-4567' }` // 表示用にハイフンを追加
+  - 成功（英数字混在／数字以外の7桁）: `{ zipCode: 'A1B2C3D' }` // 正規化済み7文字をそのまま返す
   - 失敗: `{ error: '郵便番号が存在しません' }` または `{ error: 'APIエラー（<status>）' }` / `{ error: 'API接続エラー' }`
 
 - 例:
 
 ```js
 formatZipCode('１２３－４５６７', (res) => {
-  // res === { zipCode: '123-4567' }
+	// res === { zipCode: '123-4567' }
 });
 ```
 
 ---
 
 <a id="getAddressByZipCode"></a>
+
 ### `getAddressByZipCode(zipCode, callback)`
 
 - 引数:
@@ -140,12 +143,15 @@ formatZipCode('１２３－４５６７', (res) => {
 - 失敗時は必ず次の形のオブジェクトを返す:
 
 ```js
-{ error: '郵便番号／デジタルアドレス「${zipCode}」に該当する住所が見つかりません' }
+{
+	error: '郵便番号／デジタルアドレス「${zipCode}」に該当する住所が見つかりません';
+}
 ```
 
 ---
 
 <a id="getCityByZipCode"></a>
+
 ### `getCityByZipCode(zipCode, callback)`
 
 - 引数:
@@ -159,6 +165,7 @@ formatZipCode('１２３－４５６７', (res) => {
 ---
 
 <a id="getPrefectureByZipCode"></a>
+
 ### `getPrefectureByZipCode(zipCode, callback)`
 
 - 引数:
@@ -172,6 +179,7 @@ formatZipCode('１２３－４５６７', (res) => {
 ---
 
 <a id="normalizeZipCode"></a>
+
 ### `normalizeZipCode(zipCode, callback)`
 
 - 引数:
@@ -188,6 +196,7 @@ formatZipCode('１２３－４５６７', (res) => {
 ---
 
 <a id="kintoneZipSetSpaceFieldButton"></a>
+
 ### `kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)`
 
 - 引数:
@@ -207,6 +216,7 @@ formatZipCode('１２３－４５６７', (res) => {
 ---
 
 <a id="kintoneZipSpaceFieldText"></a>
+
 ### `kintoneZipSpaceFieldText(spaceField, id, display)`
 
 - 引数:
@@ -230,13 +240,13 @@ formatZipCode('１２３－４５６７', (res) => {
 const zc = require('../src/zip-code-address-utils.js');
 
 zc.formatZipCode('１２３－４５６７', (res) => {
-  if (res.error) console.error(res.error);
-  else console.log(res.zipCode); // '123-4567'
+	if (res.error) console.error(res.error);
+	else console.log(res.zipCode); // '123-4567'
 });
 
 zc.getAddressByZipCode('1234567', (res) => {
-  if (res.error) console.error(res.error);
-  else console.log(res.prefName, res.cityName, res.townName);
+	if (res.error) console.error(res.error);
+	else console.log(res.prefName, res.cityName, res.townName);
 });
 ```
 
@@ -245,15 +255,21 @@ zc.getAddressByZipCode('1234567', (res) => {
 ```html
 <script src="src/zip-code-address-utils.js"></script>
 <script>
-  // window 上に関数が公開されています
-  window.formatZipCode('1234567', function(res) {
-    console.log(res);
-  });
+	// window 上に関数が公開されています
+	window.formatZipCode('1234567', function (res) {
+		console.log(res);
+	});
 
-  // スペースフィールドにボタンを追加
-  window.kintoneZipSetSpaceFieldButton('スペースフィールドコード', 'zip-btn', undefined, '1234567', function(result){
-    console.log(result);
-  });
+	// スペースフィールドにボタンを追加
+	window.kintoneZipSetSpaceFieldButton(
+		'スペースフィールドコード',
+		'zip-btn',
+		undefined,
+		'1234567',
+		function (result) {
+			console.log(result);
+		}
+	);
 </script>
 ```
 
@@ -271,5 +287,3 @@ zc.getAddressByZipCode('1234567', (res) => {
 ## 参照
 
 - 実装ソース: `src/zip-code-address-utils.js`
-
-
