@@ -579,3 +579,19 @@ if (typeof window !== 'undefined') {
 	window.kintoneZipSpaceFieldText = kintoneZipSpaceFieldText;
 	window.normalizeZipCode = normalizeZipCode;
 }
+
+// CommonJS export for Node/test environments
+try {
+	if (typeof module !== 'undefined' && module && module.exports) {
+		module.exports = {
+			checkZipCodeExists,
+			formatZipCode,
+			getAddressByZipCode,
+			getCityByZipCode,
+			getPrefectureByZipCode,
+			kintoneZipSetSpaceFieldButton,
+			kintoneZipSpaceFieldText,
+			normalizeZipCode,
+		};
+	}
+} catch (e) {}
