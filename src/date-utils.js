@@ -2,7 +2,7 @@
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
  * @version 1.0.0
  */
-/* exported convertToSeireki, convertToEra, convertToYear */
+/* exported convertToSeireki, convertToEra, convertToYear, convertToYearMonth */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_du_)で始める
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
@@ -308,18 +308,150 @@ const convertToYear = (date) => {
 
 // Expose as a namespaced object similar to other modules (window.DATE_UTILS)
 // Expose using the same simple pattern as other modules (window.DATE)
+/**
+ * 様々な日付入力から西暦の年と月を取り出す
+ * @param {string|Date} date 例: "令和元年5月1日", "R1/5/1", "2019-05-01", "2025-05", Date
+ * @returns {{year:number, month:number}} 西暦の年と月（例: {year:2025, month:5}）
+ * @throws {Error} 解釈できない場合
+ */
+const convertToYearMonth = (date) => {
+	// Dateオブジェクトならそのまま
+	if (date instanceof Date) {
+		if (isNaN(date.getTime())) throw new Error('不正な日付です');
+		return { year: date.getFullYear(), month: date.getMonth() + 1 };
+	}
+
+	if (typeof date === 'string') {
+		// まず convertToSeireki でフル日付として解釈を試みる
+		try {
+			const seireki = convertToSeireki(date); // 'YYYY-MM-DD' 形式
+			const y = parseInt(seireki.slice(0, 4), 10);
+			const m = parseInt(seireki.slice(5, 7), 10);
+			if (!isNaN(y) && !isNaN(m)) return { year: y, month: m };
+		} catch {
+			// フル日付として解釈できないケースは、年のみ／年+月のみ等の可能性があるため
+			try {
+				const seireki = convertToSeireki(String(date) + '1日');
+				const y = parseInt(seireki.slice(0, 4), 10);
+				const m = parseInt(seireki.slice(5, 7), 10);
+				if (!isNaN(y) && !isNaN(m)) return { year: y, month: m };
+			} catch {
+				try {
+					const seireki = convertToSeireki(String(date) + '1月1日');
+					const y = parseInt(seireki.slice(0, 4), 10);
+					const m = parseInt(seireki.slice(5, 7), 10);
+					if (!isNaN(y) && !isNaN(m)) return { year: y, month: m };
+				} catch {
+					// フォールバック処理へ
+				}
+			}
+		}
+
+		// フォールバック: 全角→半角、漢数字→数値、元号漢字→イニシャル等
+		const toHankaku = (s) =>
+			s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+		const toHankakuAlpha = (s) =>
+			s.replace(/[Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+		const kanjiNumReg = /[元一二三四五六七八九十百千〇]+/g;
+		const kanjiToNumStr = (s) => s.replace(kanjiNumReg, (m) => _du_kanjiToNumber(m));
+		const kanjiToInitial = (s) => {
+			let result = s;
+			_DU_ERAS.forEach((e) => {
+				result = result.replace(new RegExp(e.name, 'g'), e.initial);
+			});
+			return result;
+		};
+
+		let normalized = toHankakuAlpha(toHankaku(String(date)));
+		normalized = kanjiToNumStr(normalized);
+		normalized = kanjiToInitial(normalized);
+		normalized = normalized.replace(/年|日|\/|\.|\s|月|\//g, '-');
+		normalized = normalized.replace(/^-+|-+$/g, '');
+
+		// 年-月 パターン（例: 2025-05, 2025-5）
+		let m = normalized.match(/^(\d{4})-(\d{1,2})$/);
+		if (m) {
+			const y = parseInt(m[1], 10);
+			const mm = parseInt(m[2], 10);
+			if (mm >= 1 && mm <= 12) return { year: y, month: mm };
+			throw new Error('存在しない月です');
+		}
+
+		// 年のみ
+		m = normalized.match(/^(\d{4})$/);
+		if (m) return { year: parseInt(m[1], 10), month: 1 };
+
+		// 文字列先頭に4桁西暦がある場合
+		m = normalized.match(/^(\d{4})(?:-|$)/);
+		if (m) return { year: parseInt(m[1], 10), month: 1 };
+
+		// 元号（イニシャル）パターン
+		const parts = normalized.split('-').filter(Boolean);
+		if (parts.length > 0) {
+			const head = parts[0];
+			let initial = null,
+				yearNum = null,
+				monthNum = null;
+			if (/^[A-Za-z]\d*$/.test(head)) {
+				initial = head[0];
+				const rest = head.slice(1);
+				if (rest) yearNum = parseInt(rest, 10);
+			} else if (/^[A-Za-z]$/.test(head) && parts.length >= 2 && /^\d+$/.test(parts[1])) {
+				initial = head[0];
+				yearNum = parseInt(parts[1], 10);
+			}
+
+			// 月の判定: parts の残りから月を探す
+			if (parts.length >= 2) {
+				// 例: ['R1','5','1'] や ['R','1','5'] など
+				if (yearNum != null && parts.length >= 2) {
+					// if year was in head (R1), then parts[1] is month
+					if (/^\d+$/.test(parts[1])) monthNum = parseInt(parts[1], 10);
+				}
+				if (initial && yearNum == null && parts.length >= 3 && /^\d+$/.test(parts[2])) {
+					// ['R','1','5'] のような場合
+					monthNum = parseInt(parts[2], 10);
+				}
+			}
+
+			if (initial) {
+				if (!yearNum) throw new Error('元号のみの指定は年が不明です');
+				if (yearNum === 0) yearNum = 1;
+				const era = _DU_ERAS.find((e) => e.initial.toUpperCase() === initial.toUpperCase());
+				if (era) {
+					const y = era.start.getFullYear() + yearNum - 1;
+					const mmVal = monthNum != null ? monthNum : 1;
+					if (mmVal < 1 || mmVal > 12) throw new Error('存在しない月です');
+					return { year: y, month: mmVal };
+				}
+			}
+		}
+
+		// 最後の手段: 文字列中の4桁年と近接する数字を探す
+		m = normalized.match(/(\d{4}).*?(\d{1,2})/);
+		if (m) {
+			const y = parseInt(m[1], 10);
+			const mm = parseInt(m[2], 10);
+			if (mm >= 1 && mm <= 12) return { year: y, month: mm };
+			return { year: y, month: 1 };
+		}
+	}
+
+	throw new Error('不正な入力形式です');
+};
 if (typeof window !== 'undefined') {
 	window.DATE = window.DATE || {};
 	Object.assign(window.DATE, {
 		convertToSeireki,
 		convertToEra,
 		convertToYear,
+		convertToYearMonth,
 	});
 }
 
 // CommonJS export for Node/test environments
 try {
 	if (typeof module !== 'undefined' && module && module.exports) {
-		module.exports = { convertToSeireki, convertToEra, convertToYear };
+		module.exports = { convertToSeireki, convertToEra, convertToYear, convertToYearMonth };
 	}
 } catch (e) {}

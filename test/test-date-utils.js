@@ -16,25 +16,73 @@ try {
 // VM 内で評価されたスクリプトが `const`/`let` で関数を定義していると、
 // その識別子は sandbox オブジェクトの直接のプロパティになりません。
 // そこでここでは評価式を使って同一コンテキストから関数を取得します。
-let convertToSeireki, convertToEra, convertToYear;
+let convertToSeireki, convertToEra, convertToYear, convertToYearMonth;
 try {
-	const exported = vm.runInContext('({convertToSeireki, convertToEra, convertToYear})', sandbox);
+	const exported = vm.runInContext(
+		'({convertToSeireki, convertToEra, convertToYear, convertToYearMonth})',
+		sandbox
+	);
 	convertToSeireki =
-		(exported && exported.convertToSeireki) || (sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToSeireki);
+		(exported && exported.convertToSeireki) ||
+		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToSeireki);
 	convertToEra =
-		(exported && exported.convertToEra) || (sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToEra);
+		(exported && exported.convertToEra) ||
+		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToEra);
 	convertToYear =
-		(exported && exported.convertToYear) || (sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToYear);
+		(exported && exported.convertToYear) ||
+		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToYear);
+	convertToYearMonth =
+		(exported && exported.convertToYearMonth) ||
+		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToYearMonth);
 } catch (e) {
 	// 評価に失敗した場合は既存のsandbox直参照も試みる
 	convertToSeireki =
-		sandbox.convertToSeireki || (sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToSeireki);
-	convertToEra = sandbox.convertToEra || (sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToEra);
-	convertToYear = sandbox.convertToYear || (sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToYear);
+		sandbox.convertToSeireki ||
+		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToSeireki);
+	convertToEra =
+		sandbox.convertToEra ||
+		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToEra);
+	convertToYear =
+		sandbox.convertToYear ||
+		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToYear);
+	convertToYearMonth =
+		sandbox.convertToYearMonth ||
+		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToYearMonth);
 }
 
 if (!convertToSeireki || !convertToEra || !convertToYear)
 	throw new Error('date-utils の関数が取得できませんでした');
+
+if (!convertToYearMonth) throw new Error('convertToYearMonth が取得できませんでした');
+
+try {
+	// convertToYearMonth: Date input
+	const r1 = vm.runInContext('convertToYearMonth(new Date(2025,4,10))', sandbox);
+	assert.strictEqual(r1.year, 2025, 'Date -> year');
+	assert.strictEqual(r1.month, 5, 'Date -> month');
+	// string inputs
+	const r2 = convertToYearMonth('2025-05');
+	assert.strictEqual(r2.year, 2025);
+	assert.strictEqual(r2.month, 5);
+	const r3 = convertToYearMonth('令和7年5月1日');
+	assert.strictEqual(r3.year, 2025);
+	assert.strictEqual(r3.month, 5);
+	const r4 = convertToYearMonth('2025');
+	assert.strictEqual(r4.year, 2025);
+	assert.strictEqual(r4.month, 1);
+	// 元号のみはエラー
+	let threw = false;
+	try {
+		convertToYearMonth('R');
+	} catch (e) {
+		threw = true;
+	}
+	assert.ok(threw, '元号のみの指定はエラー');
+	console.log('PASS: convertToYearMonth various inputs');
+} catch (e) {
+	console.error('FAIL: convertToYearMonth cases', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
 
 try {
 	// Date オブジェクト入力（VM 内で Date を生成して呼び出す）

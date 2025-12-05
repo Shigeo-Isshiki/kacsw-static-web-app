@@ -10,8 +10,9 @@
 - 公開 API サマリ
 - 各関数の引数詳細
   - [`convertToSeireki(date)`](#convertToSeireki)
-  - [`convertToEra(date)`](#convertToEra)
+    - [`convertToEra(date)`](#convertToEra)
   - [`convertToYear(date)`](#convertToYear)
+  - [`convertToYearMonth(date)`](#convertToYearMonth)
 - エラー形式
 - 実例
 - 注意事項 / エッジケース
@@ -25,6 +26,7 @@
 - `convertToSeireki`: 任意の受け口（和暦文字列や西暦文字列、Date オブジェクトなど）を標準化して `YYYY-MM-DD` 形式の文字列で返します。
 - `convertToEra`: 日付から和暦の表現（漢字表記やイニシャル付き表記の複数形式）を返します。
 - `convertToYear`: 様々な入力から西暦年（数値）だけを抽出します。
+- `convertToYearMonth`: 様々な入力から西暦の年と月を抽出し、`{ year, month }` 形式で返します（月が欠ける場合は月を `1` として扱います）。
 
 このライブラリは内部で次のような前処理・正規化を行います:
 
@@ -42,6 +44,7 @@
 - `convertToSeireki(date) -> string` — 成功時は `'YYYY-MM-DD'` 形式の文字列を返す。
 - `convertToEra(date) -> object` — `{ kanji, initial, initialOnly, numberOnly }` を返す。
 - `convertToYear(date) -> number` — 西暦の年（数値）を返す。
+- `convertToYearMonth(date) -> object` — `{ year: number, month: number }` を返す（month が欠ける場合は 1 を既定値とする）。
 
 ---
 
@@ -147,6 +150,40 @@ convertToYear('2025'); // -> 2025
 
 ---
 
+<a id="convertToYearMonth"></a>
+
+### `convertToYearMonth(date)`
+
+概要:
+
+- 様々な日付入力から西暦の年と月を抽出してオブジェクトで返します。戻り値は `{ year: number, month: number }` の形です。月が入力で与えられない場合は既定で `1` を返します。
+
+引数:
+
+- `date` (string | Date) — 例: `"令和元年5月1日"`, `"R1/5"`, `"2019-05-01"`, `"2025-05"`, `Date`
+
+戻り値:
+
+- 成功: `object` — `{ year: <number>, month: <number> }`（例: `{ year: 2025, month: 5 }`）
+
+挙動の要点:
+
+- `Date` オブジェクトで渡された場合はその年・月をそのまま返します。
+- 文字列入力では `convertToSeireki` をまず試行し、フル日付が得られれば年・月を抽出します。年のみや年＋月のみの入力に対しては、内部で日付補完（'1日' を付加する等）や正規化を行い、可能な限り年と月を決定します。
+- 元号（漢字／イニシャル）表記もサポートします。例: `"令和7年5月"`, `"R7-5"`, `"H02-03"` など。
+- 解釈できない、あるいは元号のみ（例: `'R'`）のように年が不明な場合は `Error` を投げます。
+
+例:
+
+```js
+convertToYearMonth(new Date('2025-05-10')); // -> { year: 2025, month: 5 }
+convertToYearMonth('2025-05'); // -> { year: 2025, month: 5 }
+convertToYearMonth('令和7年5月1日'); // -> { year: 2025, month: 5 }
+convertToYearMonth('2025'); // -> { year: 2025, month: 1 }
+```
+
+---
+
 ## エラー形式
 
 - 本モジュールは不正な入力や解析不能なケースで `Error` を投げます。エラーメッセージは日本語説明を含みます（例: '不正な入力形式です', '日付不正: Date型または文字列で指定してください' など）。
@@ -166,6 +203,8 @@ convertToYear('2025'); // -> 2025
 	// -> { kanji: '令和7年', initial: 'R07', initialOnly: 'R', numberOnly: '07' }
 	console.log(window.DATE.convertToYear('R1'));
 	// -> 2019
+	console.log(window.DATE.convertToYearMonth('令和7年5月1日'));
+	// -> { year: 2025, month: 5 }
 </script>
 ```
 
