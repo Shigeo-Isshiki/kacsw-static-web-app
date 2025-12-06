@@ -62,13 +62,14 @@ const name = formatUserName('A1@+');
 
 // カスタムマップと strict モード
 try {
-  const name2 = formatUserName('Aあ', { map: { A: 'エー' }, strict: true });
+	const name2 = formatUserName('Aあ', { map: { A: 'エー' }, strict: true });
 } catch (e) {
-  // strict=true だと未定義文字で例外
+	// strict=true だと未定義文字で例外
 }
 ```
 
 **セキュリティ注意**
+
 - パスワードは生成後に平文で保存しないでください。保存する場合は適切なハッシュ化や秘密管理を行ってください。
 - ブラウザで生成したパスワードをサーバへ送信する場合は TLS を必ず使用してください。
 
@@ -89,6 +90,7 @@ node test/test-system-utils.js
 ---
 
 必要ならこのドキュメントに以下を追加できます:
+
 - API の詳細な表（引数・戻り値・例外）
 - 既定の `_su_defaultReadingMap` の完全一覧（現在はソース内に記載）
 - 実運用向けの推奨設定例
