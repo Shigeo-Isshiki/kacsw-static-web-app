@@ -13,9 +13,9 @@ try {
 	throw new Error('system-utils.js の評価に失敗しました: ' + (e && e.message ? e.message : e));
 }
 
-let generatePassword, maskPassword, formatUserName;
+let generatePassword, maskPassword, toKanaReading;
 try {
-	const exported = vm.runInContext('({generatePassword, maskPassword, formatUserName})', sandbox);
+	const exported = vm.runInContext('({generatePassword, maskPassword, toKanaReading})', sandbox);
 	generatePassword =
 		(exported && exported.generatePassword) ||
 		sandbox.generatePassword ||
@@ -24,18 +24,18 @@ try {
 		(exported && exported.maskPassword) ||
 		sandbox.maskPassword ||
 		(sandbox.window && sandbox.window.maskPassword);
-	formatUserName =
-		(exported && exported.formatUserName) ||
-		sandbox.formatUserName ||
-		(sandbox.window && sandbox.window.formatUserName);
+	toKanaReading =
+	(exported && exported.toKanaReading) ||
+	sandbox.toKanaReading ||
+	(sandbox.window && sandbox.window.toKanaReading);
 } catch (e) {
 	generatePassword =
 		sandbox.generatePassword || (sandbox.window && sandbox.window.generatePassword);
 	maskPassword = sandbox.maskPassword || (sandbox.window && sandbox.window.maskPassword);
-	formatUserName = sandbox.formatUserName || (sandbox.window && sandbox.window.formatUserName);
+	toKanaReading = sandbox.toKanaReading || (sandbox.window && sandbox.window.toKanaReading);
 }
 
-if (!generatePassword || !maskPassword || !formatUserName)
+if (!generatePassword || !maskPassword || !toKanaReading)
 	throw new Error('system-utils の関数が取得できませんでした');
 
 // 許容されない文字の集合（除外された ambiguous chars）
@@ -113,28 +113,28 @@ try {
 }
 
 try {
-	// formatUserName: default map and middot
-	const r = formatUserName('A1@+');
+	// toKanaReading: default map and middot
+	const r = toKanaReading('A1@+');
 	// Expect 'エイ・イチ・アットマーク・プラス' (map uses these readings)
 	assert.strictEqual(r, 'エイ・イチ・アットマーク・プラス');
-	console.log('PASS: formatUserName default map and middot');
+	console.log('PASS: toKanaReading default map and middot');
 } catch (e) {
-	console.error('FAIL: formatUserName default', e && e.message ? e.message : e);
+	console.error('FAIL: toKanaReading default', e && e.message ? e.message : e);
 	process.exitCode = 2;
 }
 
 try {
-	// formatUserName: strict mode throws on unmapped char
+	// toKanaReading: strict mode throws on unmapped char
 	let threw = false;
 	try {
-		formatUserName('Aあ', { strict: true });
+		toKanaReading('Aあ', { strict: true });
 	} catch (e) {
 		threw = true;
 	}
 	assert.ok(threw, 'strict mode should throw on unmapped char');
-	console.log('PASS: formatUserName strict mode');
+	console.log('PASS: toKanaReading strict mode');
 } catch (e) {
-	console.error('FAIL: formatUserName strict', e && e.message ? e.message : e);
+	console.error('FAIL: toKanaReading strict', e && e.message ? e.message : e);
 	process.exitCode = 2;
 }
 

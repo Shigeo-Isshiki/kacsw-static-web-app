@@ -3,7 +3,7 @@
 - **説明**: `system-utils.js` は kintone カスタマイズ等で使う軽量ユーティリティ群です。主に次の機能を提供します:
   - `generatePassword` : 規則に沿ったセキュアなパスワード生成
   - `maskPassword` : パスワードの一部をマスク表示
-  - `formatUserName` : 英数字・記号を読み仮名に変換（既定マップ付属）
+  - `toKanaReading` : 英数字・記号を読み仮名に変換（既定マップ付属）
 
 **インポート / 利用方法（ブラウザ/Node 共通）**
 
@@ -39,7 +39,7 @@ const pw2 = sys.generatePassword({ length: 16, useSymbols: false });
     - `visible` (number) : 左右に残す文字数（既定 2）
   - 例: `maskPassword('Secr3tPW', 2)` -> `'Se****PW'`。長さが `visible*2` 以下の場合はすべて `*` に置換されます。
 
-- `formatUserName(str, options)`
+- `toKanaReading(str, options)`
   - 目的: 入力文字列中の英数字・記号を読み仮名（ヨミガナ）に置換して返します。
   - `options`:
     - `map` (object) : カスタム置換マップ（省略時はライブラリ付属の `_su_defaultReadingMap` を使用）
@@ -57,12 +57,12 @@ const pw = generatePassword({ length: 16, useSymbols: true });
 const masked = maskPassword(pw, 1);
 
 // 読み仮名変換（デフォルトマップ）
-const name = formatUserName('A1@+');
+const name = toKanaReading('A1@+');
 // -> 例: 'エイ・イチ・アットマーク・プラス'
 
 // カスタムマップと strict モード
 try {
-	const name2 = formatUserName('Aあ', { map: { A: 'エー' }, strict: true });
+  const name2 = toKanaReading('Aあ', { map: { A: 'エー' }, strict: true });
 } catch (e) {
 	// strict=true だと未定義文字で例外
 }

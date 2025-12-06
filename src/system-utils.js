@@ -170,7 +170,7 @@ const _su_randomIndex = (n) => {
  *   - `map`: 置換マップ（例: { 'A': 'エー', '1': 'いち', '@': 'アット' }）。省略時は既定マップを使用。
  *   - `strict`: true の場合、マップにない文字が見つかると例外を投げます。
  */
-const formatUserName = (str, options) => {
+const toKanaReading = (str, options) => {
 	if (str === null || str === undefined) return '';
 	if (typeof str !== 'string') str = String(str);
 
@@ -193,7 +193,7 @@ const formatUserName = (str, options) => {
 		} else {
 			if (strict) {
 				throw new Error(
-					'formatUserName: 置換マップに存在しない文字「' +
+					'toKanaReading: 置換マップに存在しない文字「' +
 						ch +
 						'」が見つかりました（インデックス: ' +
 						i +
@@ -290,7 +290,7 @@ const maskPassword = (pw, visible) => {
 const exports = {
 	generatePassword: generatePassword,
 	maskPassword: maskPassword,
-	formatUserName: formatUserName,
+	toKanaReading: toKanaReading,
 };
 
 // CommonJS
@@ -315,7 +315,7 @@ if (typeof window !== 'undefined') {
 		window.maskPassword = typeof maskPassword !== 'undefined' ? maskPassword : undefined;
 	} catch {}
 	try {
-		window.formatUserName = typeof formatUserName !== 'undefined' ? formatUserName : undefined;
+		window.toKanaReading = typeof toKanaReading !== 'undefined' ? toKanaReading : undefined;
 	} catch {}
 }
 
