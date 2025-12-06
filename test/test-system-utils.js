@@ -25,9 +25,9 @@ try {
 		sandbox.maskPassword ||
 		(sandbox.window && sandbox.window.maskPassword);
 	toKanaReading =
-	(exported && exported.toKanaReading) ||
-	sandbox.toKanaReading ||
-	(sandbox.window && sandbox.window.toKanaReading);
+		(exported && exported.toKanaReading) ||
+		sandbox.toKanaReading ||
+		(sandbox.window && sandbox.window.toKanaReading);
 } catch (e) {
 	generatePassword =
 		sandbox.generatePassword || (sandbox.window && sandbox.window.generatePassword);
@@ -124,7 +124,7 @@ try {
 }
 
 try {
-	// toKanaReading: strict mode throws on unmapped char
+	// ≈: strict mode throws on unmapped char
 	let threw = false;
 	try {
 		toKanaReading('Aあ', { strict: true });

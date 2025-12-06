@@ -62,7 +62,7 @@ const name = toKanaReading('A1@+');
 
 // カスタムマップと strict モード
 try {
-  const name2 = toKanaReading('Aあ', { map: { A: 'エー' }, strict: true });
+	const name2 = toKanaReading('Aあ', { map: { A: 'エー' }, strict: true });
 } catch (e) {
 	// strict=true だと未定義文字で例外
 }
