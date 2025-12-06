@@ -287,7 +287,7 @@ const maskPassword = (pw, visible) => {
 	return left + middle + right;
 };
 
-const exports = {
+const _su_exports = {
 	generatePassword: generatePassword,
 	maskPassword: maskPassword,
 	toKanaReading: toKanaReading,
@@ -295,13 +295,13 @@ const exports = {
 
 // CommonJS
 if (typeof module !== 'undefined' && module.exports) {
-	module.exports = exports;
+	module.exports = _su_exports;
 }
 
 // AMD
 if (typeof define === 'function' && define.amd) {
 	define(function () {
-		return exports;
+		return _su_exports;
 	});
 }
 
