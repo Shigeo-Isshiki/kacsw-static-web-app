@@ -129,6 +129,8 @@ const _cb_formatDateSimple = (value, fmt) => {
 	const mm = String(d.getMonth() + 1).padStart(2, '0');
 	const dd = String(d.getDate()).padStart(2, '0');
 	if (!fmt || fmt === 'YYYY-MM-DD') return `${yyyy}-${mm}-${dd}`;
+	// Japanese full-width format: 2025年12月07日
+	if (fmt === 'YYYY年MM月DD日') return `${yyyy}年${mm}月${dd}日`;
 	if (fmt === 'YYYY/MM/DD') return `${yyyy}/${mm}/${dd}`;
 	if (fmt === 'YYYYMMDD') return `${yyyy}${mm}${dd}`;
 	if (fmt === 'YMMDD') {
