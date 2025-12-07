@@ -105,7 +105,7 @@ console.log(buildCSV(schema, rows, { header: true }));
   - `'string' | 'date' | 'number'`。
 
 - `format` (string | object)
-  - `type==='date'` の場合: `'YYYY-MM-DD' | 'YYYY/MM/DD' | 'YYYYMMDD' | 'YMMDD' | 'UNIX' | 'UNIX_MS'`
+  - `type==='date'` の場合: `'YYYY-MM-DD' | 'YYYY/MM/DD' | 'YYYYMMDD' | 'YMMDD' | 'UNIX' | 'UNIX_MS' | 'YYYY年MM月DD日' | 'YYYY年M月D日'`
   - `type==='number'` の場合: `{ width: N }` のように整数部の固定幅ゼロ埋めを指定。
 
 - `formatter` (function(value, record) => string)
@@ -205,28 +205,6 @@ raw 値取得 -> map 適用 -> (mapFinal?) -> formatter -> type/format -> escape
 </script>
 ```
 
-### 日本語日付フォーマットの例
-
-`src/csv-builder.js` では日本語表記のフォーマットをサポートしています。2つの形式の例を示します:
-
-- `YYYY年MM月DD日` (ゼロパディングあり): 例 `2025年11月09日`
-- `YYYY年M月D日` (ゼロパディングなし): 例 `2025年11月9日`
-
-```js
-// 例: buildRow での使用
-const schemaJP = [
-  { key: 'd1', label: 'padded', type: 'date', format: 'YYYY年MM月DD日' },
-  { key: 'd2', label: 'unpadded', type: 'date', format: 'YYYY年M月D日' },
-];
-const rec = { d1: new Date(2025, 10, 9), d2: new Date(2025, 10, 9) }; // 2025-11-09
-console.log(buildRow(schemaJP, rec));
-// -> "2025年11月09日,2025年11月9日"
-
-// buildCSV でも同様にヘッダ付きで出力可能です
-console.log(buildCSV(schemaJP, [rec], { header: true }));
-// -> "padded,unpadded\n2025年11月09日,2025年11月9日"
-```
-
 ### 2) Node で formatter を使う例（小数2桁、通貨）
 
 ```js
@@ -244,6 +222,28 @@ console.log(window.CSV.buildCSV(schema, [{ amount: 123.456 }], { header: true })
 const m = new Map([['りんご', 'A01']]);
 const schema = [{ key: 'product', map: m, mapDefault: 'UNKNOWN' }];
 console.log(buildRow(schema, { product: 'ばなな' })); // -> 'UNKNOWN'
+```
+
+### 日本語日付フォーマットの例
+
+`src/csv-builder.js` では日本語表記のフォーマットをサポートしています。2つの形式の例を示します:
+
+- `YYYY年MM月DD日` (ゼロパディングあり): 例 `2025年11月09日`
+- `YYYY年M月D日` (ゼロパディングなし): 例 `2025年11月9日`
+
+```js
+// 例: buildRow での使用
+const schemaJP = [
+	{ key: 'd1', label: 'padded', type: 'date', format: 'YYYY年MM月DD日' },
+	{ key: 'd2', label: 'unpadded', type: 'date', format: 'YYYY年M月D日' },
+];
+const rec = { d1: new Date(2025, 10, 9), d2: new Date(2025, 10, 9) }; // 2025-11-09
+console.log(buildRow(schemaJP, rec));
+// -> "2025年11月09日,2025年11月9日"
+
+// buildCSV でも同様にヘッダ付きで出力可能です
+console.log(buildCSV(schemaJP, [rec], { header: true }));
+// -> "padded,unpadded\n2025年11月09日,2025年11月9日"
 ```
 
 ---
