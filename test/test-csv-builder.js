@@ -44,10 +44,24 @@ try {
     { key: 'd4', label: 'd4', type: 'date', format: 'YMMDD' },
     { key: 'd5', label: 'd5', type: 'date', format: 'UNIX' },
     { key: 'd6', label: 'd6', type: 'date', format: 'UNIX_MS' },
+    { key: 'd7', label: 'd7', type: 'date', format: 'YYYY年MM月DD日' },
+    { key: 'd8', label: 'd8', type: 'date', format: 'YYYY年M月D日' },
   ];
   const rowDates = { d1: date, d2: date, d3: date, d4: date, d5: date, d6: date };
+  // include the two Japanese formats (padded and non-padded)
+  rowDates.d7 = date;
+  rowDates.d8 = date;
   const r = buildRow(schemaDates, rowDates, { delimiter: ',' });
-  const expectDates = ['2025-11-09','2025/11/09','20251109','51109', String(Math.floor(date.getTime()/1000)), String(date.getTime())].join(',');
+  const expectDates = [
+    '2025-11-09',
+    '2025/11/09',
+    '20251109',
+    '51109',
+    String(Math.floor(date.getTime()/1000)),
+    String(date.getTime()),
+    '2025年11月09日',
+    '2025年11月9日',
+  ].join(',');
   eq(r, expectDates, 'date formats mismatch');
 
   // 2) unix seconds input interpreted

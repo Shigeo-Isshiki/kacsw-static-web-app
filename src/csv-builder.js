@@ -131,6 +131,8 @@ const _cb_formatDateSimple = (value, fmt) => {
 	if (!fmt || fmt === 'YYYY-MM-DD') return `${yyyy}-${mm}-${dd}`;
 	// Japanese full-width format: 2025年12月07日
 	if (fmt === 'YYYY年MM月DD日') return `${yyyy}年${mm}月${dd}日`;
+	// Japanese non-padded format: 2025年12月7日 (no zero padding for month/day)
+	if (fmt === 'YYYY年M月D日') return `${yyyy}年${d.getMonth() + 1}月${d.getDate()}日`;
 	if (fmt === 'YYYY/MM/DD') return `${yyyy}/${mm}/${dd}`;
 	if (fmt === 'YYYYMMDD') return `${yyyy}${mm}${dd}`;
 	if (fmt === 'YMMDD') {
