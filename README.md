@@ -22,6 +22,8 @@ and other helpers.
   - ドキュメント: [kintone カスタムライブラリ 使い方リファレンス — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md)
 - 電話番号ユーティリティ（使い方リファレンス） — `src/phone-utils.js` の仕様、正規化・判定ルール、使用例を含みます。
   - ドキュメント: [電話番号ユーティリティ 使い方リファレンス — docs/phone-utils.md](./docs/phone-utils.md)
+- 配送処理ユーティリティ（使い方リファレンス） — `src/shipping-processing.js` の仕様、伝票番号検証、荷物問い合わせボタン、営業日判定の挙動をまとめています。
+  - ドキュメント: [配送処理ユーティリファレンス — docs/shipping-processing.md](./docs/shipping-processing.md)
 - システムユーティリティ（使い方リファレンス） — `src/system-utils.js` に含まれるパスワード生成、マスク表示、読み仮名変換などの小さなユーティリティ群。
   - ドキュメント: [システムユーティリティ 使い方リファレンス — docs/system-utils.md](./docs/system-utils.md)
 - 文字列ユーティリティ（使い方リファレンス） — `src/text-suite.js` の全角/半角変換やかな相互変換、メール検証などの仕様をまとめています。
