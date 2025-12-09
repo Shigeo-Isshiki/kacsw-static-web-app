@@ -135,10 +135,10 @@ getNextBusinessDay('2025-11-12', 16, (d) => console.log(d));
 ```js
 // 伝票番号の検証
 try {
-  const tn = validateTrackingNumber('１２３－４５６－７８９０');
-  // tn === '1234567890'
+	const tn = validateTrackingNumber('１２３－４５６－７８９０');
+	// tn === '1234567890'
 } catch (err) {
-  console.error('伝票番号が不正:', err.message);
+	console.error('伝票番号が不正:', err.message);
 }
 
 // 営業日の取得
