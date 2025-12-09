@@ -1,4 +1,4 @@
-````markdown
+```markdown
 # shipping-processing 使い方リファレンス
 
 このドキュメントは `src/shipping-processing.js` が公開する配送関連ユーティリティ関数の使い方、引数・戻り値・副作用をまとめたリファレンスです。
@@ -161,4 +161,4 @@ kintoneShippingInquiryButton('space1', 'trackBtn', undefined, '1234567890', 'jap
 
 必要であれば、このドキュメントに `URL` テンプレート一覧（`_SP_SHIPPING_INQUIRY_URL_MAP` の実際のテンプレート）や、祝日 API のレート制限・失敗時の挙動詳細を追記できます。どの部分を詳述しますか？
 
-````
+```
