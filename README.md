@@ -28,7 +28,8 @@ and other helpers.
   - ドキュメント: [システムユーティリティ 使い方リファレンス — docs/system-utils.md](./docs/system-utils.md)
 - 文字列ユーティリティ（使い方リファレンス） — `src/text-suite.js` の全角/半角変換やかな相互変換、メール検証などの仕様をまとめています。
   - ドキュメント: [文字列ユーティリティ 使い方リファレンス — docs/text-suite.md](./docs/text-suite.md)
-- その他のライブラリ — `phone-utils` の使い方ドキュメントは追って追加します（coming soon）。
+- 郵便番号／住所ユーティリティ（使い方リファレンス） — `src/zip-code-address-utils.js` の仕様、正規化・API応答の整形、kintone 向けユーティリティをまとめています。
+  - ドキュメント: [郵便番号／住所ユーティリティ 使い方リファレンス — docs/zip-code-address-utils.md](./docs/zip-code-address-utils.md)
 
 銀行振込データ作成機能を利用する場合はまず上記の 銀行振込ユーティリティリファレンスを参照してください。
 CSV 機能を利用する場合はまず上記の CSV ビルダーリファレンスを参照してください。
