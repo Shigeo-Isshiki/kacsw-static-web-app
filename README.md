@@ -1,87 +1,3 @@
-# KACSW Static Web App
-
-![Prepare dist workflow](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/workflows/prepare-dist.yml/badge.svg)
-
-This repository is a small static web app used for building and testing
-JavaScript utilities for handling Japanese phone numbers, postal codes,
-and other helpers.
-
-## ドキュメントとリファレンス
-
-このリポジトリで公開しているユーティリティについて、使い方やスキーマ仕様、実用サンプルをまとめた「使い方リファレンス」は `docs/` に格納しています。今後さらにモジュールが増えることを想定して、モジュールごとの参照をここに一覧化していきます。
-
-主なドキュメント:
-
-- 銀行振込ユーティリティ（使い方リファレンス） — `src/bank-transfer.js` の仕様、正規化ルール、EDI（振込ファイル）生成のサンプルを含みます。
-  - ドキュメント: [銀行振込ユーティリティ 使い方リファレンス — docs/bank-transfer.md](./docs/bank-transfer.md)
-- CSV ビルダー（使い方リファレンス） — `src/csv-builder.js` のスキーマ仕様、`map` / `mapMode` の挙動、formatter の実例などを含みます。
-  - ドキュメント: [CSV ビルダー 使い方リファレンス — docs/csv-builder.md](./docs/csv-builder.md)
-- 日付ユーティリティ（使い方リファレンス） — `src/date-utils.js` の仕様、和暦/漢数字変換、利用例を含みます。
-  - ドキュメント: [日付ユーティリティ 使い方リファレンス — docs/date-utils.md](./docs/date-utils.md)
-- kintone カスタムユーティリティ（使い方リファレンス） — `src/kintone-custom-lib.js` の公開ヘルパー（notify / setSpaceField / setRecordValues など）、サニタイズやダイアログ生成の振る舞いをまとめています。
-  - ドキュメント: [kintone カスタムライブラリ 使い方リファレンス — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md)
-- 電話番号ユーティリティ（使い方リファレンス） — `src/phone-utils.js` の仕様、正規化・判定ルール、使用例を含みます。
-  - ドキュメント: [電話番号ユーティリティ 使い方リファレンス — docs/phone-utils.md](./docs/phone-utils.md)
-- 配送処理ユーティリティ（使い方リファレンス） — `src/shipping-processing.js` の仕様、伝票番号検証、荷物問い合わせボタン、営業日判定の挙動をまとめています。
-  - ドキュメント: [配送処理ユーティリファレンス — docs/shipping-processing.md](./docs/shipping-processing.md)
-- システムユーティリティ（使い方リファレンス） — `src/system-utils.js` に含まれるパスワード生成、マスク表示、読み仮名変換などの小さなユーティリティ群。
-  - ドキュメント: [システムユーティリティ 使い方リファレンス — docs/system-utils.md](./docs/system-utils.md)
-- 文字列ユーティリティ（使い方リファレンス） — `src/text-suite.js` の全角/半角変換やかな相互変換、メール検証などの仕様をまとめています。
-  - ドキュメント: [文字列ユーティリティ 使い方リファレンス — docs/text-suite.md](./docs/text-suite.md)
-- ビデオ会議ユーティリティ（使い方リファレンス） — `src/vc-check.js` の検証・正規化ルール（Zoom ミーティングID/パスコード/URL）をまとめています。
-  - ドキュメント: [ビデオ会議ユーティリティ 使い方リファレンス — docs/vc-check.md](./docs/vc-check.md)
-- 郵便番号／住所ユーティリティ（使い方リファレンス） — `src/zip-code-address-utils.js` の仕様、正規化・API応答の整形、kintone 向けユーティリティをまとめています。
-  - ドキュメント: [郵便番号／住所ユーティリティ 使い方リファレンス — docs/zip-code-address-utils.md](./docs/zip-code-address-utils.md)
-
-銀行振込データ作成機能を利用する場合はまず上記の 銀行振込ユーティリティリファレンスを参照してください。
-CSV 機能を利用する場合はまず上記の CSV ビルダーリファレンスを参照してください。
-
-# Vanilla JavaScript App
-
-[Azure Static Web Apps](https://docs.microsoft.com/azure/static-web-apps/overview) allows you to easily build JavaScript apps in minutes. Use this repo with the [quickstart](https://docs.microsoft.com/azure/static-web-apps/getting-started?tabs=vanilla-javascript) to build and customize a new static site.
-
-This repo is used as a starter for a _very basic_ HTML web application using no front-end frameworks.
-
-## 今回の追加・変更 (2025-11-03)
-
-このリポジトリに対して最近行った主要な変更点と、ローカルでの確認手順をまとめます。
-
-- 追加/変更された主なファイル・仕組み:
-  - `.prettierrc` を追加して Prettier のルールを固定化しました（例: singleQuote, trailingComma, printWidth など）。
-  - `src/all-window-exports.js` を追加 — 公開 API を安全に `window` に露出するためのヘルパー（既に定義されている識別子のみを添付し、既存のグローバルを上書きしないようになっています）。
-  - ブラウザ検証用のテストページを追加: `src/test.html`, `src/test-only.html`, `src/test-all-scripts.html`。
-  - `src/bank-transfer.js` を追加/更新 — kintone 向けの銀行振込ユーティリティ。
-    - `getBank(input, callback)` はコールバック必須の非同期 API に変更しました（同期返却は廃止）。
-    - `getBank` がコールバックで返す `kana` は半角カタカナ化され、長音記号や類似ダッシュはすべて半角ハイフン `-` に正規化されます。
-  - 自動チェック用スクリプトを追加: `scripts/check-window-vm.js`（Node の VM 上での確認）、`scripts/puppeteer-check.js`（ヘッドレスブラウザでの確認）、`scripts/auto-check.js`（ファイル変更を監視して再実行）。
-  - CI ワークフローを追加/更新: `.github/workflows/prepare-dist.yml`（Prettier/ESLint/prepare:dist を実行して PR をブロックする設定）。
-
-- ローカルでの推奨確認手順（開発者向け）:
-
-```bash
-npm install
-npm run format       # Prettier でコード整形
-npm run lint         # ESLint のチェック
-npm run lint:fix     # 可能な自動修正
-npm run ci-check     # prepare:dist -> Node VM チェック -> Puppeteer ブラウザチェック
-npm run prepare:dist # dist を作成
-npm start            # src をローカル配信（http://localhost:8000）
-```
-
-- CI でよくある失敗と対処の指針:
-  - Prettier のチェックに失敗した場合: `npm run format` を実行して整形後にコミットしてください。
-  - ESLint エラーで止まる場合: `npm run lint` / `npm run lint:fix` を使って原因を確認・修正してください。
-
-- 注意事項:
-  - `window` に公開する際は、該当識別子が定義された後に公開してください（TDZ による未定義参照を避けるため）。`all-window-exports.js` はその補助をしますが、読み込み順を保証することも重要です。
-  - GitHub Actions の詳細ログ（特にアーティファクトや ZIP ログ）はリポジトリの権限に依存します。取得できない場合はリポジトリ管理者に確認してください。
-
-## 今回の変更 (2025-11-09)
-
-以下はこの作業セッションで `src/bank-transfer.js` を中心に行った主な変更点です。kintone 側および銀行ファイル生成向けのフォーマットと検証を強化しました。
-
-- SJIS バイト長関連ヘルパを追加
-  - `_bt_sjisByteLength` / `_bt_sjisTruncate` による SJIS 相当バイト長での計測・切り詰めを実装しました。
 - 受取人名・口座番号の正規化
   - `normalizePayeeName`（最大 30 バイト、半角カタカナ化や長音・ダッシュの正規化など）を追加しました。
   - `normalizeAccountNumber`（7 桁ゼロ埋め）を追加しました。
@@ -321,29 +237,57 @@ npm run prepare
   - `error` (string) — エラー識別子または簡易メッセージ（互換性のため常に設定されます）
   - `message` (string, optional) — ユーザー向けの説明文（日本語）
   - `code` (string, optional) — 詳細なプログラム向けエラーコード（例: `kigou.not_5_digits`）
-  - `field` (string, optional) — エラー対象フィールド。主に以下のいずれかになります:
-    - `kigou` (ゆうちょ記号)
-    - `bangou` (ゆうちょ番号)
-    - `bank` (銀行情報の取得)
-    - `branch` (支店情報の取得)
-    - `both` (記号・番号の両方)
-    - `other` (その他/汎用)
-  - `details` (object, optional) — 開発者向けの追加情報（正規化後の値など）。
 
-例:
+# KACSW Static Web App
 
-```json
-{
-	"error": "invalid_format",
-	"code": "kigou.not_5_digits",
-	"field": "kigou",
-	"message": "記号は5桁の数字である必要があります",
-	"details": { "raw": "１２３", "normalized": "123" }
-}
+![Prepare dist workflow](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/workflows/prepare-dist.yml/badge.svg)
+
+Lightweight utilities and examples for kintone and other JS usages.
+Provides small, focused modules (phone numbers, postal codes, text helpers,
+bank transfer formatting, Zoom input validation, etc.) under `src/`.
+
+## Docs
+
+Module usage and reference docs live in `docs/`. Key references:
+
+- [銀行振込ユーティリティ — docs/bank-transfer.md](./docs/bank-transfer.md)
+- [CSV ビルダー — docs/csv-builder.md](./docs/csv-builder.md)
+- [日付ユーティリティ — docs/date-utils.md](./docs/date-utils.md)
+- [kintone カスタムライブラリ — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md)
+- [電話番号ユーティリティ — docs/phone-utils.md](./docs/phone-utils.md)
+- [配送処理ユーティリティ — docs/shipping-processing.md](./docs/shipping-processing.md)
+- [文字列ユーティリティ — docs/text-suite.md](./docs/text-suite.md)
+- [ビデオ会議ユーティリティ — docs/vc-check.md](./docs/vc-check.md)
+- [郵便番号／住所ユーティリティ — docs/zip-code-address-utils.md](./docs/zip-code-address-utils.md)
+
+## Quickstart
+
+Install dependencies and run checks locally:
+
+```bash
+npm install
+npm run format    # prettier
+npm run lint      # eslint
+npm run test      # run tests (scripts/run-tests.js)
+npm start         # serve ./src on http://localhost:8000
 ```
 
-kintone 側では `field` を見て該当フィールドにエラーメッセージを表示する実装が推奨されます（例: `app.record.setFieldError('記号フィールドコード', res.message)`）。
+## Tests
 
-```
+- Tests are in `test/` and executed by `npm run test` (invokes `scripts/run-tests.js`).
+- New: `test/test-vc-check.js` covers `src/vc-check.js`.
 
-```
+## Packaging
+
+- `npm run prepare:dist` prepares `dist/` and `npm run zip` creates `package.zip`.
+
+## Contributing
+
+- See [CONTRIBUTING.md](./CONTRIBUTING.md) for workflow and commit hooks.
+
+## Notes
+
+- Exports intended for browser use attach safe identifiers to `window` (see `src/all-window-exports.js`).
+- This repository is lightweight by design—prefer small, focused changes and include tests for new behavior.
+
+If you'd like a shorter or English-only variant of this README, I can produce one.
