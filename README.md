@@ -2,7 +2,6 @@
 
 ![Prepare dist workflow](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/workflows/prepare-dist.yml/badge.svg)
 
-
 kintone 向けおよび汎用の小さな JavaScript ユーティリティ集です。各モジュールの使い方は `docs/` に記載しています。
 
 ## 目次
@@ -10,8 +9,11 @@ kintone 向けおよび汎用の小さな JavaScript ユーティリティ集で
 - [ドキュメント（主要）](#docs)
 - [クイックスタート](#quickstart)
 - [補足](#notes)
+- [貢献](#contributing)
+- [ライセンス](#license)
 
 <a id="docs"></a>
+
 ## ドキュメント
 
 - [銀行振込ユーティリティ — docs/bank-transfer.md](./docs/bank-transfer.md)
@@ -26,6 +28,7 @@ kintone 向けおよび汎用の小さな JavaScript ユーティリティ集で
 - [郵便番号／住所ユーティリティ — docs/zip-code-address-utils.md](./docs/zip-code-address-utils.md)
 
 <a id="quickstart"></a>
+
 ## クイックスタート
 
 ```bash
@@ -35,15 +38,21 @@ npm start       # ./src を配信（http://localhost:8000）
 ```
 
 <a id="notes"></a>
+
 ## 補足
 
 - テストは `test/` 配下にあります。
 - 配布用ファイル作成は `npm run prepare:dist` と `npm run zip` を使用します。
 
 ---
+
+<a id="contributing"></a>
+
 ## 貢献
 
 - 貢献方法については [CONTRIBUTING.md](./CONTRIBUTING.md) をご覧ください。
+
+<a id="license"></a>
 
 ## ライセンス
 
