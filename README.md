@@ -6,7 +6,7 @@ kintone 向けおよび汎用の小さな JavaScript ユーティリティ集で
 
 ## 目次
 
-- [ドキュメント（主要）](#docs)
+- [ドキュメント](#docs)
 - [クイックスタート](#quickstart)
 - [補足](#notes)
 - [貢献](#contributing)
@@ -17,16 +17,16 @@ kintone 向けおよび汎用の小さな JavaScript ユーティリティ集で
 
 ## ドキュメント
 
-- [銀行振込ユーティリティ — docs/bank-transfer.md](./docs/bank-transfer.md)
-- [CSV ビルダー — docs/csv-builder.md](./docs/csv-builder.md)
-- [日付ユーティリティ — docs/date-utils.md](./docs/date-utils.md)
-- [kintone カスタムライブラリ — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md)
-- [電話番号ユーティリティ — docs/phone-utils.md](./docs/phone-utils.md)
-- [配送処理ユーティリティ — docs/shipping-processing.md](./docs/shipping-processing.md)
-- [システムユーティリティ — docs/system-utils.md](./docs/system-utils.md)
-- [文字列ユーティリティ — docs/text-suite.md](./docs/text-suite.md)
-- [ビデオ会議ユーティリティ — docs/vc-check.md](./docs/vc-check.md)
-- [郵便番号／住所ユーティリティ — docs/zip-code-address-utils.md](./docs/zip-code-address-utils.md)
+- [銀行振込ユーティリティ — docs/bank-transfer.md](./docs/bank-transfer.md) — `src/bank-transfer.js`
+- [CSV ビルダー — docs/csv-builder.md](./docs/csv-builder.md) — `src/csv-builder.js`
+- [日付ユーティリティ — docs/date-utils.md](./docs/date-utils.md) — `src/date-utils.js`
+- [kintone カスタムライブラリ — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md) — `src/kintone-custom-lib.js`
+- [電話番号ユーティリティ — docs/phone-utils.md](./docs/phone-utils.md) — `src/phone-utils.js`
+- [配送処理ユーティリティ — docs/shipping-processing.md](./docs/shipping-processing.md) — `src/shipping-processing.js`
+- [システムユーティリティ — docs/system-utils.md](./docs/system-utils.md) — `src/system-utils.js`
+- [文字列ユーティリティ — docs/text-suite.md](./docs/text-suite.md) — `src/text-suite.js`
+- [ビデオ会議ユーティリティ — docs/vc-check.md](./docs/vc-check.md) — `src/vc-check.js`
+- [郵便番号／住所ユーティリティ — docs/zip-code-address-utils.md](./docs/zip-code-address-utils.md) — `src/zip-code-address-utils.js`
 
 <a id="quickstart"></a>
 
