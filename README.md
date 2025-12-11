@@ -36,33 +36,37 @@ This repo has a dev container. This means if you open it inside a [GitHub Codesp
 - 依存パッケージをインストール:
 
 ```bash
+## クイックスタート
+
+依存関係のインストールと簡単な確認手順:
+
+```bash
 npm install
+npm run format    # Prettier でコード整形
+npm run lint      # ESLint のチェック
+npm run test      # テストを実行（scripts/run-tests.js を使用）
+npm start         # ./src を配信（http://localhost:8000）
 ```
 
-- ローカル静的サーバを起動（`src` を公開）:
+## テスト
 
-```bash
-npm start
-# ブラウザで http://localhost:8000 を開く
-```
+- テストは `test/` 配下にあり、`npm run test` で実行されます（`scripts/run-tests.js` を経由）。
+- 追加されたテスト: `test/test-vc-check.js`（`src/vc-check.js` 用のユニットテスト）。
 
-`npm start` は `sirv` を使って `./src` を配信します（`package.json` の `start` スクリプトに定義）。
+## パッケージング
 
-## kintone 用パッケージ作成
+- `npm run prepare:dist` で `dist/` を準備し、`npm run zip` で `package.zip` を作成します。
 
-個別の `.js` をそのまま kintone アプリに登録する運用を想定しています。配布用に選択したファイルを `dist/` にまとめて ZIP 化する簡単な手順:
+## 貢献
 
-- dist を準備して ZIP 化（例）:
-
-```bash
-npm run prepare:dist || true
-npm run zip
-# 生成される package.zip を kintone にアップロードしてください
-```
-
-（注）`prepare:dist` スクリプトは `package.json` に定義できます。現状のリポジトリには `zip` スクリプトがあり、`dist` 内のファイルを `package.zip` にまとめます。
+- 貢献ガイド・コミットフックの設定は [CONTRIBUTING.md](./CONTRIBUTING.md) を参照してください。
 
 ## 注意事項
+
+- ブラウザ公開用のエクスポートは `window` に安全に添付する仕組み（`src/all-window-exports.js`）を用いています。読み込み順やグローバルの競合に注意してください。
+- 本リポジトリは軽量ユーティリティ群を想定しており、小さくフォーカスした変更とテストの追加を推奨します。
+
+完全な英語版やより短い日本語版が必要であれば作成します。
 
 - kintone 側から呼び出される関数はグローバルに公開されている必要があります（`window.xxx = ...`）。ただしファイルのロード順や一時的な未初期化（TDZ）に注意してください。安全なパターンとしては関数定義後にファイル末尾で `window` に公開する方法です。
 - 開発チームで環境を揃えるため、`package.json` と `package-lock.json` をリポジトリにコミットしています。
