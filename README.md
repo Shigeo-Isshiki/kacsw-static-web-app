@@ -28,6 +28,8 @@ and other helpers.
   - ドキュメント: [システムユーティリティ 使い方リファレンス — docs/system-utils.md](./docs/system-utils.md)
 - 文字列ユーティリティ（使い方リファレンス） — `src/text-suite.js` の全角/半角変換やかな相互変換、メール検証などの仕様をまとめています。
   - ドキュメント: [文字列ユーティリティ 使い方リファレンス — docs/text-suite.md](./docs/text-suite.md)
+- ビデオ会議ユーティリティ（使い方リファレンス） — `src/vc-check.js` の検証・正規化ルール（Zoom ミーティングID/パスコード/URL）をまとめています。
+  - ドキュメント: [ビデオ会議ユーティリティ 使い方リファレンス — docs/vc-check.md](./docs/vc-check.md)
 - 郵便番号／住所ユーティリティ（使い方リファレンス） — `src/zip-code-address-utils.js` の仕様、正規化・API応答の整形、kintone 向けユーティリティをまとめています。
   - ドキュメント: [郵便番号／住所ユーティリティ 使い方リファレンス — docs/zip-code-address-utils.md](./docs/zip-code-address-utils.md)
 
