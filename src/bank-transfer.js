@@ -1764,7 +1764,31 @@ const convertYucho = (kigou, bangou, callback) => {
 
 	// 必ず getBank を呼んで銀行情報を取得し、その結果に基づいて支店検索を行う
 	try {
-		getBank(bankCode, (bankRes) => {
+		// Prefer any test runtime stubs attached to window.BANK, like other helpers do.
+		const _callGetBank = (code, cb) => {
+			try {
+				if (
+					typeof window !== 'undefined' &&
+					window.BANK &&
+					typeof window.BANK.getBank === 'function'
+				)
+					return window.BANK.getBank(code, cb);
+			} catch (e) {}
+			return getBank(code, cb);
+		};
+		const _callGetBranch = (bankCodeVal, branchVal, cb) => {
+			try {
+				if (
+					typeof window !== 'undefined' &&
+					window.BANK &&
+					typeof window.BANK.getBranch === 'function'
+				)
+					return window.BANK.getBranch(bankCodeVal, branchVal, cb);
+			} catch (e) {}
+			return getBranch(bankCodeVal, branchVal, cb);
+		};
+
+		_callGetBank(bankCode, (bankRes) => {
 			// bankRes がエラーならそのまま返す（構造化されていない場合は enrich する）
 			if (!bankRes || bankRes.error) {
 				_bt_invokeCallback(
@@ -1904,7 +1928,7 @@ const convertYucho = (kigou, bangou, callback) => {
 			};
 
 			// 支店名/かなを取得（支店コード指定）
-			getBranch(out.bankCode, out.branchCode, (branchRes) => {
+			_callGetBranch(out.bankCode, out.branchCode, (branchRes) => {
 				if (!branchRes || branchRes.error) {
 					// 支店が見つからない/エラーの場合はエラーを返す
 					_bt_invokeCallback(

@@ -185,8 +185,27 @@ try {
 	BANK.convertYucho('12345', '12345671', (err, out) => {
 		try {
 			assert.strictEqual(err, null, 'convertYucho should not return error for valid kigou/bangou');
-			assert.ok(out && out.accountNumber, 'convertYucho should return accountNumber');
-			console.log('PASS: convertYucho with stubbed bank/branch');
+			assert.ok(out && typeof out === 'object', 'convertYucho should return an object');
+			// Minimum presence checks for expected fields
+			const required = [
+				'yuchoKigou',
+				'yuchoBangou',
+				'bankCode',
+				'bankName',
+				'bankKana',
+				'branchCode',
+				'branchName',
+				'branchKana',
+				'accountType',
+				'accountNumber',
+			];
+			for (const k of required) {
+				assert.ok(
+					out && out[k] != null && out[k] !== '',
+					`convertYucho should include non-empty field: ${k}`
+				);
+			}
+			console.log('PASS: convertYucho with stubbed bank/branch (fields present)');
 
 			// generateDataRecords yucho->yucho path
 			const records = [
