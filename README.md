@@ -41,3 +41,10 @@ npm start       # ./src を配信（http://localhost:8000）
 - 配布用ファイル作成は `npm run prepare:dist` と `npm run zip` を使用します。
 
 ---
+## 貢献
+
+- 貢献方法については [CONTRIBUTING.md](./CONTRIBUTING.md) をご覧ください。
+
+## ライセンス
+
+このプロジェクトは MIT ライセンスで公開されています。詳細は [LICENSE](./LICENSE) を参照してください。
