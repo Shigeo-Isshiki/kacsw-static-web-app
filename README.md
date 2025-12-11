@@ -242,9 +242,8 @@ npm run prepare
 
 ![Prepare dist workflow](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/workflows/prepare-dist.yml/badge.svg)
 
-Lightweight utilities and examples for kintone and other JS usages.
-Provides small, focused modules (phone numbers, postal codes, text helpers,
-bank transfer formatting, Zoom input validation, etc.) under `src/`.
+kintone 向けおよび汎用の小さな JavaScript ユーティリティとサンプルを収めた軽量リポジトリです。
+電話番号、郵便番号、文字列処理、銀行振込データ整形、ビデオ会議入力検証など、用途ごとに分かれたモジュールを `src/` に提供します。
 
 ## Docs
 
