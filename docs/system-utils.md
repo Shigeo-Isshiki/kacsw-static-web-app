@@ -23,6 +23,14 @@ const pw2 = sys.generatePassword({ length: 16, useSymbols: false });
 
 - `generatePassword(options)`
   - 目的: 指定ルールに従い、安全なパスワードを生成します。
+  - 注意: 関数はオプションオブジェクトを直接受け取ります。誤って二重にラップして
+    `{ options: { ... } }` のように渡すと、内部で `options.useSymbols` 等が見つからず
+    期待した挙動になりません（例: 記号が含まれない）。以下の例を参照してください。
+    - 正しい呼び出し例:
+      - `generatePassword({ length: 16, useLower: true, useUpper: true, useNumbers: true, useSymbols: true })`
+    - 誤った呼び出し例（避ける）:
+      - `generatePassword({ options: { length: 16, useSymbols: true } })`
+
   - `options`:
     - `length` (number) : 生成する長さ（既定 12、最小 4）。
     - `useLower` (boolean) : 小文字を含めるか（既定 true）。
