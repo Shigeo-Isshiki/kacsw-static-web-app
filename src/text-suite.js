@@ -253,6 +253,7 @@ const _ts_isFullWidthChar = (char) => {
 		(code >= 0x4e00 && code <= 0x9fff) || // 漢字
 		(code >= 0x3040 && code <= 0x309f) || // ひらがな
 		(code >= 0x30a0 && code <= 0x30ff) || // カタカナ
+		(code >= 0x3000 && code <= 0x303f) || // CJK記号・句読点（々 等を含む）
 		(code >= 0xff00 && code <= 0xff60) || // 全角記号・英数字・スペースなど
 		(code >= 0xffa0 && code <= 0xffef) // 全角記号など
 	);
