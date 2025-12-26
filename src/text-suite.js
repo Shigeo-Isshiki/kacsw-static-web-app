@@ -247,15 +247,18 @@ const _ts_buildPattern = (keys) => {
  * @returns {boolean} 全角文字ならtrue、そうでなければfalse
  */
 const _ts_isFullWidthChar = (char) => {
-	if (!_ts_checkString(char) || char.length !== 1) return false;
-	const code = char.charCodeAt(0);
+	if (!_ts_checkString(char) || char.length === 0) return false;
+	// Use codePointAt to correctly handle characters outside the BMP (surrogate pairs)
+	const code = char.codePointAt(0);
 	return (
 		(code >= 0x4e00 && code <= 0x9fff) || // 漢字
 		(code >= 0x3040 && code <= 0x309f) || // ひらがな
 		(code >= 0x30a0 && code <= 0x30ff) || // カタカナ
-		(code >= 0x3000 && code <= 0x303f) || // CJK記号・句読点（々 等を含む）
-		(code >= 0xff00 && code <= 0xff60) || // 全角記号・英数字・スペースなど
-		(code >= 0xffa0 && code <= 0xffef) // 全角記号など
+		(code >= 0x3000 && code <= 0x303f) || // CJK記号・句読点
+		(code >= 0xff00 && code <= 0xff60) || // 全角記号・英数字・スペース
+		(code >= 0xffa0 && code <= 0xffef) || // 全角記号など
+		(code >= 0xf900 && code <= 0xfaff) || // CJK互換漢字（例: 﨑）
+		(code >= 0x20000 && code <= 0x2fa1f) // 拡張漢字領域（サロゲートペア対応）
 	);
 };
 
