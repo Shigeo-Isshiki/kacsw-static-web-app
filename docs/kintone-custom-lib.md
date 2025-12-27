@@ -13,6 +13,7 @@
 - `kintoneEventOn(events, handler)`
 - `setRecordValues(record, values)`
 - `setHeaderMenuSpaceButton(id, textContent, onClick)`
+- `setRecordHeaderMenuSpaceButton(id, textContent, onClick)`
 - `setSpaceFieldButton(spaceField, id, textContent, onClick)`
 - `setSpaceFieldText(spaceField, id, innerHTML)`
 - `setSpaceFieldDisplay(spaceField, display)`
@@ -124,6 +125,35 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 - `onClick` (function | null) — クリック時に呼ばれるハンドラ。`null` でイベント登録しない
 
 テストヒント: `kintone.app.getHeaderMenuSpaceElement(id)` をモックして、返された要素に button が追加されることを検証します。
+
+### setRecordHeaderMenuSpaceButton(id, textContent, onClick)
+
+- 動作概要: レコード詳細／追加／編集画面のヘッダーメニュー上部（`kintone.app.record.getHeaderMenuSpaceElement` が返す要素）に指定 ID のボタンを追加または削除します。既に同一 ID の要素があれば削除してから追加します。`textContent` が `null` または空文字の場合は削除動作を行います。
+
+- `id` (string) — 追加するボタン要素の id（ヘッダースペース内で一意に識別するための値）
+- `textContent` (string | null) — ボタンに表示する文言。`null` または空文字で該当ボタンを削除
+- `onClick` (function | null) — クリック時に呼ばれるハンドラ。関数でない場合は無視される
+
+戻り値: 操作成功時は `true`（追加・削除が意図通り行われた場合）。要素が見つからない等で失敗した場合は `false`、引数が不正な場合は `undefined` を返すことがあります。
+
+実装上の注意点:
+
+- 生成するボタンには `type="button"` を明示しており、フォーム内で誤って `submit` を発生させないようにしています。
+- ボタン追加時に `onClick` が関数であれば `addEventListener('click', onClick)` を登録します。
+
+例（ブラウザ / kintone 上）:
+
+```js
+// ヘッダーメニュー上にボタンを追加
+setRecordHeaderMenuSpaceButton('my-rec-btn', '詳細表示', function () {
+	// 詳細処理
+});
+
+// ボタン削除
+setRecordHeaderMenuSpaceButton('my-rec-btn', null);
+```
+
+テストヒント: jsdom でテストする場合は `global.kintone.app.record.getHeaderMenuSpaceElement = id => document.getElementById('your-container')` のようにモックを用意し、返される要素に対して button が追加されることを確認します。
 
 ### setSpaceFieldButton(spaceField, id, textContent, onClick)
 

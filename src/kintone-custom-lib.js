@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_kc_)で始める
-/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton */
+/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton */
 
 // 共通定数
 /**
@@ -403,6 +403,53 @@ const setHeaderMenuSpaceButton = (id, textContent, onClick) => {
 };
 
 /**
+ * kintone のレコード詳細・追加・編集の各画面のメニューの上側にボタン要素を追加または削除します。
+ * - 既存の同 ID の要素は常に削除されます。
+ * - 追加時は type="button" として作成し、onClick が関数であれば click イベントを登録します。
+ *
+ * @param {string} id 追加するボタン要素の id
+ * @param {string|null} textContent ボタンの表示テキスト。null/空なら要素を削除して非表示にする
+ * @param {function|null|undefined} [onClick] クリック時に実行するコールバック（関数でない場合は無視される）
+ * @returns {boolean|undefined} 要素の追加/削除に成功したら true/false を返します。入力が不正な場合は undefined を返すことがあります。
+ */
+const setRecordHeaderMenuSpaceButton = (id, textContent, onClick) => {
+	if (
+		typeof id !== 'string' ||
+		!id.trim() ||
+		(textContent !== null && typeof textContent !== 'string') ||
+		(onClick !== undefined && typeof onClick !== 'function' && onClick !== null)
+	) {
+		return;
+	}
+	// 既存ボタン削除
+	const buttonElementById = document.getElementById(id);
+	if (buttonElementById) {
+		buttonElementById.remove();
+	}
+	if (textContent) {
+		// ボタン追加
+		const button = document.createElement('button');
+		// フォーム内で誤って submit を引き起こさないように type を明示する
+		button.type = 'button';
+		button.id = id;
+		button.textContent = textContent;
+		if (typeof onClick === 'function') {
+			button.addEventListener('click', onClick);
+		}
+		const spaceElement = kintone.app.record.getHeaderMenuSpaceElement(id);
+		if (!spaceElement) {
+			console.warn('setRecordHeaderMenuSpaceButton: space element not found', id);
+			return false;
+		}
+		spaceElement.appendChild(button);
+		return true;
+	} else {
+		// 非表示
+		return true;
+	}
+};
+
+/**
  * setRecordValues - record の複数フィールドに対して値を一括設定するユーティリティ
  * - 引数チェックを行い、成功時は true、失敗時は false を返します。
  * @param {Object} record 各フィールドの値（kintone の record オブジェクト想定）
@@ -643,6 +690,12 @@ if (typeof window !== 'undefined') {
 	try {
 		window.setHeaderMenuSpaceButton =
 			typeof setHeaderMenuSpaceButton !== 'undefined' ? setHeaderMenuSpaceButton : undefined;
+	} catch {}
+	try {
+		window.setRecordHeaderMenuSpaceButton =
+			typeof setRecordHeaderMenuSpaceButton !== 'undefined'
+				? setRecordHeaderMenuSpaceButton
+				: undefined;
 	} catch {}
 	try {
 		window.setRecordValues = typeof setRecordValues !== 'undefined' ? setRecordValues : undefined;
