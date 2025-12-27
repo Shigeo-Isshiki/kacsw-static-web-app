@@ -468,8 +468,17 @@ const _bt_isAllowedHalfWidthChar = (ch) => {
 	if (cp >= 0x30 && cp <= 0x39) return true;
 	// 英大文字
 	if (cp >= 0x41 && cp <= 0x5a) return true;
-	// スペースとハイフン、ピリオド、括弧を許容（'?' や '\\' は除外済）
-	if (cp === 0x20 || cp === 0x2d || cp === 0x2e || cp === 0x28 || cp === 0x29) return true;
+	// スペース、コンマ、スラッシュ、ハイフン、ピリオド、括弧を許容（'?' や '\\' は除外済）
+	if (
+		cp === 0x20 ||
+		cp === 0x2c ||
+		cp === 0x2f ||
+		cp === 0x2d ||
+		cp === 0x2e ||
+		cp === 0x28 ||
+		cp === 0x29
+	)
+		return true;
 	return false;
 };
 
@@ -2122,6 +2131,9 @@ const normalizePayeeName = (input, options = {}) => {
 	}
 	// 3) 英小文字は大文字化
 	work = work.replace(/[a-z]/g, (c) => c.toUpperCase());
+
+	// 全角カンマ（，）や日本語読点（、）は半角カンマに正規化して許容する
+	work = work.replace(/[，、]/g, ',');
 
 	// 4) 検査
 	if (_bt_isAllowedHalfWidthString(work)) {
