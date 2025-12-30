@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_kc_)で始める
-/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton */
+/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText */
 
 // 共通定数
 /**
@@ -450,6 +450,82 @@ const setRecordHeaderMenuSpaceButton = (id, textContent, onClick) => {
 };
 
 /**
+ * kintone のレコード詳細・追加・編集の各画面のメニューの上側に任意の HTML 文字列を挿入して表示／削除します。
+ * - 挿入時は既存の同 ID 要素を削除してから追加します。
+ * - innerHTML は内部でサニタイズされます。
+ *
+ * @param {string} id 追加する要素の id（既存要素があれば上書きの代わりに削除して再作成）
+ * @param {string|null} innerHTML 表示する HTML。null/空文字 の場合は要素を削除して非表示にする
+ * @returns {boolean} 成功したら true、引数不正や要素未発見などで失敗したら false
+ */
+const setRecordHeaderMenuSpaceText = (id, innerHTML) => {
+	if (
+		typeof id !== 'string' ||
+		!id.trim() ||
+		(innerHTML !== null && typeof innerHTML !== 'string')
+	) {
+		console.warn('setRecordHeaderMenuSpaceText: invalid arguments', { id, innerHTML });
+		return false;
+	}
+	// 既存要素削除
+	const existing = document.getElementById(id);
+	if (existing) existing.remove();
+
+	if (innerHTML) {
+		const createElement = () => {
+			const el = document.createElement('div');
+			el.id = id;
+			el.innerHTML = _kc_sanitizeHtml(innerHTML);
+			return el;
+		};
+
+		let appended = false;
+		try {
+			const spaceElement = kintone.app.record.getHeaderMenuSpaceElement(id);
+			if (spaceElement) {
+				const existingNow = document.getElementById(id);
+				if (existingNow) existingNow.remove();
+				spaceElement.appendChild(createElement());
+				appended = true;
+			}
+		} catch {
+			appended = false;
+		}
+
+		// 非同期リトライ
+		const startRetryLoop = () => {
+			const intervals = [50, 100, 200, 400, 800];
+			let idx = 0;
+			const tryOnce = () => {
+				if (document.getElementById(id)) return;
+				try {
+					const se = kintone.app.record.getHeaderMenuSpaceElement(id);
+					if (se) {
+						if (!document.getElementById(id)) {
+							se.appendChild(createElement());
+						}
+						return;
+					}
+				} catch {
+					// ignore and retry
+				}
+				if (idx < intervals.length) {
+					const wait = intervals[idx++];
+					setTimeout(tryOnce, wait);
+				}
+			};
+			setTimeout(tryOnce, 0);
+		};
+		startRetryLoop();
+
+		return appended;
+	} else {
+		// 非表示（削除済みであれば成功）
+		return true;
+	}
+};
+
+/**
  * setRecordValues - record の複数フィールドに対して値を一括設定するユーティリティ
  * - 引数チェックを行い、成功時は true、失敗時は false を返します。
  * @param {Object} record 各フィールドの値（kintone の record オブジェクト想定）
@@ -711,5 +787,11 @@ if (typeof window !== 'undefined') {
 	try {
 		window.setSpaceFieldText =
 			typeof setSpaceFieldText !== 'undefined' ? setSpaceFieldText : undefined;
+	} catch {}
+	try {
+		window.setRecordHeaderMenuSpaceText =
+			typeof setRecordHeaderMenuSpaceText !== 'undefined'
+				? setRecordHeaderMenuSpaceText
+				: undefined;
 	} catch {}
 }
