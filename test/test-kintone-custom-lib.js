@@ -191,6 +191,26 @@ const { JSDOM } = require('jsdom');
 			console.log('SKIP: setRecordHeaderMenuSpaceButton not exported');
 		}
 
+		if (typeof window.setRecordHeaderMenuSpaceText === 'function') {
+			const recTarget = document.getElementById('rec-header-space');
+			// ensure clean state
+			recTarget.innerHTML = '';
+			window.setRecordHeaderMenuSpaceText('rec-text', '<b>ヘッダ</b>');
+			const insertedText = document.getElementById('rec-text');
+			assert.ok(insertedText, 'record header text should be inserted');
+			// content should include the expected text; sanitizer behavior may vary
+			assert.ok(
+				insertedText.textContent.indexOf('ヘッダ') !== -1,
+				'inserted text should include ヘッダ'
+			);
+			// remove
+			window.setRecordHeaderMenuSpaceText('rec-text', null);
+			assert.strictEqual(document.getElementById('rec-text'), null);
+			console.log('PASS: setRecordHeaderMenuSpaceText inserts and removes sanitized HTML');
+		} else {
+			console.log('SKIP: setRecordHeaderMenuSpaceText not exported');
+		}
+
 		console.log('ALL KINTONE-CUSTOM-LIB DOM TESTS INVOKED');
 	} catch (err) {
 		console.error('FAIL:', err && err.message);
