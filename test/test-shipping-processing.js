@@ -52,44 +52,26 @@ try {
 	process.exitCode = 2;
 }
 
-// --- getNextBusinessDay tests (stub fetch to be deterministic) ---
+// --- getNextBusinessDay tests ---
 try {
-	// stub fetch: 常に response.ok = false にして祝日判定が false になるようにする
-	global.fetch = (url) =>
-		Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'not_found' }) });
-
 	// 基準日時が営業日かつ締め時間前 -> 同じ日が返る
 	const base = new Date('2025-11-12T10:00:00'); // 水曜日
-	getNextBusinessDay(base, 16, (out) => {
-		try {
-			assert.strictEqual(out, '2025-11-12', '締め時間前は同日が返る');
-			console.log('PASS: getNextBusinessDay same-day before cutoff');
-		} catch (e) {
-			console.error('FAIL: getNextBusinessDay same-day', e && e.message ? e.message : e);
-			process.exitCode = 2;
-		}
-	});
+	const out = getNextBusinessDay(base, 16);
+	assert.strictEqual(out, '2025-11-12', '締め時間前は同日が返る');
+	console.log('PASS: getNextBusinessDay same-day before cutoff');
 } catch (e) {
-	console.error('FAIL: getNextBusinessDay setup', e && e.message ? e.message : e);
+	console.error('FAIL: getNextBusinessDay same-day', e && e.message ? e.message : e);
 	process.exitCode = 2;
 }
 
 try {
 	// cutoff を超える場合は翌営業日が返る
-	global.fetch = (url) =>
-		Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'not_found' }) });
 	const base2 = new Date('2025-11-12T17:00:00'); // 水曜 17:00 -> 木曜に進む
-	getNextBusinessDay(base2, 16, (out) => {
-		try {
-			assert.strictEqual(out, '2025-11-13', '締め時間超過時は翌営業日');
-			console.log('PASS: getNextBusinessDay next-day after cutoff');
-		} catch (e) {
-			console.error('FAIL: getNextBusinessDay next-day', e && e.message ? e.message : e);
-			process.exitCode = 2;
-		}
-	});
+	const out2 = getNextBusinessDay(base2, 16);
+	assert.strictEqual(out2, '2025-11-13', '締め時間超過時は翌営業日');
+	console.log('PASS: getNextBusinessDay next-day after cutoff');
 } catch (e) {
-	console.error('FAIL: getNextBusinessDay second setup', e && e.message ? e.message : e);
+	console.error('FAIL: getNextBusinessDay next-day', e && e.message ? e.message : e);
 	process.exitCode = 2;
 }
 

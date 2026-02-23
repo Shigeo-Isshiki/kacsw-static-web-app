@@ -220,30 +220,32 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
 
 <a id="nextBankBusinessDay"></a>
 
-### `nextBankBusinessDay(baseDate, cutoffHour, callback)`
+### `nextBankBusinessDay(baseDate, cutoffHour)`
 
 概要:
 
-- 指定日時から次の銀行営業日を計算し、結果をコールバックで返します。内部で土日・年末年始・国民の祝日判定（ローカルロジックを使用）を行います。
+- 指定日時から次の銀行営業日を計算し、同期的に結果を返します。内部で土日・年末年始・国民の祝日判定（ローカルロジックを使用）を行います。
 
 引数:
 
 - `baseDate` (Date|string) — 基準日時。Date オブジェクトまたは解析可能な日付文字列を受け付けます。省略時は現在日時を使用します。
 - `cutoffHour` (number) — 当日の締切時刻（0-23、省略時は 18）。基準時刻がこの時刻以降であれば 翌営業日のさらに次 を返す挙動になります。
-- `callback` (function(resultDateString)) — single-arg スタイルのコールバック。結果は 'YYYY-MM-DD' 形式の文字列で渡されます。
+
+戻り値:
+
+- `string` — 'YYYY-MM-DD' 形式の日付文字列。
 
 挙動・注意点:
 
 - 祝日判定は [national-holidays.js](../src/national-holidays.js) のローカルロジックを内部に組み込んで使用します。外部APIへの依存はありません。
-- 関数はコールバック方式で結果を返すため、同期的な戻り値はありません。必ず `callback` を渡してください。
+- **v2.0から同期返却形式に変更されました**。以前のコールバック方式とは互換性がありませんので、既存コードの更新が必要です。
 
 例:
 
 ```js
 const d = new Date('2025-12-31T19:00:00');
-window.BANK.nextBankBusinessDay(d, 18, (resDate) => {
-	console.log(resDate); // '2026-01-05' など（YYYY-MM-DD 形式）
-});
+const resDate = window.BANK.nextBankBusinessDay(d, 18);
+console.log(resDate); // '2026-01-05' など（YYYY-MM-DD 形式）
 ```
 
 ---

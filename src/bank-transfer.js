@@ -2843,16 +2843,13 @@ const generateZenginData = (headerData, records, callback) => {
 	}
 };
 
-/** 公開: nextBankBusinessDay — 次の銀行営業日を計算してコールバックで返します（詳細: docs/bank-transfer.md）。 */
+/** 公開: nextBankBusinessDay — 次の銀行営業日を計算して返します（詳細: docs/bank-transfer.md）。 */
 /**
  * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）
  * @param {number} [cutoffHour=18] 締め時刻（0-23）
- * @param {function(string):void} callback 結果を 'YYYY-MM-DD' 形式で受け取るコールバック（single-arg）
+ * @returns {string} 結果を 'YYYY-MM-DD' 形式で返す
  */
-const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) => {
-	if (typeof callback !== 'function') {
-		throw new Error('callback は関数である必要があります');
-	}
+const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18) => {
 	const cutoffHourNum = Number(cutoffHour);
 	if (!Number.isInteger(cutoffHourNum) || cutoffHourNum < 0 || cutoffHourNum > 23) {
 		throw new Error('締め時刻は0～23の整数である必要があります');
@@ -3098,87 +3095,77 @@ const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18, callback) =
 		return _bt_nh_getNationalHolidayNameByLaw(date) !== null;
 	};
 
-	// 内部: 国民の祝日判定（コールバック形式）
-	const _isNationalHoliday = (date, cb) => {
-		const result = _bt_nh_isNationalHoliday(date);
-		cb(result);
+	// 内部: 国民の祝日判定（同期形式）
+	const _isNationalHoliday = (date) => {
+		return _bt_nh_isNationalHoliday(date);
 	};
 	// ========== 国民の祝日判定ロジック終了 ==========
 
 	// 汎用: 指定日から最初の営業日を探すヘルパ (startDate を変更せず新しい Date を使う)
-	const findNextBusinessFrom = (startDate, cb) => {
+	const findNextBusinessFrom = (startDate) => {
 		const cur = new Date(startDate);
-		const _step = () => {
+		while (true) {
 			const dayOfWeek = cur.getDay();
 			const month = cur.getMonth() + 1;
 			const day = cur.getDate();
 			// 土日
 			if (dayOfWeek === 0 || dayOfWeek === 6) {
 				cur.setDate(cur.getDate() + 1);
-				_step();
-				return;
+				continue;
 			}
 			// 年末年始（銀行の取り扱いに合わせて 12/31〜1/3 を非営業日とする）
 			if ((month === 12 && day >= 31) || (month === 1 && day <= 3)) {
 				cur.setDate(cur.getDate() + 1);
-				_step();
-				return;
+				continue;
 			}
 			// 国民の祝日
-			_isNationalHoliday(cur, (isHoliday) => {
-				if (isHoliday) {
-					cur.setDate(cur.getDate() + 1);
-					_step();
-				} else {
-					const y = cur.getFullYear();
-					const mm = String(cur.getMonth() + 1).padStart(2, '0');
-					const dd = String(cur.getDate()).padStart(2, '0');
-					cb(`${y}-${mm}-${dd}`);
-				}
-			});
-		};
-		_step();
+			if (_isNationalHoliday(cur)) {
+				cur.setDate(cur.getDate() + 1);
+				continue;
+			}
+			// 営業日が見つかった
+			const y = cur.getFullYear();
+			const mm = String(cur.getMonth() + 1).padStart(2, '0');
+			const dd = String(cur.getDate()).padStart(2, '0');
+			return `${y}-${mm}-${dd}`;
+		}
 	};
 
-	// 判定: 基準日が営業日かどうかをチェックする (callback boolean)
-	const _isBusinessDay = (date, cb) => {
+	// 判定: 基準日が営業日かどうかをチェックする
+	const _isBusinessDay = (date) => {
 		const dow = date.getDay();
 		const m = date.getMonth() + 1;
 		const d = date.getDate();
 		if (dow === 0 || dow === 6) {
-			cb(false);
-			return;
+			return false;
 		}
 		if ((m === 12 && d >= 31) || (m === 1 && d <= 3)) {
-			cb(false);
-			return;
+			return false;
 		}
-		_isNationalHoliday(date, (isHoliday) => cb(!isHoliday));
+		return !_isNationalHoliday(date);
 	};
 
 	// 基準日の営業性を判定して挙動を分岐する
-	_isBusinessDay(baseDateObj, (isBaseBusiness) => {
-		if (isBaseBusiness) {
-			// 基準日が営業日の場合: 翌営業日 (cutoff 超過なら翌々営業日)
-			const offset = hasTimeInfo && baseDateObj.getHours() >= cutoffHourNum ? 2 : 1;
-			const start = new Date(baseDateObj);
-			start.setDate(start.getDate() + offset);
-			findNextBusinessFrom(start, callback);
-		} else {
-			// 基準日が休業日の場合: 翌営業日の翌営業日を返す
-			const after = new Date(baseDateObj);
-			after.setDate(after.getDate() + 1);
-			// まず翌営業日を求め、その翌日からさらに次の営業日を求める
-			findNextBusinessFrom(after, (firstBiz) => {
-				// parse firstBiz into Date
-				const parts = firstBiz.split('-');
-				const d1 = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-				const afterFirst = new Date(d1);
-				afterFirst.setDate(afterFirst.getDate() + 1);
-				findNextBusinessFrom(afterFirst, callback);
-			});
-		}
-	});
+	const isBaseBusiness = _isBusinessDay(baseDateObj);
+	if (isBaseBusiness) {
+		// 基準日が営業日の場合: 翌営業日 (cutoff 超過なら翌々営業日)
+		const offset = hasTimeInfo && baseDateObj.getHours() >= cutoffHourNum ? 2 : 1;
+		const start = new Date(baseDateObj);
+		start.setDate(start.getDate() + offset);
+		return findNextBusinessFrom(start);
+	} else {
+		// 基準日が休業日の場合: 翌営業日の翌営業日を返す
+		const after = new Date(baseDateObj);
+		after.setDate(after.getDate() + 1);
+		// まず翌営業日を求め、その翌日からさらに次の営業日を求める
+		const firstBiz = findNextBusinessFrom(after);
+		// parse firstBiz into Date
+		const parts = firstBiz.split('-');
+		const d1 = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+		const afterFirst = new Date(d1);
+		afterFirst.setDate(afterFirst.getDate() + 1);
+		return findNextBusinessFrom(afterFirst);
+	}
 };
 
 // kintone 向けに window に公開します

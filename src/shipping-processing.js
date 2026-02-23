@@ -256,64 +256,49 @@ const _sp_nh_isNationalHoliday = (date) => {
 // ========== 国民の祝日判定ロジック終了 ==========
 
 /**
- * 指定された日付が国民の祝日かどうかを判定する内部関数（コールバック形式）
+ * 指定された日付が国民の祝日かどうかを判定する内部関数（同期形式）
  * @param {Date} date 判定対象の日付
- * @param {(isHoliday: boolean) => void} callback 判定結果を返すコールバック関数
- * @returns {void}
+ * @returns {boolean} 祝日である場合はtrue、そうでない場合はfalse
  */
-const _sp_isNationalHolidayCallback = (date, callback) => {
-	const result = _sp_nh_isNationalHoliday(date);
-	callback(result);
+const _sp_isNationalHoliday = (date) => {
+	return _sp_nh_isNationalHoliday(date);
 };
 
 /**
- * 指定された日付が営業日（土日・祝日・年末年始を除く平日）かどうかを判定する内部関数（コールバック形式）
+ * 指定された日付が営業日（土日・祝日・年末年始を除く平日）かどうかを判定する内部関数（同期形式）
  * @param {Date} date 判定対象の日付
- * @param {(isBusinessDay: boolean) => void} callback 判定結果を返すコールバック関数
- * @returns {void}
+ * @returns {boolean} 営業日である場合はtrue、そうでない場合はfalse
  */
-const _sp_isBusinessDayCallback = (date, callback) => {
+const _sp_isBusinessDay = (date) => {
 	const dayOfWeek = date.getDay(); // 0=日曜日, 6=土曜日
 	const month = date.getMonth() + 1; // 1-12月
 	const day = date.getDate();
 
 	// 土曜日または日曜日は営業日ではない
 	if (dayOfWeek === 0 || dayOfWeek === 6) {
-		callback(false);
-		return;
+		return false;
 	}
 
 	// 年末年始（12月29日〜1月4日）は営業日ではない
 	if ((month === 12 && day >= 29) || (month === 1 && day <= 4)) {
-		callback(false);
-		return;
+		return false;
 	}
 
 	// 国民の祝日は営業日ではない
-	_sp_isNationalHolidayCallback(date, (isHoliday) => {
-		if (isHoliday) {
-			callback(false);
-		} else {
-			callback(true);
-		}
-	});
+	return !_sp_isNationalHoliday(date);
 };
 
 //　ライブラリ本体部
 /**
- * 発送日として適切な営業日を取得する関数（コールバック形式）
+ * 発送日として適切な営業日を取得する関数（同期形式）
  * 土曜日、日曜日、国民の祝日、年末年始（12月29日～1月4日）を除いた営業日を返す
  * cutoffHour以降の場合は翌営業日を返す（省略時は16時）
  * @param {Date|string} [baseDate=new Date()] 基準日時（省略時は現在日時、kintoneの日付・日時フィールド形式にも対応）
  * @param {number} [cutoffHour=16] 締め時刻（省略時は16）
- * @param {(businessDay: string) => void} callback 発送可能な営業日（YYYY-MM-DD形式）を返すコールバック関数
- * @returns {void}
+ * @returns {string} 発送可能な営業日（YYYY-MM-DD形式）
  * @throws {Error} 不正な日付の場合は例外
  */
-const getNextBusinessDay = (baseDate = new Date(), cutoffHour = 16, callback) => {
-	if (typeof callback !== 'function') {
-		throw new Error('callback は関数である必要があります');
-	}
+const getNextBusinessDay = (baseDate = new Date(), cutoffHour = 16) => {
 	// cutoffHourが文字列の場合も数値化して判定
 	const cutoffHourNum = Number(cutoffHour);
 	if (!Number.isInteger(cutoffHourNum) || cutoffHourNum < 0 || cutoffHourNum > 23) {
@@ -342,23 +327,15 @@ const getNextBusinessDay = (baseDate = new Date(), cutoffHour = 16, callback) =>
 	if (hasTimeInfo && targetDate.getHours() >= cutoffHourNum) {
 		targetDate.setDate(targetDate.getDate() + 1);
 	}
-	// 営業日を探す再帰関数
-	const findBusinessDay = () => {
-		_sp_isBusinessDayCallback(targetDate, (isBusinessDay) => {
-			if (isBusinessDay) {
-				// 営業日が見つかったので結果を返す
-				const year = targetDate.getFullYear();
-				const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-				const day = String(targetDate.getDate()).padStart(2, '0');
-				callback(`${year}-${month}-${day}`);
-			} else {
-				// 営業日でない場合は翌日をチェック
-				targetDate.setDate(targetDate.getDate() + 1);
-				findBusinessDay();
-			}
-		});
-	};
-	findBusinessDay();
+	// 営業日を探すループ
+	while (!_sp_isBusinessDay(targetDate)) {
+		targetDate.setDate(targetDate.getDate() + 1);
+	}
+	// 営業日が見つかったので結果を返す
+	const year = targetDate.getFullYear();
+	const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+	const day = String(targetDate.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
 };
 
 /**

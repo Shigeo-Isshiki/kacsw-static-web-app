@@ -26,11 +26,11 @@
 
 ## 公開 API サマリ
 
-- `getNextBusinessDay(baseDate, cutoffHour, callback)`
+- `getNextBusinessDay(baseDate, cutoffHour)`
 - `kintoneShippingInquiryButton(spaceField, id, label, trackingNumber, carrier)`
 - `validateTrackingNumber(trackingNumber, minLength, maxLength)`
 
-（注）`getNextBusinessDay` は非同期コールバック方式、`kintoneShippingInquiryButton` は DOM に副作用を与えます。`validateTrackingNumber` は同期関数で、入力不正時に `Error` を投げます。
+（注）`getNextBusinessDay` は同期関数（**v2.0からコールバック方式から変更**）、`kintoneShippingInquiryButton` は DOM に副作用を与えます。`validateTrackingNumber` は同期関数で、入力不正時に `Error` を投げます。
 
 ---
 
@@ -69,31 +69,32 @@ validateTrackingNumber('123-45 67890', 10, 14); // -> '1234567890'
 
 ---
 
-### `getNextBusinessDay(baseDate = new Date(), cutoffHour = 16, callback)`
+### `getNextBusinessDay(baseDate = new Date(), cutoffHour = 16)`
 
-- 概要: 指定日時から発送可能な次の営業日（`YYYY-MM-DD`）をコールバックで返します。土日・国民の祝日・年末年始（12/29〜1/4）を営業日から除外します。`cutoffHour` 以降の場合は翌営業日を返します。
+- 概要: 指定日時から発送可能な次の営業日（`YYYY-MM-DD`）を同期的に返します。土日・国民の祝日・年末年始（12/29〜1/4）を営業日から除外します。`cutoffHour` 以降の場合は翌営業日を返します。
 - 引数:
   - `baseDate` (Date|string, optional) — 基準日時。Date オブジェクト、またはパース可能な日付文字列を受け付けます。省略時は現在日時。
   - `cutoffHour` (number, optional) — 当日の締め時刻（0〜23）。省略時は `16`。
-  - `callback` (function(businessDayString)) — 結果を受け取るコールバック。結果は `'YYYY-MM-DD'` 形式の文字列。
-- 戻り値: なし（コールバックで結果を返す）
-- 例外: `callback` が関数でない、`baseDate` が不正な場合は `Error` を投げます。
+- 戻り値: `string` — 結果は `'YYYY-MM-DD'` 形式の文字列。
+- 例外: `baseDate` が不正な場合は `Error` を投げます。
 
 動作メモ:
 
 - `baseDate` に時刻情報が含まれる場合のみ `cutoffHour` を考慮する（日時文字列に時間が無ければ時刻なしと見なす）
 - 国民の祝日判定は [national-holidays.js](../src/national-holidays.js) のローカルロジックを内部に組み込んで使用します。外部APIへの依存はありません。
+- **v2.0から同期返却形式に変更されました**。以前のコールバック方式とは互換性がありませんので、既存コードの更新が必要です。
 
 使用例:
 
 ```js
-getNextBusinessDay(new Date('2025-11-12T10:00:00'), 16, (d) => console.log(d)); // -> '2025-11-12'
-getNextBusinessDay('2025-11-12', 16, (d) => console.log(d));
+const d = getNextBusinessDay(new Date('2025-11-12T10:00:00'), 16);
+console.log(d); // -> '2025-11-12'
+const d2 = getNextBusinessDay('2025-11-12', 16);
+console.log(d2); // -> '2025-11-12'
 ```
 
 テストヒント:
 
-- `fetch` をモックして API の応答 404 / success / ネットワークエラーをシミュレートし、祝日判定分岐を検証する
 - 土日、年末年始（12/29〜1/4）、祝日が連続するケースで正しく翌営業日に進むかを確認する
 
 ---
@@ -149,7 +150,8 @@ try {
 }
 
 // 営業日の取得
-getNextBusinessDay(new Date(), 16, (d) => console.log('発送可能日:', d));
+const d = getNextBusinessDay(new Date(), 16);
+console.log('発送可能日:', d);
 
 // kintone でボタンを追加
 // kintone.app.record.getSpaceElement をスタブするか、kintone 環境で実行
