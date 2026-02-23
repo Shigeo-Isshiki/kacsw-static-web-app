@@ -21,6 +21,7 @@ kintone 向けおよび汎用の小さな JavaScript ユーティリティ集で
 - [CSV ビルダー — docs/csv-builder.md](./docs/csv-builder.md) — `src/csv-builder.js`
 - [日付ユーティリティ — docs/date-utils.md](./docs/date-utils.md) — `src/date-utils.js`
 - [kintone カスタムライブラリ — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md) — `src/kintone-custom-lib.js`
+- [国民の祝日ユーティリティ — docs/national-holidays.md](./docs/national-holidays.md) — `src/national-holidays.js`
 - [電話番号ユーティリティ — docs/phone-utils.md](./docs/phone-utils.md) — `src/phone-utils.js`
 - [配送処理ユーティリティ — docs/shipping-processing.md](./docs/shipping-processing.md) — `src/shipping-processing.js`
 - [システムユーティリティ — docs/system-utils.md](./docs/system-utils.md) — `src/system-utils.js`

@@ -24,6 +24,7 @@
 > 注意: ここに書かれた使用例はライブラリの公開 API に合わせたもので、実行環境（ブラウザ / kintone / Node+jsdom）によって前提が異なります。kintone の DOM 要素を参照する関数は、テスト時に `kintone.app` のモックや `document`（jsdom）の用意が必要です。
 
 <a id="getfieldvalueor"></a>
+
 ### getFieldValueOr(record, fieldCode, defaultValue)
 
 - 動作概要: 指定した `record` から `fieldCode` の `value` を安全に取得します。存在しない場合や入力が不正な場合は `defaultValue` を返します。
@@ -47,6 +48,7 @@ getFieldValueOr(rec, 'missing', '不明'); // -> '不明'
 テストヒント: 無効な `record` を渡したときに `defaultValue` が返ることをアサートします。
 
 <a id="kintoneeventon"></a>
+
 ### kintoneEventOn(events, handler)
 
 - 動作概要: `kintone.events.on` にラップして指定イベントを登録します。ハンドラ内で例外が発生した場合はログ出力と `notifyError` の表示を行い、元のイベントオブジェクトを返します。
@@ -79,6 +81,7 @@ setRecordValues(r, { a: 10, c: 3 });
 ````
 
 <a id="notifyerror"></a>
+
 ### notifyError(message, title = 'エラー', allowHtml = false)
 
 - 動作概要: 指定メッセージをダイアログで表示します。`allowHtml` が真の場合はサニタイズした HTML を挿入し、偽の場合はプレーンテキストとして表示します。アクセシビリティ用の属性（role/aria-live等）も設定されます。
@@ -106,6 +109,7 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 実装上は `notifyError` / `notifyWarning` / `notifyInfo` の基本挙動（ダイアログ作成、サニタイズの適用など）は共通です。用途に応じてタイトルや CSS クラス、アクセシビリティの取り扱い（role や aria-live の優先度）を変えて使い分けてください。
 
 <a id="notifyinfo"></a>
+
 ### notifyInfo(message, title = '情報', allowHtml = false)
 
 - 動作概要: 情報表示用のダイアログを表示します。操作の成功通知や一般的な案内に使い、`allowHtml` に応じてサニタイズされた HTML またはプレーンテキストを挿入します。
@@ -115,6 +119,7 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 - `allowHtml` (boolean) — true の場合 HTML を許可しサニタイズして挿入
 
 <a id="notifywarning"></a>
+
 ### notifyWarning(message, title = '注意', allowHtml = false)
 
 - 動作概要: 注意喚起や軽度の問題を通知するためのダイアログを表示します。処理を継続できるがユーザーの注意を促したいケースで使用します。
@@ -124,6 +129,7 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 - `allowHtml` (boolean) — true の場合 HTML を許可しサニタイズして挿入
 
 <a id="setheadermenuspacebutton"></a>
+
 ### setHeaderMenuSpaceButton(id, textContent, onClick)
 
 - 動作概要: ヘッダーメニューのスペース要素に指定 ID のボタンを追加または削除します。既に同一 ID の要素があれば差し替え（削除→追加）し、`textContent` が null/空文字の場合は削除動作を行います。
@@ -135,6 +141,7 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 テストヒント: `kintone.app.getHeaderMenuSpaceElement(id)` をモックして、返された要素に button が追加されることを検証します。
 
 <a id="setrecordheadermenuspacebutton"></a>
+
 ### setRecordHeaderMenuSpaceButton(id, textContent, onClick)
 
 - 動作概要: レコード詳細／追加／編集画面のヘッダーメニュー上部（`kintone.app.record.getHeaderMenuSpaceElement` が返す要素）に指定 ID のボタンを追加または削除します。既に同一 ID の要素があれば削除してから追加します。`textContent` が `null` または空文字の場合は削除動作を行います。
@@ -165,6 +172,7 @@ setRecordHeaderMenuSpaceButton('my-rec-btn', null);
 テストヒント: jsdom でテストする場合は `global.kintone.app.record.getHeaderMenuSpaceElement = id => document.getElementById('your-container')` のようにモックを用意し、返される要素に対して button が追加されることを確認します。
 
 <a id="setrecordheadermenuspacetext"></a>
+
 ### setRecordHeaderMenuSpaceText(id, innerHTML)
 
 - 動作概要: レコード詳細／追加／編集画面のヘッダーメニュー上部（`kintone.app.record.getHeaderMenuSpaceElement` が返す要素）に任意の HTML 文字列を挿入して表示／削除します。挿入時は既存の同 ID 要素を削除してから追加し、`innerHTML` は内部でサニタイズされます。DOM が未準備の場合に備えて非同期リトライを行います。
@@ -187,6 +195,7 @@ setRecordHeaderMenuSpaceText('rec-text', null);
 テストヒント: jsdom で `document` を用意し、`global.kintone.app.record.getHeaderMenuSpaceElement = id => document.getElementById('rec-header-space')` のようにモックしてから呼び出し、返された要素に該当 ID の要素が appendChild されることを確認します。
 
 <a id="setspacefieldbutton"></a>
+
 ### setSpaceFieldButton(spaceField, id, textContent, onClick)
 
 - 動作概要: 指定したスペースフィールド（`kintone.app.record.getSpaceElement` から取得）にボタンを追加または削除します。追加時は `type="button"` を設定し、`onClick` を登録します。
@@ -205,6 +214,7 @@ setSpaceFieldButton('space-A', 'btn-1', '実行', () => console.log('clicked'));
 ```
 
 <a id="setspacefieldtext"></a>
+
 ### setSpaceFieldText(spaceField, id, innerHTML)
 
 - 動作概要: 指定スペースフィールドに HTML（サニタイズ済）を挿入します。`innerHTML` が null または空文字列の場合は該当要素を削除します。DOM が未準備の場合はリトライ設計を採ることを想定しています。
@@ -216,6 +226,7 @@ setSpaceFieldButton('space-A', 'btn-1', '実行', () => console.log('clicked'));
 テストヒント: `kintone.app.record.getSpaceElement` をモックして、要素が appendChild されることを確認します。
 
 <a id="setspacefielddisplay"></a>
+
 ### setSpaceFieldDisplay(spaceField, display)
 
 - 動作概要: 指定したスペースフィールドの親ノードの `style.display` を切り替えます。`display` が `true` のときは表示、`false` のときは非表示に設定します。
