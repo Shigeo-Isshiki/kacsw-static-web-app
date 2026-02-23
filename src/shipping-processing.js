@@ -6,9 +6,6 @@
 /* exported getNextBusinessDay, kintoneShippingInquiryButton, validateTrackingNumber */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
-// 祝日APIベースURL
-const _SP_HOLIDAY_API_BASE_URL = 'https://api.national-holidays.jp';
-
 // 運送会社ごとの問い合わせURLテンプレート
 const _SP_SHIPPING_INQUIRY_URL_MAP = {
 	yamato: 'https://member.kms.kuronekoyamato.co.jp/parcel/detail?pno={trackingNumber}', // ヤマト運輸
@@ -37,52 +34,236 @@ const _sp_checkString = (str) => {
  */
 // _sp_checkBoolean は内部ユーティリティで、外部公開は行いません
 
+// ========== 内部: 国民の祝日判定ロジック（national-holidays.jsより組み込み） ==========
+// 【重要】kintoneでの単体動作のため、national-holidays.jsのロジックをここに組み込んでいます。
+// 祝日定義を変更する場合は、以下のファイルも同時に更新してください：
+// - src/national-holidays.js (オリジナル)
+// - src/bank-transfer.js (プレフィックス: _bt_nh_)
+// --- 祝日定義定数 ---
+const _sp_nh_HOLIDAYS = [
+	{ type: 'fixed', month: 1, date: 1, name: '元日', since: 1949 },
+	{ type: 'fixed', month: 1, date: 15, name: '成人の日', since: 1949, until: 1999 },
+	{ type: 'variable', month: 1, week: 2, dayOfWeek: 1, name: '成人の日', since: 2000 },
+	{ type: 'fixed', month: 2, date: 11, name: '建国記念の日', since: 1966 },
+	{ type: 'fixed', month: 2, date: 23, name: '天皇誕生日', since: 2020 },
+	{ type: 'equinox', month: 3, calculator: 'vernal', name: '春分の日', since: 1949 },
+	{ type: 'fixed', month: 4, date: 29, name: '天皇誕生日', since: 1949, until: 1988 },
+	{ type: 'fixed', month: 4, date: 29, name: 'みどりの日', since: 1989, until: 2006 },
+	{ type: 'fixed', month: 4, date: 29, name: '昭和の日', since: 2007 },
+	{ type: 'fixed', month: 5, date: 1, name: '天皇の即位の日', since: 2019, until: 2019 },
+	{ type: 'fixed', month: 5, date: 3, name: '憲法記念日', since: 1949 },
+	{ type: 'fixed', month: 5, date: 4, name: 'みどりの日', since: 2007 },
+	{ type: 'fixed', month: 5, date: 5, name: 'こどもの日', since: 1949 },
+	{ type: 'fixed', month: 7, date: 20, name: '海の日', since: 1996, until: 2002 },
+	{
+		type: 'variable',
+		month: 7,
+		week: 3,
+		dayOfWeek: 1,
+		name: '海の日',
+		since: 2003,
+		excludeYears: [2020, 2021],
+	},
+	{ type: 'fixed', month: 7, date: 23, name: '海の日', since: 2020, until: 2020 },
+	{ type: 'fixed', month: 7, date: 22, name: '海の日', since: 2021, until: 2021 },
+	{ type: 'fixed', month: 7, date: 24, name: 'スポーツの日', since: 2020, until: 2020 },
+	{ type: 'fixed', month: 7, date: 23, name: 'スポーツの日', since: 2021, until: 2021 },
+	{ type: 'fixed', month: 8, date: 11, name: '山の日', since: 2016, excludeYears: [2020, 2021] },
+	{ type: 'fixed', month: 8, date: 10, name: '山の日', since: 2020, until: 2020 },
+	{ type: 'fixed', month: 8, date: 8, name: '山の日', since: 2021, until: 2021 },
+	{ type: 'fixed', month: 9, date: 15, name: '敬老の日', since: 1966, until: 2002 },
+	{ type: 'variable', month: 9, week: 3, dayOfWeek: 1, name: '敬老の日', since: 2003 },
+	{ type: 'equinox', month: 9, calculator: 'autumnal', name: '秋分の日', since: 1949 },
+	{ type: 'fixed', month: 10, date: 10, name: '体育の日', since: 1966, until: 1999 },
+	{
+		type: 'variable',
+		month: 10,
+		week: 2,
+		dayOfWeek: 1,
+		name: '体育の日',
+		since: 2000,
+		until: 2019,
+	},
+	{
+		type: 'variable',
+		month: 10,
+		week: 2,
+		dayOfWeek: 1,
+		name: 'スポーツの日',
+		since: 2020,
+		excludeYears: [2020, 2021],
+	},
+	{ type: 'fixed', month: 10, date: 22, name: '即位礼正殿の儀', since: 2019, until: 2019 },
+	{ type: 'fixed', month: 11, date: 3, name: '文化の日', since: 1949 },
+	{ type: 'fixed', month: 11, date: 23, name: '勤労感謝の日', since: 1949 },
+	{ type: 'fixed', month: 12, date: 23, name: '天皇誕生日', since: 1989, until: 2018 },
+];
+const _sp_nh_EQUINOX_COEFFICIENTS = {
+	vernal: [
+		{ startYear: 1948, endYear: 1979, constant: 20.8357, coefficient: 0.242194 },
+		{ startYear: 1980, endYear: 2099, constant: 20.8431, coefficient: 0.242194 },
+		{ startYear: 2100, endYear: 2150, constant: 21.851, coefficient: 0.242194 },
+	],
+	autumnal: [
+		{ startYear: 1948, endYear: 1979, constant: 23.2588, coefficient: 0.242194 },
+		{ startYear: 1980, endYear: 2099, constant: 23.2488, coefficient: 0.242194 },
+		{ startYear: 2100, endYear: 2150, constant: 24.2488, coefficient: 0.242194 },
+	],
+};
+
+// --- ヘルパー関数 ---
+const _sp_nh_getEquinoxCoefficient = (year, type) => {
+	const coefficients = _sp_nh_EQUINOX_COEFFICIENTS[type];
+	if (!coefficients) return null;
+	for (const coeff of coefficients) {
+		if (year >= coeff.startYear && year <= coeff.endYear) return coeff;
+	}
+	return null;
+};
+const _sp_nh_formatDateFromDate = (date) => {
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+const _sp_nh_formatDate = (year, month, day) => {
+	return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+const _sp_nh_parseDate = (dateStr) => {
+	const [year, month, day] = dateStr.split('-').map((v) => parseInt(v, 10));
+	return new Date(year, month - 1, day);
+};
+const _sp_nh_addDays = (date, days) => {
+	const next = new Date(date);
+	next.setDate(next.getDate() + days);
+	return next;
+};
+const _sp_nh_getVernalEquinoxDate = (year) => {
+	const coeff = _sp_nh_getEquinoxCoefficient(year, 'vernal');
+	if (!coeff) throw new Error(`春分の日の計算に対応していない年度です: ${year}年`);
+	const a = Math.floor((year - 1980) / 4);
+	const day = coeff.constant + coeff.coefficient * (year - 1980) - a;
+	return Math.floor(day);
+};
+const _sp_nh_getAutumnalEquinoxDate = (year) => {
+	const coeff = _sp_nh_getEquinoxCoefficient(year, 'autumnal');
+	if (!coeff) throw new Error(`秋分の日の計算に対応していない年度です: ${year}年`);
+	const a = Math.floor((year - 1980) / 4);
+	const day = coeff.constant + coeff.coefficient * (year - 1980) - a;
+	return Math.floor(day);
+};
+const _sp_nh_getNthWeekdayDate = (year, month, week, dayOfWeek) => {
+	const firstDay = new Date(year, month - 1, 1);
+	const firstDayOfWeek = firstDay.getDay();
+	const diff = (dayOfWeek - firstDayOfWeek + 7) % 7;
+	return 1 + diff + (week - 1) * 7;
+};
+const _sp_nh_isValidYear = (year) => year >= 1949;
+const _sp_nh_getBaseHolidaysForYear = (year) => {
+	const holidays = [];
+	for (const holiday of _sp_nh_HOLIDAYS) {
+		if (holiday.since > year || (holiday.until && year > holiday.until)) continue;
+		if (holiday.excludeYears && holiday.excludeYears.includes(year)) continue;
+		if (holiday.type === 'fixed') {
+			const dateStr = _sp_nh_formatDate(year, holiday.month, holiday.date);
+			holidays.push({ date: dateStr, name: holiday.name });
+		}
+		if (holiday.type === 'variable') {
+			const day = _sp_nh_getNthWeekdayDate(year, holiday.month, holiday.week, holiday.dayOfWeek);
+			const dateStr = _sp_nh_formatDate(year, holiday.month, day);
+			holidays.push({ date: dateStr, name: holiday.name });
+		}
+		if (holiday.type === 'equinox') {
+			let equinoxDate;
+			if (holiday.calculator === 'vernal') equinoxDate = _sp_nh_getVernalEquinoxDate(year);
+			else if (holiday.calculator === 'autumnal') equinoxDate = _sp_nh_getAutumnalEquinoxDate(year);
+			const dateStr = _sp_nh_formatDate(year, holiday.month, equinoxDate);
+			holidays.push({ date: dateStr, name: holiday.name });
+		}
+	}
+	return holidays;
+};
+const _sp_nh_addNationalHolidays = (holidayMap, year) => {
+	if (year < 1985) return;
+	for (
+		let date = new Date(year, 0, 1);
+		date.getFullYear() === year;
+		date = _sp_nh_addDays(date, 1)
+	) {
+		const dateStr = _sp_nh_formatDateFromDate(date);
+		if (holidayMap.has(dateStr)) continue;
+		const prevStr = _sp_nh_formatDateFromDate(_sp_nh_addDays(date, -1));
+		const nextStr = _sp_nh_formatDateFromDate(_sp_nh_addDays(date, 1));
+		if (holidayMap.has(prevStr) && holidayMap.has(nextStr)) {
+			holidayMap.set(dateStr, '国民の休日');
+		}
+	}
+};
+const _sp_nh_addSubstituteHolidays = (holidayMap, year) => {
+	if (year < 1973) return;
+	const workingMap = new Map(holidayMap);
+	const baseDates = Array.from(holidayMap.keys());
+	for (const dateStr of baseDates) {
+		const date = _sp_nh_parseDate(dateStr);
+		if (date.getDay() !== 0) continue;
+		if (year <= 2006) {
+			const nextDate = _sp_nh_addDays(date, 1);
+			const nextStr = _sp_nh_formatDateFromDate(nextDate);
+			if (!workingMap.has(nextStr)) {
+				workingMap.set(nextStr, '振替休日');
+				holidayMap.set(nextStr, '振替休日');
+			}
+			continue;
+		}
+		let substituteDate = _sp_nh_addDays(date, 1);
+		while (workingMap.has(_sp_nh_formatDateFromDate(substituteDate))) {
+			substituteDate = _sp_nh_addDays(substituteDate, 1);
+		}
+		const substituteStr = _sp_nh_formatDateFromDate(substituteDate);
+		workingMap.set(substituteStr, '振替休日');
+		holidayMap.set(substituteStr, '振替休日');
+	}
+};
+const _sp_nh_buildHolidayMap = (year) => {
+	const map = new Map();
+	const baseHolidays = _sp_nh_getBaseHolidaysForYear(year);
+	for (const holiday of baseHolidays) {
+		map.set(holiday.date, holiday.name);
+	}
+	_sp_nh_addNationalHolidays(map, year);
+	_sp_nh_addSubstituteHolidays(map, year);
+	return map;
+};
+const _sp_nh_getNationalHolidayNameByLaw = (date) => {
+	let targetDate;
+	if (typeof date === 'string') {
+		const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+		if (!match) throw new Error('日付は yyyy-MM-dd 形式で指定してください');
+		targetDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+	} else if (date instanceof Date) {
+		targetDate = new Date(date);
+	} else {
+		throw new Error('日付はDateオブジェクトまたは文字列で指定してください');
+	}
+	const year = targetDate.getFullYear();
+	const month = targetDate.getMonth() + 1;
+	const day = targetDate.getDate();
+	if (!_sp_nh_isValidYear(year)) return null;
+	const holidayMap = _sp_nh_buildHolidayMap(year);
+	const dateStr = _sp_nh_formatDate(year, month, day);
+	return holidayMap.get(dateStr) || null;
+};
+const _sp_nh_isNationalHoliday = (date) => {
+	return _sp_nh_getNationalHolidayNameByLaw(date) !== null;
+};
+// ========== 国民の祝日判定ロジック終了 ==========
+
 /**
- * 指定された日付が国民の祝日かどうかをWebAPIで判定する内部関数（コールバック形式）
+ * 指定された日付が国民の祝日かどうかを判定する内部関数（コールバック形式）
  * @param {Date} date 判定対象の日付
  * @param {(isHoliday: boolean) => void} callback 判定結果を返すコールバック関数
  * @returns {void}
  */
 const _sp_isNationalHolidayCallback = (date, callback) => {
-	// 1948年7月20日以前は祝日法制定前なので対象外
-	if (date < new Date(1948, 6, 20)) {
-		callback(false);
-		return;
-	}
-
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, '0');
-	const day = String(date.getDate()).padStart(2, '0');
-	const dateStr = `${year}-${month}-${day}`;
-
-	fetch(`${_SP_HOLIDAY_API_BASE_URL}/${dateStr}`)
-		.then((response) => {
-			if (!response.ok) {
-				// 404などのエラーは祝日でないことを意味する
-				callback(false);
-				return;
-			}
-			return response.json();
-		})
-		.then((result) => {
-			// 祝日でない場合 { error: "not_found" }
-			if (result && typeof result === 'object') {
-				if (result.error === 'not_found') {
-					callback(false);
-					return;
-				}
-				// 祝日の場合 { date: "2025-01-01", name: "元日" }
-				if (typeof result.date === 'string' && typeof result.name === 'string') {
-					callback(true);
-					return;
-				}
-			}
-			callback(false);
-		})
-		.catch((_error) => {
-			// 通信エラーやAPI異常時は祝日でないものとして扱う
-			callback(false);
-		});
+	const result = _sp_nh_isNationalHoliday(date);
+	callback(result);
 };
 
 /**

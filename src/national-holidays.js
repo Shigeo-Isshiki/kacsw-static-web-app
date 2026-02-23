@@ -3,6 +3,12 @@
  *
  * @fileoverview 国民の祝日に関する法律（昭和23年法律第178号）に基づいて、
  * 指定された日付が祝日かどうかの判定、祝日名の取得、年間祝日リストの生成を行います。
+ *
+ * 【重要】このファイルの祝日判定ロジックは、kintoneでの単体動作のため、
+ * 以下のファイルにも組み込まれています。祝日定義を変更する際は、すべてのファイルを更新してください：
+ * - bank-transfer.js (プレフィックス: _bt_nh_)
+ * - shipping-processing.js (プレフィックス: _sp_nh_)
+ *
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
  * @version 1.0.0
  */
@@ -541,6 +547,13 @@ const getNationalHolidaysInYear = (year) => {
 
 	return holidays;
 };
+
+// --- ブラウザ環境でのグローバルエクスポート ---
+if (typeof window !== 'undefined') {
+	window.isNationalHoliday = isNationalHoliday;
+	window.getNationalHolidayNameByLaw = getNationalHolidayNameByLaw;
+	window.getNationalHolidaysInYear = getNationalHolidaysInYear;
+}
 
 // --- CommonJS 形式でのエクスポート ---
 if (typeof module !== 'undefined' && module.exports) {

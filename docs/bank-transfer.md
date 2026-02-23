@@ -2,6 +2,12 @@
 
 このドキュメントは `src/bank-transfer.js` が公開する関数と、全銀フォーマット出力に必要な引数の詳細（契約）をまとめた使い方リファレンスです。
 
+> **重要**: このファイルには、kintoneでの単体動作のため、[src/national-holidays.js](../src/national-holidays.js) の祝日判定ロジックが組み込まれています（プレフィックス: `_bt_nh_`）。
+> 祝日定義を変更する際は、以下のファイルも同時に更新してください：
+>
+> - [src/national-holidays.js](../src/national-holidays.js) (オリジナル)
+> - [src/shipping-processing.js](../src/shipping-processing.js) (プレフィックス: `_sp_nh_`)
+
 ---
 
 ## 目次
@@ -34,6 +40,9 @@
 - ゆうちょ変換（`convertYucho`）
 - 全銀フォーマット（Zengin）用のレコード生成（`generateZenginData` など）
 - 受取人名・口座番号の正規化ヘルパ
+- 銀行営業日の算出（`nextBankBusinessDay`）
+
+**祝日判定について**: 営業日算出で必要な祝日判定は、[national-holidays.js](../src/national-holidays.js) のローカルロジックを内部に組み込んでいます。外部APIを使用せず、オフラインでも動作します。
 
 詳細な使い方、引数の意味、フォーマット規則はこのドキュメントにまとめています。
 
@@ -215,7 +224,7 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
 
 概要:
 
-- 指定日時から次の銀行営業日を計算し、結果をコールバックで返します。内部で土日・年末年始・国民の祝日判定（外部 API を利用）を行います。
+- 指定日時から次の銀行営業日を計算し、結果をコールバックで返します。内部で土日・年末年始・国民の祝日判定（ローカルロジックを使用）を行います。
 
 引数:
 
@@ -225,7 +234,7 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
 
 挙動・注意点:
 
-- 祝日判定は内部で外部 API を参照します（ネットワークエラー時は祝日扱いとしないフェールソフトの挙動）。
+- 祝日判定は [national-holidays.js](../src/national-holidays.js) のローカルロジックを内部に組み込んで使用します。外部APIへの依存はありません。
 - 関数はコールバック方式で結果を返すため、同期的な戻り値はありません。必ず `callback` を渡してください。
 
 例:

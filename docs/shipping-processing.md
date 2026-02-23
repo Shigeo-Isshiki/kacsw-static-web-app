@@ -2,6 +2,12 @@
 
 このドキュメントは `src/shipping-processing.js` が公開する配送関連ユーティリティ関数の使い方（引数・戻り値・副作用）をまとめたリファレンスです。
 
+> **重要**: このファイルには、kintoneでの単体動作のため、[src/national-holidays.js](../src/national-holidays.js) の祝日判定ロジックが組み込まれています（プレフィックス: `_sp_nh_`）。
+> 祝日定義を変更する際は、以下のファイルも同時に更新してください：
+>
+> - [src/national-holidays.js](../src/national-holidays.js) (オリジナル)
+> - [src/bank-transfer.js](../src/bank-transfer.js) (プレフィックス: `_bt_nh_`)
+
 ---
 
 ## 概要
@@ -11,6 +17,8 @@
 - 伝票番号の正規化・妥当性検証（`validateTrackingNumber`）
 - kintone のスペースフィールドへ「荷物問い合わせ」ボタンを追加するユーティリティ（`kintoneShippingInquiryButton`）
 - 営業日（平日・祝日・年末年始を除く）に基づく発送可能日の算出（`getNextBusinessDay`）
+
+**祝日判定について**: 営業日算出で必要な祝日判定は、[national-holidays.js](../src/national-holidays.js) のローカルロジックを内部に組み込んでいます。外部APIを使用せず、オフラインでも動作します。
 
 ブラウザと Node の両方で利用できるように設計されています。ブラウザ環境ではファイル末尾で `window` に関数を公開します。テストでは `global.window = global` として利用します。
 
@@ -74,8 +82,7 @@ validateTrackingNumber('123-45 67890', 10, 14); // -> '1234567890'
 動作メモ:
 
 - `baseDate` に時刻情報が含まれる場合のみ `cutoffHour` を考慮する（日時文字列に時間が無ければ時刻なしと見なす）
-- 国民の祝日判定には外部 API（`https://api.national-holidays.jp/<YYYY-MM-DD>`）を利用する。API が `404` を返す場合は祝日でないと判断する。
-- ネットワークエラーや API 異常時はフェールソフトで祝日扱いにせず営業日として扱う（安全側）
+- 国民の祝日判定は [national-holidays.js](../src/national-holidays.js) のローカルロジックを内部に組み込んで使用します。外部APIへの依存はありません。
 
 使用例:
 
@@ -154,7 +161,7 @@ kintoneShippingInquiryButton('space1', 'trackBtn', undefined, '1234567890', 'jap
 ## テスト／検証のヒント
 
 - `validateTrackingNumber` の境界、全角/半角、ハイフン・空白の扱いを網羅する
-- `getNextBusinessDay` は外部 API に依存するため、テストでは `fetch` をスタブして挙動を決定論的にする
+- `getNextBusinessDay` は内部に組み込まれた祝日判定ロジックを使用するため、外部APIへの依存はありません。土日・祝日・年末年始が連続するケースで正しく翌営業日に進むかを検証する。
 - `kintoneShippingInquiryButton` は DOM と kintone API をスタブして副作用（ボタン追加、親の display 値、`window.open` 呼び出し）を検証する
 
 ---

@@ -2,6 +2,12 @@
 
 このドキュメントは [src/national-holidays.js](src/national-holidays.js) が公開する祝日ユーティリティ関数群の使い方と引数・戻り値の契約を整理したリファレンスです。
 
+> **重要**: このファイルの祝日判定ロジックは、kintoneでの利用を容易にするため、以下のファイルにも組み込まれています。
+> 祝日定義を変更する際は、すべてのファイルを更新してください。
+>
+> - [src/bank-transfer.js](../src/bank-transfer.js) (プレフィックス: `_bt_nh_`)
+> - [src/shipping-processing.js](../src/shipping-processing.js) (プレフィックス: `_sp_nh_`)
+
 ---
 
 ## 目次
