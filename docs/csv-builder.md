@@ -106,7 +106,7 @@ console.log(buildCSV(schema, rows, { header: true }));
 
 - `format` (string | object)
   - `type==='date'` の場合: `'YYYY-MM-DD' | 'YYYY/MM/DD' | 'YYYYMMDD' | 'YMMDD' | 'UNIX' | 'UNIX_MS' | 'YYYY年MM月DD日' | 'YYYY年M月D日'`
-  - `type==='number'` の場合: `{ width: N }` のように整数部の固定幅ゼロ埋めを指定。
+  - `type==='number'` の場合: `{ width: N }` のように整数部の固定幅ゼロ埋めを指定。数値 `N` は埋めたい桁数です。例えば `{ width: 5 }` なら `42` は `00042` に変換されます。
 
 - `formatter` (function(value, record) => string)
   - `map` 適用後に最優先で呼ばれ、その戻り値をそのままセルとして使います。小数桁制御や通貨表記など、文字列として柔軟に整形したいときに使用します。
@@ -244,6 +244,25 @@ console.log(buildRow(schemaJP, rec));
 // buildCSV でも同様にヘッダ付きで出力可能です
 console.log(buildCSV(schemaJP, [rec], { header: true }));
 // -> "padded,unpadded\n2025年11月09日,2025年11月9日"
+```
+
+### number型のゼロ埋めフォーマットの例
+
+`type: 'number'` と `format: { width: N }` を組み合わせることで、整数部をN桁にゼロ埋めできます。
+
+```js
+// 例: buildRow での使用
+const schemaPadding = [
+	{ key: 'code', label: 'コード', type: 'number', format: { width: 5 } },
+	{ key: 'id', label: 'ID', type: 'number', format: { width: 3 } },
+];
+const rec = { code: 42, id: 7 };
+console.log(buildRow(schemaPadding, rec));
+// -> "00042,007"
+
+// buildCSV でも同様にヘッダ付きで出力可能です
+console.log(buildCSV(schemaPadding, [rec], { header: true }));
+// -> "コード,ID\n00042,007"
 ```
 
 ---
