@@ -144,11 +144,19 @@ const convertToSeireki = (date) => {
 			const y = parseInt(ymdMatch[1], 10);
 			const m = parseInt(ymdMatch[2], 10);
 			const d0 = parseInt(ymdMatch[3], 10);
+			// 月が1～12の範囲外はエラー
+			if (m < 1 || m > 12) {
+				throw new Error('存在しない月です');
+			}
 			// 日付部分が1～31以外はエラー
 			if (d0 < 1 || d0 > 31) {
 				throw new Error('存在しない日付です');
 			}
 			const d = new Date(`${y}-${String(m).padStart(2, '0')}-${String(d0).padStart(2, '0')}`);
+			// 作成したDateが入力値と一致しているか確認（無効な日付の検出）
+			if (d.getFullYear() !== y || d.getMonth() + 1 !== m || d.getDate() !== d0) {
+				throw new Error('存在しない日付です');
+			}
 			return formatDate(d);
 		}
 	}
