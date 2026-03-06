@@ -222,6 +222,13 @@ const convertToYear = (date) => {
 
 	// 2) まず既存のconvertToSeirekiでフル日付として解釈を試みる
 	if (typeof date === 'string') {
+		const raw = String(date).trim();
+		const isEraOnly =
+			_DU_ERAS.some(
+				(e) => raw === e.initial || raw === e.initial.toLowerCase() || raw === e.name
+			) || /^[A-Za-z]$/.test(raw);
+		if (isEraOnly) throw new Error('元号のみの指定は年が不明です');
+
 		// まず convertToSeireki でフル日付として解釈を試みる
 		try {
 			const seireki = convertToSeireki(date); // 'YYYY-MM-DD' 形式
@@ -229,14 +236,14 @@ const convertToYear = (date) => {
 			if (!isNaN(y)) return y;
 		} catch {
 			// フル日付として解釈できないケースは、年のみ／年+月のみ等の可能性があるため
-			// '1日' や '1月1日' を付けて再試行してみる（例: '昭和八十年' -> '昭和八十年1月1日'）
+			// '/1' や '/1/1' を付けて再試行してみる（例: '昭和八十年' -> '昭和八十年/1/1'）
 			try {
-				const seireki = convertToSeireki(String(date) + '1日');
+				const seireki = convertToSeireki(String(date) + '/1');
 				const y = parseInt(seireki.slice(0, 4), 10);
 				if (!isNaN(y)) return y;
 			} catch {
 				try {
-					const seireki = convertToSeireki(String(date) + '1月1日');
+					const seireki = convertToSeireki(String(date) + '/1/1');
 					const y = parseInt(seireki.slice(0, 4), 10);
 					if (!isNaN(y)) return y;
 				} catch {
@@ -330,6 +337,13 @@ const convertToYearMonth = (date) => {
 	}
 
 	if (typeof date === 'string') {
+		const raw = String(date).trim();
+		const isEraOnly =
+			_DU_ERAS.some(
+				(e) => raw === e.initial || raw === e.initial.toLowerCase() || raw === e.name
+			) || /^[A-Za-z]$/.test(raw);
+		if (isEraOnly) throw new Error('元号のみの指定は年が不明です');
+
 		// まず convertToSeireki でフル日付として解釈を試みる
 		try {
 			const seireki = convertToSeireki(date); // 'YYYY-MM-DD' 形式
@@ -339,13 +353,13 @@ const convertToYearMonth = (date) => {
 		} catch {
 			// フル日付として解釈できないケースは、年のみ／年+月のみ等の可能性があるため
 			try {
-				const seireki = convertToSeireki(String(date) + '1日');
+				const seireki = convertToSeireki(String(date) + '/1');
 				const y = parseInt(seireki.slice(0, 4), 10);
 				const m = parseInt(seireki.slice(5, 7), 10);
 				if (!isNaN(y) && !isNaN(m)) return { year: y, month: m };
 			} catch {
 				try {
-					const seireki = convertToSeireki(String(date) + '1月1日');
+					const seireki = convertToSeireki(String(date) + '/1/1');
 					const y = parseInt(seireki.slice(0, 4), 10);
 					const m = parseInt(seireki.slice(5, 7), 10);
 					if (!isNaN(y) && !isNaN(m)) return { year: y, month: m };

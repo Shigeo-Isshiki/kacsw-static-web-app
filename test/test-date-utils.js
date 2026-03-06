@@ -70,6 +70,9 @@ try {
 	const r4 = convertToYearMonth('2025');
 	assert.strictEqual(r4.year, 2025);
 	assert.strictEqual(r4.month, 1);
+	const r5 = convertToYearMonth('H13/5');
+	assert.strictEqual(r5.year, 2001);
+	assert.strictEqual(r5.month, 5);
 	// 元号のみはエラー
 	let threw = false;
 	try {
@@ -154,6 +157,7 @@ try {
 	assert.strictEqual(convertToYear('R1'), 2019, 'R1 -> 2019');
 	assert.strictEqual(convertToYear('2025'), 2025, 'YYYY string -> year');
 	assert.strictEqual(convertToYear('H02'), 1990, 'H02 -> 1990');
+	assert.strictEqual(convertToYear('H13/5'), 2001, 'H13/5 -> 2001');
 	console.log('PASS: convertToYear various inputs');
 } catch (e) {
 	console.error('FAIL: convertToYear cases', e && e.message ? e.message : e);
