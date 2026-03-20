@@ -12,8 +12,8 @@
 - [getFieldValueOr(record, fieldCode, defaultValue)](#getfieldvalueor)
 - [kintoneEventOn(events, handler)](#kintoneeventon)
 - [setRecordValues(record, values)](#setrecordvalues)
-- [setHeaderMenuSpaceButton(id, textContent, onClick)](#setheadermenuspacebutton)
-- [setRecordHeaderMenuSpaceButton(id, textContent, onClick)](#setrecordheadermenuspacebutton)
+- [setHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)](#setheadermenuspacebutton)
+- [setRecordHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)](#setrecordheadermenuspacebutton)
 - [setRecordHeaderMenuSpaceText(id, innerHTML)](#setrecordheadermenuspacetext)
 - [setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)](#setspacefieldbutton)
 - [setSpaceFieldText(spaceField, id, innerHTML)](#setspacefieldtext)
@@ -130,25 +130,35 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 
 <a id="setheadermenuspacebutton"></a>
 
-### setHeaderMenuSpaceButton(id, textContent, onClick)
+### setHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)
 
 - 動作概要: ヘッダーメニューのスペース要素に指定 ID のボタンを追加または削除します。既に同一 ID の要素があれば差し替え（削除→追加）し、`textContent` が null/空文字の場合は削除動作を行います。
 
 - `id` (string) — ヘッダースペース内で一意に識別するための ID
 - `textContent` (string | null) — ボタンに表示する文言。`null` または空文字で該当ボタンを削除
 - `onClick` (function | null) — クリック時に呼ばれるハンドラ。`null` でイベント登録しない
+- `styleOptions` (object | null) — 任意のスタイル指定（省略時は標準ボタン）
+- `styleOptions.width` (string) — ボタン幅（例: `120px`, `100%`）
+- `styleOptions.marginLeft` (string) — 左余白（例: `8px`, `0.5rem`）
+- `styleOptions.marginRight` (string) — 右余白（例: `8px`, `0.5rem`）
+- `styleOptions.horizontalMargin` (string) — 左右余白（後方互換用。`marginLeft`/`marginRight` 未指定側に適用）
 
 テストヒント: `kintone.app.getHeaderMenuSpaceElement(id)` をモックして、返された要素に button が追加されることを検証します。
 
 <a id="setrecordheadermenuspacebutton"></a>
 
-### setRecordHeaderMenuSpaceButton(id, textContent, onClick)
+### setRecordHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)
 
 - 動作概要: レコード詳細／追加／編集画面のヘッダーメニュー上部（`kintone.app.record.getHeaderMenuSpaceElement` が返す要素）に指定 ID のボタンを追加または削除します。既に同一 ID の要素があれば削除してから追加します。`textContent` が `null` または空文字の場合は削除動作を行います。
 
 - `id` (string) — 追加するボタン要素の id（ヘッダースペース内で一意に識別するための値）
 - `textContent` (string | null) — ボタンに表示する文言。`null` または空文字で該当ボタンを削除
 - `onClick` (function | null) — クリック時に呼ばれるハンドラ。関数でない場合は無視される
+- `styleOptions` (object | null) — 任意のスタイル指定（省略時は標準ボタン）
+- `styleOptions.width` (string) — ボタン幅（例: `120px`, `100%`）
+- `styleOptions.marginLeft` (string) — 左余白（例: `8px`, `0.5rem`）
+- `styleOptions.marginRight` (string) — 右余白（例: `8px`, `0.5rem`）
+- `styleOptions.horizontalMargin` (string) — 左右余白（後方互換用。`marginLeft`/`marginRight` 未指定側に適用）
 
 戻り値: 操作成功時は `true`（追加・削除が意図通り行われた場合）。要素が見つからない等で失敗した場合は `false`、引数が不正な場合は `undefined` を返すことがあります。
 
@@ -163,6 +173,15 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 // ヘッダーメニュー上にボタンを追加
 setRecordHeaderMenuSpaceButton('my-rec-btn', '詳細表示', function () {
 	// 詳細処理
+});
+
+// 幅と左右余白を指定
+setRecordHeaderMenuSpaceButton('my-rec-btn', '詳細表示', function () {
+	// 詳細処理
+}, {
+	width: '140px',
+	marginLeft: '4px',
+	marginRight: '12px',
 });
 
 // ボタン削除

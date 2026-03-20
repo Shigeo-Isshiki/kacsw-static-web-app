@@ -219,9 +219,40 @@ const { JSDOM } = require('jsdom');
 			window.setRecordHeaderMenuSpaceButton('rec-btn', null);
 			const afterRemove = recTarget.querySelectorAll('button').length;
 			assert.strictEqual(afterRemove, before);
+
+			window.setRecordHeaderMenuSpaceButton('rec-btn-style', '詳細', null, {
+				width: '120px',
+				marginLeft: '4px',
+				marginRight: '10px',
+			});
+			const recStyledButton = document.getElementById('rec-btn-style');
+			assert.ok(recStyledButton, 'record header styled button should exist');
+			assert.strictEqual(recStyledButton.style.width, '120px');
+			assert.strictEqual(recStyledButton.style.marginLeft, '4px');
+			assert.strictEqual(recStyledButton.style.marginRight, '10px');
 			console.log('PASS: setRecordHeaderMenuSpaceButton inserts and removes a button');
 		} else {
 			console.log('SKIP: setRecordHeaderMenuSpaceButton not exported');
+		}
+
+		if (typeof window.setHeaderMenuSpaceButton === 'function') {
+			const headerTarget = document.getElementById('rec-header-space');
+			const before = headerTarget.querySelectorAll('button').length;
+			window.setHeaderMenuSpaceButton('hdr-btn', '一覧', null, {
+				horizontalMargin: '6px',
+			});
+			const afterAdd = headerTarget.querySelectorAll('button').length;
+			assert.strictEqual(afterAdd, before + 1);
+			const headerStyledButton = document.getElementById('hdr-btn');
+			assert.ok(headerStyledButton, 'header styled button should exist');
+			assert.strictEqual(headerStyledButton.style.marginLeft, '6px');
+			assert.strictEqual(headerStyledButton.style.marginRight, '6px');
+			window.setHeaderMenuSpaceButton('hdr-btn', null);
+			const afterRemove = headerTarget.querySelectorAll('button').length;
+			assert.strictEqual(afterRemove, before);
+			console.log('PASS: setHeaderMenuSpaceButton inserts and removes a button');
+		} else {
+			console.log('SKIP: setHeaderMenuSpaceButton not exported');
 		}
 
 		if (typeof window.setRecordHeaderMenuSpaceText === 'function') {
