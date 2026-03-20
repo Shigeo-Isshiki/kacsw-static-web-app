@@ -599,16 +599,22 @@ const setSpaceFieldDisplay = (spaceField, display) => {
  * @param {string} id 追加するボタン要素の id
  * @param {string|null} textContent ボタンの表示テキスト。null/空なら要素を削除して非表示にする
  * @param {function|null|undefined} [onClick] クリック時に実行するコールバック（関数でない場合は無視される）
+ * @param {Object|null|undefined} [styleOptions] ボタンのスタイル指定（省略時は標準スタイル）
+ * @param {string} [styleOptions.width] ボタンの幅（例: '120px', '100%'）
+ * @param {string} [styleOptions.marginLeft] 左余白（例: '8px', '0.5rem'）
+ * @param {string} [styleOptions.marginRight] 右余白（例: '8px', '0.5rem'）
+ * @param {string} [styleOptions.horizontalMargin] 左右余白（後方互換用。marginLeft/marginRight が未指定の側に適用）
  * @returns {boolean|undefined} 要素の追加/削除に成功したら true/false を返します。入力が不正な場合は undefined を返すことがあります。
  */
-const setSpaceFieldButton = (spaceField, id, textContent, onClick) => {
+const setSpaceFieldButton = (spaceField, id, textContent, onClick, styleOptions) => {
 	if (
 		typeof spaceField !== 'string' ||
 		!spaceField.trim() ||
 		typeof id !== 'string' ||
 		!id.trim() ||
 		(textContent !== null && typeof textContent !== 'string') ||
-		(onClick !== undefined && typeof onClick !== 'function' && onClick !== null)
+		(onClick !== undefined && typeof onClick !== 'function' && onClick !== null) ||
+		(styleOptions !== undefined && styleOptions !== null && typeof styleOptions !== 'object')
 	) {
 		return;
 	}
@@ -624,6 +630,23 @@ const setSpaceFieldButton = (spaceField, id, textContent, onClick) => {
 		button.type = 'button';
 		button.id = id;
 		button.textContent = textContent;
+		if (styleOptions && typeof styleOptions === 'object') {
+			if (typeof styleOptions.width === 'string' && styleOptions.width.trim()) {
+				button.style.width = styleOptions.width;
+			}
+			const hasHorizontalMargin =
+				typeof styleOptions.horizontalMargin === 'string' && styleOptions.horizontalMargin.trim();
+			if (typeof styleOptions.marginLeft === 'string' && styleOptions.marginLeft.trim()) {
+				button.style.marginLeft = styleOptions.marginLeft;
+			} else if (hasHorizontalMargin) {
+				button.style.marginLeft = styleOptions.horizontalMargin;
+			}
+			if (typeof styleOptions.marginRight === 'string' && styleOptions.marginRight.trim()) {
+				button.style.marginRight = styleOptions.marginRight;
+			} else if (hasHorizontalMargin) {
+				button.style.marginRight = styleOptions.horizontalMargin;
+			}
+		}
 		if (typeof onClick === 'function') {
 			button.addEventListener('click', onClick);
 		}

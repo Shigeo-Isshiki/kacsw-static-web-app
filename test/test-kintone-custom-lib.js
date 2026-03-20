@@ -170,6 +170,39 @@ const { JSDOM } = require('jsdom');
 			window.setSpaceFieldButton(spaceCode, 'btn-1', 'クリック');
 			const afterButtons = target.querySelectorAll('button').length;
 			assert.strictEqual(afterButtons, beforeButtons + 1);
+			const defaultButton = document.getElementById('btn-1');
+			assert.ok(defaultButton, 'default button should exist');
+			assert.strictEqual(defaultButton.style.width, '');
+			assert.strictEqual(defaultButton.style.marginLeft, '');
+			assert.strictEqual(defaultButton.style.marginRight, '');
+
+			window.setSpaceFieldButton(spaceCode, 'btn-2', '幅付き', null, {
+				width: '140px',
+				horizontalMargin: '8px',
+			});
+			const styledButton = document.getElementById('btn-2');
+			assert.ok(styledButton, 'styled button should exist');
+			assert.strictEqual(styledButton.style.width, '140px');
+			assert.strictEqual(styledButton.style.marginLeft, '8px');
+			assert.strictEqual(styledButton.style.marginRight, '8px');
+
+			window.setSpaceFieldButton(spaceCode, 'btn-3', '左右別', null, {
+				marginLeft: '4px',
+				marginRight: '12px',
+			});
+			const sideMarginButton = document.getElementById('btn-3');
+			assert.ok(sideMarginButton, 'side margin button should exist');
+			assert.strictEqual(sideMarginButton.style.marginLeft, '4px');
+			assert.strictEqual(sideMarginButton.style.marginRight, '12px');
+
+			window.setSpaceFieldButton(spaceCode, 'btn-4', '片側優先', null, {
+				marginLeft: '6px',
+				horizontalMargin: '10px',
+			});
+			const mixedMarginButton = document.getElementById('btn-4');
+			assert.ok(mixedMarginButton, 'mixed margin button should exist');
+			assert.strictEqual(mixedMarginButton.style.marginLeft, '6px');
+			assert.strictEqual(mixedMarginButton.style.marginRight, '10px');
 			console.log('PASS: setSpaceFieldButton inserts a button');
 		} else {
 			console.log('SKIP: setSpaceFieldButton not exported');

@@ -15,7 +15,7 @@
 - [setHeaderMenuSpaceButton(id, textContent, onClick)](#setheadermenuspacebutton)
 - [setRecordHeaderMenuSpaceButton(id, textContent, onClick)](#setrecordheadermenuspacebutton)
 - [setRecordHeaderMenuSpaceText(id, innerHTML)](#setrecordheadermenuspacetext)
-- [setSpaceFieldButton(spaceField, id, textContent, onClick)](#setspacefieldbutton)
+- [setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)](#setspacefieldbutton)
 - [setSpaceFieldText(spaceField, id, innerHTML)](#setspacefieldtext)
 - [setSpaceFieldDisplay(spaceField, display)](#setspacefielddisplay)
 
@@ -196,7 +196,7 @@ setRecordHeaderMenuSpaceText('rec-text', null);
 
 <a id="setspacefieldbutton"></a>
 
-### setSpaceFieldButton(spaceField, id, textContent, onClick)
+### setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)
 
 - 動作概要: 指定したスペースフィールド（`kintone.app.record.getSpaceElement` から取得）にボタンを追加または削除します。追加時は `type="button"` を設定し、`onClick` を登録します。
 
@@ -204,6 +204,11 @@ setRecordHeaderMenuSpaceText('rec-text', null);
 - `id` (string) — 追加する要素の ID（同一 ID があれば差し替える）
 - `textContent` (string | null) — ボタンに表示する文言。`null` または空文字で削除
 - `onClick` (function | null) — ボタンのクリックハンドラ
+- `styleOptions` (object | null) — 任意のスタイル指定（省略時は標準ボタン）
+- `styleOptions.width` (string) — ボタン幅（例: `120px`, `100%`）
+- `styleOptions.marginLeft` (string) — 左余白（例: `8px`, `0.5rem`）
+- `styleOptions.marginRight` (string) — 右余白（例: `8px`, `0.5rem`）
+- `styleOptions.horizontalMargin` (string) — 左右余白（後方互換用。`marginLeft`/`marginRight` 未指定側に適用）
 
 例（テスト）:
 
@@ -211,6 +216,18 @@ setRecordHeaderMenuSpaceText('rec-text', null);
 // jsdom の DOM を作成しておき、
 // global.kintone.app.record.getSpaceElement = code => document.getElementById(code);
 setSpaceFieldButton('space-A', 'btn-1', '実行', () => console.log('clicked'));
+
+// 幅と左右余白を任意指定
+setSpaceFieldButton('space-A', 'btn-2', '実行', () => console.log('clicked'), {
+	width: '140px',
+	horizontalMargin: '8px',
+});
+
+// 左右を個別に指定
+setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), {
+	marginLeft: '4px',
+	marginRight: '12px',
+});
 ```
 
 <a id="setspacefieldtext"></a>
