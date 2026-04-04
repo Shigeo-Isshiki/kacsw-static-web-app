@@ -37,7 +37,7 @@
 - 記号や全角空白を除去（`-`, `ー`, 全角スペース 等）
 - 英字は大文字化して扱う（デジタルアドレス対応）
 
-API ベース URL: `https://digital-address.app`
+API ベース URL: `https://zipcode.kacsw.or.jp/?s=xxxxxxx`
 
 ---
 

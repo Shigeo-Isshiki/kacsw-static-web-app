@@ -176,13 +176,18 @@ setRecordHeaderMenuSpaceButton('my-rec-btn', '詳細表示', function () {
 });
 
 // 幅と左右余白を指定
-setRecordHeaderMenuSpaceButton('my-rec-btn', '詳細表示', function () {
-	// 詳細処理
-}, {
-	width: '140px',
-	marginLeft: '4px',
-	marginRight: '12px',
-});
+setRecordHeaderMenuSpaceButton(
+	'my-rec-btn',
+	'詳細表示',
+	function () {
+		// 詳細処理
+	},
+	{
+		width: '140px',
+		marginLeft: '4px',
+		marginRight: '12px',
+	}
+);
 
 // ボタン削除
 setRecordHeaderMenuSpaceButton('my-rec-btn', null);

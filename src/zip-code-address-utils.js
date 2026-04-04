@@ -7,7 +7,7 @@
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // 郵便番号APIベースURL
-const _ZC_ZIPCODE_API_BASE_URL = 'https://digital-address.app';
+const _ZC_ZIPCODE_API_BASE_URL = 'https://zipcode.kacsw.or.jp';
 
 // 郵便番号で使用される可能性のある記号を検出するための正規表現
 const _ZC_SYMBOLS_REGEX = /[\-－‐‑–—−ー― 　]/g;
@@ -47,6 +47,10 @@ const _zc_getValidatedNormalized = (zipCode) => {
 	return { ok: true, normalized };
 };
 
+const _zc_buildZipcodeApiUrl = (normalized) => {
+	return `${_ZC_ZIPCODE_API_BASE_URL}/?s=${encodeURIComponent(normalized)}`;
+};
+
 /**
  * kintone のスペースフィールド（スペースエレメント）を表示/非表示に切り替えます。
  *
@@ -84,7 +88,7 @@ const checkZipCodeExists = (zipCode, callback) => {
 		return;
 	}
 	const normalized = v.normalized;
-	fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
 				callback(false);
@@ -120,7 +124,7 @@ const formatZipCode = (zipCode, callback) => {
 		return;
 	}
 	const normalized = v.normalized;
-	fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
 				callback({ error: '郵便番号が存在しません' });
@@ -190,7 +194,7 @@ const getAddressByZipCode = (zipCode, callback) => {
 	}
 	const normalized = v.normalized;
 	// 正規化後は7文字の半角英数字であることが保証されている
-	fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (!response.ok) {
 				if (response.status === 404) {
@@ -357,7 +361,7 @@ const getCityByZipCode = (zipCode, callback) => {
 		return;
 	}
 	const normalized = v.normalized;
-	fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
 				callback(null);
@@ -393,7 +397,7 @@ const getPrefectureByZipCode = (zipCode, callback) => {
 		return;
 	}
 	const normalized = v.normalized;
-	fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
 				callback(null);
@@ -543,7 +547,7 @@ const normalizeZipCode = (zipCode, callback) => {
 		return;
 	}
 	const normalized = v.normalized;
-	fetch(`${_ZC_ZIPCODE_API_BASE_URL}/${normalized}`)
+	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
 				callback({ error: '郵便番号が存在しません' });
