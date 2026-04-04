@@ -171,13 +171,14 @@ const formatZipCode = (zipCode, callback) => {
  *   apiZipCode: '1234567',             // API返却値（7桁数字のみ）
  *   zipCode: '123-4567',               // ハイフン付き郵便番号（表示用）
  *   zipCode1: '1', zipCode2: '2', ... zipCode7: '7', // 各桁分割
- *   address: '神奈川県横浜市西区みなとみらい', // 住所（都道府県＋市区町村＋町名＋番地等）
  *   prefName: '神奈川県',               // 都道府県
  *   cityName: '横浜市西区',             // 市区町村
- *   townName: 'みなとみらい',           // 町名
- *   blockName: '1-1-1',                // 番地（存在する場合）
+ *   townName: 'みなとみらい',           // 町域
+ *   bizName: '株式会社○○',              // 事業所名（存在する場合）
+ *   blockName: '1-1-1',                // 番地等（存在する場合）
  *   otherName: '○○マンション',          // その他住所（存在する場合）
- *   bizName: '株式会社○○'               // 事業所名（存在する場合）
+ *   businessName: '株式会社○○'          // 企業名（存在する場合）
+ *   address: '神奈川県横浜市西区みなとみらい', // 住所（都道府県＋市区町村＋町名＋番地等）
  * }
  *
  * エラー時の例：
@@ -237,9 +238,10 @@ const getAddressByZipCode = (zipCode, callback) => {
 					typeof addr.city_name !== 'string' ||
 					addr.town_name == null ||
 					typeof addr.town_name !== 'string' ||
+					(addr.biz_name != null && typeof addr.biz_name !== 'string') ||
 					(addr.block_name != null && typeof addr.block_name !== 'string') ||
 					(addr.other_name != null && typeof addr.other_name !== 'string') ||
-					(addr.biz_name != null && typeof addr.biz_name !== 'string')
+					(addr.business_name != null && typeof addr.business_name !== 'string')
 				) {
 					invalid = true;
 				}
@@ -271,9 +273,10 @@ const getAddressByZipCode = (zipCode, callback) => {
 						typeof addressObj.city_name !== 'string' ||
 						addressObj.town_name == null ||
 						typeof addressObj.town_name !== 'string' ||
+						(addressObj.biz_name != null && typeof addressObj.biz_name !== 'string') ||
 						(addressObj.block_name != null && typeof addressObj.block_name !== 'string') ||
 						(addressObj.other_name != null && typeof addressObj.other_name !== 'string') ||
-						(addressObj.biz_name != null && typeof addressObj.biz_name !== 'string')
+						(addressObj.business_name != null && typeof addressObj.business_name !== 'string')
 					) {
 						isInvalid = true;
 					}
@@ -327,14 +330,17 @@ const getAddressByZipCode = (zipCode, callback) => {
 						townName: addressObj.town_name
 							? addressObj.town_name.replace(/[\u3000\u0020]/g, '')
 							: null,
+						bizName: addressObj.biz_name
+							? addressObj.biz_name.replace(/[\u3000\u0020]/g, '')
+							: null,
 						blockName: addressObj.block_name
 							? addressObj.block_name.replace(/[\u3000\u0020]/g, '')
 							: null,
 						otherName: addressObj.other_name
 							? addressObj.other_name.replace(/[\u3000\u0020]/g, '')
 							: null,
-						bizName: addressObj.biz_name
-							? addressObj.biz_name.replace(/[\u3000\u0020]/g, '')
+						businessName: addressObj.business_name
+							? addressObj.business_name.replace(/[\u3000\u0020]/g, '')
 							: null,
 					});
 				});
