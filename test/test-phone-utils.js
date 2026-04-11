@@ -74,6 +74,26 @@ try {
 }
 
 try {
+	const invalidMobile10 = '0801322983';
+	assert.strictEqual(
+		isValidPhoneNumber(invalidMobile10),
+		false,
+		`${invalidMobile10} は 080 プレフィックスのため 11 桁必須`
+	);
+	let threwFmt = false;
+	try {
+		formatPhoneNumber(invalidMobile10);
+	} catch (err) {
+		threwFmt = true;
+	}
+	assert.ok(threwFmt, '無効な 080 の 10 桁番号に対して formatPhoneNumber は例外を投げる');
+	console.log('PASS: reject 10-digit number for 080 prefix');
+} catch (e) {
+	console.error('FAIL: reject 10-digit number for 080 prefix', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
 	const t2 = getPhoneNumberType('0120-123-456');
 	assert.strictEqual(t2, '着信課金');
 	console.log('PASS: getPhoneNumberType toll-free/charge');

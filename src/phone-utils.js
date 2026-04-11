@@ -6,7 +6,7 @@
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // ==================== 電話番号データ定義ここから ====================
-// ※この部分は、2026年3月1日時点の総務省公開情報に基づいています。
+// ※この部分は、2026年4月1日時点の総務省公開情報に基づいています。
 const _PU_PHONE_NUMBER_CONFIG = {
 	// 市外局番ごとの市内局番（もしくは局番）の桁数リスト
 	areaCodeList: {
@@ -1112,63 +1112,56 @@ const _pu_isValidJapanesePhoneNumber = (str) => {
 	if (!num) return false;
 	// 先頭0でなければNG
 	if (!num.startsWith('0')) return false;
-	// areaCodeRangesに範囲指定があるprefixは、桁数に関係なく範囲チェックを行う
-	// 例：0200（14桁）、0800/0120/050/020/090/080（11桁）、0570/0990（10桁）など
+
 	const areaCodeList = _pu_getAreaCodeList();
 	for (let c = 0, l = areaCodeList.length; c < l; c++) {
 		let areaCodeLen = areaCodeList[c];
 		let areaCode = num.substring(0, areaCodeLen);
 		let localLen = _pu_getAreaCodeInfo(areaCodeLen, areaCode);
-		if (localLen) {
-			const ranges = _pu_getLocalAreaCodeRange(areaCode);
-			if (ranges) {
-				// localLenが桁数を超える場合は不正
-				if (num.length < areaCodeLen + localLen) return false;
-				let localCode = num.substring(areaCodeLen, areaCodeLen + localLen);
-				let localCodeNum = Number(localCode);
-				let inRange = false;
-				for (const [start, end] of ranges) {
-					if (localCodeNum >= start && localCodeNum <= end) {
-						inRange = true;
-						break;
-					}
+		if (!localLen) continue;
+
+		const ranges = _pu_getLocalAreaCodeRange(areaCode);
+		if (ranges) {
+			if (num.length < areaCodeLen + localLen) return false;
+			let localCode = num.substring(areaCodeLen, areaCodeLen + localLen);
+			let localCodeNum = Number(localCode);
+			let inRange = false;
+			for (const [start, end] of ranges) {
+				if (localCodeNum >= start && localCodeNum <= end) {
+					inRange = true;
+					break;
 				}
-				if (!inRange) return false;
 			}
-			// 固定電話（10桁）の場合はここでtrue
-			if (num.length === 10) return true;
-			// 11桁や14桁などの場合は、areaCodeRangesの範囲チェックが通ればtrue（例：0200, 0800, 0120, 050, 020, 090, 080, 0570, 0990など）
-			if (num.length === areaCodeLen + localLen + (num.length - (areaCodeLen + localLen))) {
-				// 追加の桁数チェックはprefixごとに必要
-				// 例：0200は14桁、0800/0120/050/020/090/080は11桁、0570/0990は10桁
-				// areaCodeごとに桁数を厳密に判定
-				if (areaCode === '0200' && num.length === 14) return true;
-				if (
-					(areaCode === '0800' ||
-						areaCode === '0120' ||
-						areaCode === '050' ||
-						areaCode === '020' ||
-						areaCode === '090' ||
-						areaCode === '080' ||
-						areaCode === '070' ||
-						areaCode === '060') &&
-					num.length === 11
-				)
-					return true;
-				if ((areaCode === '0570' || areaCode === '0990') && num.length === 10) return true;
-			}
+			if (!inRange) return false;
 		}
+
+		// 10桁は原則固定電話だが、11桁/14桁専用プレフィックスは除外
+		if (num.length === 10) {
+			if (_pu_isDigit11PhoneNumberRange(areaCode) || areaCode === '0200') return false;
+			return true;
+		}
+
+		if (areaCode === '0200' && num.length === 14) return true;
+		if (
+			(areaCode === '0800' ||
+				areaCode === '0120' ||
+				areaCode === '050' ||
+				areaCode === '020' ||
+				areaCode === '090' ||
+				areaCode === '080' ||
+				areaCode === '070' ||
+				areaCode === '060') &&
+			num.length === 11
+		)
+			return true;
 	}
-	// 10桁番号でareaCodeRangesに該当しない場合はfalse（上記forでtrueにならなければfalse）
+
 	if (num.length === 10) return false;
-	// 091で始まる6～13桁の特殊番号を許可
 	if (num.startsWith('091') && num.length >= 6 && num.length <= 13) return true;
-	// 11桁はareaCodeRangesで範囲チェックが通った場合のみtrue（上記forでtrueにならなければfalse）
 	if (num.length === 11) return false;
 	return false;
 };
 
-//　ライブラリ本体部
 /**
  * 電話番号の有効性を検証する関数
  * @param {string|number|null|undefined} phoneNumber 電話番号
@@ -1211,7 +1204,6 @@ const isValidPhoneNumber = (phoneNumber) => {
  *  - '091' で始まる6〜13桁は '特定接続' として許可されますが、今回の通話可能集合には含めていません。
  */
 const formatPhoneNumber = (phoneNumber) => {
-	// 基本的な正規化とバリデーション
 	if (!phoneNumber) {
 		throw new Error('電話番号が指定されていません。文字列または数値を入力してください。');
 	}
@@ -1229,11 +1221,6 @@ const formatPhoneNumber = (phoneNumber) => {
 	const type = _pu_getPhoneType(num);
 	const formatted = _pu_formatPhoneNumber(num);
 
-	// 属性判定ルール（更新）
-	// - homeLine: 通話可能な種別で、かつ携帯電話ではないものを true とする
-	// - mobile: '携帯電話' のみ true
-	// - faxCapable: 通話可能な種別のうち IP 電話は除外する（携帯も除外）
-	// 通話可能／FAX等の属性判定は設定から読み込む（将来の変更を容易にする）
 	const cfgCallCapable = Array.isArray(_PU_PHONE_NUMBER_CONFIG.callCapableTypes)
 		? _PU_PHONE_NUMBER_CONFIG.callCapableTypes
 		: ['固定電話', '着信課金', '統一番号', '携帯電話', 'IP電話'];
@@ -1245,8 +1232,7 @@ const formatPhoneNumber = (phoneNumber) => {
 	const callCapableTypes = new Set(cfgCallCapable);
 	const mobile = type === cfgMobileType;
 	const isCallCapable = callCapableTypes.has(type);
-	const homeLine = isCallCapable && !mobile; // 携帯を除外
-	// FAX は通話可能で、かつ設定で除外されたタイプを除外
+	const homeLine = isCallCapable && !mobile;
 	const faxCapable = isCallCapable && !cfgFaxExcluded.includes(type) && !mobile;
 
 	return {
