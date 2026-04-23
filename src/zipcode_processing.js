@@ -1,20 +1,20 @@
 /**
  * 郵便番号処理用ユーティリティ関数群
  *
- * @fileoverview 郵便番号API（https://zipcode.kacsw.or.jp/?s=xxxxxxx）を利用し、指定郵便番号に対応する住所を取得します。
+ * @fileoverview 郵便番号API（https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/digital?search_code=xxxxxxx）を利用し、指定郵便番号に対応する住所を取得します。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zp_)で始める
 /* exported getZipcodeAddress */
 // リソースの読み込み制限を行っている場合は、fetch通信を下記のURLに対して許可する必要があります
-// https://zipcode.kacsw.or.jp
+// https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/digital
 'use strict';
 /**
  * 郵便番号APIベースURL
  * @type {string}
  */
-const _zp_ADDRESS_API_BASE_URL = 'https://zipcode.kacsw.or.jp';
+const _zp_ADDRESS_API_BASE_URL = 'https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/digital';
 /**
  * 郵便番号の左側の桁数
  * @type {number}
@@ -211,7 +211,7 @@ const getZipcodeAddress = (zipcode, successCallback, failureCallback) => {
 			_zp_ERROR_TYPE.LOGIC
 		);
 	}
-	fetch(`${_zp_ADDRESS_API_BASE_URL}/?s=${encodeURIComponent(zipcodeNO)}`)
+	fetch(`${_zp_ADDRESS_API_BASE_URL}?search_code=${encodeURIComponent(zipcodeNO)}`)
 		.then((response) => {
 			if (!response.ok) {
 				if (response.status === 404) {

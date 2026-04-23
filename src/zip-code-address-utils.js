@@ -7,7 +7,7 @@
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // 郵便番号APIベースURL
-const _ZC_ZIPCODE_API_BASE_URL = 'https://zipcode.kacsw.or.jp';
+const _ZC_ZIPCODE_API_BASE_URL = 'https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/digital';
 
 // 郵便番号で使用される可能性のある記号を検出するための正規表現
 const _ZC_SYMBOLS_REGEX = /[\-－‐‑–—−ー― 　]/g;
@@ -48,7 +48,7 @@ const _zc_getValidatedNormalized = (zipCode) => {
 };
 
 const _zc_buildZipcodeApiUrl = (normalized) => {
-	return `${_ZC_ZIPCODE_API_BASE_URL}/?s=${encodeURIComponent(normalized)}`;
+	return `${_ZC_ZIPCODE_API_BASE_URL}?search_code=${encodeURIComponent(normalized)}`;
 };
 
 /**
