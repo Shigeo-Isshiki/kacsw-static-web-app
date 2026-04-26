@@ -54,10 +54,11 @@ try {
 		{ key: 'd14', label: 'd14', type: 'date', format: 'ERA_KANJI_DATE_PAD' },
 		{ key: 'd15', label: 'd15', type: 'date', format: 'ERA_KANJI_YM' },
 		{ key: 'd16', label: 'd16', type: 'date', format: 'ERA_INITIAL_YY/MM' },
-		{ key: 'd17', label: 'd17', type: 'date', format: 'ERA_INITIAL_Y/M/D' },
-		{ key: 'd18', label: 'd18', type: 'date', format: 'ERA_INITIAL_YY/MM/DD' },
-		{ key: 'd19', label: 'd19', type: 'date', format: 'ERA_INITIAL_JIS_YM' },
-		{ key: 'd20', label: 'd20', type: 'date', format: 'ERA_INITIAL_JIS_YMD' },
+		{ key: 'd17', label: 'd17', type: 'date', format: 'ERA_INITIAL_KANJI_DATE' },
+		{ key: 'd18', label: 'd18', type: 'date', format: 'ERA_INITIAL_Y/M/D' },
+		{ key: 'd19', label: 'd19', type: 'date', format: 'ERA_INITIAL_YY/MM/DD' },
+		{ key: 'd20', label: 'd20', type: 'date', format: 'ERA_INITIAL_JIS_YM' },
+		{ key: 'd21', label: 'd21', type: 'date', format: 'ERA_INITIAL_JIS_YMD' },
 	];
 	const rowDates = { d1: date, d2: date, d3: date, d4: date, d5: date, d6: date };
 	// include the two Japanese formats (padded and non-padded)
@@ -75,6 +76,7 @@ try {
 	rowDates.d18 = date;
 	rowDates.d19 = date;
 	rowDates.d20 = date;
+	rowDates.d21 = date;
 	const r = buildRow(schemaDates, rowDates, { delimiter: ',' });
 	const expectDates = [
 		'2025-11-09',
@@ -93,6 +95,7 @@ try {
 		'令和7年11月09日',
 		'令和7年11月',
 		'R07/11',
+		'R7年11月9日',
 		'R7/11/9',
 		'R07/11/09',
 		'R07.11',

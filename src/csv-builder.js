@@ -257,6 +257,8 @@ const _cb_formatDateSimple = (value, fmt) => {
 		}
 		if (fmt === 'ERA_INITIAL_YY/MM')
 			return `${era.initial}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+		if (fmt === 'ERA_INITIAL_KANJI_DATE')
+			return `${era.initialOnly}${Number(era.numberOnly)}年${d.getMonth() + 1}月${d.getDate()}日`;
 		if (fmt === 'ERA_INITIAL_Y/M/D')
 			return `${era.initialOnly}${Number(era.numberOnly)}/${d.getMonth() + 1}/${d.getDate()}`;
 		if (fmt === 'ERA_INITIAL_YY/MM/DD')
