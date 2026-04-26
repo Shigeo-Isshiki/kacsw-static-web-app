@@ -2,6 +2,14 @@
 
 このドキュメントは `src/date-utils.js` が公開する日付ユーティリティ関数群の使い方と引数・戻り値の契約を整理したリファレンスです。ブラウザや kintone 上で直接 `window` 経由で利用できることを前提としています。
 
+> **重要**: 元号定義は `date-utils` だけでなく `csv-builder` にも組み込まれています。
+> 改元対応では、次のファイルをセットで更新してください。
+>
+> - `src/date-utils.js`（`_DU_ERAS`）
+> - `src/csv-builder.js`（`_CB_ERAS`）
+> - `docs/date-utils.md`（本ドキュメント）
+> - `docs/csv-builder.md`（和暦フォーマット仕様）
+
 ---
 
 ## 目次
@@ -263,9 +271,11 @@ console.log(DATE.convertToEra('1989-01-08')); // { kanji: '平成1年', initial:
 - 新しい元号オブジェクトは配列の先頭（最新順）に置いてください。実装は配列を上から順に比較して最初にマッチした元号を採用します。
 - `initial` は半角英字1文字で他の元号の `initial` と重複しないようにしてください。内部実装では大文字小文字を区別せず比較します。
 
-- 2. ドキュメントの更新
+- 2. 関連ファイルをまとめて更新
 
-- 本ファイル（`docs/date-utils.md`）に加えて、リリースノートや `README.md` に新元号の対応を明記してください。
+- `src/date-utils.js` の `_DU_ERAS` を更新したら、`src/csv-builder.js` の `_CB_ERAS` も同じ内容に更新してください。
+- 仕様変更を反映するため、`docs/date-utils.md` と `docs/csv-builder.md` の両方を更新してください。
+- 必要に応じて、リリースノートや `README.md` に新元号対応を明記してください。
 
 - 3. テストとローカル確認
 
@@ -277,6 +287,9 @@ npm test
 
 # 簡単な Node 実行での動作確認例（CommonJS エクスポートを利用）
 node -e "const d=require('./src/date-utils.js');console.log(d.convertToSeireki('X1-11-26'));"
+
+# csv-builder 側の和暦フォーマット確認（例）
+node -e "global.window=global;require('./src/csv-builder.js');console.log(window.CSV.buildRow([{key:'d',type:'date',format:'ERA_INITIAL_JIS_YMD'}],{d:'X1-11-26'}));"
 ```
 
 上記の例では、`X1-11-26`（新元号の元年 11/26）を適切に西暦に変換できるかを検証します。

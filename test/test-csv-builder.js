@@ -46,11 +46,35 @@ try {
 		{ key: 'd6', label: 'd6', type: 'date', format: 'UNIX_MS' },
 		{ key: 'd7', label: 'd7', type: 'date', format: 'YYYY年MM月DD日' },
 		{ key: 'd8', label: 'd8', type: 'date', format: 'YYYY年M月D日' },
+		{ key: 'd9', label: 'd9', type: 'date', format: 'ERA_KANJI' },
+		{ key: 'd10', label: 'd10', type: 'date', format: 'ERA_INITIAL' },
+		{ key: 'd11', label: 'd11', type: 'date', format: 'ERA_INITIAL_ONLY' },
+		{ key: 'd12', label: 'd12', type: 'date', format: 'ERA_NUMBER_ONLY' },
+		{ key: 'd13', label: 'd13', type: 'date', format: 'ERA_KANJI_DATE' },
+		{ key: 'd14', label: 'd14', type: 'date', format: 'ERA_KANJI_DATE_PAD' },
+		{ key: 'd15', label: 'd15', type: 'date', format: 'ERA_KANJI_YM' },
+		{ key: 'd16', label: 'd16', type: 'date', format: 'ERA_INITIAL_YY/MM' },
+		{ key: 'd17', label: 'd17', type: 'date', format: 'ERA_INITIAL_Y/M/D' },
+		{ key: 'd18', label: 'd18', type: 'date', format: 'ERA_INITIAL_YY/MM/DD' },
+		{ key: 'd19', label: 'd19', type: 'date', format: 'ERA_INITIAL_JIS_YM' },
+		{ key: 'd20', label: 'd20', type: 'date', format: 'ERA_INITIAL_JIS_YMD' },
 	];
 	const rowDates = { d1: date, d2: date, d3: date, d4: date, d5: date, d6: date };
 	// include the two Japanese formats (padded and non-padded)
 	rowDates.d7 = date;
 	rowDates.d8 = date;
+	rowDates.d9 = date;
+	rowDates.d10 = date;
+	rowDates.d11 = date;
+	rowDates.d12 = date;
+	rowDates.d13 = date;
+	rowDates.d14 = date;
+	rowDates.d15 = date;
+	rowDates.d16 = date;
+	rowDates.d17 = date;
+	rowDates.d18 = date;
+	rowDates.d19 = date;
+	rowDates.d20 = date;
 	const r = buildRow(schemaDates, rowDates, { delimiter: ',' });
 	const expectDates = [
 		'2025-11-09',
@@ -61,8 +85,25 @@ try {
 		String(date.getTime()),
 		'2025年11月09日',
 		'2025年11月9日',
+		'令和7年',
+		'R07',
+		'R',
+		'07',
+		'令和7年11月9日',
+		'令和7年11月09日',
+		'令和7年11月',
+		'R07/11',
+		'R7/11/9',
+		'R07/11/09',
+		'R07.11',
+		'R07.11.09',
 	].join(',');
 	eq(r, expectDates, 'date formats mismatch');
+
+	// 1-b) era parsing from era-string input
+	const schemaEraInput = [{ key: 'e1', type: 'date', format: 'ERA_KANJI_DATE' }];
+	const rEraInput = buildRow(schemaEraInput, { e1: '令和7年11月9日' });
+	eq(rEraInput, '令和7年11月9日', 'era string input should be parsed and formatted');
 
 	// 2) unix seconds input interpreted
 	const unixSec = Math.floor(Date.UTC(2025, 10, 9, 0, 0, 0) / 1000);

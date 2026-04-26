@@ -90,41 +90,183 @@ const _cb_applyMap = (f, rawVal, record) => {
 	return rawVal;
 };
 
+// date-utils.js と同等の元号テーブル（kintone で扱う和暦フォーマット用）
+const _CB_ERAS = [
+	{ name: '令和', initial: 'R', start: new Date('2019-05-01') },
+	{ name: '平成', initial: 'H', start: new Date('1989-01-08') },
+	{ name: '昭和', initial: 'S', start: new Date('1926-12-25') },
+	{ name: '大正', initial: 'T', start: new Date('1912-07-30') },
+	{ name: '明治', initial: 'M', start: new Date('1868-01-25') },
+];
+
+const _CB_KANJI_NUM = {
+	〇: 0,
+	一: 1,
+	二: 2,
+	三: 3,
+	四: 4,
+	五: 5,
+	六: 6,
+	七: 7,
+	八: 8,
+	九: 9,
+	十: 10,
+	百: 100,
+	千: 1000,
+};
+
+const _cb_kanjiToNumber = (kanji) => {
+	if (kanji === '元') return 1;
+	let num = 0;
+	let tmp = 0;
+	for (let i = 0; i < kanji.length; i++) {
+		const c = kanji[i];
+		if (_CB_KANJI_NUM[c] >= 10) {
+			if (tmp === 0) tmp = 1;
+			num += tmp * _CB_KANJI_NUM[c];
+			tmp = 0;
+		} else if (_CB_KANJI_NUM[c] >= 0) {
+			tmp = tmp * 10 + _CB_KANJI_NUM[c];
+		}
+	}
+	num += tmp;
+	return num;
+};
+
+const _cb_parseDateLikeDateUtils = (value) => {
+	if (value == null || value === '') return null;
+	if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+	if (typeof value === 'number') {
+		if (!Number.isFinite(value)) return null;
+		return Math.abs(value) < 1e11 ? new Date(value * 1000) : new Date(value);
+	}
+	if (typeof value !== 'string') return null;
+
+	const input = value.trim();
+	if (!input) return null;
+
+	// まず既存互換の西暦系パターンを優先
+	if (/^\d{8}$/.test(input)) {
+		const y = parseInt(input.slice(0, 4), 10);
+		const m = parseInt(input.slice(4, 6), 10) - 1;
+		const day = parseInt(input.slice(6, 8), 10);
+		return new Date(y, m, day);
+	}
+	if (/^\d{6}$/.test(input)) {
+		const y2 = parseInt(input.slice(0, 2), 10);
+		const fullY = y2 >= 70 ? 1900 + y2 : 2000 + y2;
+		const m = parseInt(input.slice(2, 4), 10) - 1;
+		const day = parseInt(input.slice(4, 6), 10);
+		return new Date(fullY, m, day);
+	}
+
+	const toHankaku = (s) =>
+		s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+	const toHankakuAlpha = (s) =>
+		s.replace(/[Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+	const kanjiNumReg = /[元一二三四五六七八九十百千〇]+/g;
+	const kanjiToNumStr = (s) => s.replace(kanjiNumReg, (m) => String(_cb_kanjiToNumber(m)));
+	const kanjiToInitial = (s) => {
+		let out = s;
+		for (const era of _CB_ERAS) {
+			out = out.replace(new RegExp(era.name, 'g'), era.initial);
+		}
+		return out;
+	};
+
+	let normalized = toHankakuAlpha(toHankaku(input));
+	normalized = kanjiToNumStr(normalized);
+	normalized = kanjiToInitial(normalized);
+	normalized = normalized.replace(/年|\/|\.|\s|月/g, '-').replace(/日/g, '');
+	normalized = normalized.replace(/^-+|-+$/g, '');
+
+	const parts = normalized.split('-').filter(Boolean);
+	if (parts.length >= 3) {
+		let initial = parts[0];
+		let yearStr = '';
+		if (initial.length > 1) {
+			yearStr = initial.slice(1);
+			initial = initial[0];
+		}
+		const era = _CB_ERAS.find((e) => e.initial.toUpperCase() === initial.toUpperCase());
+		if (era) {
+			let yearNum;
+			let monthNum;
+			let dayNum;
+			if (yearStr) {
+				yearNum = parseInt(yearStr, 10);
+				monthNum = parseInt(parts[1], 10);
+				dayNum = parseInt(parts[2], 10);
+			} else {
+				yearNum = parseInt(parts[1], 10);
+				monthNum = parseInt(parts[2], 10);
+				dayNum = parts.length >= 4 ? parseInt(parts[3], 10) : 1;
+			}
+			if (!Number.isFinite(yearNum) || !Number.isFinite(monthNum) || !Number.isFinite(dayNum))
+				return null;
+			if (yearNum === 0) yearNum = 1;
+			if (monthNum === 0) monthNum = 1;
+			if (dayNum === 0) dayNum = 1;
+			const fullYear = era.start.getFullYear() + yearNum - 1;
+			return new Date(fullYear, monthNum - 1, dayNum);
+		}
+	}
+
+	const t = Date.parse(normalized);
+	if (!Number.isNaN(t)) return new Date(t);
+	return null;
+};
+
+const _cb_convertToEra = (d) => {
+	for (const era of _CB_ERAS) {
+		if (d >= era.start) {
+			const eraYear = d.getFullYear() - era.start.getFullYear() + 1;
+			const yearKanji = eraYear === 1 ? '元' : String(eraYear);
+			const year2 = eraYear === 1 ? '01' : String(eraYear).padStart(2, '0');
+			return {
+				kanji: `${era.name}${yearKanji}年`,
+				initial: `${era.initial}${year2}`,
+				initialOnly: era.initial,
+				numberOnly: year2,
+			};
+		}
+	}
+	return null;
+};
+
 // 日付の簡易フォーマッタ
 const _cb_formatDateSimple = (value, fmt) => {
 	if (value == null || value === '') return '';
-	let d = null;
-	if (value instanceof Date) d = value;
-	else if (typeof value === 'number') {
-		// 数値が UNIX 秒 (例: 1700000000) で渡されるケースがあるため自動判定して ms に変換
-		// 目安: 秒は ~1e9〜1e10、ミリ秒は ~1e12 前後なので閾値で判定する
-		const n = Number(value);
-		if (!Number.isFinite(n)) return String(value);
-		// 小さめの数値は秒とみなして 1000 を掛ける（閾値は 1e11）
-		d = Math.abs(n) < 1e11 ? new Date(n * 1000) : new Date(n);
-	} else if (typeof value === 'string') {
-		const s = value.trim();
-		if (/^\d{8}$/.test(s)) {
-			const y = parseInt(s.substr(0, 4), 10);
-			const m = parseInt(s.substr(4, 2), 10) - 1;
-			const day = parseInt(s.substr(6, 2), 10);
-			d = new Date(y, m, day);
-		} else if (/^\d{6}$/.test(s)) {
-			// YYMMDD を想定（YMMDD 指定時の扱い）
-			const y2 = parseInt(s.substr(0, 2), 10);
-			const fullY = y2 >= 70 ? 1900 + y2 : 2000 + y2;
-			const m = parseInt(s.substr(2, 2), 10) - 1;
-			const day = parseInt(s.substr(4, 2), 10);
-			d = new Date(fullY, m, day);
-		} else {
-			const t = Date.parse(s);
-			if (!Number.isNaN(t)) d = new Date(t);
-		}
-	}
+	const d = _cb_parseDateLikeDateUtils(value);
 	if (!d || Number.isNaN(d.getTime())) return String(value);
 	// UNIX 出力オプション
 	if (fmt === 'UNIX') return Math.floor(d.getTime() / 1000);
 	if (fmt === 'UNIX_MS') return d.getTime();
+	const era = _cb_convertToEra(d);
+	if (era) {
+		if (fmt === 'ERA_KANJI') return era.kanji;
+		if (fmt === 'ERA_INITIAL') return era.initial;
+		if (fmt === 'ERA_INITIAL_ONLY') return era.initialOnly;
+		if (fmt === 'ERA_NUMBER_ONLY') return era.numberOnly;
+		if (fmt === 'ERA_KANJI_YM') return `${era.kanji}${d.getMonth() + 1}月`;
+		if (fmt === 'ERA_KANJI_DATE') return `${era.kanji}${d.getMonth() + 1}月${d.getDate()}日`;
+		if (fmt === 'ERA_KANJI_DATE_PAD') {
+			const m2 = String(d.getMonth() + 1).padStart(2, '0');
+			const d2 = String(d.getDate()).padStart(2, '0');
+			return `${era.kanji}${m2}月${d2}日`;
+		}
+		if (fmt === 'ERA_INITIAL_YY/MM')
+			return `${era.initial}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+		if (fmt === 'ERA_INITIAL_Y/M/D')
+			return `${era.initialOnly}${Number(era.numberOnly)}/${d.getMonth() + 1}/${d.getDate()}`;
+		if (fmt === 'ERA_INITIAL_YY/MM/DD')
+			return `${era.initial}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+		// JIS X 0301 の表記に合わせたピリオド区切り（例: R07.11.09）
+		if (fmt === 'ERA_INITIAL_JIS_YM')
+			return `${era.initial}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+		if (fmt === 'ERA_INITIAL_JIS_YMD')
+			return `${era.initial}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+	}
 	const yyyy = d.getFullYear();
 	const mm = String(d.getMonth() + 1).padStart(2, '0');
 	const dd = String(d.getDate()).padStart(2, '0');

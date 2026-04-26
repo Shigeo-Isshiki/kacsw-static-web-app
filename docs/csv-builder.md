@@ -105,7 +105,7 @@ console.log(buildCSV(schema, rows, { header: true }));
   - `'string' | 'date' | 'number'`。
 
 - `format` (string | object)
-  - `type==='date'` の場合: `'YYYY-MM-DD' | 'YYYY/MM/DD' | 'YYYYMMDD' | 'YMMDD' | 'UNIX' | 'UNIX_MS' | 'YYYY年MM月DD日' | 'YYYY年M月D日'`
+  - `type==='date'` の場合: `'YYYY-MM-DD' | 'YYYY/MM/DD' | 'YYYYMMDD' | 'YMMDD' | 'UNIX' | 'UNIX_MS' | 'YYYY年MM月DD日' | 'YYYY年M月D日' | 'ERA_KANJI' | 'ERA_INITIAL' | 'ERA_INITIAL_ONLY' | 'ERA_NUMBER_ONLY' | 'ERA_KANJI_YM' | 'ERA_KANJI_DATE' | 'ERA_KANJI_DATE_PAD' | 'ERA_INITIAL_YY/MM' | 'ERA_INITIAL_Y/M/D' | 'ERA_INITIAL_YY/MM/DD' | 'ERA_INITIAL_JIS_YM' | 'ERA_INITIAL_JIS_YMD'`
   - `type==='number'` の場合: `{ width: N }` のように整数部の固定幅ゼロ埋めを指定。数値 `N` は埋めたい桁数です。例えば `{ width: 5 }` なら `42` は `00042` に変換されます。
 
 - `formatter` (function(value, record) => string)
@@ -246,6 +246,39 @@ console.log(buildCSV(schemaJP, [rec], { header: true }));
 // -> "padded,unpadded\n2025年11月09日,2025年11月9日"
 ```
 
+### 和暦フォーマット（kintone 向け）の例
+
+`src/csv-builder.js` は `date-utils.js` の `convertToEra` 相当ロジックを内包しており、`type: 'date'` の `format` に和暦系を指定できます。
+
+- `ERA_KANJI`: `令和7年`
+- `ERA_INITIAL`: `R07`
+- `ERA_INITIAL_ONLY`: `R`
+- `ERA_NUMBER_ONLY`: `07`
+- `ERA_KANJI_YM`: `令和7年11月`
+- `ERA_KANJI_DATE`: `令和7年11月9日`
+- `ERA_KANJI_DATE_PAD`: `令和7年11月09日`
+- `ERA_INITIAL_YY/MM`: `R07/11`
+- `ERA_INITIAL_Y/M/D`: `R7/11/9`
+- `ERA_INITIAL_YY/MM/DD`: `R07/11/09`
+- `ERA_INITIAL_JIS_YM`: `R07.11`
+- `ERA_INITIAL_JIS_YMD`: `R07.11.09`（JIS X 0301 寄りの区切り）
+
+```js
+const schemaEra = [
+  { key: 'd1', label: '和暦年', type: 'date', format: 'ERA_KANJI' },
+  { key: 'd2', label: '和暦日付', type: 'date', format: 'ERA_KANJI_DATE' },
+];
+
+const rec = {
+  // kintone の DATE フィールド相当（YYYY-MM-DD 文字列）
+  d1: '2025-11-09',
+  d2: '2025-11-09',
+};
+
+console.log(buildRow(schemaEra, rec));
+// -> "令和7年,令和7年11月9日"
+```
+
 ### number型のゼロ埋めフォーマットの例
 
 `type: 'number'` と `format: { width: N }` を組み合わせることで、整数部をN桁にゼロ埋めできます。
@@ -281,6 +314,8 @@ console.log(buildCSV(schemaPadding, [rec], { header: true }));
 - `map` に plain object を使うときは `mapMode:'string'` を指定してください（デフォルトは型厳密な Map を期待します）。
 - `YMMDD` は年の下1桁 + 月2桁 + 日2桁を返します（例: 2025-11-09 -> '51109'）。
 - UNIX 出力は `UNIX`（秒）と `UNIX_MS`（ミリ秒）をサポートします。数値入力は閾値で秒/ミリ秒判定されます。
+- 和暦出力は `ERA_*` 形式で指定できます。`date-utils.js` と同じ元号定義（令和/平成/昭和/大正/明治）を使用します。
+- 区切り文字を JIS 寄りにしたい場合は `ERA_INITIAL_JIS_YM` / `ERA_INITIAL_JIS_YMD` を使ってください。
 
 ---
 
