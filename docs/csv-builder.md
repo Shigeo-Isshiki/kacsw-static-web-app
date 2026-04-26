@@ -265,14 +265,14 @@ console.log(buildCSV(schemaJP, [rec], { header: true }));
 
 ```js
 const schemaEra = [
-  { key: 'd1', label: '和暦年', type: 'date', format: 'ERA_KANJI' },
-  { key: 'd2', label: '和暦日付', type: 'date', format: 'ERA_KANJI_DATE' },
+	{ key: 'd1', label: '和暦年', type: 'date', format: 'ERA_KANJI' },
+	{ key: 'd2', label: '和暦日付', type: 'date', format: 'ERA_KANJI_DATE' },
 ];
 
 const rec = {
-  // kintone の DATE フィールド相当（YYYY-MM-DD 文字列）
-  d1: '2025-11-09',
-  d2: '2025-11-09',
+	// kintone の DATE フィールド相当（YYYY-MM-DD 文字列）
+	d1: '2025-11-09',
+	d2: '2025-11-09',
 };
 
 console.log(buildRow(schemaEra, rec));
