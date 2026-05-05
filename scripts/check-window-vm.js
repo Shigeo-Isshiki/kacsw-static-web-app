@@ -6,7 +6,6 @@ const distDir = path.resolve(__dirname, '..', 'dist');
 const files = [
   'kintone-custom-lib.js',
   'date-utils.js',
-  'date_handling.js',
   'text-suite.js',
   'character_handling.js',
   'national_holiday_handling.js',

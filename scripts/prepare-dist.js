@@ -15,7 +15,6 @@ const FILES = [
 	'phone-utils.js',
 	'character_handling.js',
 	'date-utils.js',
-	'date_handling.js',
 	'text-suite.js',
 	'financial_institution_processing.js',
 	'shipping-processing.js',
