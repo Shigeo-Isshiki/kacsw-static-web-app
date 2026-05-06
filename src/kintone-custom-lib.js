@@ -359,6 +359,9 @@ const notifyWarning = (message, title = '注意', allowHtml = false) => {
  * kintone のレコード一覧のメニューの右側にボタン要素を追加または削除します。
  * - 既存の同 ID の要素は常に削除されます。
  * - 追加時は type="button" として作成し、onClick が関数であれば click イベントを登録します。
+ * - ボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。
+ * - kintone のデザインと調和したボタン外観にするには、アプリに「51-modern-default」スタイルシートを
+ *   適用してください。
  *
  * @param {string} id 追加するボタン要素の id
  * @param {string|null} textContent ボタンの表示テキスト。null/空なら要素を削除して非表示にする
@@ -390,6 +393,7 @@ const setHeaderMenuSpaceButton = (id, textContent, onClick, styleOptions) => {
 		const button = document.createElement('button');
 		// フォーム内で誤って submit を引き起こさないように type を明示する
 		button.type = 'button';
+		button.className = 'kintoneplugin-button-normal';
 		button.id = id;
 		button.textContent = textContent;
 		if (styleOptions && typeof styleOptions === 'object') {
@@ -429,6 +433,9 @@ const setHeaderMenuSpaceButton = (id, textContent, onClick, styleOptions) => {
  * kintone のレコード詳細・追加・編集の各画面のメニューの上側にボタン要素を追加または削除します。
  * - 既存の同 ID の要素は常に削除されます。
  * - 追加時は type="button" として作成し、onClick が関数であれば click イベントを登録します。
+ * - ボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。
+ * - kintone のデザインと調和したボタン外観にするには、アプリに「51-modern-default」スタイルシートを
+ *   適用してください。
  *
  * @param {string} id 追加するボタン要素の id
  * @param {string|null} textContent ボタンの表示テキスト。null/空なら要素を削除して非表示にする
@@ -460,6 +467,7 @@ const setRecordHeaderMenuSpaceButton = (id, textContent, onClick, styleOptions) 
 		const button = document.createElement('button');
 		// フォーム内で誤って submit を引き起こさないように type を明示する
 		button.type = 'button';
+		button.className = 'kintoneplugin-button-normal';
 		button.id = id;
 		button.textContent = textContent;
 		if (styleOptions && typeof styleOptions === 'object') {
@@ -640,6 +648,9 @@ const setSpaceFieldDisplay = (spaceField, display) => {
  * kintone のスペースフィールドにボタン要素を追加または削除します。
  * - 既存の同 ID の要素は常に削除されます。
  * - 追加時は type="button" として作成し、onClick が関数であれば click イベントを登録します。
+ * - ボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。
+ * - kintone のデザインと調和したボタン外観にするには、アプリに「51-modern-default」スタイルシートを
+ *   適用してください。
  *
  * @param {string} spaceField スペースフィールドのフィールドコード
  * @param {string} id 追加するボタン要素の id
@@ -674,6 +685,7 @@ const setSpaceFieldButton = (spaceField, id, textContent, onClick, styleOptions)
 		const button = document.createElement('button');
 		// フォーム内で誤って submit を引き起こさないように type を明示する
 		button.type = 'button';
+		button.className = 'kintoneplugin-button-normal';
 		button.id = id;
 		button.textContent = textContent;
 		if (styleOptions && typeof styleOptions === 'object') {
