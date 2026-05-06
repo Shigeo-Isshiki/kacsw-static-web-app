@@ -451,6 +451,9 @@ const getPrefectureByZipCode = (zipCode, callback) => {
  *   - undefinedなら「郵便番号から住所を取得」ラベルで表示
  *   - null/空文字ならボタン非表示（削除）
  *   ボタン押下時、callbackコールバックで住所取得結果を返します。
+ *   生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。
+ *   kintone のデザインと調和したボタン外観にするには、アプリに「51-modern-default」スタイルシートを
+ *   適用してください（https://js.kacsw.or.jp/51-modern-default.css から利用できます）。
  */
 const kintoneZipSetSpaceFieldButton = (spaceField, id, label, zipCode, callback) => {
 	if (
@@ -481,6 +484,9 @@ const kintoneZipSetSpaceFieldButton = (spaceField, id, label, zipCode, callback)
 		return;
 	}
 	const button = document.createElement('button');
+	// フォーム内で誤って submit を引き起こさないように type を明示する
+	button.type = 'button';
+	button.className = 'kintoneplugin-button-normal';
 	button.id = id;
 	button.textContent = textContent;
 	button.addEventListener('click', () => {

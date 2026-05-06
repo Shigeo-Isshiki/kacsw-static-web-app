@@ -210,6 +210,7 @@ formatZipCode('１２３－４５６７', (res) => {
 - 動作:
   - 指定した `spaceField` のスペース要素にボタンを追加します。`label` が `null` または空文字の場合はボタンを削除/非表示にします。
   - ボタン押下時に `getAddressByZipCode` を呼び出し、`callback` に結果を返します。
+  - 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 
 - 戻り値:
   - `void`（DOM に対する副作用を行います）

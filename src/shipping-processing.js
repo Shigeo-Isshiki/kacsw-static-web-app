@@ -356,6 +356,9 @@ const getNextBusinessDay = (baseDate = new Date(), cutoffHour = 16) => {
  *   - undefinedならデフォルト文言で表示
  *   - null/空文字ならボタン非表示（削除）
  *   ボタン押下時、公式サイト（ヤマト運輸・日本郵便・佐川急便）に遷移します。
+ *   生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。
+ *   kintone のデザインと調和したボタン外観にするには、アプリに「51-modern-default」スタイルシートを
+ *   適用してください（https://js.kacsw.or.jp/51-modern-default.css から利用できます）。
  */
 const kintoneShippingInquiryButton = (spaceField, id, label, trackingNumber, carrier) => {
 	if (
@@ -396,6 +399,9 @@ const kintoneShippingInquiryButton = (spaceField, id, label, trackingNumber, car
 	}
 	// ボタン追加
 	const button = document.createElement('button');
+	// フォーム内で誤って submit を引き起こさないように type を明示する
+	button.type = 'button';
+	button.className = 'kintoneplugin-button-normal';
 	button.id = id;
 	button.textContent = textContent;
 	button.addEventListener('click', () => {

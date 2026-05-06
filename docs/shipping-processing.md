@@ -102,6 +102,7 @@ console.log(d2); // -> '2025-11-12'
 ### `kintoneShippingInquiryButton(spaceField, id, label, trackingNumber, carrier)`
 
 - 概要: kintone のスペースフィールドに「荷物問い合わせ」ボタンを追加します。`label` に `null` または空文字を渡すと親要素を非表示にします。ボタン押下時は指定の運送会社の追跡ページを新しいウィンドウで開きます。
+- 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 - 引数:
   - `spaceField` (string) — kintone のスペースフィールドコード（`kintone.app.record.getSpaceElement` に渡す値）。必須。
   - `id` (string) — 生成するボタン要素の ID。必須。
