@@ -133,7 +133,7 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 ### setHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)
 
 - 動作概要: ヘッダーメニューのスペース要素に指定 ID のボタンを追加または削除します。既に同一 ID の要素があれば差し替え（削除→追加）し、`textContent` が null/空文字の場合は削除動作を行います。
-- 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください。
+- 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 
 - `id` (string) — ヘッダースペース内で一意に識別するための ID
 - `textContent` (string | null) — ボタンに表示する文言。`null` または空文字で該当ボタンを削除
@@ -151,7 +151,7 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 ### setRecordHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)
 
 - 動作概要: レコード詳細／追加／編集画面のヘッダーメニュー上部（`kintone.app.record.getHeaderMenuSpaceElement` が返す要素）に指定 ID のボタンを追加または削除します。既に同一 ID の要素があれば削除してから追加します。`textContent` が `null` または空文字の場合は削除動作を行います。
-- 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください。
+- 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 
 - `id` (string) — 追加するボタン要素の id（ヘッダースペース内で一意に識別するための値）
 - `textContent` (string | null) — ボタンに表示する文言。`null` または空文字で該当ボタンを削除
@@ -225,7 +225,7 @@ setRecordHeaderMenuSpaceText('rec-text', null);
 ### setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)
 
 - 動作概要: 指定したスペースフィールド（`kintone.app.record.getSpaceElement` から取得）にボタンを追加または削除します。追加時は `type="button"` を設定し、`onClick` を登録します。
-- 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください。
+- 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 
 - `spaceField` (string) — スペースフィールドのコード（`kintone.app.record.getSpaceElement` に渡す値）
 - `id` (string) — 追加する要素の ID（同一 ID があれば差し替える）
