@@ -478,6 +478,9 @@ const convertToAge = (birthDate, asOfDate = new Date(), useLegalAge = false) => 
 	if (typeof normalizedAsOfDate === 'boolean') {
 		normalizedUseLegalAge = normalizedAsOfDate;
 		normalizedAsOfDate = new Date();
+	} else if (normalizedAsOfDate == null) {
+		// null / undefined は「当日」として扱う
+		normalizedAsOfDate = new Date();
 	}
 
 	const toDate = (value, argName) => {
