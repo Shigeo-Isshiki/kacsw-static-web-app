@@ -21,7 +21,7 @@
   - [`convertToEra(date)`](#convertToEra)
   - [`convertToYear(date)`](#convertToYear)
   - [`convertToYearMonth(date)`](#convertToYearMonth)
-	- [`convertToAge(birthDate, asOfDate, useLegalAge)`](#convertToAge)
+  - [`convertToAge(birthDate, asOfDate, useLegalAge)`](#convertToAge)
 - エラー形式
 - 実例
 - 注意事項 / エッジケース
@@ -205,8 +205,8 @@ convertToYearMonth('2025'); // -> { year: 2025, month: 1 }
 概要:
 
 - 生年月日と基準日を受け取り、`useLegalAge` に応じて年齢を返します。
-	- `false`: 満年齢（誕生日未到来なら 1 引く）
-	- `true`: 年齢計算ニ関スル法律ベース（誕生日の前日満了で加齢）
+  - `false`: 満年齢（誕生日未到来なら 1 引く）
+  - `true`: 年齢計算ニ関スル法律ベース（誕生日の前日満了で加齢）
 
 引数:
 
@@ -221,8 +221,8 @@ convertToYearMonth('2025'); // -> { year: 2025, month: 1 }
 例外:
 
 - `Error` を投げます。以下のケースが該当します:
-	- 入力形式が不正
-	- 基準日が生年月日より前
+  - 入力形式が不正
+  - 基準日が生年月日より前
 
 例:
 
