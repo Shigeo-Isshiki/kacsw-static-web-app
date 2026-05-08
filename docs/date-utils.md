@@ -21,6 +21,7 @@
   - [`convertToEra(date)`](#convertToEra)
   - [`convertToYear(date)`](#convertToYear)
   - [`convertToYearMonth(date)`](#convertToYearMonth)
+	- [`convertToAge(birthDate, asOfDate, useLegalAge)`](#convertToAge)
 - エラー形式
 - 実例
 - 注意事項 / エッジケース
@@ -35,6 +36,7 @@
 - `convertToEra`: 日付から和暦の表現（漢字表記やイニシャル付き表記の複数形式）を返します。
 - `convertToYear`: 様々な入力から西暦年（数値）だけを抽出します。
 - `convertToYearMonth`: 様々な入力から西暦の年と月を抽出し、`{ year, month }` 形式で返します（月が欠ける場合は月を `1` として扱います）。
+- `convertToAge`: 生年月日と基準日から年齢を返します（`false`: 満年齢、`true`: 法律ベース年齢）。
 
 このライブラリは内部で次のような前処理・正規化を行います:
 
@@ -53,6 +55,7 @@
 - `convertToEra(date) -> object` — `{ kanji, initial, initialOnly, numberOnly }` を返す。
 - `convertToYear(date) -> number` — 西暦の年（数値）を返す。
 - `convertToYearMonth(date) -> object` — `{ year: number, month: number }` を返す（month が欠ける場合は 1 を既定値とする）。
+- `convertToAge(birthDate, asOfDate?, useLegalAge?) -> number` — 生年月日と基準日から年齢を返す（`true`: 法律ベース / `false`: 満年齢、既定値は `false`）。
 
 ---
 
@@ -195,6 +198,43 @@ convertToYearMonth('2025'); // -> { year: 2025, month: 1 }
 
 ---
 
+<a id="convertToAge"></a>
+
+### `convertToAge(birthDate, asOfDate, useLegalAge)`
+
+概要:
+
+- 生年月日と基準日を受け取り、`useLegalAge` に応じて年齢を返します。
+	- `false`: 満年齢（誕生日未到来なら 1 引く）
+	- `true`: 年齢計算ニ関スル法律ベース（誕生日の前日満了で加齢）
+
+引数:
+
+- `birthDate` (string | Date) — 生年月日。`convertToSeireki` で解釈可能な形式を受け付けます。
+- `asOfDate` (string | Date, optional) — 基準日。省略時は当日。
+- `useLegalAge` (boolean, optional) — 年齢算出モード。`true` は法律ベース、`false` は満年齢。省略時は `false`。
+
+戻り値:
+
+- 成功: `number` — 満年齢
+
+例外:
+
+- `Error` を投げます。以下のケースが該当します:
+	- 入力形式が不正
+	- 基準日が生年月日より前
+
+例:
+
+```js
+convertToAge('1990-05-10', '2026-05-09'); // -> 35
+convertToAge('1990-05-09', '2026-05-09'); // -> 36
+convertToAge('平成2年5月9日', '2026-05-09'); // -> 36
+convertToAge('1990-05-10', '2026-05-09', true); // -> 36
+```
+
+---
+
 ## エラー形式
 
 - 本モジュールは不正な入力や解析不能なケースで `Error` を投げます。エラーメッセージは日本語説明を含みます（例: '不正な入力形式です', '日付不正: Date型または文字列で指定してください' など）。
@@ -216,6 +256,8 @@ convertToYearMonth('2025'); // -> { year: 2025, month: 1 }
 	// -> 2019
 	console.log(window.DATE.convertToYearMonth('令和7年5月1日'));
 	// -> { year: 2025, month: 5 }
+	console.log(window.DATE.convertToAge('1990-05-10', '2026-05-09'));
+	// -> 35
 </script>
 ```
 

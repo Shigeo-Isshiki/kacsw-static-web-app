@@ -2,7 +2,7 @@
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
  * @version 1.0.0
  */
-/* exported convertToSeireki, convertToEra, convertToYear, convertToYearMonth */
+/* exported convertToSeireki, convertToEra, convertToYear, convertToYearMonth, convertToAge */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_du_)で始める
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
@@ -461,6 +461,65 @@ const convertToYearMonth = (date) => {
 
 	throw new Error('不正な入力形式です');
 };
+
+/**
+ * 生年月日と基準日から満年齢を算出する
+ * @param {string|Date} birthDate 生年月日（例: "1990-04-15", "平成2年4月15日", Date）
+ * @param {string|Date} [asOfDate] 基準日（省略時は当日）
+ * @param {boolean} [useLegalAge=false] true: 法律ベース / false: 満年齢
+ * @returns {number} 満年齢
+ * @throws {Error} 入力不正、または基準日が生年月日より前の場合
+ */
+const convertToAge = (birthDate, asOfDate = new Date(), useLegalAge = false) => {
+	let normalizedAsOfDate = asOfDate;
+	let normalizedUseLegalAge = useLegalAge;
+
+	// 第2引数をフラグとして渡せるようにする: convertToAge(birthDate, true)
+	if (typeof normalizedAsOfDate === 'boolean') {
+		normalizedUseLegalAge = normalizedAsOfDate;
+		normalizedAsOfDate = new Date();
+	}
+
+	const toDate = (value, argName) => {
+		if (value instanceof Date) {
+			if (isNaN(value.getTime())) throw new Error(`${argName}が不正な日付です`);
+			return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+		}
+		if (typeof value === 'string') {
+			const seireki = convertToSeireki(value);
+			const d = new Date(seireki);
+			if (isNaN(d.getTime())) throw new Error(`${argName}が不正な日付です`);
+			return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+		}
+		throw new Error(`${argName}はDate型または文字列で指定してください`);
+	};
+
+	const birth = toDate(birthDate, 'birthDate');
+	const asOf = toDate(normalizedAsOfDate, 'asOfDate');
+
+	if (typeof normalizedUseLegalAge !== 'boolean') {
+		throw new Error('useLegalAgeはbooleanで指定してください');
+	}
+
+	if (asOf < birth) {
+		throw new Error('基準日が生年月日より前です');
+	}
+
+	// legal は「誕生日の前日満了で加齢」を日単位で扱うため、基準日+1日で判定する
+	const targetAsOf = normalizedUseLegalAge
+		? new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate() + 1)
+		: asOf;
+
+	let age = targetAsOf.getFullYear() - birth.getFullYear();
+	const hasNotHadBirthdayYet =
+		targetAsOf.getMonth() < birth.getMonth() ||
+		(targetAsOf.getMonth() === birth.getMonth() && targetAsOf.getDate() < birth.getDate());
+	if (hasNotHadBirthdayYet) {
+		age -= 1;
+	}
+
+	return age;
+};
 if (typeof window !== 'undefined') {
 	window.DATE = window.DATE || {};
 	Object.assign(window.DATE, {
@@ -468,12 +527,19 @@ if (typeof window !== 'undefined') {
 		convertToEra,
 		convertToYear,
 		convertToYearMonth,
+		convertToAge,
 	});
 }
 
 // CommonJS export for Node/test environments
 try {
 	if (typeof module !== 'undefined' && module && module.exports) {
-		module.exports = { convertToSeireki, convertToEra, convertToYear, convertToYearMonth };
+		module.exports = {
+			convertToSeireki,
+			convertToEra,
+			convertToYear,
+			convertToYearMonth,
+			convertToAge,
+		};
 	}
 } catch (e) {}

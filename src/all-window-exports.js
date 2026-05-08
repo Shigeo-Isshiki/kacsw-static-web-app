@@ -20,6 +20,8 @@
 		'convertToSeireki',
 		'convertToEra',
 		'convertToYear',
+		'convertToYearMonth',
+		'convertToAge',
 		// kintone-custom-lib.js
 		'notifyError',
 		'getFieldValueOr',

@@ -16,10 +16,10 @@ try {
 // VM 内で評価されたスクリプトが `const`/`let` で関数を定義していると、
 // その識別子は sandbox オブジェクトの直接のプロパティになりません。
 // そこでここでは評価式を使って同一コンテキストから関数を取得します。
-let convertToSeireki, convertToEra, convertToYear, convertToYearMonth;
+let convertToSeireki, convertToEra, convertToYear, convertToYearMonth, convertToAge;
 try {
 	const exported = vm.runInContext(
-		'({convertToSeireki, convertToEra, convertToYear, convertToYearMonth})',
+		'({convertToSeireki, convertToEra, convertToYear, convertToYearMonth, convertToAge})',
 		sandbox
 	);
 	convertToSeireki =
@@ -34,6 +34,9 @@ try {
 	convertToYearMonth =
 		(exported && exported.convertToYearMonth) ||
 		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToYearMonth);
+	convertToAge =
+		(exported && exported.convertToAge) ||
+		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToAge);
 } catch (e) {
 	// 評価に失敗した場合は既存のsandbox直参照も試みる
 	convertToSeireki =
@@ -48,12 +51,67 @@ try {
 	convertToYearMonth =
 		sandbox.convertToYearMonth ||
 		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToYearMonth);
+	convertToAge =
+		sandbox.convertToAge ||
+		(sandbox.window && sandbox.window.DATE && sandbox.window.DATE.convertToAge);
 }
 
 if (!convertToSeireki || !convertToEra || !convertToYear)
 	throw new Error('date-utils の関数が取得できませんでした');
 
 if (!convertToYearMonth) throw new Error('convertToYearMonth が取得できませんでした');
+if (!convertToAge) throw new Error('convertToAge が取得できませんでした');
+
+try {
+	// convertToAge: 基本ケース（誕生日到達前）
+	assert.strictEqual(convertToAge('1990-05-10', '2026-05-09'), 35);
+	assert.strictEqual(convertToAge('1990-05-10', '2026-05-09', false), 35);
+	// convertToAge: 誕生日当日
+	assert.strictEqual(convertToAge('1990-05-09', '2026-05-09'), 36);
+	// convertToAge: 和暦入力
+	assert.strictEqual(convertToAge('平成2年5月9日', '2026-05-09'), 36);
+	// convertToAge: 法律年齢（誕生日前日で加齢）
+	assert.strictEqual(convertToAge('1990-05-10', '2026-05-09', true), 36);
+	const ageWithBoolOnly = convertToAge('1990-05-10', true);
+	assert.ok(Number.isInteger(ageWithBoolOnly), '第2引数boolean指定でも年齢を返す');
+	// convertToAge: Date入力
+	const ageWithDate = vm.runInContext(
+		'convertToAge(new Date(1990,4,10), new Date(2026,4,9))',
+		sandbox
+	);
+	assert.strictEqual(ageWithDate, 35);
+	const ageWithDateLegal = vm.runInContext(
+		'convertToAge(new Date(1990,4,10), new Date(2026,4,9), true)',
+		sandbox
+	);
+	assert.strictEqual(ageWithDateLegal, 36);
+	console.log('PASS: convertToAge various inputs');
+} catch (e) {
+	console.error('FAIL: convertToAge cases', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	// convertToAge: 生年月日より前の基準日はエラー
+	let threw = false;
+	try {
+		convertToAge('2026-05-10', '2026-05-09');
+	} catch (e) {
+		threw = true;
+	}
+	assert.ok(threw, '基準日が生年月日より前はエラー');
+	let threw2 = false;
+	try {
+		convertToAge('1990-05-10', '2026-05-09', 'unknown');
+	} catch (e) {
+		threw2 = true;
+	}
+	assert.ok(threw2, 'boolean以外のuseLegalAge指定はエラー');
+	console.log('PASS: convertToAge invalid cases');
+} catch (e) {
+	console.error('FAIL: convertToAge invalid cases', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
 
 try {
 	// convertToYearMonth: Date input
