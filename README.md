@@ -39,12 +39,29 @@ npm run test    # テスト実行（scripts/run-tests.js を使用）
 npm start       # ./src を配信（http://localhost:8000）
 ```
 
+ローカル起動後は、まず以下のURLを開くと全体像を把握しやすくなります。
+
+- `http://localhost:8000/` : 入口ページ（`src/index.html`）
+- `http://localhost:8000/test.html` : 個別スクリプト確認ページ
+- `http://localhost:8000/test-all-scripts.html` : 一括読み込み確認ページ
+
+### URL と JavaScript ファイルの対応
+
+`npm start` は `src/` をそのまま配信するため、`src` 配下の JavaScript は URL で直接確認できます。
+
+- 例: `src/text-suite.js` -> `http://localhost:8000/text-suite.js`
+- 例: `src/phone-utils.js` -> `http://localhost:8000/phone-utils.js`
+- 例: `src/kintone-custom-lib.js` -> `http://localhost:8000/kintone-custom-lib.js`
+
+どのファイルを使うべきか迷う場合は、先に `docs/` の各説明を参照してください。
+
 <a id="notes"></a>
 
 ## 補足
 
 - テストは `test/` 配下にあります。
 - 配布用ファイル作成は `npm run prepare:dist` と `npm run zip` を使用します。
+- `npm run prepare:dist` は `src/index.html` を `dist/index.html` としてコピーします。
 - 電話番号ユーティリティで参照している総務省公開情報は、2026年4月1日時点の内容に基づいています。
 
 ---

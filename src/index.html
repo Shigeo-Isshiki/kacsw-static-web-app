@@ -2,10 +2,134 @@
 <html lang="ja">
 	<head>
 		<meta charset="UTF-8" />
-		<meta http-equiv="refresh" content="0; url=http://www.kacsw.or.jp/" />
-		<title>リダイレクト中...</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>KACSW Static Web App</title>
+		<style>
+			:root {
+				--bg: #f5f8ff;
+				--panel: #ffffff;
+				--text: #10233f;
+				--muted: #4e627d;
+				--accent: #0066cc;
+				--border: #d9e4f5;
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			body {
+				margin: 0;
+				font-family: 'Yu Gothic UI', 'Hiragino Sans', 'Meiryo', sans-serif;
+				background: linear-gradient(160deg, var(--bg), #eaf1ff 60%, #e2ecff);
+				color: var(--text);
+			}
+
+			main {
+				max-width: 860px;
+				margin: 40px auto;
+				padding: 24px;
+			}
+
+			.panel {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 14px;
+				padding: 24px;
+				box-shadow: 0 8px 20px rgba(16, 35, 63, 0.08);
+			}
+
+			h1 {
+				margin-top: 0;
+				font-size: 1.6rem;
+			}
+
+			p,
+			li {
+				line-height: 1.7;
+				color: var(--muted);
+			}
+
+			a {
+				color: var(--accent);
+				text-decoration-thickness: 2px;
+			}
+
+			ul {
+				padding-left: 1.2rem;
+			}
+
+			.grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 12px;
+			}
+
+			.card {
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 12px 14px;
+				background: #fbfdff;
+			}
+
+			@media (max-width: 720px) {
+				main {
+					margin: 20px auto;
+					padding: 14px;
+				}
+
+				.panel {
+					padding: 16px;
+				}
+
+				.grid {
+					grid-template-columns: 1fr;
+				}
+			}
+		</style>
 	</head>
 	<body>
-		<p>自動的に http://www.kacsw.or.jp/ にリダイレクトされます。</p>
+		<main>
+			<section class="panel">
+				<h1>KACSW Static Web App</h1>
+				<p>
+					このページはライブラリ確認用の入口です。まず README
+					を確認すると、提供モジュールと使い方を把握できます。
+				</p>
+
+				<h2>README への導線</h2>
+				<ul>
+					<li>
+						<a
+							href="https://github.com/Shigeo-Isshiki/kacsw-static-web-app/blob/main/README.md"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							GitHub の README.md を開く
+						</a>
+					</li>
+					<li>ローカル作業時は、プロジェクト直下の README.md を参照してください。</li>
+				</ul>
+
+				<h2>ローカル確認ページ</h2>
+				<div class="grid">
+					<div class="card">
+						<a href="/test.html">test.html</a>
+						<p>個別スクリプトの動作確認に使います。</p>
+					</div>
+					<div class="card">
+						<a href="/test-all-scripts.html">test-all-scripts.html</a>
+						<p>主要スクリプトの一括読み込み確認に使います。</p>
+					</div>
+				</div>
+
+				<h2>JavaScript 直接参照例</h2>
+				<ul>
+					<li><a href="/text-suite.js">/text-suite.js</a></li>
+					<li><a href="/phone-utils.js">/phone-utils.js</a></li>
+					<li><a href="/kintone-custom-lib.js">/kintone-custom-lib.js</a></li>
+				</ul>
+			</section>
+		</main>
 	</body>
 </html>
