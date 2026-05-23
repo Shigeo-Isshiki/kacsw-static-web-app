@@ -722,6 +722,29 @@ const setSpaceFieldButton = (spaceField, id, textContent, onClick, styleOptions)
 	}
 };
 
+// setSpaceFieldText の非同期リトライ競合を防ぐための内部状態管理
+// key: `${spaceField}::${id}`
+// value: { generation: number, timerIds: number[] }
+const _kc_spaceFieldTextRetryStateMap = new Map();
+
+const _kc_makeSpaceFieldTextRetryKey = (spaceField, id) => {
+	return String(spaceField) + '::' + String(id);
+};
+
+const _kc_cancelPendingRetries = (key) => {
+	const state = _kc_spaceFieldTextRetryStateMap.get(key);
+	if (!state || !Array.isArray(state.timerIds)) return;
+	state.timerIds.forEach((timerId) => {
+		clearTimeout(timerId);
+	});
+	state.timerIds = [];
+};
+
+const _kc_isLatestGeneration = (key, generation) => {
+	const state = _kc_spaceFieldTextRetryStateMap.get(key);
+	return !!state && state.generation === generation;
+};
+
 /**
  * kintone のスペースフィールド内に任意の HTML 文字列を挿入して表示／削除します。
  * - 挿入時は既存の同 ID 要素を削除してから追加します。
@@ -747,11 +770,32 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
 		});
 		return false;
 	}
+
+	const retryKey = _kc_makeSpaceFieldTextRetryKey(spaceField, id);
+	const prevState = _kc_spaceFieldTextRetryStateMap.get(retryKey) || {
+		generation: 0,
+		timerIds: [],
+	};
+	// 同一キーの旧リトライは新規呼び出し時に必ず無効化する
+	_kc_cancelPendingRetries(retryKey);
+	const generation = prevState.generation + 1;
+	const state = {
+		generation,
+		timerIds: [],
+	};
+	_kc_spaceFieldTextRetryStateMap.set(retryKey, state);
+
 	// 既存要素削除
 	const spaceFieldElementById = document.getElementById(id);
 	if (spaceFieldElementById) {
 		spaceFieldElementById.remove();
 	}
+
+	if (innerHTML === null || innerHTML === '') {
+		// 空文字/null は即時クリア最優先: 追加リトライは行わない
+		return setSpaceFieldDisplay(spaceField, false);
+	}
+
 	if (innerHTML) {
 		// 表示
 		// createElement を関数化してリトライ時にも使えるようにする
@@ -789,7 +833,25 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
 			// exponential backoff style intervals for faster initial response
 			const intervals = [50, 100, 200, 400, 800]; // ms
 			let idx = 0;
+
+			const scheduleRetry = (fn, wait) => {
+				const timerId = setTimeout(() => {
+					const current = _kc_spaceFieldTextRetryStateMap.get(retryKey);
+					if (current && Array.isArray(current.timerIds)) {
+						current.timerIds = current.timerIds.filter((idValue) => idValue !== timerId);
+					}
+					if (!_kc_isLatestGeneration(retryKey, generation)) {
+						return;
+					}
+					fn();
+				}, wait);
+				state.timerIds.push(timerId);
+			};
+
 			const tryOnce = () => {
+				if (!_kc_isLatestGeneration(retryKey, generation)) {
+					return;
+				}
 				// 要素が既に存在すれば成功とみなして終了
 				if (document.getElementById(id)) {
 					return;
@@ -810,21 +872,21 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
 				// schedule next attempt if available
 				if (idx < intervals.length) {
 					const wait = intervals[idx++];
-					setTimeout(tryOnce, wait);
+					scheduleRetry(tryOnce, wait);
 				}
 			};
 
 			// kick off immediately (non-blocking)
-			setTimeout(tryOnce, 0);
+			scheduleRetry(tryOnce, 0);
 		};
 		// 実行
 		startRetryLoop();
 
 		return appended;
-	} else {
-		// 非表示
-		return setSpaceFieldDisplay(spaceField, false);
 	}
+
+	// 非表示
+	return setSpaceFieldDisplay(spaceField, false);
 };
 
 // 公開: kintone 側から直接呼び出すためにグローバルに割り当てる（初期化後に安全に行う）

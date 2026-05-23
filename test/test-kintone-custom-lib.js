@@ -165,6 +165,112 @@ const { JSDOM } = require('jsdom');
 		assert.strictEqual(inserted.textContent, 'テスト文字列');
 		console.log('PASS: setSpaceFieldText updates space element text');
 
+		// setSpaceFieldText の競合回避を検証するため、setTimeout をテスト内で制御する
+		const originalSetTimeout = global.setTimeout;
+		const originalClearTimeout = global.clearTimeout;
+		const originalWindowSetTimeout = window.setTimeout;
+		const originalWindowClearTimeout = window.clearTimeout;
+		const originalGetSpaceElement = global.kintone.app.record.getSpaceElement;
+
+		let nextTimerId = 1;
+		const timerQueue = new Map();
+		const blockedSpaces = new Set();
+
+		const fakeSetTimeout = (fn) => {
+			const timerId = nextTimerId++;
+			timerQueue.set(timerId, fn);
+			return timerId;
+		};
+		const fakeClearTimeout = (timerId) => {
+			timerQueue.delete(timerId);
+		};
+		const drainTimers = () => {
+			let guard = 0;
+			while (timerQueue.size > 0) {
+				guard += 1;
+				if (guard > 100) {
+					throw new Error('timer drain guard exceeded');
+				}
+				const firstId = timerQueue.keys().next().value;
+				const fn = timerQueue.get(firstId);
+				timerQueue.delete(firstId);
+				if (typeof fn === 'function') fn();
+			}
+		};
+
+		global.setTimeout = fakeSetTimeout;
+		global.clearTimeout = fakeClearTimeout;
+		window.setTimeout = fakeSetTimeout;
+		window.clearTimeout = fakeClearTimeout;
+		global.kintone.app.record.getSpaceElement = (code) => {
+			if (blockedSpaces.has(code)) {
+				return null;
+			}
+			return document.getElementById(code);
+		};
+
+		try {
+			// 1) 連続呼び出し（表示→非表示→表示）で最終状態が最後の呼び出しに一致する
+			const raceSpace = 'space-race';
+			const raceTarget = document.createElement('div');
+			raceTarget.id = raceSpace;
+			document.body.appendChild(raceTarget);
+			window.setSpaceFieldText(raceSpace, 'race-text', '先行表示');
+			window.setSpaceFieldText(raceSpace, 'race-text', null);
+			blockedSpaces.add(raceSpace);
+			window.setSpaceFieldText(raceSpace, 'race-text', '最終表示');
+			blockedSpaces.delete(raceSpace);
+			drainTimers();
+			const raceInserted = document.getElementById('race-text');
+			assert.ok(raceInserted, 'final race element should exist');
+			assert.strictEqual(raceInserted.textContent, '最終表示');
+			assert.notStrictEqual(raceTarget.parentNode.style.display, 'none');
+			console.log('PASS: setSpaceFieldText keeps final state after rapid show/hide/show');
+
+			// 2) 空文字クリア後に古いリトライで再表示されない
+			const clearSpace = 'space-clear';
+			const clearTarget = document.createElement('div');
+			clearTarget.id = clearSpace;
+			document.body.appendChild(clearTarget);
+			blockedSpaces.add(clearSpace);
+			window.setSpaceFieldText(clearSpace, 'clear-text', '古い表示');
+			blockedSpaces.delete(clearSpace);
+			window.setSpaceFieldText(clearSpace, 'clear-text', '');
+			drainTimers();
+			assert.strictEqual(document.getElementById('clear-text'), null);
+			assert.strictEqual(clearTarget.parentNode.style.display, 'none');
+			console.log('PASS: setSpaceFieldText does not resurrect text after empty-string clear');
+
+			// 3) 同一キーと別キー混在でも相互干渉しない
+			const mixedSpaceA = 'space-mixed-a';
+			const mixedSpaceB = 'space-mixed-b';
+			const mixedA = document.createElement('div');
+			const mixedB = document.createElement('div');
+			mixedA.id = mixedSpaceA;
+			mixedB.id = mixedSpaceB;
+			document.body.appendChild(mixedA);
+			document.body.appendChild(mixedB);
+			blockedSpaces.add(mixedSpaceA);
+			blockedSpaces.add(mixedSpaceB);
+			window.setSpaceFieldText(mixedSpaceA, 'mixed-a-text', 'A-old');
+			window.setSpaceFieldText(mixedSpaceB, 'mixed-b-text', 'B-final');
+			blockedSpaces.delete(mixedSpaceA);
+			window.setSpaceFieldText(mixedSpaceA, 'mixed-a-text', null);
+			blockedSpaces.delete(mixedSpaceB);
+			drainTimers();
+			assert.strictEqual(document.getElementById('mixed-a-text'), null);
+			const mixedBInserted = document.getElementById('mixed-b-text');
+			assert.ok(mixedBInserted, 'other key should remain active');
+			assert.strictEqual(mixedBInserted.textContent, 'B-final');
+			console.log('PASS: setSpaceFieldText isolates retry states by spaceField+id key');
+		} finally {
+			global.setTimeout = originalSetTimeout;
+			global.clearTimeout = originalClearTimeout;
+			window.setTimeout = originalWindowSetTimeout;
+			window.clearTimeout = originalWindowClearTimeout;
+			global.kintone.app.record.getSpaceElement = originalGetSpaceElement;
+		}
+
 		if (typeof window.setSpaceFieldButton === 'function') {
 			const beforeButtons = target.querySelectorAll('button').length;
 			window.setSpaceFieldButton(spaceCode, 'btn-1', 'クリック');
