@@ -228,6 +228,8 @@ setRecordHeaderMenuSpaceText('rec-text', null);
 ### setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)
 
 - 動作概要: 指定したスペースフィールドにボタンを追加または削除します。追加時は `type="button"` を設定し、`onClick` を登録します。実行環境に応じて PC / モバイルの API を自動判定して `getSpaceElement` を使用します。
+- API 選択ルール: `location.pathname` が `/k/m/` を含む場合は `kintone.mobile.app.record.getSpaceElement` を優先し、そうでない場合は `kintone.app.record.getSpaceElement` を優先します。優先先が使えない場合はもう一方へフォールバックします。
+- `getSpaceElement` が `null` を返す画面（スペースフィールド非対応画面など）では、要素追加は行われず `false` を返します。
 - 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 
 - `spaceField` (string) — スペースフィールドのコード
@@ -265,18 +267,22 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 ### setSpaceFieldText(spaceField, id, innerHTML)
 
 - 動作概要: 指定スペースフィールドに HTML（サニタイズ済）を挿入します。`innerHTML` が null または空文字列の場合は該当要素を削除します。DOM が未準備の場合はリトライ設計を採ることを想定しています。実行環境に応じて PC / モバイルの API を自動判定して `getSpaceElement` を使用します。
+- API 選択ルールは `setSpaceFieldButton` と同じです（モバイル画面パスでは mobile API 優先）。
+- スペース要素が取得できない場合、同期戻り値は `false` になります（内部リトライで後追い復旧する設計）。
 
 - `spaceField` (string) — スペースフィールドのコード
 - `id` (string) — 挿入する要素の ID
 - `innerHTML` (string | null) — 挿入する HTML（サニタイズ済を想定）。`null` または空文字で削除
 
-テストヒント: `kintone.app.record.getSpaceElement` をモックして、要素が appendChild されることを確認します。
+テストヒント: PC だけでなく `location.pathname = '/k/m/...'` を設定し、`kintone.mobile.app.record.getSpaceElement` が使われるケースも検証します。
 
 <a id="setspacefielddisplay"></a>
 
 ### setSpaceFieldDisplay(spaceField, display)
 
 - 動作概要: 指定したスペースフィールドの親ノードの `style.display` を切り替えます。`display` が `true` のときは表示、`false` のときは非表示に設定します。実行環境に応じて PC / モバイルの API を自動判定して `getSpaceElement` を使用します。
+- API 選択ルールは `setSpaceFieldButton` と同じです（モバイル画面パスでは mobile API 優先）。
+- 取得したスペース要素またはその親ノードが存在しない場合は `false` を返します。
 
 - `spaceField` (string) — スペースフィールドのコード
 - `display` (boolean) — true で表示、false で非表示にする指定

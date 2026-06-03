@@ -166,6 +166,51 @@ try {
 		);
 		process.exitCode = 2;
 	}
+
+	// 3) モバイル画面パスでは mobile.app.record.getSpaceElement を利用する
+	const originalLocation = global.location;
+	const mobileSpaceField = 'mobile-space1';
+	const mobileSpaceElement = {
+		_appended: null,
+		appendChild: function (el) {
+			this._appended = el;
+		},
+		parentNode: { style: { display: 'none' } },
+	};
+	global.location = { pathname: '/k/m/123/' };
+	global.kintone = {
+		app: {
+			record: {
+				getSpaceElement: function () {
+					return null;
+				},
+			},
+		},
+		mobile: {
+			app: {
+				record: {
+					getSpaceElement: function (field) {
+						if (field === mobileSpaceField) return mobileSpaceElement;
+						return null;
+					},
+				},
+			},
+		},
+	};
+	kintoneShippingInquiryButton(mobileSpaceField, 'btn-mobile', undefined, '1234567890', 'yamato');
+	try {
+		assert.ok(mobileSpaceElement._appended, 'モバイルのスペース要素にボタンが追加されること');
+		assert.strictEqual(mobileSpaceElement.parentNode.style.display, '', '表示状態に切り替わること');
+		console.log('PASS: kintoneShippingInquiryButton supports mobile getSpaceElement');
+	} catch (e) {
+		console.error(
+			'FAIL: kintoneShippingInquiryButton mobile getSpaceElement',
+			e && e.message ? e.message : e
+		);
+		process.exitCode = 2;
+	} finally {
+		global.location = originalLocation;
+	}
 } catch (e) {
 	console.error('FAIL: kintoneShippingInquiryButton setup', e && e.message ? e.message : e);
 	process.exitCode = 2;

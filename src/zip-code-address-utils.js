@@ -51,20 +51,40 @@ const _zc_buildZipcodeApiUrl = (normalized) => {
 	return `${_ZC_ZIPCODE_API_BASE_URL}?search_code=${encodeURIComponent(normalized)}`;
 };
 
+const _zc_getAppNamespace = () => {
+	try {
+		if (typeof kintone === 'undefined' || !kintone) return null;
+		const pcApp = kintone.app || null;
+		const mobileApp = kintone.mobile && kintone.mobile.app ? kintone.mobile.app : null;
+		const isMobilePath =
+			typeof location !== 'undefined' && typeof location.pathname === 'string'
+				? /\/k\/m\//.test(location.pathname)
+				: false;
+
+		if (isMobilePath && mobileApp) return mobileApp;
+		if (pcApp) return pcApp;
+		if (mobileApp) return mobileApp;
+		return null;
+	} catch {
+		return null;
+	}
+};
+
+const _zc_getRecordNamespace = () => {
+	const appNamespace = _zc_getAppNamespace();
+	if (!appNamespace || !appNamespace.record) return null;
+	return appNamespace.record;
+};
+
 const _zc_getSpaceElement = (spaceField) => {
 	if (typeof spaceField !== 'string' || !spaceField.trim()) {
 		return null;
 	}
-	if (
-		typeof kintone === 'undefined' ||
-		!kintone ||
-		!kintone.app ||
-		!kintone.app.record ||
-		typeof kintone.app.record.getSpaceElement !== 'function'
-	) {
+	const recordNamespace = _zc_getRecordNamespace();
+	if (!recordNamespace || typeof recordNamespace.getSpaceElement !== 'function') {
 		return null;
 	}
-	return kintone.app.record.getSpaceElement(spaceField);
+	return recordNamespace.getSpaceElement(spaceField);
 };
 
 const _zc_setSpaceFieldDisplayFallback = (spaceField, display) => {

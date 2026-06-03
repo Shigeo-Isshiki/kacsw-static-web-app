@@ -193,6 +193,37 @@ const makeFetchStub = (status, jsonBody) => {
 		zc.kintoneZipSpaceFieldText('S', 'txt-id', true);
 		console.log('PASS: kintone DOM helper basic calls');
 
+		// 11) モバイル画面パスでは mobile.app.record.getSpaceElement を利用する
+		const originalLocation = global.location;
+		const mobileSpaceElement = {
+			parentNode: { style: { display: 'none' } },
+			appendChild: () => {},
+		};
+		global.location = { pathname: '/k/m/123/' };
+		global.kintone = {
+			app: {
+				record: {
+					getSpaceElement: () => null,
+				},
+			},
+			mobile: {
+				app: {
+					record: {
+						getSpaceElement: (code) => {
+							if (code === 'S-mobile') return mobileSpaceElement;
+							return null;
+						},
+					},
+				},
+			},
+		};
+
+		zc.kintoneZipSetSpaceFieldButton('S-mobile', 'btn-mobile', undefined, '1234567');
+		zc.kintoneZipSpaceFieldText('S-mobile', 'txt-mobile', true);
+		assert.strictEqual(mobileSpaceElement.parentNode.style.display, '');
+		global.location = originalLocation;
+		console.log('PASS: kintone ZIP helpers support mobile getSpaceElement');
+
 		console.log('ALL ZIP-CODE-ADDRESS-UTILS TESTS INVOKED');
 	} finally {
 		// restore

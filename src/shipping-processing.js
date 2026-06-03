@@ -17,20 +17,40 @@ const _SP_SHIPPING_INQUIRY_URL_MAP = {
 // ハイフン類を検出するための正規表現（全角・半角・ダッシュ類）
 const _SP_HYPHEN_REGEX = /[－‐‑–—−ー―]/g;
 
+const _sp_getAppNamespace = () => {
+	try {
+		if (typeof kintone === 'undefined' || !kintone) return null;
+		const pcApp = kintone.app || null;
+		const mobileApp = kintone.mobile && kintone.mobile.app ? kintone.mobile.app : null;
+		const isMobilePath =
+			typeof location !== 'undefined' && typeof location.pathname === 'string'
+				? /\/k\/m\//.test(location.pathname)
+				: false;
+
+		if (isMobilePath && mobileApp) return mobileApp;
+		if (pcApp) return pcApp;
+		if (mobileApp) return mobileApp;
+		return null;
+	} catch {
+		return null;
+	}
+};
+
+const _sp_getRecordNamespace = () => {
+	const appNamespace = _sp_getAppNamespace();
+	if (!appNamespace || !appNamespace.record) return null;
+	return appNamespace.record;
+};
+
 const _sp_getSpaceElement = (spaceField) => {
 	if (typeof spaceField !== 'string' || !spaceField.trim()) {
 		return null;
 	}
-	if (
-		typeof kintone === 'undefined' ||
-		!kintone ||
-		!kintone.app ||
-		!kintone.app.record ||
-		typeof kintone.app.record.getSpaceElement !== 'function'
-	) {
+	const recordNamespace = _sp_getRecordNamespace();
+	if (!recordNamespace || typeof recordNamespace.getSpaceElement !== 'function') {
 		return null;
 	}
-	return kintone.app.record.getSpaceElement(spaceField);
+	return recordNamespace.getSpaceElement(spaceField);
 };
 
 const _sp_setSpaceFieldDisplay = (spaceField, display) => {
