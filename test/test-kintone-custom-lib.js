@@ -422,10 +422,15 @@ const { JSDOM } = require('jsdom');
 	global.window = dom.window;
 	global.document = dom.window.document;
 	global.HTMLElement = dom.window.HTMLElement;
+	const originalLocation = global.location;
+	global.location = { pathname: '/k/123/' };
 
-	// Provide kintone.createDialog mock returning an object with element and show()
+	// PC path でも mobile API が存在する場合に createDialog が優先されることを確認する
+	let createDialogCalled = 0;
+	let createBottomSheetCalled = 0;
 	global.kintone = global.kintone || {};
 	global.kintone.createDialog = (config) => {
+		createDialogCalled += 1;
 		const container = document.createElement('div');
 		const okBtn = document.createElement('button');
 		okBtn.className = 'kintone-dialog-ok-button';
@@ -435,6 +440,12 @@ const { JSDOM } = require('jsdom');
 			element: container,
 			show: () => document.body.appendChild(container),
 		};
+	};
+	global.kintone.mobile = {
+		createBottomSheet: () => {
+			createBottomSheetCalled += 1;
+			throw new Error('createBottomSheet should not be called on desktop path');
+		},
 	};
 
 	// Re-require so library attaches to this DOM window
@@ -476,10 +487,16 @@ const { JSDOM } = require('jsdom');
 			assert.ok(document.querySelector('.kc-notify-warning__message'));
 		}
 
+		assert.strictEqual(createBottomSheetCalled, 0, 'desktop path should not call createBottomSheet');
+		assert.ok(createDialogCalled > 0, 'desktop path should use createDialog');
+
 		console.log('PASS: notify dialogs created and sanitized');
+		console.log('PASS: desktop path prefers createDialog over createBottomSheet');
 		console.log('ALL KINTONE-CUSTOM-LIB NOTIFY DOM TESTS INVOKED');
 	} catch (err) {
 		console.error('FAIL:', err && err.message);
 		process.exitCode = 1;
+	} finally {
+		global.location = originalLocation;
 	}
 })();
