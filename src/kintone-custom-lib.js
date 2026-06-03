@@ -134,7 +134,12 @@ const _kc_showDialog = (options) => {
 	};
 
 	try {
+		const isMobilePath =
+			typeof location !== 'undefined' && typeof location.pathname === 'string'
+				? /\/k\/m\//.test(location.pathname)
+				: false;
 		const isMobileBottomSheetAvailable =
+			isMobilePath &&
 			typeof kintone !== 'undefined' &&
 			kintone.mobile &&
 			typeof kintone.mobile.createBottomSheet === 'function';
@@ -142,7 +147,7 @@ const _kc_showDialog = (options) => {
 			if (isMobileBottomSheetAvailable) {
 				return kintone.mobile.createBottomSheet(config);
 			}
-			if (kintone.createDialog) {
+			if (typeof kintone !== 'undefined' && kintone.createDialog) {
 				return kintone.createDialog(config);
 			}
 			return null;
