@@ -37,9 +37,28 @@ const _sp_getAppNamespace = () => {
 };
 
 const _sp_getRecordNamespace = () => {
-	const appNamespace = _sp_getAppNamespace();
-	if (!appNamespace || !appNamespace.record) return null;
-	return appNamespace.record;
+	try {
+		if (typeof kintone === 'undefined' || !kintone) return null;
+		const pcRecord = kintone.app && kintone.app.record ? kintone.app.record : null;
+		const mobileRecord =
+			kintone.mobile && kintone.mobile.app && kintone.mobile.app.record
+				? kintone.mobile.app.record
+				: null;
+		const preferredApp = _sp_getAppNamespace();
+		const preferredRecord = preferredApp && preferredApp.record ? preferredApp.record : null;
+		const fallbackRecord = preferredRecord === pcRecord ? mobileRecord : pcRecord;
+		if (preferredRecord && typeof preferredRecord.getSpaceElement === 'function') {
+			return preferredRecord;
+		}
+		if (fallbackRecord && typeof fallbackRecord.getSpaceElement === 'function') {
+			return fallbackRecord;
+		}
+		if (preferredRecord) return preferredRecord;
+		if (fallbackRecord) return fallbackRecord;
+		return null;
+	} catch {
+		return null;
+	}
 };
 
 const _sp_getSpaceElement = (spaceField) => {

@@ -309,6 +309,34 @@ const { JSDOM } = require('jsdom');
 			assert.ok(mixedMarginButton, 'mixed margin button should exist');
 			assert.strictEqual(mixedMarginButton.style.marginLeft, '6px');
 			assert.strictEqual(mixedMarginButton.style.marginRight, '10px');
+
+			const originalLocation = global.location;
+			const originalKintone = global.kintone;
+			const mobileFallbackSpaceCode = 'space-mobile-fallback';
+			const mobileFallbackTarget = document.createElement('div');
+			mobileFallbackTarget.id = mobileFallbackSpaceCode;
+			document.body.appendChild(mobileFallbackTarget);
+			global.location = { pathname: '/k/123/' };
+			global.kintone = {
+				app: {
+					record: {
+						// PC 側には getSpaceElement が無いケースを再現
+					},
+				},
+				mobile: {
+					app: {
+						record: {
+							getSpaceElement: (code) => document.getElementById(code),
+						},
+					},
+				},
+			};
+			window.setSpaceFieldButton(mobileFallbackSpaceCode, 'btn-mobile-fallback', 'モバイル');
+			const mobileFallbackButton = document.getElementById('btn-mobile-fallback');
+			assert.ok(mobileFallbackButton, 'mobile fallback button should exist');
+			assert.strictEqual(mobileFallbackTarget.parentNode.style.display, '');
+			global.location = originalLocation;
+			global.kintone = originalKintone;
 			console.log('PASS: setSpaceFieldButton inserts a button');
 		} else {
 			console.log('SKIP: setSpaceFieldButton not exported');

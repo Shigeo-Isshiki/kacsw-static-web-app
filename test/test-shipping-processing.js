@@ -211,6 +211,55 @@ try {
 	} finally {
 		global.location = originalLocation;
 	}
+
+	// 4) モバイル API が使える環境では path 判定に依存せず fallback できる
+	const originalLocationFallback = global.location;
+	const mobileFallbackField = 'mobile-space-fallback';
+	const mobileFallbackElement = {
+		_appended: null,
+		appendChild: function (el) {
+			this._appended = el;
+		},
+		parentNode: { style: { display: 'none' } },
+	};
+	global.location = { pathname: '/k/123/' };
+	global.kintone = {
+		app: {
+			record: {
+				// PC 側には getSpaceElement が無いケースを再現
+			},
+		},
+		mobile: {
+			app: {
+				record: {
+					getSpaceElement: function (field) {
+						if (field === mobileFallbackField) return mobileFallbackElement;
+						return null;
+					},
+				},
+			},
+		},
+	};
+	kintoneShippingInquiryButton(
+		mobileFallbackField,
+		'btn-mobile-fallback',
+		undefined,
+		'1234567890',
+		'yamato'
+	);
+	try {
+		assert.ok(mobileFallbackElement._appended, 'path 非依存でモバイル側に追加されること');
+		assert.strictEqual(mobileFallbackElement.parentNode.style.display, '', '表示状態に切り替わること');
+		console.log('PASS: kintoneShippingInquiryButton mobile fallback works without /k/m/ path');
+	} catch (e) {
+		console.error(
+			'FAIL: kintoneShippingInquiryButton mobile fallback without /k/m/ path',
+			e && e.message ? e.message : e
+		);
+		process.exitCode = 2;
+	} finally {
+		global.location = originalLocationFallback;
+	}
 } catch (e) {
 	console.error('FAIL: kintoneShippingInquiryButton setup', e && e.message ? e.message : e);
 	process.exitCode = 2;

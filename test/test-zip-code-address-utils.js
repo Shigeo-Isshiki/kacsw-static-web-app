@@ -224,6 +224,36 @@ const makeFetchStub = (status, jsonBody) => {
 		global.location = originalLocation;
 		console.log('PASS: kintone ZIP helpers support mobile getSpaceElement');
 
+		// 12) /k/m/ 以外でも mobile 側しか使えない場合に fallback できる
+		const originalLocationFallback = global.location;
+		const fallbackSpaceElement = {
+			parentNode: { style: { display: 'none' } },
+			appendChild: () => {},
+		};
+		global.location = { pathname: '/k/123/' };
+		global.kintone = {
+			app: {
+				record: {
+					// PC 側には getSpaceElement が無いケースを再現
+				},
+			},
+			mobile: {
+				app: {
+					record: {
+						getSpaceElement: (code) => {
+							if (code === 'S-mobile-fallback') return fallbackSpaceElement;
+							return null;
+						},
+					},
+				},
+			},
+		};
+		zc.kintoneZipSetSpaceFieldButton('S-mobile-fallback', 'btn-mobile-fallback', undefined, '1234567');
+		zc.kintoneZipSpaceFieldText('S-mobile-fallback', 'txt-mobile-fallback', true);
+		assert.strictEqual(fallbackSpaceElement.parentNode.style.display, '');
+		global.location = originalLocationFallback;
+		console.log('PASS: kintone ZIP helpers support mobile fallback without /k/m/ path');
+
 		console.log('ALL ZIP-CODE-ADDRESS-UTILS TESTS INVOKED');
 	} finally {
 		// restore
