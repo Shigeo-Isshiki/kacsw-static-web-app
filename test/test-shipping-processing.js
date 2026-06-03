@@ -249,7 +249,11 @@ try {
 	);
 	try {
 		assert.ok(mobileFallbackElement._appended, 'path 非依存でモバイル側に追加されること');
-		assert.strictEqual(mobileFallbackElement.parentNode.style.display, '', '表示状態に切り替わること');
+		assert.strictEqual(
+			mobileFallbackElement.parentNode.style.display,
+			'',
+			'表示状態に切り替わること'
+		);
 		console.log('PASS: kintoneShippingInquiryButton mobile fallback works without /k/m/ path');
 	} catch (e) {
 		console.error(

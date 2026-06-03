@@ -248,7 +248,12 @@ const makeFetchStub = (status, jsonBody) => {
 				},
 			},
 		};
-		zc.kintoneZipSetSpaceFieldButton('S-mobile-fallback', 'btn-mobile-fallback', undefined, '1234567');
+		zc.kintoneZipSetSpaceFieldButton(
+			'S-mobile-fallback',
+			'btn-mobile-fallback',
+			undefined,
+			'1234567'
+		);
 		zc.kintoneZipSpaceFieldText('S-mobile-fallback', 'txt-mobile-fallback', true);
 		assert.strictEqual(fallbackSpaceElement.parentNode.style.display, '');
 		global.location = originalLocationFallback;
