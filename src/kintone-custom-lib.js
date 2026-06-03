@@ -12,6 +12,38 @@
  */
 const _KC_ASSET_BASE = 'https://js.kacsw.or.jp/image';
 
+/**
+ * 内部: 実行環境（PC/モバイル）に応じた app 名前空間を返す
+ * @returns {Object|null} app 名前空間、取得できない場合は null
+ */
+const _kc_getAppNamespace = () => {
+	try {
+		const pcApp = kintone.app || null;
+		const mobileApp = kintone.mobile && kintone.mobile.app ? kintone.mobile.app : null;
+		const isMobilePath =
+			typeof location !== 'undefined' && typeof location.pathname === 'string'
+				? /\/k\/m\//.test(location.pathname)
+				: false;
+
+		if (isMobilePath && mobileApp) return mobileApp;
+		if (pcApp) return pcApp;
+		if (mobileApp) return mobileApp;
+		return null;
+	} catch {
+		return null;
+	}
+};
+
+/**
+ * 内部: 実行環境（PC/モバイル）に応じた app.record 名前空間を返す
+ * @returns {Object|null} app.record 名前空間、取得できない場合は null
+ */
+const _kc_getRecordNamespace = () => {
+	const appNamespace = _kc_getAppNamespace();
+	if (!appNamespace || !appNamespace.record) return null;
+	return appNamespace.record;
+};
+
 // 内部関数
 /**
  * HTML文字列をサニタイズして安全な HTML を返します。
@@ -83,7 +115,20 @@ const _kc_showDialog = (options) => {
 	};
 
 	try {
-		const dialog = kintone.createDialog && kintone.createDialog(config);
+		const isMobileBottomSheetAvailable =
+			typeof kintone !== 'undefined' &&
+			kintone.mobile &&
+			typeof kintone.mobile.createBottomSheet === 'function';
+		const createUi = () => {
+			if (isMobileBottomSheetAvailable) {
+				return kintone.mobile.createBottomSheet(config);
+			}
+			if (kintone.createDialog) {
+				return kintone.createDialog(config);
+			}
+			return null;
+		};
+		const dialog = createUi();
 		const setOkAriaLabel = (dialogObj) => {
 			try {
 				const container = dialogObj.element || dialogObj.dialog || dialogObj.container || null;
@@ -97,17 +142,28 @@ const _kc_showDialog = (options) => {
 				// noop
 			}
 		};
+		const showUi = (object) => {
+			if (!object || typeof object.show !== 'function') return;
+			try {
+				const showResult = object.show();
+				if (showResult && typeof showResult.catch === 'function') {
+					showResult.catch((error) =>
+						console.error('ダイアログ/ボトムシート表示中にエラー:', error)
+					);
+				}
+			} catch (error) {
+				console.error('ダイアログ/ボトムシート表示中にエラー:', error);
+			}
+		};
 		if (dialog && typeof dialog.then === 'function') {
 			dialog
 				.then((object) => {
-					try {
-						object.show();
-					} catch {}
+					showUi(object);
 					setOkAriaLabel(object);
 				})
 				.catch((error) => console.error('ダイアログ表示中にエラー:', error));
 		} else if (dialog && typeof dialog.show === 'function') {
-			dialog.show();
+			showUi(dialog);
 			setOkAriaLabel(dialog);
 		}
 	} catch (error) {
@@ -416,7 +472,11 @@ const setHeaderMenuSpaceButton = (id, textContent, onClick, styleOptions) => {
 		if (typeof onClick === 'function') {
 			button.addEventListener('click', onClick);
 		}
-		const spaceElement = kintone.app.getHeaderMenuSpaceElement(id);
+		const appNamespace = kintone.app;
+		const spaceElement =
+			appNamespace && typeof appNamespace.getHeaderMenuSpaceElement === 'function'
+				? appNamespace.getHeaderMenuSpaceElement(id)
+				: null;
 		if (!spaceElement) {
 			console.warn('setHeaderMenuSpaceButton: space element not found', id);
 			return false;
@@ -490,7 +550,11 @@ const setRecordHeaderMenuSpaceButton = (id, textContent, onClick, styleOptions) 
 		if (typeof onClick === 'function') {
 			button.addEventListener('click', onClick);
 		}
-		const spaceElement = kintone.app.record.getHeaderMenuSpaceElement(id);
+		const recordNamespace = kintone.app && kintone.app.record ? kintone.app.record : null;
+		const spaceElement =
+			recordNamespace && typeof recordNamespace.getHeaderMenuSpaceElement === 'function'
+				? recordNamespace.getHeaderMenuSpaceElement(id)
+				: null;
 		if (!spaceElement) {
 			console.warn('setRecordHeaderMenuSpaceButton: space element not found', id);
 			return false;
@@ -535,7 +599,11 @@ const setRecordHeaderMenuSpaceText = (id, innerHTML) => {
 
 		let appended = false;
 		try {
-			const spaceElement = kintone.app.record.getHeaderMenuSpaceElement(id);
+			const recordNamespace = kintone.app && kintone.app.record ? kintone.app.record : null;
+			const spaceElement =
+				recordNamespace && typeof recordNamespace.getHeaderMenuSpaceElement === 'function'
+					? recordNamespace.getHeaderMenuSpaceElement(id)
+					: null;
 			if (spaceElement) {
 				const existingNow = document.getElementById(id);
 				if (existingNow) existingNow.remove();
@@ -553,7 +621,11 @@ const setRecordHeaderMenuSpaceText = (id, innerHTML) => {
 			const tryOnce = () => {
 				if (document.getElementById(id)) return;
 				try {
-					const se = kintone.app.record.getHeaderMenuSpaceElement(id);
+					const recordNamespace = kintone.app && kintone.app.record ? kintone.app.record : null;
+					const se =
+						recordNamespace && typeof recordNamespace.getHeaderMenuSpaceElement === 'function'
+							? recordNamespace.getHeaderMenuSpaceElement(id)
+							: null;
 					if (se) {
 						if (!document.getElementById(id)) {
 							se.appendChild(createElement());
@@ -635,7 +707,11 @@ const setSpaceFieldDisplay = (spaceField, display) => {
 		});
 		return false;
 	}
-	const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+	const recordNamespace = _kc_getRecordNamespace();
+	const spaceElement =
+		recordNamespace && typeof recordNamespace.getSpaceElement === 'function'
+			? recordNamespace.getSpaceElement(spaceField)
+			: null;
 	if (!spaceElement) {
 		console.warn('setSpaceFieldDisplay: space element not found', spaceField);
 		return false;
@@ -708,7 +784,11 @@ const setSpaceFieldButton = (spaceField, id, textContent, onClick, styleOptions)
 		if (typeof onClick === 'function') {
 			button.addEventListener('click', onClick);
 		}
-		const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+		const recordNamespace = _kc_getRecordNamespace();
+		const spaceElement =
+			recordNamespace && typeof recordNamespace.getSpaceElement === 'function'
+				? recordNamespace.getSpaceElement(spaceField)
+				: null;
 		if (!spaceElement) {
 			console.warn('setSpaceFieldButton: space element not found', spaceField);
 			return false;
@@ -810,7 +890,11 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
 		// 初回アタック（同期的に試す）
 		let appended = false;
 		try {
-			const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+			const recordNamespace = _kc_getRecordNamespace();
+			const spaceElement =
+				recordNamespace && typeof recordNamespace.getSpaceElement === 'function'
+					? recordNamespace.getSpaceElement(spaceField)
+					: null;
 			if (spaceElement) {
 				// 既に同 id の要素がある場合は削除してから追加
 				const existing = document.getElementById(id);
@@ -858,7 +942,11 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
 				}
 				// スペース要素が利用可能であれば追加を試みる
 				try {
-					const se = kintone.app.record.getSpaceElement(spaceField);
+					const recordNamespace = _kc_getRecordNamespace();
+					const se =
+						recordNamespace && typeof recordNamespace.getSpaceElement === 'function'
+							? recordNamespace.getSpaceElement(spaceField)
+							: null;
 					if (se) {
 						if (!document.getElementById(id)) {
 							se.appendChild(createSpaceFieldElement());

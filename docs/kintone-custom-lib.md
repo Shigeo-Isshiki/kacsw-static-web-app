@@ -84,7 +84,7 @@ setRecordValues(r, { a: 10, c: 3 });
 
 ### notifyError(message, title = 'エラー', allowHtml = false)
 
-- 動作概要: 指定メッセージをダイアログで表示します。`allowHtml` が真の場合はサニタイズした HTML を挿入し、偽の場合はプレーンテキストとして表示します。アクセシビリティ用の属性（role/aria-live等）も設定されます。
+- 動作概要: 指定メッセージを表示 UI で通知します。`allowHtml` が真の場合はサニタイズした HTML を挿入し、偽の場合はプレーンテキストとして表示します。アクセシビリティ用の属性（role/aria-live等）も設定されます。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
 
 - `message` (string | Node) — ダイアログに表示する本文。Node を渡すとそのまま挿入可能（`allowHtml` の影響を受ける）
 - `title` (string) — ダイアログタイトル（省略時は `'エラー'`）
@@ -98,7 +98,7 @@ notifyError('必須項目が未入力です');
 notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true);
 ```
 
-テストヒント: jsdom と `kintone.createDialog` のモックを用意し、生成されたダイアログコンテナ内に `.kc-notify-error__message` が存在すること、不正な `script` 要素や `on*` 属性が削除されていることを確認します。
+テストヒント: jsdom と `kintone.createDialog`（PC）または `kintone.mobile.createBottomSheet`（モバイル）のモックを用意し、生成されたコンテナ内に `.kc-notify-error__message` が存在すること、不正な `script` 要素や `on*` 属性が削除されていることを確認します。
 
 違い（用途の目安）:
 
@@ -112,7 +112,7 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 
 ### notifyInfo(message, title = '情報', allowHtml = false)
 
-- 動作概要: 情報表示用のダイアログを表示します。操作の成功通知や一般的な案内に使い、`allowHtml` に応じてサニタイズされた HTML またはプレーンテキストを挿入します。
+- 動作概要: 情報表示用の通知 UI を表示します。操作の成功通知や一般的な案内に使い、`allowHtml` に応じてサニタイズされた HTML またはプレーンテキストを挿入します。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
 
 - `message` (string | Node) — ダイアログに表示する本文
 - `title` (string) — ダイアログタイトル（省略時は `'情報'`）
@@ -122,7 +122,7 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 
 ### notifyWarning(message, title = '注意', allowHtml = false)
 
-- 動作概要: 注意喚起や軽度の問題を通知するためのダイアログを表示します。処理を継続できるがユーザーの注意を促したいケースで使用します。
+- 動作概要: 注意喚起や軽度の問題を通知するための通知 UI を表示します。処理を継続できるがユーザーの注意を促したいケースで使用します。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
 
 - `message` (string | Node) — ダイアログに表示する本文
 - `title` (string) — ダイアログタイトル（省略時は `'注意'`）
@@ -134,6 +134,7 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 
 - 動作概要: ヘッダーメニューのスペース要素に指定 ID のボタンを追加または削除します。既に同一 ID の要素があれば差し替え（削除→追加）し、`textContent` が null/空文字の場合は削除動作を行います。
 - 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
+- 注意: この関数は PC 版 API（`kintone.app.getHeaderMenuSpaceElement`）のみを使用します。モバイル版向け API は存在しないため、モバイル対応スイッチはありません。
 
 - `id` (string) — ヘッダースペース内で一意に識別するための ID
 - `textContent` (string | null) — ボタンに表示する文言。`null` または空文字で該当ボタンを削除
@@ -152,6 +153,7 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 
 - 動作概要: レコード詳細／追加／編集画面のヘッダーメニュー上部（`kintone.app.record.getHeaderMenuSpaceElement` が返す要素）に指定 ID のボタンを追加または削除します。既に同一 ID の要素があれば削除してから追加します。`textContent` が `null` または空文字の場合は削除動作を行います。
 - 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
+- 注意: この関数は PC 版 API（`kintone.app.record.getHeaderMenuSpaceElement`）のみを使用します。モバイル版向け API は存在しないため、モバイル対応スイッチはありません。
 
 - `id` (string) — 追加するボタン要素の id（ヘッダースペース内で一意に識別するための値）
 - `textContent` (string | null) — ボタンに表示する文言。`null` または空文字で該当ボタンを削除
@@ -202,6 +204,7 @@ setRecordHeaderMenuSpaceButton('my-rec-btn', null);
 ### setRecordHeaderMenuSpaceText(id, innerHTML)
 
 - 動作概要: レコード詳細／追加／編集画面のヘッダーメニュー上部（`kintone.app.record.getHeaderMenuSpaceElement` が返す要素）に任意の HTML 文字列を挿入して表示／削除します。挿入時は既存の同 ID 要素を削除してから追加し、`innerHTML` は内部でサニタイズされます。DOM が未準備の場合に備えて非同期リトライを行います。
+- 注意: この関数は PC 版 API（`kintone.app.record.getHeaderMenuSpaceElement`）のみを使用します。モバイル版向け API は存在しないため、モバイル対応スイッチはありません。
 
 - `id` (string) — 挿入する要素の ID（既存要素があれば上書きの代わりに削除して再作成）
 - `innerHTML` (string | null) — 挿入する HTML（サニタイズされます）。`null` または空文字列の場合は要素を削除して非表示にします。
@@ -224,10 +227,10 @@ setRecordHeaderMenuSpaceText('rec-text', null);
 
 ### setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)
 
-- 動作概要: 指定したスペースフィールド（`kintone.app.record.getSpaceElement` から取得）にボタンを追加または削除します。追加時は `type="button"` を設定し、`onClick` を登録します。
+- 動作概要: 指定したスペースフィールドにボタンを追加または削除します。追加時は `type="button"` を設定し、`onClick` を登録します。実行環境に応じて PC / モバイルの API を自動判定して `getSpaceElement` を使用します。
 - 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 
-- `spaceField` (string) — スペースフィールドのコード（`kintone.app.record.getSpaceElement` に渡す値）
+- `spaceField` (string) — スペースフィールドのコード
 - `id` (string) — 追加する要素の ID（同一 ID があれば差し替える）
 - `textContent` (string | null) — ボタンに表示する文言。`null` または空文字で削除
 - `onClick` (function | null) — ボタンのクリックハンドラ
@@ -261,7 +264,7 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 
 ### setSpaceFieldText(spaceField, id, innerHTML)
 
-- 動作概要: 指定スペースフィールドに HTML（サニタイズ済）を挿入します。`innerHTML` が null または空文字列の場合は該当要素を削除します。DOM が未準備の場合はリトライ設計を採ることを想定しています。
+- 動作概要: 指定スペースフィールドに HTML（サニタイズ済）を挿入します。`innerHTML` が null または空文字列の場合は該当要素を削除します。DOM が未準備の場合はリトライ設計を採ることを想定しています。実行環境に応じて PC / モバイルの API を自動判定して `getSpaceElement` を使用します。
 
 - `spaceField` (string) — スペースフィールドのコード
 - `id` (string) — 挿入する要素の ID
@@ -273,7 +276,7 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 
 ### setSpaceFieldDisplay(spaceField, display)
 
-- 動作概要: 指定したスペースフィールドの親ノードの `style.display` を切り替えます。`display` が `true` のときは表示、`false` のときは非表示に設定します。
+- 動作概要: 指定したスペースフィールドの親ノードの `style.display` を切り替えます。`display` が `true` のときは表示、`false` のときは非表示に設定します。実行環境に応じて PC / モバイルの API を自動判定して `getSpaceElement` を使用します。
 
 - `spaceField` (string) — スペースフィールドのコード
 - `display` (boolean) — true で表示、false で非表示にする指定
