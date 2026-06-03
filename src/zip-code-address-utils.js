@@ -51,6 +51,31 @@ const _zc_buildZipcodeApiUrl = (normalized) => {
 	return `${_ZC_ZIPCODE_API_BASE_URL}?search_code=${encodeURIComponent(normalized)}`;
 };
 
+const _zc_getSpaceElement = (spaceField) => {
+	if (typeof spaceField !== 'string' || !spaceField.trim()) {
+		return null;
+	}
+	if (
+		typeof kintone === 'undefined' ||
+		!kintone ||
+		!kintone.app ||
+		!kintone.app.record ||
+		typeof kintone.app.record.getSpaceElement !== 'function'
+	) {
+		return null;
+	}
+	return kintone.app.record.getSpaceElement(spaceField);
+};
+
+const _zc_setSpaceFieldDisplayFallback = (spaceField, display) => {
+	const spaceElement = _zc_getSpaceElement(spaceField);
+	if (!spaceElement || !spaceElement.parentNode) {
+		return false;
+	}
+	spaceElement.parentNode.style.display = display ? '' : 'none';
+	return true;
+};
+
 /**
  * kintone のスペースフィールド（スペースエレメント）を表示/非表示に切り替えます。
  *
@@ -66,12 +91,11 @@ const _zc_setSpaceFieldDisplay = (spaceField, display) => {
 		});
 		return false;
 	}
-	const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-	if (!spaceElement) {
+	const isDisplayed = _zc_setSpaceFieldDisplayFallback(spaceField, display);
+	if (!isDisplayed) {
 		console.warn('_zc_setSpaceFieldDisplay: space element not found', spaceField);
 		return false;
 	}
-	spaceElement.parentNode.style.display = display ? '' : 'none';
 	return true;
 };
 
@@ -497,7 +521,7 @@ const kintoneZipSetSpaceFieldButton = (spaceField, id, label, zipCode, callback)
 			}
 		});
 	});
-	const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+	const spaceElement = _zc_getSpaceElement(spaceField);
 	if (spaceElement) {
 		spaceElement.appendChild(button);
 		_zc_setSpaceFieldDisplay(spaceField, true);
@@ -529,7 +553,7 @@ const kintoneZipSpaceFieldText = (spaceField, id, display) => {
 	if (spaceFieldElementById) {
 		spaceFieldElementById.remove();
 	}
-	const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+	const spaceElement = _zc_getSpaceElement(spaceField);
 	if (display) {
 		// 表示
 		const createSpaceFieldElement = document.createElement('div');
@@ -538,11 +562,11 @@ const kintoneZipSpaceFieldText = (spaceField, id, display) => {
 			'<div>郵便番号の代わりにデジタルアドレスでも検索可能です。<br>デジタルアドレスの場合は郵便番号に変換されます。</div>';
 		if (spaceElement) {
 			spaceElement.appendChild(createSpaceFieldElement);
-			spaceElement.parentNode.style.display = '';
+			_zc_setSpaceFieldDisplay(spaceField, true);
 		}
 	} else {
 		// 非表示
-		spaceElement.parentNode.style.display = 'none';
+		_zc_setSpaceFieldDisplay(spaceField, false);
 	}
 	return;
 };

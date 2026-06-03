@@ -104,7 +104,7 @@ console.log(d2); // -> '2025-11-12'
 - 概要: kintone のスペースフィールドに「荷物問い合わせ」ボタンを追加します。`label` に `null` または空文字を渡すと親要素を非表示にします。ボタン押下時は指定の運送会社の追跡ページを新しいウィンドウで開きます。
 - 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 - 引数:
-  - `spaceField` (string) — kintone のスペースフィールドコード（`kintone.app.record.getSpaceElement` に渡す値）。必須。
+  - `spaceField` (string) — kintone のスペースフィールドコード（内部で PC/モバイルを自動判定して取得します）。必須。
   - `id` (string) — 生成するボタン要素の ID。必須。
   - `label` (string|undefined|null) — ボタンラベル。
     - 文字列: 指定ラベルで表示
@@ -127,7 +127,7 @@ console.log(d2); // -> '2025-11-12'
 
 テストヒント:
 
-- `document.createElement` / `kintone.app.record.getSpaceElement` をスタブして、生成される要素の `id`、`textContent`、およびクリック時に `window.open` が正しい URL を受け取ることを確認する
+- `document.createElement` / kintone の record namespace をスタブして、生成される要素の `id`、`textContent`、およびクリック時に `window.open` が正しい URL を受け取ることを確認する
 - `label === null` の場合に親要素が `display: none` になる挙動を確認する
 
 ---
@@ -155,7 +155,7 @@ const d = getNextBusinessDay(new Date(), 16);
 console.log('発送可能日:', d);
 
 // kintone でボタンを追加
-// kintone.app.record.getSpaceElement をスタブするか、kintone 環境で実行
+// kintone の record namespace をスタブするか、kintone 環境で実行
 kintoneShippingInquiryButton('space1', 'trackBtn', undefined, '1234567890', 'japanpost');
 ```
 

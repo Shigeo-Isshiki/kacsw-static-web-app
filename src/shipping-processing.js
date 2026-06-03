@@ -17,6 +17,31 @@ const _SP_SHIPPING_INQUIRY_URL_MAP = {
 // ハイフン類を検出するための正規表現（全角・半角・ダッシュ類）
 const _SP_HYPHEN_REGEX = /[－‐‑–—−ー―]/g;
 
+const _sp_getSpaceElement = (spaceField) => {
+	if (typeof spaceField !== 'string' || !spaceField.trim()) {
+		return null;
+	}
+	if (
+		typeof kintone === 'undefined' ||
+		!kintone ||
+		!kintone.app ||
+		!kintone.app.record ||
+		typeof kintone.app.record.getSpaceElement !== 'function'
+	) {
+		return null;
+	}
+	return kintone.app.record.getSpaceElement(spaceField);
+};
+
+const _sp_setSpaceFieldDisplay = (spaceField, display) => {
+	const spaceElement = _sp_getSpaceElement(spaceField);
+	if (!spaceElement || !spaceElement.parentNode) {
+		return false;
+	}
+	spaceElement.parentNode.style.display = display ? '' : 'none';
+	return true;
+};
+
 //　ライブラリ内の共通関数定義部
 /**
  * 文字列が文字列型であることを確認する関数
@@ -391,10 +416,7 @@ const kintoneShippingInquiryButton = (spaceField, id, label, trackingNumber, car
 	}
 	if (textContent === '' || !trackingNumber || !carrier) {
 		// 非表示
-		const spaceElement = kintone.app.record.getSpaceElement(spaceField);
-		if (spaceElement && spaceElement.parentNode) {
-			spaceElement.parentNode.style.display = 'none';
-		}
+		_sp_setSpaceFieldDisplay(spaceField, false);
 		return;
 	}
 	// ボタン追加
@@ -408,10 +430,10 @@ const kintoneShippingInquiryButton = (spaceField, id, label, trackingNumber, car
 		const url = getInquiryUrl(carrier, trackingNumber);
 		if (url) window.open(url, '_blank');
 	});
-	const spaceElement = kintone.app.record.getSpaceElement(spaceField);
+	const spaceElement = _sp_getSpaceElement(spaceField);
 	if (spaceElement) {
 		spaceElement.appendChild(button);
-		spaceElement.parentNode.style.display = '';
+		_sp_setSpaceFieldDisplay(spaceField, true);
 	}
 	return;
 };

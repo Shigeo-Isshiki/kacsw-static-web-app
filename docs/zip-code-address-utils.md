@@ -209,6 +209,7 @@ formatZipCode('１２３－４５６７', (res) => {
 
 - 動作:
   - 指定した `spaceField` のスペース要素にボタンを追加します。`label` が `null` または空文字の場合はボタンを削除/非表示にします。
+  - スペース要素の取得と表示/非表示は内部で PC/モバイルを自動判定します。
   - ボタン押下時に `getAddressByZipCode` を呼び出し、`callback` に結果を返します。
   - 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 
@@ -228,6 +229,7 @@ formatZipCode('１２３－４５６７', (res) => {
 
 - 動作:
   - スペースフィールドに説明テキスト用の要素を追加または削除します。
+  - 表示切り替えは内部で PC/モバイルを自動判定します。
 
 - 戻り値:
   - `void`（DOM に対する副作用を行います）
@@ -281,7 +283,7 @@ zc.getAddressByZipCode('1234567', (res) => {
 
 - 入力はまず全角→半角・記号除去・大文字化されます。正規化後は必ず `^[0-9A-Z]{7}$` の形式で API に問い合わせられます。
 - API レスポンスが複数件返ってきた場合はエラー（複数見つかりました）扱いになります。実装は単一ヒットを期待しています。
-- kintone DOM ヘルパは kintone のランタイム環境に依存します。テスト時には DOM と `kintone.app.record.getSpaceElement` のスタブが必要です（テストコードで実施済み）。
+- kintone DOM ヘルパは kintone のランタイム環境に依存します。テスト時には DOM と kintone の record namespace のスタブが必要です（テストコードで実施済み）。
 - ネットワークや API の異常 JSON に対しては安全に `error` オブジェクトを返すよう実装されています。
 
 ---
