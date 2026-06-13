@@ -169,17 +169,30 @@ parseCSV(schema, (options = {}));
 
 代表的な `code`:
 
-- `FILE_NOT_SELECTED`
-- `FILE_PICKER_UNAVAILABLE`
-- `ENCODING_ERROR`
-- `CSV_PARSE_ERROR_UNCLOSED_QUOTE`
-- `COLUMN_NOT_FOUND`
-- `REQUIRED_MISSING`
-- `TYPE_NUMBER_INVALID`
-- `TYPE_BOOLEAN_INVALID`
-- `TYPE_DATE_INVALID`
-- `TYPE_DATETIME_INVALID`
-- `VALIDATION_ERROR`
+- `FILE_PICKER_UNAVAILABLE`: ファイル選択ダイアログを開けない
+- `FILE_READER_UNAVAILABLE`: ファイル読み込み API を利用できない
+- `FILE_READ_ERROR`: ファイルの読み込みに失敗した
+- `ENCODING_JS_UNAVAILABLE`: 文字コード変換ライブラリを利用できない
+- `ENCODING_JS_CODETOSTRING_UNAVAILABLE`: 文字列変換機能を利用できない
+- `TEXT_DECODER_UNAVAILABLE`: `TextDecoder` を利用できない
+- `ENCODING_ERROR`: 文字コードの判定または復号に失敗した
+- `CSV_PARSE_ERROR_UNCLOSED_QUOTE`: CSV の引用符が閉じられていない
+- `COLUMN_COUNT_MISMATCH`: 列数が一致しない
+- `COLUMN_NOT_FOUND`: CSV ヘッダーに列が見つからない
+- `REQUIRED_MISSING`: 必須項目が入力されていない
+- `TYPE_NUMBER_INVALID`: 数値に変換できない
+- `TYPE_BOOLEAN_INVALID`: 真偽値に変換できない
+- `TYPE_DATE_INVALID`: 日付に変換できない
+- `TYPE_DATETIME_INVALID`: 日時に変換できない
+- `TYPE_CONVERSION_ERROR`: 値の変換に失敗した
+- `ROW_ERROR`: 行エラーが発生した
+- `VALIDATION_ERROR`: 入力値が条件を満たしていない
+- `PARSE_ERROR`: 予期しない理由で CSV 解析に失敗した
+
+### キャンセル時
+
+- ファイル選択ダイアログをキャンセルした場合は `errors` には追加せず、`meta.cancelled = true` を返します。
+- そのため、利用側では `result.meta.cancelled` を見てキャンセルとエラーを分けて扱えます。
 
 ### meta
 
@@ -190,6 +203,7 @@ parseCSV(schema, (options = {}));
 - `detectedEncoding` (string|null): 実際に採用した文字コード
 - `decodeMethod` (string|null): `encodingjs` または `textdecoder`
 - `hadBom` (boolean): BOM 有無
+- `cancelled` (boolean): ファイル選択をキャンセルしたか
 - `delimiter` (string)
 - `newline` (string)
 
@@ -243,6 +257,11 @@ const options = {
 
 const result = await parseCSV(schema, options);
 
+if (result.meta.cancelled) {
+	console.log('CSV の読み込みはキャンセルされました');
+	return;
+}
+
 if (result.errors.length > 0) {
 	console.warn('CSV 変換エラー', result.errors);
 }
@@ -255,4 +274,5 @@ console.log('meta', result.meta);
 
 - `type: 'date'` は最終的に `YYYY-MM-DD` へ正規化されます。
 - `type: 'datetime'` は最終的に `YYYY-MM-DDTHH:MM:SSZ` へ正規化されます。
+- ユーザーがファイル選択をキャンセルした場合は `result.meta.cancelled` で判定します。
 - 反映先アプリへの追加/更新/Upsert 判定は、`result.records` を使って kintone 側ロジックで実行してください。

@@ -45,10 +45,48 @@ const _cp_createEmptyResult = () => ({
 		detectedEncoding: null,
 		decodeMethod: null,
 		hadBom: false,
+		cancelled: false,
 		delimiter: ',',
 		newline: 'auto',
 	},
 });
+
+const _cp_errorMessagesJa = {
+	FILE_PICKER_UNAVAILABLE: 'ファイル選択機能を利用できません',
+	FILE_NOT_SELECTED: 'CSVファイルが選択されていません',
+	FILE_READER_UNAVAILABLE: 'ファイル読み込み機能を利用できません',
+	FILE_READ_ERROR: 'ファイルの読み込みに失敗しました',
+	ENCODING_JS_UNAVAILABLE: '文字コード変換ライブラリを利用できません',
+	ENCODING_JS_CODETOSTRING_UNAVAILABLE: '文字列変換機能を利用できません',
+	TEXT_DECODER_UNAVAILABLE: '文字コードの復号機能を利用できません',
+	ENCODING_ERROR: '文字コードの判定または復号に失敗しました',
+	CSV_PARSE_ERROR_UNCLOSED_QUOTE: 'CSVの引用符が閉じられていません',
+	TYPE_NUMBER_INVALID: '数値に変換できません',
+	TYPE_BOOLEAN_INVALID: '真偽値に変換できません',
+	TYPE_DATE_INVALID: '日付に変換できません',
+	TYPE_DATETIME_INVALID: '日時に変換できません',
+	COLUMN_COUNT_MISMATCH: '列数が一致しません',
+	COLUMN_NOT_FOUND: 'CSVヘッダーに列が見つかりません',
+	REQUIRED_MISSING: '必須項目が入力されていません',
+	VALIDATION_ERROR: '入力値が条件を満たしていません',
+	TYPE_CONVERSION_ERROR: '値の変換に失敗しました',
+	ROW_ERROR: 'CSVの一部の行にエラーがあります',
+	PARSE_ERROR: 'CSVの解析に失敗しました',
+};
+
+const _cp_toJapaneseMessage = (code, fallback) => {
+	if (code && Object.prototype.hasOwnProperty.call(_cp_errorMessagesJa, code)) {
+		return _cp_errorMessagesJa[code];
+	}
+	return fallback || String(code || '');
+};
+
+const _cp_createError = (code, details) => {
+	const err = new Error(_cp_toJapaneseMessage(code));
+	err.code = code;
+	if (details !== undefined) err.details = details;
+	return err;
+};
 
 const _cp_mergeOptions = (options) => {
 	const merged = { ..._cp_defaultOptions, ...(options || {}) };
@@ -105,7 +143,7 @@ const _cp_detectBom = (bytes) => {
 
 const _cp_pickCsvFile = async (accept) => {
 	if (typeof document === 'undefined') {
-		throw new Error('FILE_PICKER_UNAVAILABLE');
+		throw _cp_createError('FILE_PICKER_UNAVAILABLE');
 	}
 
 	return new Promise((resolve) => {
@@ -148,17 +186,17 @@ const _cp_pickCsvFile = async (accept) => {
 };
 
 const _cp_readFileAsUint8Array = async (file) => {
-	if (!file) throw new Error('FILE_NOT_SELECTED');
+	if (!file) throw _cp_createError('FILE_NOT_SELECTED');
 	if (typeof file.arrayBuffer === 'function') {
 		const ab = await file.arrayBuffer();
 		return new Uint8Array(ab);
 	}
 
-	if (typeof FileReader === 'undefined') throw new Error('FILE_READER_UNAVAILABLE');
+	if (typeof FileReader === 'undefined') throw _cp_createError('FILE_READER_UNAVAILABLE');
 
 	return new Promise((resolve, reject) => {
 		const reader = new FileReader();
-		reader.onerror = () => reject(new Error('FILE_READ_ERROR'));
+		reader.onerror = () => reject(_cp_createError('FILE_READ_ERROR'));
 		reader.onload = () => {
 			const ab = reader.result;
 			resolve(new Uint8Array(ab));
@@ -169,7 +207,7 @@ const _cp_readFileAsUint8Array = async (file) => {
 
 const _cp_decodeWithEncodingJs = (bytes, encoding) => {
 	if (typeof Encoding === 'undefined' || !Encoding || typeof Encoding.convert !== 'function') {
-		throw new Error('ENCODING_JS_UNAVAILABLE');
+		throw _cp_createError('ENCODING_JS_UNAVAILABLE');
 	}
 	const src = Array.from(bytes);
 	const converted = Encoding.convert(src, {
@@ -178,13 +216,13 @@ const _cp_decodeWithEncodingJs = (bytes, encoding) => {
 		type: 'array',
 	});
 	if (typeof Encoding.codeToString !== 'function') {
-		throw new Error('ENCODING_JS_CODETOSTRING_UNAVAILABLE');
+		throw _cp_createError('ENCODING_JS_CODETOSTRING_UNAVAILABLE');
 	}
 	return Encoding.codeToString(converted);
 };
 
 const _cp_decodeWithTextDecoder = (bytes, encoding) => {
-	if (typeof TextDecoder === 'undefined') throw new Error('TEXT_DECODER_UNAVAILABLE');
+	if (typeof TextDecoder === 'undefined') throw _cp_createError('TEXT_DECODER_UNAVAILABLE');
 	const decoder = new TextDecoder(_cp_toTextDecoderEncoding(encoding), { fatal: true });
 	return decoder.decode(bytes);
 };
@@ -236,13 +274,16 @@ const _cp_decodeBytes = (bytes, options) => {
 				hadBom: bom.hadBom,
 			};
 		} catch (e) {
-			errors.push({ encoding: enc, message: e && e.message ? e.message : 'decode failed' });
+			const code = e && e.code ? e.code : 'DECODE_FAILED';
+			errors.push({
+				encoding: enc,
+				code,
+				message: _cp_toJapaneseMessage(code, '復号に失敗しました'),
+			});
 		}
 	}
 
-	const err = new Error('ENCODING_ERROR');
-	err.details = errors;
-	throw err;
+	throw _cp_createError('ENCODING_ERROR', errors);
 };
 
 const _cp_normalizeNewline = (text, newlineOption) => {
@@ -303,9 +344,7 @@ const _cp_parseCsvText = (text, options) => {
 	}
 
 	if (inQuotes) {
-		const err = new Error('CSV_PARSE_ERROR_UNCLOSED_QUOTE');
-		err.code = 'CSV_PARSE_ERROR_UNCLOSED_QUOTE';
-		throw err;
+		throw _cp_createError('CSV_PARSE_ERROR_UNCLOSED_QUOTE');
 	}
 
 	row.push(cell);
@@ -512,7 +551,7 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 				column: null,
 				fieldCode: null,
 				code: 'COLUMN_COUNT_MISMATCH',
-				message: `Expected ${header.length} columns but got ${row.length}`,
+				message: `期待される列数は ${header.length} 列ですが、実際は ${row.length} 列です`,
 			});
 		}
 
@@ -529,7 +568,7 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 					column: columnName,
 					fieldCode,
 					code: 'COLUMN_NOT_FOUND',
-					message: 'Column was not found in CSV header',
+					message: 'CSVヘッダーに列が見つかりません',
 				});
 				continue;
 			}
@@ -547,7 +586,7 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 					column: columnName,
 					fieldCode,
 					code: 'REQUIRED_MISSING',
-					message: 'Required value is missing',
+					message: '必須項目が入力されていません',
 				});
 				continue;
 			}
@@ -561,8 +600,9 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 					rowIndex,
 					column: columnName,
 					fieldCode,
-					code: e && e.message ? e.message : 'TYPE_CONVERSION_ERROR',
-					message: e && e.message ? e.message : 'Failed to convert value',
+					code: e && e.code ? e.code : 'TYPE_CONVERSION_ERROR',
+					message:
+						e && e.code ? _cp_toJapaneseMessage(e.code, e.message) : '値の変換に失敗しました',
 				});
 				continue;
 			}
@@ -575,7 +615,7 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 						column: columnName,
 						fieldCode,
 						code: 'VALIDATION_ERROR',
-						message: typeof vr === 'string' ? vr : 'Validation failed',
+						message: typeof vr === 'string' ? vr : '入力値が条件を満たしていません',
 					});
 					continue;
 				}
@@ -587,9 +627,7 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 		if (rowErrors.length > 0) {
 			errors.push(...rowErrors);
 			if (options.onRowError === 'throw') {
-				const err = new Error('ROW_ERROR');
-				err.details = rowErrors;
-				throw err;
+				throw _cp_createError('ROW_ERROR', rowErrors);
 			}
 			if (options.onRowError === 'skip' || options.onRowError === 'collect') {
 				continue;
@@ -614,13 +652,7 @@ const parseCSV = async (schema, options = {}) => {
 	try {
 		const file = await _cp_pickCsvFile(opt.accept);
 		if (!file) {
-			result.errors.push({
-				rowIndex: null,
-				column: null,
-				fieldCode: null,
-				code: 'FILE_NOT_SELECTED',
-				message: 'No CSV file was selected',
-			});
+			result.meta.cancelled = true;
 			return result;
 		}
 
@@ -651,8 +683,8 @@ const parseCSV = async (schema, options = {}) => {
 			rowIndex: null,
 			column: null,
 			fieldCode: null,
-			code: e && e.message ? e.message : 'PARSE_ERROR',
-			message: e && e.message ? e.message : 'Failed to parse CSV',
+			code: e && e.code ? e.code : e && e.message ? e.message : 'PARSE_ERROR',
+			message: e && e.code ? _cp_toJapaneseMessage(e.code, e.message) : 'CSVの解析に失敗しました',
 			details: e && e.details ? e.details : undefined,
 		});
 		return result;
