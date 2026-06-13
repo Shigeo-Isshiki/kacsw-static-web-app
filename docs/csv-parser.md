@@ -88,6 +88,14 @@ parseCSV(schema, (options = {}));
 - `allowBom` (boolean)
   - BOM 判定を使うか。デフォルト `true`。
 
+### ファイル選択オプション
+
+- `accept` (string)
+  - ファイル選択ダイアログに渡す `accept` 属性値。デフォルト `.csv,text/csv`。
+  - 例: `'.csv,.txt,text/csv,text/plain'`（CSV と TXT を許可）
+  - 例: `'*'`（制限なし）
+  - ブラウザの UI フィルタのみで、強制制限ではありません。
+
 ### エラー/出力オプション
 
 - `onRowError` (string)
@@ -217,25 +225,26 @@ parseCSV(schema, (options = {}));
 
 ```js
 const schema = [
-  { column: '顧客コード', fieldCode: 'customer_code', type: 'string', required: true },
-  { column: '顧客名', fieldCode: 'customer_name', type: 'string' },
-  { column: '取引日', fieldCode: 'trade_date', type: 'date', format: 'YYYYMMDD' },
-  { column: '金額', fieldCode: 'amount', type: 'number' },
-  { column: '更新日時', fieldCode: 'updated_at', type: 'datetime', format: 'UNIX' },
+	{ column: '顧客コード', fieldCode: 'customer_code', type: 'string', required: true },
+	{ column: '顧客名', fieldCode: 'customer_name', type: 'string' },
+	{ column: '取引日', fieldCode: 'trade_date', type: 'date', format: 'YYYYMMDD' },
+	{ column: '金額', fieldCode: 'amount', type: 'number' },
+	{ column: '更新日時', fieldCode: 'updated_at', type: 'datetime', format: 'UNIX' },
 ];
 
 const options = {
-  encoding: 'SJIS',
-  encodingLibrary: 'encodingjs',
-  hasHeader: true,
-  delimiter: ',',
-  onRowError: 'collect',
+	encoding: 'SJIS',
+	encodingLibrary: 'encodingjs',
+	hasHeader: true,
+	delimiter: ',',
+	onRowError: 'collect',
+	accept: '.csv,text/csv', // ファイル選択ダイアログの絞り込み（省略時は .csv,text/csv）
 };
 
 const result = await parseCSV(schema, options);
 
 if (result.errors.length > 0) {
-  console.warn('CSV 変換エラー', result.errors);
+	console.warn('CSV 変換エラー', result.errors);
 }
 
 console.log('records', result.records);

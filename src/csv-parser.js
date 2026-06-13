@@ -31,6 +31,7 @@ const _cp_defaultOptions = {
 	allowBom: true,
 	onRowError: 'collect',
 	includeRawRows: false,
+	accept: '.csv,text/csv',
 };
 
 const _cp_createEmptyResult = () => ({
@@ -102,7 +103,7 @@ const _cp_detectBom = (bytes) => {
 	return { encoding: null, offset: 0, hadBom: false };
 };
 
-const _cp_pickCsvFile = async () => {
+const _cp_pickCsvFile = async (accept) => {
 	if (typeof document === 'undefined') {
 		throw new Error('FILE_PICKER_UNAVAILABLE');
 	}
@@ -110,7 +111,7 @@ const _cp_pickCsvFile = async () => {
 	return new Promise((resolve) => {
 		const input = document.createElement('input');
 		input.type = 'file';
-		input.accept = '.csv,text/csv';
+		input.accept = accept || '.csv,text/csv';
 		input.style.display = 'none';
 
 		const body = document.body || document.documentElement;
@@ -611,7 +612,7 @@ const parseCSV = async (schema, options = {}) => {
 	result.meta.newline = opt.newline;
 
 	try {
-		const file = await _cp_pickCsvFile();
+		const file = await _cp_pickCsvFile(opt.accept);
 		if (!file) {
 			result.errors.push({
 				rowIndex: null,
