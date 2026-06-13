@@ -487,7 +487,11 @@ const { JSDOM } = require('jsdom');
 			assert.ok(document.querySelector('.kc-notify-warning__message'));
 		}
 
-		assert.strictEqual(createBottomSheetCalled, 0, 'desktop path should not call createBottomSheet');
+		assert.strictEqual(
+			createBottomSheetCalled,
+			0,
+			'desktop path should not call createBottomSheet'
+		);
 		assert.ok(createDialogCalled > 0, 'desktop path should use createDialog');
 
 		console.log('PASS: notify dialogs created and sanitized');
