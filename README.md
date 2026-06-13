@@ -19,6 +19,7 @@ kintone 向けおよび汎用の小さな JavaScript ユーティリティ集で
 
 - [銀行振込ユーティリティ — docs/bank-transfer.md](./docs/bank-transfer.md) — `src/bank-transfer.js`
 - [CSV ビルダー — docs/csv-builder.md](./docs/csv-builder.md) — `src/csv-builder.js`
+- [CSV パーサー — docs/csv-parser.md](./docs/csv-parser.md) — `src/csv-parser.js`
 - [日付ユーティリティ — docs/date-utils.md](./docs/date-utils.md) — `src/date-utils.js`
 - [kintone カスタムライブラリ — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md) — `src/kintone-custom-lib.js`
 - [国民の祝日ユーティリティ — docs/national-holidays.md](./docs/national-holidays.md) — `src/national-holidays.js`
@@ -62,7 +63,7 @@ npm start       # ./src を配信（http://localhost:8000）
 - テストは `test/` 配下にあります。
 - 配布用ファイル作成は `npm run prepare:dist` と `npm run zip` を使用します。
 - `npm run prepare:dist` は `src/index.html` を `dist/index.html` としてコピーします。
-- 電話番号ユーティリティで参照している総務省公開情報は、2026年4月1日時点の内容に基づいています。
+- 電話番号ユーティリティで参照している総務省公開情報は、2026年6月1日時点の内容に基づいています。
 
 ---
 
