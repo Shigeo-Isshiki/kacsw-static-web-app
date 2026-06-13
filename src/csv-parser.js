@@ -46,6 +46,7 @@ const _cp_createEmptyResult = () => ({
 		decodeMethod: null,
 		hadBom: false,
 		cancelled: false,
+		hasFatalError: false,
 		delimiter: ',',
 		newline: 'auto',
 	},
@@ -61,6 +62,7 @@ const _cp_errorMessagesJa = {
 	TEXT_DECODER_UNAVAILABLE: '文字コードの復号機能を利用できません',
 	ENCODING_ERROR: '文字コードの判定または復号に失敗しました',
 	CSV_PARSE_ERROR_UNCLOSED_QUOTE: 'CSVの引用符が閉じられていません',
+	CSV_STRUCTURE_MISMATCH: 'CSVの列構成がschemaと一致しません',
 	TYPE_NUMBER_INVALID: '数値に変換できません',
 	TYPE_BOOLEAN_INVALID: '真偽値に変換できません',
 	TYPE_DATE_INVALID: '日付に変換できません',
@@ -79,6 +81,11 @@ const _cp_toJapaneseMessage = (code, fallback) => {
 		return _cp_errorMessagesJa[code];
 	}
 	return fallback || String(code || '');
+};
+
+const _cp_rowErrorPrefix = (rowIndex, columnName) => {
+	const col = columnName !== null && columnName !== undefined ? ` [${columnName}]` : '';
+	return `${rowIndex}行目${col}: `;
 };
 
 const _cp_createError = (code, details) => {
@@ -367,6 +374,67 @@ const _cp_getHeaderAndRows = (allRows, options) => {
 	return { header, dataRows: allRows.slice(1) };
 };
 
+const _cp_validateCsvStructure = (split, schema, options) => {
+	const normSchema = _cp_normalizeSchema(schema);
+
+	if (options.hasHeader) {
+		const missingColumns = [];
+		for (let s = 0; s < normSchema.length; s += 1) {
+			const f = normSchema[s];
+			const idx = _cp_resolveColumnIndex(f, split.header, 0, options, s);
+			if (idx < 0) {
+				missingColumns.push({
+					schemaIndex: s,
+					fieldCode: f.fieldCode || f.key || null,
+					column: f.column !== undefined ? f.column : null,
+				});
+			}
+		}
+
+		if (missingColumns.length > 0) {
+			throw _cp_createError('CSV_STRUCTURE_MISMATCH', {
+				mode: 'hasHeader',
+				header: split.header,
+				missingColumns,
+				sampleRow: split.dataRows[0] || [],
+			});
+		}
+
+		return normSchema;
+	}
+
+	const expectedColumns = normSchema.reduce((max, f, s) => {
+		if (typeof f.column === 'number' && Number.isInteger(f.column)) {
+			return Math.max(max, f.column + 1);
+		}
+		return Math.max(max, s + 1);
+	}, 0);
+
+	if (expectedColumns === 0) return normSchema;
+
+	const shortRows = [];
+	for (let i = 0; i < split.dataRows.length; i += 1) {
+		const row = split.dataRows[i];
+		if (row.length < expectedColumns) {
+			shortRows.push({
+				rowIndex: i + 1,
+				actualColumns: row.length,
+			});
+			if (shortRows.length >= 10) break;
+		}
+	}
+
+	if (shortRows.length > 0) {
+		throw _cp_createError('CSV_STRUCTURE_MISMATCH', {
+			mode: 'noHeader',
+			expectedColumns,
+			shortRows,
+		});
+	}
+
+	return normSchema;
+};
+
 const _cp_resolveColumnIndex = (field, header, rowLength, options, schemaIndex) => {
 	if (typeof field.column === 'number' && Number.isInteger(field.column)) return field.column;
 	if (typeof field.column === 'string' && options.hasHeader) {
@@ -551,7 +619,7 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 				column: null,
 				fieldCode: null,
 				code: 'COLUMN_COUNT_MISMATCH',
-				message: `期待される列数は ${header.length} 列ですが、実際は ${row.length} 列です`,
+				message: `${rowIndex}行目: 期待される列数は ${header.length} 列ですが、実際は ${row.length} 列です`,
 			});
 		}
 
@@ -568,7 +636,7 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 					column: columnName,
 					fieldCode,
 					code: 'COLUMN_NOT_FOUND',
-					message: 'CSVヘッダーに列が見つかりません',
+					message: _cp_rowErrorPrefix(rowIndex, columnName) + 'CSVヘッダーに列が見つかりません',
 				});
 				continue;
 			}
@@ -586,7 +654,7 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 					column: columnName,
 					fieldCode,
 					code: 'REQUIRED_MISSING',
-					message: '必須項目が入力されていません',
+					message: _cp_rowErrorPrefix(rowIndex, columnName) + '必須項目が入力されていません',
 				});
 				continue;
 			}
@@ -602,7 +670,8 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 					fieldCode,
 					code: e && e.code ? e.code : 'TYPE_CONVERSION_ERROR',
 					message:
-						e && e.code ? _cp_toJapaneseMessage(e.code, e.message) : '値の変換に失敗しました',
+						_cp_rowErrorPrefix(rowIndex, columnName) +
+						(e && e.code ? _cp_toJapaneseMessage(e.code, e.message) : '値の変換に失敗しました'),
 				});
 				continue;
 			}
@@ -615,7 +684,9 @@ const _cp_mapRows = (dataRows, header, schema, options) => {
 						column: columnName,
 						fieldCode,
 						code: 'VALIDATION_ERROR',
-						message: typeof vr === 'string' ? vr : '入力値が条件を満たしていません',
+						message:
+							_cp_rowErrorPrefix(rowIndex, columnName) +
+							(typeof vr === 'string' ? vr : '入力値が条件を満たしていません'),
 					});
 					continue;
 				}
@@ -667,7 +738,7 @@ const parseCSV = async (schema, options = {}) => {
 		result.meta.header = split.header;
 		result.meta.totalRows = split.dataRows.length;
 
-		const normSchema = _cp_normalizeSchema(schema);
+		const normSchema = _cp_validateCsvStructure(split, schema, opt);
 		const mapped = _cp_mapRows(split.dataRows, split.header, normSchema, opt);
 		result.records = mapped.records;
 		result.errors.push(...mapped.errors);
@@ -679,6 +750,7 @@ const parseCSV = async (schema, options = {}) => {
 		}
 		return result;
 	} catch (e) {
+		result.meta.hasFatalError = true;
 		result.errors.push({
 			rowIndex: null,
 			column: null,

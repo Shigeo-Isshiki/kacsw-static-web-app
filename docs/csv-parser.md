@@ -177,6 +177,7 @@ parseCSV(schema, (options = {}));
 - `TEXT_DECODER_UNAVAILABLE`: `TextDecoder` を利用できない
 - `ENCODING_ERROR`: 文字コードの判定または復号に失敗した
 - `CSV_PARSE_ERROR_UNCLOSED_QUOTE`: CSV の引用符が閉じられていない
+- `CSV_STRUCTURE_MISMATCH`: CSV のヘッダー/列構成が schema と一致しない
 - `COLUMN_COUNT_MISMATCH`: 列数が一致しない
 - `COLUMN_NOT_FOUND`: CSV ヘッダーに列が見つからない
 - `REQUIRED_MISSING`: 必須項目が入力されていない
@@ -188,6 +189,12 @@ parseCSV(schema, (options = {}));
 - `ROW_ERROR`: 行エラーが発生した
 - `VALIDATION_ERROR`: 入力値が条件を満たしていない
 - `PARSE_ERROR`: 予期しない理由で CSV 解析に失敗した
+
+### 構造不一致時
+
+- `hasHeader: true` の場合は、ヘッダーと schema の列対応が合わないときに `CSV_STRUCTURE_MISMATCH` を 1 件返して処理を止めます。
+- `hasHeader: false` の場合は、schema の想定列数に対して実データの列数が足りないときに `CSV_STRUCTURE_MISMATCH` を 1 件返して処理を止めます。
+- これにより、個別列の `COLUMN_NOT_FOUND` が大量に並ぶ状態を避けられます。
 
 ### キャンセル時
 
@@ -204,6 +211,7 @@ parseCSV(schema, (options = {}));
 - `decodeMethod` (string|null): `encodingjs` または `textdecoder`
 - `hadBom` (boolean): BOM 有無
 - `cancelled` (boolean): ファイル選択をキャンセルしたか
+- `hasFatalError` (boolean): 処理全体を中止する致命的エラーが発生したか
 - `delimiter` (string)
 - `newline` (string)
 
@@ -262,8 +270,20 @@ if (result.meta.cancelled) {
 	return;
 }
 
+if (result.meta.hasFatalError) {
+	// ファイル不正・文字コードエラー・構造不一致など、CSV全体を扱えない場合
+	const err = result.errors[0];
+	console.error('CSV読み込みエラー', err && err.message);
+	if (err && err.details) console.error('詳細', err.details);
+	return;
+}
+
 if (result.errors.length > 0) {
-	console.warn('CSV 変換エラー', result.errors);
+	// 一部行の変換・検証エラー（読み込み自体は完了）
+	// message には「5行目 [顧客コード]: 必須項目が入力されていません」のように行番号・列名が含まれるため、
+	// そのまま結合して表示できます。
+	const errorText = result.errors.map((e) => e.message).join('\n');
+	console.warn('CSV 変換エラー\n' + errorText);
 }
 
 console.log('records', result.records);
