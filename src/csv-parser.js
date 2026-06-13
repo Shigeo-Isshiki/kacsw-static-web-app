@@ -53,27 +53,37 @@ const _cp_createEmptyResult = () => ({
 });
 
 const _cp_errorMessagesJa = {
-	FILE_PICKER_UNAVAILABLE: 'ファイル選択機能を利用できません',
-	FILE_NOT_SELECTED: 'CSVファイルが選択されていません',
-	FILE_READER_UNAVAILABLE: 'ファイル読み込み機能を利用できません',
-	FILE_READ_ERROR: 'ファイルの読み込みに失敗しました',
-	ENCODING_JS_UNAVAILABLE: '文字コード変換ライブラリを利用できません',
-	ENCODING_JS_CODETOSTRING_UNAVAILABLE: '文字列変換機能を利用できません',
-	TEXT_DECODER_UNAVAILABLE: '文字コードの復号機能を利用できません',
-	ENCODING_ERROR: '文字コードの判定または復号に失敗しました',
-	CSV_PARSE_ERROR_UNCLOSED_QUOTE: 'CSVの引用符が閉じられていません',
-	CSV_STRUCTURE_MISMATCH: 'CSVの列構成がschemaと一致しません',
-	TYPE_NUMBER_INVALID: '数値に変換できません',
-	TYPE_BOOLEAN_INVALID: '真偽値に変換できません',
-	TYPE_DATE_INVALID: '日付に変換できません',
-	TYPE_DATETIME_INVALID: '日時に変換できません',
-	COLUMN_COUNT_MISMATCH: '列数が一致しません',
-	COLUMN_NOT_FOUND: 'CSVヘッダーに列が見つかりません',
-	REQUIRED_MISSING: '必須項目が入力されていません',
-	VALIDATION_ERROR: '入力値が条件を満たしていません',
-	TYPE_CONVERSION_ERROR: '値の変換に失敗しました',
-	ROW_ERROR: 'CSVの一部の行にエラーがあります',
-	PARSE_ERROR: 'CSVの解析に失敗しました',
+	FILE_PICKER_UNAVAILABLE:
+		'このブラウザではファイル選択ダイアログを開けません。別のブラウザをお試しください。',
+	FILE_NOT_SELECTED: 'ファイルが選択されませんでした。再度お試しください。',
+	FILE_READER_UNAVAILABLE:
+		'このブラウザではファイルを読み込めません。別のブラウザをお試しください。',
+	FILE_READ_ERROR: 'ファイルを開けませんでした。ファイルが壊れていないか確認してください。',
+	ENCODING_JS_UNAVAILABLE:
+		'文字コード変換の準備ができていません。ページを再読み込みしてからお試しください。',
+	ENCODING_JS_CODETOSTRING_UNAVAILABLE:
+		'文字コード変換の準備ができていません。ページを再読み込みしてからお試しください。',
+	TEXT_DECODER_UNAVAILABLE:
+		'このブラウザではファイルの文字コードを読み取れません。別のブラウザをお試しください。',
+	ENCODING_ERROR:
+		'ファイルの文字コードを判定できませんでした。UTF-8またはShift-JISで保存されたCSVファイルかどうか確認してください。',
+	CSV_PARSE_ERROR_UNCLOSED_QUOTE:
+		'CSVファイルの形式が正しくありません（引用符が閉じられていません）。ファイルの内容を確認してください。',
+	CSV_STRUCTURE_MISMATCH:
+		'CSVファイルの列が合っていません。ヘッダー行の有無や列の順番を確認してください。',
+	TYPE_NUMBER_INVALID:
+		'数値として読み取れない値が含まれています。半角数字で入力されているか確認してください。',
+	TYPE_BOOLEAN_INVALID: 'はい/いいえの値として読み取れない値が含まれています。',
+	TYPE_DATE_INVALID: '日付として読み取れない値が含まれています。日付の書式を確認してください。',
+	TYPE_DATETIME_INVALID: '日時として読み取れない値が含まれています。日時の書式を確認してください。',
+	COLUMN_COUNT_MISMATCH: '行ごとの列数が一致していません。CSVファイルの内容を確認してください。',
+	COLUMN_NOT_FOUND:
+		'指定された列名がCSVのヘッダーに見つかりません。ヘッダー行の内容を確認してください。',
+	REQUIRED_MISSING: '必須の項目が空欄になっています。入力内容を確認してください。',
+	VALIDATION_ERROR: '入力内容が正しくありません。',
+	TYPE_CONVERSION_ERROR: '値を正しい形式に変換できませんでした。入力内容を確認してください。',
+	ROW_ERROR: '一部の行にエラーがあります。',
+	PARSE_ERROR: 'CSVファイルを読み込めませんでした。ファイルの形式や内容を確認してください。',
 };
 
 const _cp_toJapaneseMessage = (code, fallback) => {
