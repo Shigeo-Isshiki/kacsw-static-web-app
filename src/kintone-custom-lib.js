@@ -118,7 +118,7 @@ const _kc_sanitizeHtml = (html) => {
  * }
  */
 const _kc_showDialog = (options) => {
-	if (!options || typeof options !== 'object') return;
+	if (!options || typeof options !== 'object') return Promise.resolve(undefined);
 	const { title, body } = options;
 	const config = {
 		title: String(title || ''),
@@ -167,29 +167,32 @@ const _kc_showDialog = (options) => {
 			}
 		};
 		const showUi = (object) => {
-			if (!object || typeof object.show !== 'function') return;
+			if (!object || typeof object.show !== 'function') return Promise.resolve(undefined);
 			try {
 				const showResult = object.show();
-				if (showResult && typeof showResult.catch === 'function') {
-					showResult.catch((error) =>
-						console.error('ダイアログ/ボトムシート表示中にエラー:', error)
-					);
-				}
+				setOkAriaLabel(object);
+				return Promise.resolve(showResult).catch((error) => {
+					console.error('ダイアログ/ボトムシート表示中にエラー:', error);
+					return undefined;
+				});
 			} catch (error) {
 				console.error('ダイアログ/ボトムシート表示中にエラー:', error);
+				return Promise.resolve(undefined);
 			}
 		};
 		if (dialog && typeof dialog.then === 'function') {
-			dialog
+			return dialog
 				.then((object) => {
-					showUi(object);
-					setOkAriaLabel(object);
+					return showUi(object);
 				})
-				.catch((error) => console.error('ダイアログ表示中にエラー:', error));
+				.catch((error) => {
+					console.error('ダイアログ表示中にエラー:', error);
+					return undefined;
+				});
 		} else if (dialog && typeof dialog.show === 'function') {
-			showUi(dialog);
-			setOkAriaLabel(dialog);
+			return showUi(dialog);
 		}
+		return Promise.resolve(undefined);
 	} catch (error) {
 		console.error('_kc_showDialog error', error);
 		try {
@@ -197,6 +200,7 @@ const _kc_showDialog = (options) => {
 		} catch {
 			/* noop */
 		}
+		return Promise.resolve(undefined);
 	}
 };
 
@@ -213,7 +217,7 @@ const _kc_showDialog = (options) => {
  * @param {string|Node} message 表示するメッセージ（文字列が想定）。Node を渡す場合はそのまま挿入されます。
  * @param {string} [title='エラー'] ダイアログのタイトル
  * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか（サニタイズされます）
- * @returns {void}
+ * @returns {Promise<string|undefined>} ダイアログ終了時の操作種別（OK/CANCEL/CLOSE/FUNCTION など）
  */
 const notifyError = (message, title = 'エラー', allowHtml = false) => {
 	const body = document.createElement('div');
@@ -253,7 +257,7 @@ const notifyError = (message, title = 'エラー', allowHtml = false) => {
 	body.setAttribute('aria-label', String(title));
 	body.setAttribute('aria-describedby', messageId);
 	// 共通処理でダイアログ表示
-	_kc_showDialog({ title, body });
+	return _kc_showDialog({ title, body });
 };
 
 /**
@@ -351,7 +355,7 @@ const kintoneEventOn = (events, handler) => {
  * @param {string|Node} message 表示するメッセージ（文字列が想定）。Node を渡す場合はそのまま挿入されます。
  * @param {string} [title='情報'] ダイアログのタイトル
  * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか（サニタイズされます）
- * @returns {void}
+ * @returns {Promise<string|undefined>} ダイアログ終了時の操作種別（OK/CANCEL/CLOSE/FUNCTION など）
  */
 const notifyInfo = (message, title = '情報', allowHtml = false) => {
 	const body = document.createElement('div');
@@ -385,7 +389,7 @@ const notifyInfo = (message, title = '情報', allowHtml = false) => {
 	body.setAttribute('aria-label', String(title));
 	body.setAttribute('aria-describedby', messageId);
 
-	_kc_showDialog({ title, body });
+	return _kc_showDialog({ title, body });
 };
 
 /**
@@ -398,7 +402,7 @@ const notifyInfo = (message, title = '情報', allowHtml = false) => {
  * @param {string|Node} message 表示するメッセージ（文字列が想定）。Node を渡す場合はそのまま挿入されます。
  * @param {string} [title='注意'] ダイアログのタイトル
  * @param {boolean} [allowHtml=false] メッセージを HTML として挿入するか（サニタイズされます）
- * @returns {void}
+ * @returns {Promise<string|undefined>} ダイアログ終了時の操作種別（OK/CANCEL/CLOSE/FUNCTION など）
  */
 const notifyWarning = (message, title = '注意', allowHtml = false) => {
 	const body = document.createElement('div');
@@ -432,7 +436,7 @@ const notifyWarning = (message, title = '注意', allowHtml = false) => {
 	body.setAttribute('aria-label', String(title));
 	body.setAttribute('aria-describedby', messageId);
 	// 共通処理でダイアログ表示
-	_kc_showDialog({ title, body });
+	return _kc_showDialog({ title, body });
 };
 
 /**

@@ -417,7 +417,7 @@ const { JSDOM } = require('jsdom');
 })();
 
 // ---------------------- DOM tests: notify helpers ----------------------
-(function domNotifyTests() {
+(async function domNotifyTests() {
 	const dom = new JSDOM(`<!doctype html><html><body></body></html>`);
 	global.window = dom.window;
 	global.document = dom.window.document;
@@ -458,14 +458,19 @@ const { JSDOM } = require('jsdom');
 		}
 
 		// Plain text case
-		window.notifyError('単純なエラー', 'エラー', false);
+		const errorResult = window.notifyError('単純なエラー', 'エラー', false);
+		assert.ok(
+			errorResult && typeof errorResult.then === 'function',
+			'notifyError should return Promise'
+		);
+		await errorResult;
 		const errMsg = document.querySelector('.kc-notify-error__message');
 		assert.ok(errMsg, 'error message element exists');
 		assert.strictEqual(errMsg.textContent, '単純なエラー');
 
 		// HTML with potentially dangerous content should be sanitized
 		const malicious = '<span onclick="alert(1)">X</span><script>evil()</script>';
-		window.notifyError(malicious, 'エラーHTML', true);
+		await window.notifyError(malicious, 'エラーHTML', true);
 		const allErr = document.querySelectorAll('.kc-notify-error__message');
 		const last = allErr[allErr.length - 1];
 		assert.ok(last, 'sanitized element exists');
@@ -479,11 +484,21 @@ const { JSDOM } = require('jsdom');
 		assert.ok(!hasOnAttr, 'on* attributes removed');
 
 		if (typeof window.notifyInfo === 'function') {
-			window.notifyInfo('情報です', '情報', false);
+			const infoResult = window.notifyInfo('情報です', '情報', false);
+			assert.ok(
+				infoResult && typeof infoResult.then === 'function',
+				'notifyInfo should return Promise'
+			);
+			await infoResult;
 			assert.ok(document.querySelector('.kc-notify-info__message'));
 		}
 		if (typeof window.notifyWarning === 'function') {
-			window.notifyWarning('注意です', '注意', false);
+			const warningResult = window.notifyWarning('注意です', '注意', false);
+			assert.ok(
+				warningResult && typeof warningResult.then === 'function',
+				'notifyWarning should return Promise'
+			);
+			await warningResult;
 			assert.ok(document.querySelector('.kc-notify-warning__message'));
 		}
 

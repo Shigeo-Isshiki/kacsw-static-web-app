@@ -85,6 +85,7 @@ setRecordValues(r, { a: 10, c: 3 });
 ### notifyError(message, title = 'エラー', allowHtml = false)
 
 - 動作概要: 指定メッセージを表示 UI で通知します。`allowHtml` が真の場合はサニタイズした HTML を挿入し、偽の場合はプレーンテキストとして表示します。アクセシビリティ用の属性（role/aria-live等）も設定されます。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
+- 戻り値: `Promise<string | undefined>` を返します。`await` すると、通常は `OK` を受け取れます（notify 系は OK ボタンのみ表示）。ダイアログ API が利用できない場合や内部エラー時は `undefined` になります。`CANCEL` / `CLOSE` / `FUNCTION` は notify 系の現行設定では通常発生しません。
 
 - `message` (string | Node) — ダイアログに表示する本文。Node を渡すとそのまま挿入可能（`allowHtml` の影響を受ける）
 - `title` (string) — ダイアログタイトル（省略時は `'エラー'`）
@@ -96,6 +97,12 @@ setRecordValues(r, { a: 10, c: 3 });
 notifyError('必須項目が未入力です');
 // HTML を許可する場合（サニタイズされます）
 notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true);
+
+// Promise 対応: await で終了アクションを受け取れる
+const action = await notifyError('送信に失敗しました', 'エラー');
+if (action === 'OK') {
+	console.log('ユーザーが閉じました');
+}
 ```
 
 テストヒント: jsdom と `kintone.createDialog`（PC）または `kintone.mobile.createBottomSheet`（モバイル）のモックを用意し、生成されたコンテナ内に `.kc-notify-error__message` が存在すること、不正な `script` 要素や `on*` 属性が削除されていることを確認します。
@@ -113,20 +120,36 @@ notifyError('<strong>重要</strong><script>evil()</script>', 'エラー', true)
 ### notifyInfo(message, title = '情報', allowHtml = false)
 
 - 動作概要: 情報表示用の通知 UI を表示します。操作の成功通知や一般的な案内に使い、`allowHtml` に応じてサニタイズされた HTML またはプレーンテキストを挿入します。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
+- 戻り値: `Promise<string | undefined>` を返します。`await` すると、通常は `OK` を受け取れます（notify 系は OK ボタンのみ表示）。ダイアログ API が利用できない場合や内部エラー時は `undefined` になります。
 
 - `message` (string | Node) — ダイアログに表示する本文
 - `title` (string) — ダイアログタイトル（省略時は `'情報'`）
 - `allowHtml` (boolean) — true の場合 HTML を許可しサニタイズして挿入
+
+例:
+
+```js
+const infoAction = await notifyInfo('保存が完了しました', '情報');
+console.log('notifyInfo action:', infoAction);
+```
 
 <a id="notifywarning"></a>
 
 ### notifyWarning(message, title = '注意', allowHtml = false)
 
 - 動作概要: 注意喚起や軽度の問題を通知するための通知 UI を表示します。処理を継続できるがユーザーの注意を促したいケースで使用します。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
+- 戻り値: `Promise<string | undefined>` を返します。`await` すると、通常は `OK` を受け取れます（notify 系は OK ボタンのみ表示）。ダイアログ API が利用できない場合や内部エラー時は `undefined` になります。
 
 - `message` (string | Node) — ダイアログに表示する本文
 - `title` (string) — ダイアログタイトル（省略時は `'注意'`）
 - `allowHtml` (boolean) — true の場合 HTML を許可しサニタイズして挿入
+
+例:
+
+```js
+const warningAction = await notifyWarning('入力内容を確認してください', '注意');
+console.log('notifyWarning action:', warningAction);
+```
 
 <a id="setheadermenuspacebutton"></a>
 
