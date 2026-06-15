@@ -1,17 +1,40 @@
 const fs = require('fs');
 const path = require('path');
-
-// Load global test setup (stubs for CI)
-require(path.join(__dirname, '..', 'test', 'setup-tests.js'));
+const { spawnSync } = require('child_process');
 
 const testDir = path.join(__dirname, '..', 'test');
-fs.readdirSync(testDir)
-	.filter((f) => /^test-.*\.js$/.test(f))
-	.filter((f) => !/^test-bank-transfer-/.test(f))
-	.forEach((f) => {
-		console.log('RUN', f);
-		require(path.join(testDir, f));
+const setupFile = path.join(testDir, 'setup-tests.js');
+
+const runTestFile = (fileName) => {
+	console.log('RUN', fileName);
+	const testFile = path.join(testDir, fileName);
+	const result = spawnSync(process.execPath, ['-r', setupFile, testFile], {
+		stdio: 'inherit',
 	});
+	return result.status || 0;
+};
+
+let hasFailure = false;
+
+const testFiles = fs
+	.readdirSync(testDir)
+	.filter((f) => /^test-.*\.js$/.test(f))
+	.filter((f) => f !== 'test-bank-transfer.js')
+	.sort();
+
+testFiles.forEach((f) => {
+	const code = runTestFile(f);
+	if (code !== 0) {
+		hasFailure = true;
+	}
+});
 
 // Run bank-transfer tests last (keeps existing ordering behavior)
-require(path.join(testDir, 'test-bank-transfer.js'));
+const bankTransferCode = runTestFile('test-bank-transfer.js');
+if (bankTransferCode !== 0) {
+	hasFailure = true;
+}
+
+if (hasFailure) {
+	process.exitCode = 1;
+}
