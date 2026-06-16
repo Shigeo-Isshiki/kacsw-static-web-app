@@ -1549,21 +1549,21 @@ const _bt_toAccountTypeLabel = (code) => {
 const _bt_normalizeProcessResult = (rawCode) => {
 	const c = _bt_toStr(rawCode).trim().toUpperCase();
 	if (c === '0') {
-		return { processResultCode: 'OK', processResultLabel: '正常（処理済）' };
+		return { processResultCode: '0', processResultLabel: '正常（処理済）' };
 	}
 	if (c === '1') {
-		return { processResultCode: 'NO_ACCOUNT', processResultLabel: '該当口座なし' };
+		return { processResultCode: '1', processResultLabel: '該当口座なし' };
 	}
 	if (c === '2') {
-		return { processResultCode: 'NAME_MISMATCH', processResultLabel: '氏名相違' };
+		return { processResultCode: '2', processResultLabel: '氏名相違' };
 	}
 	if (c === '8') {
-		return { processResultCode: 'CANCELED_BY_OWNER', processResultLabel: '事業主取消' };
+		return { processResultCode: '8', processResultLabel: '事業主取消' };
 	}
 	if (c === '9') {
-		return { processResultCode: 'OTHER', processResultLabel: 'その他' };
+		return { processResultCode: '9', processResultLabel: 'その他' };
 	}
-	return { processResultCode: c || 'OTHER', processResultLabel: 'その他' };
+	return { processResultCode: c ? c.charAt(0) : '', processResultLabel: 'その他' };
 };
 
 /** 内部: 全銀テキストを120文字単位のレコードへ分割する。 */

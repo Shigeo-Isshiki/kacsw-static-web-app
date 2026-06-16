@@ -435,7 +435,7 @@ try {
 				assert.strictEqual(res.records[0].amount, 1000);
 				assert.strictEqual(res.records[0].customerKana, 'ﾔﾏﾀﾞﾀﾛｳ');
 				assert.strictEqual(res.records[0].ediInfo.trim(), 'EDI-TEST');
-				assert.strictEqual(res.records[0].processResultCode, 'NAME_MISMATCH');
+				assert.strictEqual(res.records[0].processResultCode, '2');
 				assert.strictEqual(res.records[0].processResultLabel, '氏名相違');
 				assert.strictEqual(res.meta.detectedEncoding, 'UTF8');
 				console.log('PASS: parseZenginFile parses header and data records');
