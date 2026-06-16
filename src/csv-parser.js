@@ -188,8 +188,18 @@ const _cp_pickCsvFile = async (accept) => {
 		const onWindowFocus = () => {
 			setTimeout(() => {
 				if (!settled) {
-					cleanup();
-					resolve(null);
+					const selected = input.files && input.files[0] ? input.files[0] : null;
+					if (selected) {
+						cleanup();
+						resolve(selected);
+						return;
+					}
+					setTimeout(() => {
+						if (settled) return;
+						const selectedLater = input.files && input.files[0] ? input.files[0] : null;
+						cleanup();
+						resolve(selectedLater || null);
+					}, 350);
 				}
 			}, 350);
 		};
