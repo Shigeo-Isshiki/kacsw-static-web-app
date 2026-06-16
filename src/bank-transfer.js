@@ -1656,7 +1656,6 @@ const parseZenginFile = async (options = {}) => {
 
 		const records = dataLines.map((line) => {
 			const bankNo = _bt_toStr(line.slice(1, 5)).trim();
-			const bankName = _bt_toStr(line.slice(5, 20)).trim();
 			const branchNo = _bt_toStr(line.slice(20, 23)).trim();
 			const depCode = _bt_toStr(line.slice(42, 43)).trim();
 			const accountNo = _bt_toStr(line.slice(43, 50)).trim();
@@ -1678,7 +1677,7 @@ const parseZenginFile = async (options = {}) => {
 
 			const processResult = _bt_normalizeProcessResult(resultRaw);
 			return {
-				toBank: bankName || bankNo,
+				toBankNo: bankNo,
 				toBranchNo: branchNo,
 				toAccountType: _bt_toAccountTypeLabel(depCode),
 				toAccountNumber: accountNo,

@@ -428,6 +428,7 @@ try {
 				assert.strictEqual(res.trailerData.failedAmount, 500);
 				assert.ok(Array.isArray(res.records), 'records should be an array');
 				assert.strictEqual(res.records.length, 1, 'one data record should be parsed');
+				assert.strictEqual(res.records[0].toBankNo, '0005');
 				assert.strictEqual(res.records[0].toBranchNo, '123');
 				assert.strictEqual(res.records[0].toAccountType, '普通');
 				assert.strictEqual(res.records[0].toAccountNumber, '7654321');

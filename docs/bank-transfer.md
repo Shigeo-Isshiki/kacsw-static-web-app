@@ -262,7 +262,7 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
   },
   records: [
     {
-      toBank,
+      toBankNo,
       toBranchNo,
       toAccountType,
       toAccountNumber,
@@ -303,7 +303,7 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
   - `failedAmount` (number) — 処理不能金額合計。処理済金額との差分確認に使えます。
 
 - `records` (Array<object>) — データ区分 `2` の明細レコードだけを抽出した配列です。ヘッダ・トレーラ・エンドは含みません。
-  - `toBank` (string) — 受取銀行コード（4桁）。生成系 API の `toBankNo` に相当する値です。
+  - `toBankNo` (string) — 受取銀行コード（4桁）です。
   - `toBranchNo` (string) — 受取支店コード（3桁）。
   - `toAccountType` (string) — 預金種目コードまたは正規化後の値。元ファイルの1文字コードをベースに返します。
   - `toAccountNumber` (string) — 受取人口座番号。7桁文字列です。
