@@ -1640,7 +1640,8 @@ const parseZenginFile = async (options = {}) => {
 				tradeDate: _bt_toStr(headerLine.slice(54, 58)).trim(),
 				fromBankNo: _bt_toStr(headerLine.slice(58, 62)).trim(),
 				fromBranchNo: _bt_toStr(headerLine.slice(77, 80)).trim(),
-				depositType: _bt_toAccountTypeLabel(headerDepCode),
+				depositType: headerDepCode,
+				depositTypeLabel: _bt_toAccountTypeLabel(headerDepCode),
 				accountNumber: _bt_toStr(headerLine.slice(96, 103)).trim(),
 			};
 		}

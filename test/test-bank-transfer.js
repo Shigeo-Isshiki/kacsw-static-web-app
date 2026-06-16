@@ -420,6 +420,8 @@ try {
 				assert.strictEqual(res.headerData.typeCode, '11');
 				assert.strictEqual(res.headerData.requesterCode, '1234567890');
 				assert.strictEqual(res.headerData.fromBankNo, '0001');
+				assert.strictEqual(res.headerData.depositType, '1');
+				assert.strictEqual(res.headerData.depositTypeLabel, '普通');
 				assert.strictEqual(res.trailerData.processedCount, 1);
 				assert.strictEqual(res.trailerData.processedAmount, 1000);
 				assert.strictEqual(res.trailerData.failedCount, 1);

@@ -251,6 +251,7 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
     fromBankNo,
     fromBranchNo,
     depositType,
+    depositTypeLabel,
     accountNumber
   },
   trailerData: {
@@ -292,6 +293,7 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
   - `fromBankNo` (string) — 仕向銀行コード（4桁）。
   - `fromBranchNo` (string) — 仕向支店コード（3桁）。
   - `depositType` (string) — 預金種目コード。ファイル上の値をそのまま返します。例: `"1"`（普通）、`"2"`（当座）。
+  - `depositTypeLabel` (string) — `depositType` を表示用に変換した預金種目ラベルです。例: `"普通"`, `"当座"`, `"貯蓄"`, `"その他"`。
   - `accountNumber` (string) — 依頼人口座番号。7桁文字列です。
 
 - `trailerData` (object|null) — トレーラレコード（データ区分 `8`）から抽出した集計値です。トレーラが無いファイルでは `null` になります。
