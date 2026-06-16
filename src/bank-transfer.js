@@ -6,11 +6,13 @@
  *  - getBank(bankCodeOrName, callback)
  *  - getBranch(bankCode, branchCodeOrName, callback)
  *  - convertYucho(kigou, bangou, callback)
+ *  - parseZenginFile(options?) -> Promise<{ success, headerData, records, meta }>
  
  *  - loadBankByCode(bankCode, options?, callback)
  *
  * 注意:
- *  - 全ての公開 API はコールバック（単一引数スタイルをサポート）で返します。
+ *  - parseZenginFile を除く公開 API はコールバック（単一引数スタイルをサポート）で返します。
+ *  - parseZenginFile は Promise を返します。
  *  - 本ビルドは Web API による検索のみを行い、グローバルな内部キャッシュは保持しません。
  */
 /**
@@ -1403,6 +1405,198 @@ const _bt_generateEndRecordString = () => {
 	return line;
 };
 
+/** 内部: 全銀ファイル読み込みエラー作成ヘルパ。 */
+const _bt_createFileLoadError = (code, message, details) => {
+	const err = {
+		error: message || String(code || ''),
+		message: message || String(code || ''),
+		code,
+	};
+	if (details !== undefined) err.details = details;
+	return err;
+};
+
+/** 内部: ブラウザのファイルピッカーで全銀ファイルを1件選択する。 */
+const _bt_pickZenginFile = (accept) => {
+	if (typeof document === 'undefined') {
+		return Promise.reject(
+			_bt_createFileLoadError(
+				'FILE_PICKER_UNAVAILABLE',
+				'この環境ではファイル選択ダイアログを利用できません'
+			)
+		);
+	}
+
+	return new Promise((resolve) => {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = accept || '.txt,.dat,text/plain,*/*';
+		input.style.display = 'none';
+
+		const body = document.body || document.documentElement;
+		body.appendChild(input);
+
+		let settled = false;
+		const cleanup = () => {
+			if (settled) return;
+			settled = true;
+			if (input.parentNode) input.parentNode.removeChild(input);
+		};
+
+		input.addEventListener('change', () => {
+			const file = input.files && input.files[0] ? input.files[0] : null;
+			cleanup();
+			resolve(file);
+		});
+
+		const onWindowFocus = () => {
+			setTimeout(() => {
+				if (!settled) {
+					cleanup();
+					resolve(null);
+				}
+			}, 350);
+		};
+
+		if (typeof window !== 'undefined') {
+			window.addEventListener('focus', onWindowFocus, { once: true });
+		}
+
+		input.click();
+	});
+};
+
+/** 内部: File から Uint8Array を取得する。 */
+const _bt_readFileAsUint8Array = async (file) => {
+	if (!file) {
+		throw _bt_createFileLoadError('FILE_NOT_SELECTED', 'ファイルが選択されませんでした');
+	}
+	if (typeof file.arrayBuffer === 'function') {
+		const ab = await file.arrayBuffer();
+		return new Uint8Array(ab);
+	}
+	if (typeof FileReader === 'undefined') {
+		throw _bt_createFileLoadError(
+			'FILE_READER_UNAVAILABLE',
+			'このブラウザではファイルを読み込めません'
+		);
+	}
+
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onerror = () =>
+			reject(_bt_createFileLoadError('FILE_READ_ERROR', 'ファイル読み込みに失敗しました'));
+		reader.onload = () => {
+			const ab = reader.result;
+			resolve(new Uint8Array(ab));
+		};
+		reader.readAsArrayBuffer(file);
+	});
+};
+
+/** 内部: TextDecoder 用のエンコーディング名へ正規化する。 */
+const _bt_toTextDecoderEncoding = (encoding) => {
+	const e = _bt_toStr(encoding).trim().toUpperCase().replace(/[-_]/g, '');
+	if (e === 'UTF8' || e === 'UTF') return 'utf-8';
+	if (e === 'SJIS' || e === 'SHIFTJIS' || e === 'CP932' || e === 'WINDOWS31J') return 'shift_jis';
+	return 'utf-8';
+};
+
+/** 内部: 全銀ファイルのバイト列を文字列へ復号する。 */
+const _bt_decodeZenginBytes = (bytes, encoding) => {
+	if (typeof TextDecoder === 'undefined') {
+		throw _bt_createFileLoadError(
+			'TEXT_DECODER_UNAVAILABLE',
+			'このブラウザでは文字コード復号を利用できません'
+		);
+	}
+	const mode = _bt_toStr(encoding || 'AUTO')
+		.trim()
+		.toUpperCase();
+	const candidates = mode === 'AUTO' ? ['UTF8', 'SJIS'] : [mode];
+	let lastError = null;
+
+	for (const candidate of candidates) {
+		try {
+			const label = _bt_toTextDecoderEncoding(candidate);
+			const decoder = new TextDecoder(label, { fatal: true });
+			let text = decoder.decode(bytes);
+			if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+			return { text, encoding: candidate };
+		} catch (e) {
+			lastError = e;
+		}
+	}
+
+	throw _bt_createFileLoadError(
+		'ENCODING_ERROR',
+		'文字コードを判定できませんでした。UTF-8またはShift-JISのファイルを指定してください',
+		{ cause: lastError && lastError.message ? lastError.message : String(lastError || '') }
+	);
+};
+
+/** 内部: データ区分コードを表示用口座種別へ変換する。 */
+const _bt_toAccountTypeLabel = (code) => {
+	const c = _bt_toStr(code).trim();
+	if (c === '1') return '普通';
+	if (c === '2') return '当座';
+	if (c === '4') return '貯蓄';
+	if (c === '9') return 'その他';
+	return 'その他';
+};
+
+/** 内部: 処理結果コードを正規化し、表示ラベルを返す。 */
+const _bt_normalizeProcessResult = (rawCode) => {
+	const c = _bt_toStr(rawCode).trim().toUpperCase();
+	if (c === '0') {
+		return { processResultCode: 'OK', processResultLabel: '正常（処理済）' };
+	}
+	if (c === '1') {
+		return { processResultCode: 'NO_ACCOUNT', processResultLabel: '該当口座なし' };
+	}
+	if (c === '2') {
+		return { processResultCode: 'NAME_MISMATCH', processResultLabel: '氏名相違' };
+	}
+	if (c === '8') {
+		return { processResultCode: 'CANCELED_BY_OWNER', processResultLabel: '事業主取消' };
+	}
+	if (c === '9') {
+		return { processResultCode: 'OTHER', processResultLabel: 'その他' };
+	}
+	return { processResultCode: c || 'OTHER', processResultLabel: 'その他' };
+};
+
+/** 内部: 全銀テキストを120文字単位のレコードへ分割する。 */
+const _bt_splitZenginLines = (text, strict) => {
+	const raw = _bt_toStr(text || '');
+	if (!raw.trim()) {
+		throw _bt_createFileLoadError('EMPTY_FILE', 'ファイル内容が空です');
+	}
+
+	let lines = raw.split(/\r?\n/).filter((l) => _bt_toStr(l).length > 0);
+	if (lines.length <= 1 && !/\r|\n/.test(raw)) {
+		lines = [];
+		for (let i = 0; i < raw.length; i += 120) {
+			const chunk = raw.slice(i, i + 120);
+			if (chunk.length > 0) lines.push(chunk);
+		}
+	}
+
+	if (strict) {
+		for (let i = 0; i < lines.length; i++) {
+			if (lines[i].length !== 120) {
+				throw _bt_createFileLoadError(
+					'INVALID_RECORD_LENGTH',
+					`${i + 1}行目のレコード長が120文字ではありません`,
+					{ index: i, length: lines[i].length }
+				);
+			}
+		}
+	}
+
+	return lines;
+};
+
 /* ============================================================================
  * 公開 API (エクスポート)
  *
@@ -1410,6 +1604,110 @@ const _bt_generateEndRecordString = () => {
  *  - 公開関数は依存する内部ヘルパの後に宣言してください。
  *  - 公開シンボルはこのファイルの末尾で `window.BANK` にアタッチしてください。
  * ============================================================================ */
+/** 公開: parseZenginFile — 全銀ファイルを読み込み、データレコードをPromiseで返します。 */
+/**
+ * @param {object} [options] 読み込みオプション
+ * @returns {Promise<object>} 成功時: { success, headerData, trailerData, records, meta }
+ */
+const parseZenginFile = async (options = {}) => {
+	const opt = Object.assign(
+		{
+			accept: '.txt,.dat,text/plain,*/*',
+			encoding: 'AUTO',
+			strict: true,
+			resultCodeRange: null, // { start: 1-based, length }
+		},
+		options || {}
+	);
+
+	try {
+		const file = await _bt_pickZenginFile(opt.accept);
+		const bytes = await _bt_readFileAsUint8Array(file);
+		const decoded = _bt_decodeZenginBytes(bytes, opt.encoding);
+		const lines = _bt_splitZenginLines(decoded.text, !!opt.strict);
+		const headerLine = lines.find((line) => _bt_toStr(line).charAt(0) === '1') || '';
+		const trailerLine = lines.find((line) => _bt_toStr(line).charAt(0) === '8') || '';
+		const dataLines = lines.filter((line) => _bt_toStr(line).charAt(0) === '2');
+
+		let headerData = null;
+		let trailerData = null;
+		if (headerLine) {
+			const headerDepCode = _bt_toStr(headerLine.slice(95, 96)).trim();
+			headerData = {
+				typeCode: _bt_toStr(headerLine.slice(1, 3)).trim(),
+				requesterCode: _bt_toStr(headerLine.slice(4, 14)).trim(),
+				requesterName: _bt_toStr(headerLine.slice(14, 54)).trimEnd(),
+				tradeDate: _bt_toStr(headerLine.slice(54, 58)).trim(),
+				fromBankNo: _bt_toStr(headerLine.slice(58, 62)).trim(),
+				fromBranchNo: _bt_toStr(headerLine.slice(77, 80)).trim(),
+				depositType: _bt_toAccountTypeLabel(headerDepCode),
+				accountNumber: _bt_toStr(headerLine.slice(96, 103)).trim(),
+			};
+		}
+		if (trailerLine) {
+			trailerData = {
+				processedCount: Number(_bt_toStr(trailerLine.slice(19, 25)).trim() || '0'),
+				processedAmount: Number(_bt_toStr(trailerLine.slice(25, 37)).trim() || '0'),
+				failedCount: Number(_bt_toStr(trailerLine.slice(37, 43)).trim() || '0'),
+				failedAmount: Number(_bt_toStr(trailerLine.slice(43, 55)).trim() || '0'),
+			};
+		}
+
+		const records = dataLines.map((line) => {
+			const bankNo = _bt_toStr(line.slice(1, 5)).trim();
+			const bankName = _bt_toStr(line.slice(5, 20)).trim();
+			const branchNo = _bt_toStr(line.slice(20, 23)).trim();
+			const depCode = _bt_toStr(line.slice(42, 43)).trim();
+			const accountNo = _bt_toStr(line.slice(43, 50)).trim();
+			const customerKana = _bt_toStr(line.slice(50, 80)).trim();
+			const amountRaw = _bt_toStr(line.slice(80, 90)).trim();
+			const ediInfo = _bt_toStr(line.slice(91, 111)).trimEnd();
+
+			// 振込結果コードの既定位置は 114桁目（1-based）
+			let resultRaw = _bt_toStr(line.slice(113, 114)).trim();
+			if (
+				opt.resultCodeRange &&
+				typeof opt.resultCodeRange.start === 'number' &&
+				typeof opt.resultCodeRange.length === 'number'
+			) {
+				const from = Math.max(0, Number(opt.resultCodeRange.start) - 1);
+				const len = Math.max(1, Number(opt.resultCodeRange.length));
+				resultRaw = _bt_toStr(line.slice(from, from + len)).trim();
+			}
+
+			const processResult = _bt_normalizeProcessResult(resultRaw);
+			return {
+				toBank: bankName || bankNo,
+				toBranchNo: branchNo,
+				toAccountType: _bt_toAccountTypeLabel(depCode),
+				toAccountNumber: accountNo,
+				amount: Number(amountRaw || '0'),
+				customerKana,
+				ediInfo,
+				processResultCode: processResult.processResultCode,
+				processResultLabel: processResult.processResultLabel,
+			};
+		});
+
+		return {
+			success: true,
+			headerData,
+			trailerData,
+			records,
+			meta: {
+				totalLines: lines.length,
+				dataRecordLines: dataLines.length,
+				detectedEncoding: decoded.encoding,
+			},
+		};
+	} catch (err) {
+		throw _bt_enrichError(err, {
+			code: err && err.code ? err.code : 'PARSE_FILE_ERROR',
+			message: err && err.message ? err.message : '全銀ファイルの読み込みまたは解析に失敗しました',
+		});
+	}
+};
+
 /** 公開: getBank — 銀行コード/銀行名で検索し結果をコールバックで返します（詳細: docs/bank-transfer.md）。 */
 /**
  * @param {string} bankCodeOrName 銀行コードまたは銀行名
@@ -3177,6 +3475,7 @@ if (typeof window !== 'undefined') {
 		getBank,
 		getBranch,
 		convertYucho,
+		parseZenginFile,
 		normalizeAccountNumber,
 		normalizePayeeName,
 		normalizeEdiInfo,
@@ -3199,6 +3498,7 @@ try {
 						getBank,
 						getBranch,
 						convertYucho,
+						parseZenginFile,
 						normalizeAccountNumber,
 						normalizePayeeName,
 						normalizeEdiInfo,

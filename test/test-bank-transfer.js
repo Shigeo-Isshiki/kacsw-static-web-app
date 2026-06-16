@@ -323,4 +323,138 @@ try {
 	process.exitCode = 2;
 }
 
+// ---------------------- parseZenginFile test ----------------------
+try {
+	const originalDocument = global.document;
+	const originalAddEventListener = global.addEventListener;
+	const originalRemoveEventListener = global.removeEventListener;
+
+	const makeFixedLine = () => new Array(120).fill(' ');
+	const put = (arr, start, text) => {
+		for (let i = 0; i < String(text).length; i++) arr[start + i] = String(text).charAt(i);
+	};
+	const toLine = (arr) => arr.join('');
+
+	const headerArr = makeFixedLine();
+	put(headerArr, 0, '1');
+	put(headerArr, 1, '11');
+	put(headerArr, 3, '0');
+	put(headerArr, 4, '1234567890');
+	put(headerArr, 14, 'ﾃｽﾄｲﾗｲﾆﾝ');
+	put(headerArr, 54, '1108');
+	put(headerArr, 58, '0001');
+	put(headerArr, 62, 'ﾃｽﾄｷﾞﾝｺｳ');
+	put(headerArr, 77, '001');
+	put(headerArr, 80, 'ﾎﾝﾃﾝ');
+	put(headerArr, 95, '1');
+	put(headerArr, 96, '1234567');
+	const headerLine = toLine(headerArr);
+
+	const dataArr = makeFixedLine();
+	put(dataArr, 0, '2');
+	put(dataArr, 1, '0005');
+	put(dataArr, 5, 'ﾐｽﾞﾎｷﾞﾝｺｳ');
+	put(dataArr, 20, '123');
+	put(dataArr, 23, 'ｼﾌﾞﾔ');
+	put(dataArr, 42, '1');
+	put(dataArr, 43, '7654321');
+	put(dataArr, 50, 'ﾔﾏﾀﾞﾀﾛｳ');
+	put(dataArr, 80, '0000001000');
+	put(dataArr, 91, 'EDI-TEST');
+	put(dataArr, 113, '2');
+	const dataLine = toLine(dataArr);
+
+	const trailerArr = makeFixedLine();
+	put(trailerArr, 0, '8');
+	put(trailerArr, 19, '000001');
+	put(trailerArr, 25, '000000001000');
+	put(trailerArr, 37, '000001');
+	put(trailerArr, 43, '000000000500');
+	const trailerLine = toLine(trailerArr);
+
+	const content = headerLine + '\r\n' + dataLine + '\r\n' + trailerLine;
+	const fakeFile = {
+		arrayBuffer: async () => new TextEncoder().encode(content).buffer,
+	};
+
+	const body = {
+		appendChild(node) {
+			node.parentNode = this;
+		},
+		removeChild(node) {
+			node.parentNode = null;
+		},
+	};
+
+	global.document = {
+		body,
+		documentElement: body,
+		createElement(tag) {
+			assert.strictEqual(tag, 'input', 'file picker should create input element');
+			const listeners = {};
+			return {
+				type: '',
+				accept: '',
+				style: {},
+				files: null,
+				parentNode: null,
+				addEventListener(name, handler) {
+					listeners[name] = handler;
+				},
+				click() {
+					this.files = [fakeFile];
+					if (listeners.change) listeners.change();
+				},
+			};
+		},
+	};
+	global.addEventListener = () => {};
+	global.removeEventListener = () => {};
+
+	BANK.parseZenginFile({ encoding: 'UTF8', strict: true })
+		.then((res) => {
+			try {
+				assert.ok(res && res.success, 'parseZenginFile should resolve success:true');
+				assert.ok(res.headerData, 'headerData should exist');
+				assert.ok(res.trailerData, 'trailerData should exist');
+				assert.strictEqual(res.headerData.typeCode, '11');
+				assert.strictEqual(res.headerData.requesterCode, '1234567890');
+				assert.strictEqual(res.headerData.fromBankNo, '0001');
+				assert.strictEqual(res.trailerData.processedCount, 1);
+				assert.strictEqual(res.trailerData.processedAmount, 1000);
+				assert.strictEqual(res.trailerData.failedCount, 1);
+				assert.strictEqual(res.trailerData.failedAmount, 500);
+				assert.ok(Array.isArray(res.records), 'records should be an array');
+				assert.strictEqual(res.records.length, 1, 'one data record should be parsed');
+				assert.strictEqual(res.records[0].toBranchNo, '123');
+				assert.strictEqual(res.records[0].toAccountType, '普通');
+				assert.strictEqual(res.records[0].toAccountNumber, '7654321');
+				assert.strictEqual(res.records[0].amount, 1000);
+				assert.strictEqual(res.records[0].customerKana, 'ﾔﾏﾀﾞﾀﾛｳ');
+				assert.strictEqual(res.records[0].ediInfo.trim(), 'EDI-TEST');
+				assert.strictEqual(res.records[0].processResultCode, 'NAME_MISMATCH');
+				assert.strictEqual(res.records[0].processResultLabel, '氏名相違');
+				assert.strictEqual(res.meta.detectedEncoding, 'UTF8');
+				console.log('PASS: parseZenginFile parses header and data records');
+			} catch (e) {
+				console.error('FAIL: parseZenginFile assertions', e && e.message ? e.message : e);
+				process.exitCode = 2;
+			} finally {
+				global.document = originalDocument;
+				global.addEventListener = originalAddEventListener;
+				global.removeEventListener = originalRemoveEventListener;
+			}
+		})
+		.catch((e) => {
+			console.error('FAIL: parseZenginFile invocation', e && e.message ? e.message : e);
+			process.exitCode = 2;
+			global.document = originalDocument;
+			global.addEventListener = originalAddEventListener;
+			global.removeEventListener = originalRemoveEventListener;
+		});
+} catch (e) {
+	console.error('FAIL: parseZenginFile setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
 console.log('ALL BANK-TRANSFER TESTS INVOKED');

@@ -18,6 +18,7 @@
   - [`getBank(bankCodeOrName, callback)`](#getBank)
   - [`getBranch(bankCode, branchCodeOrName, callback)`](#getBranch)
   - [`convertYucho(kigou, bangou, callback)`](#convertYucho)
+  - [`parseZenginFile(options)`](#parseZenginFile)
   - [`generateZenginData(headerData, records, callback)`](#generateZenginData)
   - [`generateHeader(headerData, callback)`](#generateHeader)
   - [`generateDataRecords(records, fromBankNo, callback)`](#generateDataRecords)
@@ -53,6 +54,7 @@
 - `getBank(bankCodeOrName, callback)`
 - `getBranch(bankCode, branchCodeOrName, callback)`
 - `convertYucho(kigou, bangou, callback)`
+- `parseZenginFile(options)`
 - `generateHeader(headerData, callback)`
 - `generateDataRecords(records, fromBankNo, callback)`
 - `generateTrailer(summaryData, callback)`
@@ -63,7 +65,7 @@
 - `normalizeAccountNumber(input)`
 - `nextBankBusinessDay(baseDate, cutoffHour, callback)`
 
-（各関数はコールバック単一引数スタイルを基本にしています。Node 風の (err, res) も互換的に扱える場合があります）
+（`parseZenginFile` を除く各関数はコールバック単一引数スタイルを基本にしています。Node 風の (err, res) も互換的に扱える場合があります。`parseZenginFile` は Promise を返します）
 
 ---
 
@@ -214,6 +216,176 @@ window.BANK.getBranch('0005', '横浜', (res) => {
 window.BANK.convertYucho('12345', '1234567', (res) => {
 	console.log(res);
 });
+```
+
+---
+
+<a id="nextBankBusinessDay"></a>
+
+### `parseZenginFile(options)`
+
+概要:
+
+- 全銀ファイルをファイル選択ダイアログから読み込み、ヘッダ情報とデータレコード配列を Promise で返します。
+
+引数:
+
+- `options` (object, optional) — 読み込みオプション。
+  - `accept` (string) — ファイル選択ダイアログの accept 属性。省略時は `.txt,.dat,text/plain,*/*`。
+  - `encoding` (string) — `AUTO` / `UTF8` / `SJIS`。省略時は `AUTO`。
+  - `strict` (boolean) — `true` の場合、各レコード長が120文字であることを検証します。省略時は `true`。
+  - `resultCodeRange` (object|null) — 処理結果コードの位置を上書きする指定。`{ start: 1-based, length }`。
+
+戻り値:
+
+- `Promise<object>` — 成功時は次の形式のオブジェクトを解決します。
+
+```js
+{
+  success: true,
+  headerData: {
+    typeCode,
+    requesterCode,
+    requesterName,
+    tradeDate,
+    fromBankNo,
+    fromBranchNo,
+    depositType,
+    accountNumber
+  },
+  trailerData: {
+    processedCount,
+    processedAmount,
+    failedCount,
+    failedAmount
+  },
+  records: [
+    {
+      toBank,
+      toBranchNo,
+      toAccountType,
+      toAccountNumber,
+      amount,
+      customerKana,
+      ediInfo,
+      processResultCode,
+      processResultLabel
+    }
+  ],
+  meta: {
+    totalLines,
+    dataRecordLines,
+    detectedEncoding
+  }
+}
+```
+
+戻り値オブジェクトの各プロパティ:
+
+- `success` (boolean) — 正常に解析できた場合は `true` です。`parseZenginFile` は失敗時に `{ success: false }` を返すのではなく Promise を reject するため、resolve された時点で基本的に `true` になります。
+
+- `headerData` (object|null) — ヘッダレコード（データ区分 `1`）から抽出した値です。ヘッダが存在しない場合は `null` になります。
+  - `typeCode` (string) — 種別コード。例: `"11"`。`generateZenginData` の `headerData.typeCode` と同じ意味です。
+  - `requesterCode` (string) — 依頼人コード。全銀ヘッダ上の10桁文字列をそのまま返します。
+  - `requesterName` (string) — 依頼人名。ファイル内の文字列を trim した値です。半角カナ前提の値が入る想定です。
+  - `tradeDate` (string) — 振込指定日。`MMDD` 形式の4文字で返します。例: `"1109"`。
+  - `fromBankNo` (string) — 仕向銀行コード（4桁）。
+  - `fromBranchNo` (string) — 仕向支店コード（3桁）。
+  - `depositType` (string) — 預金種目コード。ファイル上の値をそのまま返します。例: `"1"`（普通）、`"2"`（当座）。
+  - `accountNumber` (string) — 依頼人口座番号。7桁文字列です。
+
+- `trailerData` (object|null) — トレーラレコード（データ区分 `8`）から抽出した集計値です。トレーラが無いファイルでは `null` になります。
+  - `processedCount` (number) — 処理済件数。トレーラの件数欄を数値化したものです。
+  - `processedAmount` (number) — 処理済金額合計。トレーラの金額欄を数値化したものです。
+  - `failedCount` (number) — 処理不能件数。組戻しやエラー対象の件数確認に使えます。
+  - `failedAmount` (number) — 処理不能金額合計。処理済金額との差分確認に使えます。
+
+- `records` (Array<object>) — データ区分 `2` の明細レコードだけを抽出した配列です。ヘッダ・トレーラ・エンドは含みません。
+  - `toBank` (string) — 受取銀行コード（4桁）。生成系 API の `toBankNo` に相当する値です。
+  - `toBranchNo` (string) — 受取支店コード（3桁）。
+  - `toAccountType` (string) — 預金種目コードまたは正規化後の値。元ファイルの1文字コードをベースに返します。
+  - `toAccountNumber` (string) — 受取人口座番号。7桁文字列です。
+  - `amount` (number) — 振込金額。文字列ではなく数値に変換して返します。
+  - `customerKana` (string) — 受取人名義カナ。行末スペースを除去した値です。
+  - `ediInfo` (string) — EDI 情報欄。空欄の場合は空文字です。
+  - `processResultCode` (string) — 処理結果コード。既定では114桁目（1-based）の1文字を読みます。例: `"0"`, `"1"`, `"2"`, `"8"`, `"9"`。
+  - `processResultLabel` (string) — `processResultCode` を業務上読みやすい文言へ変換したラベルです。例: `"正常"`, `"該当口座なし"`, `"氏名相違"`。
+
+- `meta` (object) — 解析時の補助情報です。画面表示やログ出力、簡易バリデーションに使えます。
+  - `totalLines` (number) — CRLF / LF 分割後の総レコード数です。
+  - `dataRecordLines` (number) — `records.length` と同義の、データ区分 `2` の件数です。
+  - `detectedEncoding` (string) — 実際に採用した復号方式です。例: `"UTF-8"`, `"Shift_JIS"`。
+
+戻り値の使い分け:
+
+- `headerData` は、読み込んだ全銀ファイルが「どの依頼人・どの実行日・どの仕向口座のデータか」を照合したい場合に使います。
+- `records` は、kintone レコード更新や結果一覧表示など、明細単位の後続処理にそのまま渡す主データです。
+- `trailerData` は、処理済件数や金額が明細の集計と一致しているかを検算したい場合に便利です。
+- `meta` は、想定件数との差分確認や、文字コード自動判定の結果をログへ残したい場合に使えます。
+
+挙動・注意点:
+
+- 返却される `records` はデータ区分 `2` のレコードのみです。ヘッダ・トレーラ・エンドは `records` に含みません。
+- `headerData` は `generateZenginData` に渡すヘッダ項目と照合しやすいように整形して返します。
+- `trailerData` はトレーラレコード（データ区分 `8`）から、処理済/処理不能の件数・金額を抽出した要約です。
+- 処理結果コードは既定で114桁目（1-based）の1文字を読みます。
+- 文字コードは現状 `TextDecoder` による `UTF-8` / `Shift_JIS` 判定です。
+
+エラー時に reject される代表的なエラーコード（`code` フィールド）:
+
+- `FILE_NOT_SELECTED` — ファイル選択ダイアログでユーザーが何も選択しなかった。
+- `FILE_PICKER_UNAVAILABLE` — ブラウザ環境ではなく、ファイルピッカーを利用できない（Node.js等）。
+- `FILE_READER_UNAVAILABLE` — `FileReader` がこのブラウザで利用できない。
+- `FILE_READ_ERROR` — ファイルの読み込み処理中にエラーが発生した。
+- `TEXT_DECODER_UNAVAILABLE` — `TextDecoder` がこのブラウザで利用できない（非常に古いブラウザ）。
+- `ENCODING_ERROR` — UTF-8 と Shift_JIS の両方で復号に失敗した。別のエンコーディングのファイルを指定した可能性があります。
+- `EMPTY_FILE` — ファイルの内容が空である。
+- `INVALID_RECORD_LENGTH` — `strict: true` の設定下で、あるレコード（行）の長さが120文字ではない。`details.index` と `details.length` にレコード番号と実際の長さが入ります。
+
+エラーオブジェクト構造:
+
+Promise が reject する際、以下の形式のエラーオブジェクトが投げられます:
+
+```js
+{
+  error: "メッセージ文字列",
+  message: "ユーザ向けの詳細メッセージ",
+  code: "ERROR_CODE",
+  details: { ... }  // 追加情報（オプション）
+}
+```
+
+呼び出し側では `try-catch` または `.catch()` でハンドルしてください:
+
+```js
+try {
+  const res = await window.BANK.parseZenginFile({ encoding: 'AUTO' });
+  console.log(res.records);
+} catch (err) {
+  if (err.code === 'FILE_NOT_SELECTED') {
+    console.log('ファイルが選択されませんでした');
+  } else if (err.code === 'ENCODING_ERROR') {
+    console.log('別のエンコーディングを試してください');
+  } else {
+    console.error('エラー:', err.message);
+  }
+}
+```
+
+例:
+
+```js
+try {
+  const res = await window.BANK.parseZenginFile({
+    encoding: 'AUTO',
+    strict: true
+  });
+
+  console.log(res.headerData);
+  console.log(res.records);
+} catch (e) {
+  console.error(e.code, e.message);
+}
 ```
 
 ---
