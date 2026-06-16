@@ -361,16 +361,16 @@ Promise が reject する際、以下の形式のエラーオブジェクトが�
 
 ```js
 try {
-  const res = await window.BANK.parseZenginFile({ encoding: 'AUTO' });
-  console.log(res.records);
+	const res = await window.BANK.parseZenginFile({ encoding: 'AUTO' });
+	console.log(res.records);
 } catch (err) {
-  if (err.code === 'FILE_NOT_SELECTED') {
-    console.log('ファイルが選択されませんでした');
-  } else if (err.code === 'ENCODING_ERROR') {
-    console.log('別のエンコーディングを試してください');
-  } else {
-    console.error('エラー:', err.message);
-  }
+	if (err.code === 'FILE_NOT_SELECTED') {
+		console.log('ファイルが選択されませんでした');
+	} else if (err.code === 'ENCODING_ERROR') {
+		console.log('別のエンコーディングを試してください');
+	} else {
+		console.error('エラー:', err.message);
+	}
 }
 ```
 
@@ -378,15 +378,15 @@ try {
 
 ```js
 try {
-  const res = await window.BANK.parseZenginFile({
-    encoding: 'AUTO',
-    strict: true
-  });
+	const res = await window.BANK.parseZenginFile({
+		encoding: 'AUTO',
+		strict: true,
+	});
 
-  console.log(res.headerData);
-  console.log(res.records);
+	console.log(res.headerData);
+	console.log(res.records);
 } catch (e) {
-  console.error(e.code, e.message);
+	console.error(e.code, e.message);
 }
 ```
 
