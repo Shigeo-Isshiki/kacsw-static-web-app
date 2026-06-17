@@ -19,7 +19,7 @@ const { JSDOM } = require('jsdom');
 	delete require.cache[require.resolve(path.join(__dirname, '..', 'src', 'kintone-custom-lib.js'))];
 	require(path.join(__dirname, '..', 'src', 'kintone-custom-lib.js'));
 
-	const { getFieldValueOr, kintoneEventOn, setRecordValues } = global;
+	const { getFieldValueOr, kintoneEventOn, setRecordValues, showYesNoDialog, showInputDialog } = global;
 
 	if (!getFieldValueOr) {
 		console.error('kintone-custom-lib: getFieldValueOr が公開されていません');
@@ -110,6 +110,8 @@ const { JSDOM } = require('jsdom');
 		assert.strictEqual(typeof global.getFieldValueOr, 'function');
 		assert.strictEqual(typeof global.setRecordValues, 'function');
 		assert.strictEqual(typeof global.kintoneEventOn, 'function');
+		assert.strictEqual(typeof showYesNoDialog, 'function');
+		assert.strictEqual(typeof showInputDialog, 'function');
 		console.log('PASS: functions exported to global/window');
 	} catch (e) {
 		console.error('FAIL: exports presence', e && e.message ? e.message : e);
@@ -428,6 +430,10 @@ const { JSDOM } = require('jsdom');
 	// PC path でも mobile API が存在する場合に createDialog が優先されることを確認する
 	let createDialogCalled = 0;
 	let createBottomSheetCalled = 0;
+	let showConfirmDialogCalled = 0;
+	let showConfirmBottomSheetCalled = 0;
+	let nextConfirmAction = 'OK';
+	let lastConfirmConfig = null;
 	global.kintone = global.kintone || {};
 	global.kintone.createDialog = (config) => {
 		createDialogCalled += 1;
@@ -441,7 +447,16 @@ const { JSDOM } = require('jsdom');
 			show: () => document.body.appendChild(container),
 		};
 	};
+	global.kintone.showConfirmDialog = (config) => {
+		showConfirmDialogCalled += 1;
+		lastConfirmConfig = config;
+		return Promise.resolve(nextConfirmAction);
+	};
 	global.kintone.mobile = {
+		showConfirmBottomSheet: () => {
+			showConfirmBottomSheetCalled += 1;
+			throw new Error('showConfirmBottomSheet should not be called on desktop path');
+		},
 		createBottomSheet: () => {
 			createBottomSheetCalled += 1;
 			throw new Error('createBottomSheet should not be called on desktop path');
@@ -502,15 +517,356 @@ const { JSDOM } = require('jsdom');
 			assert.ok(document.querySelector('.kc-notify-warning__message'));
 		}
 
+		if (typeof window.showYesNoDialog !== 'function') {
+			throw new Error('showYesNoDialog not exported');
+		}
+		nextConfirmAction = 'OK';
+		const confirmed = await window.showYesNoDialog('選択したレコードを更新しますか？', '確認');
+		assert.strictEqual(confirmed, true, 'showYesNoDialog should return true on OK');
+		assert.ok(lastConfirmConfig, 'showConfirmDialog should receive config');
+		assert.strictEqual(lastConfirmConfig.title, '確認');
+		assert.strictEqual(lastConfirmConfig.body, '選択したレコードを更新しますか？');
+		assert.strictEqual(lastConfirmConfig.okButtonText, 'はい');
+		assert.strictEqual(lastConfirmConfig.cancelButtonText, 'いいえ');
+
+		nextConfirmAction = 'CANCEL';
+		const rejected = await window.showYesNoDialog('実行しますか？', '確認');
+		assert.strictEqual(rejected, false, 'showYesNoDialog should return false on CANCEL');
+
+		if (typeof window.showInputDialog !== 'function') {
+			throw new Error('showInputDialog not exported');
+		}
+		const originalCreateDialog = global.kintone.createDialog;
+		global.kintone.createDialog = (config) => {
+			createDialogCalled += 1;
+			const container = document.createElement('div');
+			const okBtn = document.createElement('button');
+			okBtn.className = 'kintone-dialog-ok-button';
+			container.appendChild(okBtn);
+			if (config && config.body) container.appendChild(config.body);
+			return {
+				element: container,
+				show: async () => {
+					const titleInput = config.body.querySelector('[name="title"]');
+					const countInput = config.body.querySelector('[name="count"]');
+					const dueDateInput = config.body.querySelector('[name="dueDate"]');
+					if (titleInput) titleInput.value = '月次確認';
+					if (countInput) countInput.value = '3';
+					if (dueDateInput) dueDateInput.value = '2026-06-18';
+					document.body.appendChild(container);
+					if (config.beforeClose) {
+						const canClose = await config.beforeClose('OK');
+						assert.strictEqual(canClose, true, 'valid input should allow dialog close');
+					}
+					return 'OK';
+				},
+			};
+		};
+
+		const inputResult = await window.showInputDialog({
+			title: 'タスク登録',
+			okButtonText: '登録',
+			fields: [
+				{ name: 'title', label: 'タイトル', type: 'text' },
+				{ name: 'count', label: '件数', type: 'number' },
+				{ name: 'dueDate', label: '期限', type: 'date' },
+			],
+		});
+		assert.ok(inputResult, 'showInputDialog should resolve result object');
+		assert.strictEqual(inputResult.action, 'OK');
+		assert.deepStrictEqual(inputResult.values, {
+			title: '月次確認',
+			count: 3,
+			dueDate: '2026-06-18',
+		});
+
+		global.kintone.createDialog = (config) => {
+			createDialogCalled += 1;
+			const container = document.createElement('div');
+			const okBtn = document.createElement('button');
+			okBtn.className = 'kintone-dialog-ok-button';
+			container.appendChild(okBtn);
+			if (config && config.body) container.appendChild(config.body);
+			return {
+				element: container,
+				show: () => {
+					document.body.appendChild(container);
+					return 'CANCEL';
+				},
+			};
+		};
+		const cancelledInputResult = await window.showInputDialog({
+			title: 'キャンセル確認',
+			fields: [{ name: 'memo', label: 'メモ', type: 'textarea' }],
+		});
+		assert.ok(cancelledInputResult, 'cancelled input dialog should resolve result object');
+		assert.strictEqual(cancelledInputResult.action, 'CANCEL');
+		assert.strictEqual(cancelledInputResult.values, null);
+
+		global.kintone.createDialog = (config) => {
+			createDialogCalled += 1;
+			const container = document.createElement('div');
+			const okBtn = document.createElement('button');
+			okBtn.className = 'kintone-dialog-ok-button';
+			container.appendChild(okBtn);
+			if (config && config.body) container.appendChild(config.body);
+			return {
+				element: container,
+				show: async () => {
+					if (config && config.body && config.body.classList.contains('kc-notify-error')) {
+						document.body.appendChild(container);
+						return 'OK';
+					}
+					const countInput = config.body.querySelector('[name="count"]');
+					const dueDateInput = config.body.querySelector('[name="dueDate"]');
+					if (countInput) {
+						countInput.type = 'text';
+						countInput.value = 'abc';
+					}
+					if (dueDateInput) {
+						dueDateInput.type = 'text';
+						dueDateInput.value = '2026-02-30';
+					}
+					document.body.appendChild(container);
+					const firstAttempt = config.beforeClose ? await config.beforeClose('OK') : true;
+					assert.strictEqual(
+						firstAttempt,
+						false,
+						'invalid input should keep the dialog open on first attempt'
+					);
+					assert.strictEqual(
+						document.activeElement,
+						countInput,
+						'focus should move to the first invalid input'
+					);
+					if (countInput) {
+						countInput.value = '5';
+					}
+					if (dueDateInput) {
+						dueDateInput.type = 'date';
+						dueDateInput.value = '2026-02-28';
+					}
+					const secondAttempt = config.beforeClose ? await config.beforeClose('OK') : true;
+					assert.strictEqual(
+						secondAttempt,
+						true,
+						'valid input should allow the dialog to close on second attempt'
+					);
+					return 'OK';
+				},
+			};
+		};
+		const invalidInputResult = await window.showInputDialog({
+			title: '不正値確認',
+			fields: [
+				{ name: 'count', label: '件数', type: 'number' },
+				{ name: 'dueDate', label: '期限', type: 'date' },
+			],
+		});
+		assert.ok(invalidInputResult, 'invalid input dialog should resolve result object');
+		assert.strictEqual(invalidInputResult.action, 'OK');
+		assert.deepStrictEqual(invalidInputResult.values, {
+			count: 5,
+			dueDate: '2026-02-28',
+		});
+		const invalidErrorMessages = document.querySelectorAll('.kc-notify-error__message');
+		const invalidErrorMessage = invalidErrorMessages[invalidErrorMessages.length - 1];
+		assert.ok(invalidErrorMessage, 'validation error should be shown by notifyError');
+		assert.ok(
+			invalidErrorMessage.textContent.indexOf('件数') !== -1,
+			'validation error should include field label'
+		);
+		assert.ok(
+			invalidErrorMessage.textContent.indexOf('期限') !== -1,
+			'validation error should include date field label'
+		);
+		assert.ok(
+			invalidErrorMessage.textContent.indexOf('20260618') !== -1,
+			'date validation error should show accepted example formats'
+		);
+
+		global.kintone.createDialog = (config) => {
+			createDialogCalled += 1;
+			const container = document.createElement('div');
+			const okBtn = document.createElement('button');
+			okBtn.className = 'kintone-dialog-ok-button';
+			container.appendChild(okBtn);
+			if (config && config.body) container.appendChild(config.body);
+			return {
+				element: container,
+				show: async () => {
+					const dueDateInput = config.body.querySelector('[name="dueDate"]');
+					if (dueDateInput) {
+						dueDateInput.type = 'text';
+						dueDateInput.value = '20260608';
+					}
+					document.body.appendChild(container);
+					const firstAttempt = config.beforeClose ? await config.beforeClose('OK') : true;
+					assert.strictEqual(
+						firstAttempt,
+						true,
+						'compact date input should allow the dialog to close'
+					);
+					assert.strictEqual(
+						dueDateInput.value,
+						'2026-06-08',
+						'date input should be normalized to YYYY-MM-DD'
+					);
+					return 'OK';
+				},
+			};
+		};
+		const normalizedDateInputResult = await window.showInputDialog({
+			title: '日付正規化確認',
+			fields: [{ name: 'dueDate', label: '期限', type: 'date' }],
+		});
+		assert.ok(
+			normalizedDateInputResult,
+			'normalized date input dialog should resolve result object'
+		);
+		assert.strictEqual(normalizedDateInputResult.action, 'OK');
+		assert.deepStrictEqual(normalizedDateInputResult.values, {
+			dueDate: '2026-06-08',
+		});
+
+		global.kintone.createDialog = (config) => {
+			createDialogCalled += 1;
+			const container = document.createElement('div');
+			const okBtn = document.createElement('button');
+			okBtn.className = 'kintone-dialog-ok-button';
+			container.appendChild(okBtn);
+			if (config && config.body) container.appendChild(config.body);
+			return {
+				element: container,
+				show: async () => {
+					const dueDateInput = config.body.querySelector('[name="dueDate"]');
+					if (dueDateInput) {
+						dueDateInput.type = 'text';
+						dueDateInput.value = '２０２６年６月８日';
+					}
+					document.body.appendChild(container);
+					const firstAttempt = config.beforeClose ? await config.beforeClose('OK') : true;
+					assert.strictEqual(
+						firstAttempt,
+						true,
+						'localized date input should allow the dialog to close'
+					);
+					assert.strictEqual(
+						dueDateInput.value,
+						'2026-06-08',
+						'localized date input should be normalized to YYYY-MM-DD'
+					);
+					return 'OK';
+				},
+			};
+		};
+		const localizedDateInputResult = await window.showInputDialog({
+			title: '日付正規化確認2',
+			fields: [{ name: 'dueDate', label: '期限', type: 'date' }],
+		});
+		assert.ok(
+			localizedDateInputResult,
+			'localized date input dialog should resolve result object'
+		);
+		assert.strictEqual(localizedDateInputResult.action, 'OK');
+		assert.deepStrictEqual(localizedDateInputResult.values, {
+			dueDate: '2026-06-08',
+		});
+
+		global.kintone.createDialog = (config) => {
+			createDialogCalled += 1;
+			const container = document.createElement('div');
+			const okBtn = document.createElement('button');
+			okBtn.className = 'kintone-dialog-ok-button';
+			container.appendChild(okBtn);
+			if (config && config.body) container.appendChild(config.body);
+			return {
+				element: container,
+				show: async () => {
+					if (config && config.body && config.body.classList.contains('kc-notify-error')) {
+						document.body.appendChild(container);
+						return 'OK';
+					}
+					const titleInput = config.body.querySelector('[name="title"]');
+					const memoInput = config.body.querySelector('[name="memo"]');
+					if (titleInput) {
+						titleInput.value = '123456';
+					}
+					if (memoInput) {
+						memoInput.value = 'NG';
+					}
+					document.body.appendChild(container);
+					const firstAttempt = config.beforeClose ? await config.beforeClose('OK') : true;
+					assert.strictEqual(
+						firstAttempt,
+						false,
+						'text validation error should keep the dialog open on first attempt'
+					);
+					assert.strictEqual(
+						document.activeElement,
+						titleInput,
+						'focus should move to the first invalid text input'
+					);
+					if (titleInput) {
+						titleInput.value = '1234';
+					}
+					if (memoInput) {
+						memoInput.value = 'ABC-12';
+					}
+					const secondAttempt = config.beforeClose ? await config.beforeClose('OK') : true;
+					assert.strictEqual(
+						secondAttempt,
+						true,
+						'valid text values should allow the dialog to close on second attempt'
+					);
+					return 'OK';
+				},
+			};
+		};
+		const textValidatedResult = await window.showInputDialog({
+			title: '文字列バリデーション確認',
+			fields: [
+				{ name: 'title', label: 'タイトル', type: 'text', maxLength: 4 },
+				{
+					name: 'memo',
+					label: 'メモ',
+					type: 'textarea',
+					pattern: '^[A-Z]{3}-\\d{2}$',
+					patternMessage: 'メモは ABC-12 の形式で入力してください。',
+				},
+			],
+		});
+		assert.ok(textValidatedResult, 'text validated dialog should resolve result object');
+		assert.strictEqual(textValidatedResult.action, 'OK');
+		assert.deepStrictEqual(textValidatedResult.values, {
+			title: '1234',
+			memo: 'ABC-12',
+		});
+		const textErrorMessages = document.querySelectorAll('.kc-notify-error__message');
+		const textErrorMessage = textErrorMessages[textErrorMessages.length - 1];
+		assert.ok(
+			textErrorMessage.textContent.indexOf('メモは ABC-12 の形式で入力してください。') !== -1,
+			'custom pattern message should be shown in notifyError'
+		);
+		global.kintone.createDialog = originalCreateDialog;
+
 		assert.strictEqual(
 			createBottomSheetCalled,
 			0,
 			'desktop path should not call createBottomSheet'
 		);
+		assert.strictEqual(
+			showConfirmBottomSheetCalled,
+			0,
+			'desktop path should not call showConfirmBottomSheet'
+		);
 		assert.ok(createDialogCalled > 0, 'desktop path should use createDialog');
+		assert.ok(showConfirmDialogCalled > 0, 'desktop path should use showConfirmDialog');
 
 		console.log('PASS: notify dialogs created and sanitized');
 		console.log('PASS: desktop path prefers createDialog over createBottomSheet');
+		console.log('PASS: yes/no dialog uses showConfirmDialog');
+		console.log('PASS: input dialog collects form values');
 		console.log('ALL KINTONE-CUSTOM-LIB NOTIFY DOM TESTS INVOKED');
 	} catch (err) {
 		console.error('FAIL:', err && err.message);

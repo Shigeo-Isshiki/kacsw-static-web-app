@@ -9,6 +9,8 @@
 - [notifyError(message, title = 'エラー', allowHtml = false)](#notifyerror)
 - [notifyInfo(message, title = '情報', allowHtml = false)](#notifyinfo)
 - [notifyWarning(message, title = '注意', allowHtml = false)](#notifywarning)
+- [showYesNoDialog(message, title = '確認', options)](#showyesnodialog)
+- [showInputDialog(options)](#showinputdialog)
 - [getFieldValueOr(record, fieldCode, defaultValue)](#getfieldvalueor)
 - [kintoneEventOn(events, handler)](#kintoneeventon)
 - [setRecordValues(record, values)](#setrecordvalues)
@@ -149,6 +151,99 @@ console.log('notifyInfo action:', infoAction);
 ```js
 const warningAction = await notifyWarning('入力内容を確認してください', '注意');
 console.log('notifyWarning action:', warningAction);
+```
+
+<a id="showyesnodialog"></a>
+
+### showYesNoDialog(message, title = '確認', options)
+
+- 動作概要: `はい / いいえ` の2択確認ダイアログを表示します。PC では `kintone.showConfirmDialog()`、モバイルでは `kintone.mobile.showConfirmBottomSheet()` を優先し、利用できない場合は共通ダイアログ実装にフォールバックします。
+- 戻り値: `Promise<boolean>`。`はい` 相当の操作なら `true`、`いいえ` やダイアログ表示失敗時は `false` を返します。
+
+- `message` (string) — 本文メッセージ
+- `title` (string) — ダイアログタイトル（省略時は `確認`）
+- `options` (object, optional) — 表示オプション
+- `options.yesText` (string) — OK 側ボタンラベル（省略時は `はい`）
+- `options.noText` (string) — キャンセル側ボタンラベル（省略時は `いいえ`）
+- `options.allowHtml` (boolean) — フォールバック表示時に本文を HTML として扱うか
+
+例:
+
+```js
+const shouldUpdate = await showYesNoDialog(
+	'選択したレコードを更新しますか？',
+	'レコードの一括更新',
+	{
+		yesText: '更新する',
+		noText: 'キャンセル',
+	}
+);
+
+if (shouldUpdate) {
+	// 更新処理
+}
+```
+
+<a id="showinputdialog"></a>
+
+### showInputDialog(options)
+
+- 動作概要: `createDialog()` / `createBottomSheet()` を使って、入力フォーム付きダイアログを表示します。`text`、`number`、`date`、`textarea` の入力欄を宣言的に構成できます。
+- 入力値の扱い:
+	- `number` はライブラリ側でも数値文字列かどうかを再検証し、`NaN` や文字列混入を返しません。
+	- `date` は最終的に `YYYY-MM-DD` 形式へ正規化してから実在する日付かを再検証し、`2026-02-30` のような不正日付は返しません。
+	- `date` では `20260608`、`2026/6/8`、`2026.6.8`、`2026年6月8日`、全角数字を含む同等表記のような「西暦4桁で始まる非曖昧な入力」を受け付けます。
+	- `date` の入力エラー時は、例として `2026-06-18` や `20260618` を含む案内メッセージを表示します。
+	- `required: true` を付けた項目は空文字を許可しません。
+	- `text` / `textarea` では `maxLength` と `pattern` による追加バリデーションを指定できます。
+- 検証エラー時の表示: 検証に失敗した場合はダイアログを閉じず、`notifyError()` を使ってフィールド名付きのエラーメッセージを統一的に表示します。ユーザーは入力値を保持したまま、その場で修正して再実行できます。
+- フォーカス制御: 検証エラー後は、最初の不正項目へフォーカスを戻します。
+- 戻り値: `Promise<{ action: string | undefined, values: Object | null } | undefined>`。`action === 'OK'` の場合に `values` に入力結果が入ります。キャンセル時は `values` は `null` です。入力エラーだけではダイアログは閉じないため、`VALIDATION_ERROR` は返しません。
+
+- `options.title` (string) — ダイアログタイトル（省略時は `入力`）
+- `options.description` (string, optional) — フォーム上部の補足説明
+- `options.allowHtml` (boolean, optional) — `description` を HTML として扱うか
+- `options.okButtonText` (string, optional) — OK ボタンラベル（省略時は `OK`）
+- `options.cancelButtonText` (string, optional) — キャンセルボタンラベル（省略時は `キャンセル`）
+- `options.fields` (Array<Object>) — 入力欄定義
+- `fields[].name` (string) — 返却値オブジェクトのキーになる名前
+- `fields[].label` (string) — 表示ラベル
+- `fields[].type` (string) — `text` / `number` / `date` / `textarea`
+- `fields[].value` (string | number, optional) — 初期値
+- `fields[].placeholder` (string, optional) — プレースホルダー
+- `fields[].required` (boolean, optional) — 必須属性
+- `fields[].min` / `fields[].max` / `fields[].step` — `number` や `date` に渡す属性値
+- `fields[].maxLength` (number, optional) — `text` / `textarea` の最大文字数
+- `fields[].pattern` (string, optional) — 入力値が一致すべき正規表現パターン
+- `fields[].patternMessage` (string, optional) — `pattern` 不一致時に表示するカスタムエラーメッセージ
+
+例:
+
+```js
+const result = await showInputDialog({
+	title: 'タスクの簡易登録',
+	description: '必要な項目を入力してください。',
+	okButtonText: '登録',
+	fields: [
+		{ name: 'title', label: 'タイトル', type: 'text', required: true, maxLength: 40 },
+		{ name: 'count', label: '件数', type: 'number', min: 1, step: 1 },
+		{ name: 'dueDate', label: '期限', type: 'date' },
+		{
+			name: 'memo',
+			label: 'メモ',
+			type: 'textarea',
+			pattern: '^[A-Z]{3}-\\d{2}$',
+			patternMessage: 'メモは ABC-12 の形式で入力してください。',
+		},
+	],
+});
+
+if (result && result.action === 'OK') {
+	console.log(result.values.title);
+	console.log(result.values.count);
+	console.log(result.values.dueDate);
+	console.log(result.values.memo);
+}
 ```
 
 <a id="setheadermenuspacebutton"></a>

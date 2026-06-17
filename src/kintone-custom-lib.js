@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_kc_)で始める
-/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText */
+/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText */
 
 // 共通定数
 /**
@@ -11,6 +11,14 @@
  * @constant {string} _KC_ASSET_BASE - アイコン画像のベースURL
  */
 const _KC_ASSET_BASE = 'https://js.kacsw.or.jp/image';
+
+const _kc_isMobilePath = () => {
+	return (
+		typeof location !== 'undefined' &&
+		typeof location.pathname === 'string' &&
+		/\/k\/m\//.test(location.pathname)
+	);
+};
 
 /**
  * 内部: 実行環境（PC/モバイル）に応じた app 名前空間を返す
@@ -110,6 +118,281 @@ const _kc_sanitizeHtml = (html) => {
 	}
 };
 
+const _kc_createTextBody = (message, allowHtml, className) => {
+	const body = document.createElement('div');
+	if (className) body.className = className;
+	if (allowHtml) {
+		body.innerHTML = _kc_sanitizeHtml(message);
+	} else {
+		body.textContent = String(message);
+	}
+	return body;
+};
+
+const _kc_isSupportedInputType = (type) => {
+	return ['text', 'number', 'date', 'textarea'].indexOf(type) !== -1;
+};
+
+const _kc_normalizeInputField = (field, index) => {
+	if (!field || typeof field !== 'object') return null;
+	const name = typeof field.name === 'string' ? field.name.trim() : '';
+	if (!name) return null;
+	const type = typeof field.type === 'string' ? field.type.trim().toLowerCase() : 'text';
+	if (!_kc_isSupportedInputType(type)) return null;
+	const label =
+		typeof field.label === 'string' && field.label.trim()
+			? field.label
+			: '入力' + String(index + 1);
+	return {
+		name,
+		label,
+		type,
+		value: field.value === undefined || field.value === null ? '' : String(field.value),
+		placeholder:
+			typeof field.placeholder === 'string' && field.placeholder.trim() ? field.placeholder : '',
+		required: field.required === true,
+		min: field.min,
+		max: field.max,
+		step: field.step,
+		maxLength:
+			typeof field.maxLength === 'number' &&
+			Number.isInteger(field.maxLength) &&
+			field.maxLength >= 0
+				? field.maxLength
+				: undefined,
+		pattern: typeof field.pattern === 'string' && field.pattern.trim() ? field.pattern : undefined,
+		patternMessage:
+			typeof field.patternMessage === 'string' && field.patternMessage.trim()
+				? field.patternMessage
+				: undefined,
+	};
+};
+
+const _kc_createInputControl = (field) => {
+	const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
+	if (field.type !== 'textarea') {
+		input.type = field.type;
+	}
+	input.name = field.name;
+	input.value = field.value;
+	input.placeholder = field.placeholder;
+	input.required = field.required;
+	input.className = 'kc-input-dialog__control';
+	input.style.width = '100%';
+	input.style.boxSizing = 'border-box';
+	input.style.marginTop = '4px';
+	if (field.type === 'textarea') {
+		input.rows = 4;
+	}
+	if (field.min !== undefined) input.min = String(field.min);
+	if (field.max !== undefined) input.max = String(field.max);
+	if (field.step !== undefined) input.step = String(field.step);
+	if (field.maxLength !== undefined) input.maxLength = field.maxLength;
+	if (field.pattern !== undefined && field.type !== 'textarea') input.pattern = field.pattern;
+	return input;
+};
+
+const _kc_matchesPattern = (value, pattern) => {
+	if (typeof pattern !== 'string' || !pattern) return true;
+	try {
+		return new RegExp(pattern).test(value);
+	} catch {
+		return true;
+	}
+};
+
+const _kc_createInputDialogBody = (description, allowHtml, fields) => {
+	const body = document.createElement('div');
+	body.className = 'kc-input-dialog';
+	body.style.display = 'flex';
+	body.style.flexDirection = 'column';
+	body.style.gap = '12px';
+	body.style.padding = '8px 0';
+
+	if (typeof description === 'string' && description) {
+		const descriptionElement = _kc_createTextBody(
+			description,
+			allowHtml,
+			'kc-input-dialog__description'
+		);
+		descriptionElement.style.margin = '0';
+		body.appendChild(descriptionElement);
+	}
+
+	fields.forEach((field) => {
+		const fieldWrapper = document.createElement('label');
+		fieldWrapper.className = 'kc-input-dialog__field';
+		fieldWrapper.style.display = 'block';
+
+		const labelText = document.createElement('div');
+		labelText.className = 'kc-input-dialog__label';
+		labelText.textContent = field.label;
+		fieldWrapper.appendChild(labelText);
+		fieldWrapper.appendChild(_kc_createInputControl(field));
+		body.appendChild(fieldWrapper);
+	});
+
+	return body;
+};
+
+const _kc_isValidNumberString = (value) => {
+	if (typeof value !== 'string') return false;
+	const trimmed = value.trim();
+	if (!trimmed) return false;
+	if (!/^[+-]?(?:\d+\.\d+|\d+|\.\d+)$/.test(trimmed)) return false;
+	const numericValue = Number(trimmed);
+	return Number.isFinite(numericValue);
+};
+
+const _kc_isValidDateString = (value) => {
+	if (typeof value !== 'string') return false;
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+	const year = Number(value.slice(0, 4));
+	const month = Number(value.slice(5, 7));
+	const day = Number(value.slice(8, 10));
+	const date = new Date(Date.UTC(year, month - 1, day));
+	return (
+		date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+	);
+};
+
+const _kc_normalizeDateInput = (value) => {
+	if (typeof value !== 'string') return null;
+	const trimmed = value.trim();
+	if (!trimmed) return null;
+	const compactDigits = trimmed.replace(/[０-９]/g, (char) =>
+		String.fromCharCode(char.charCodeAt(0) - 0xfee0)
+	);
+	const compactMatch = compactDigits.match(/^(\d{4})(\d{2})(\d{2})$/);
+	if (compactMatch) {
+		return [compactMatch[1], compactMatch[2], compactMatch[3]].join('-');
+	}
+	const normalized = trimmed
+		.replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+		.replace(/[年月/.]/g, '-')
+		.replace(/日/g, '')
+		.replace(/\s+/g, '-')
+		.replace(/-+/g, '-')
+		.replace(/^-|-$/g, '');
+	const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+	if (!match) return null;
+	return [match[1], match[2].padStart(2, '0'), match[3].padStart(2, '0')].join('-');
+};
+
+const _kc_collectInputDialogResult = (body, fields) => {
+	return fields.reduce(
+		(result, field) => {
+			const input = body.querySelector('[name="' + field.name + '"]');
+			if (!input) {
+				result.values[field.name] = null;
+				result.errors[field.name] = '入力欄を取得できませんでした。';
+				return result;
+			}
+
+			const rawValue = typeof input.value === 'string' ? input.value : '';
+			const trimmedValue = rawValue.trim();
+
+			if (!trimmedValue) {
+				if (field.required) {
+					result.errors[field.name] = 'この項目は必須です。';
+				}
+				result.values[field.name] = null;
+				return result;
+			}
+
+			if (field.type === 'number') {
+				if (!_kc_isValidNumberString(trimmedValue)) {
+					result.errors[field.name] = '数値を入力してください。';
+					result.values[field.name] = null;
+					return result;
+				}
+				const numericValue = Number(trimmedValue);
+				if (field.min !== undefined && numericValue < Number(field.min)) {
+					result.errors[field.name] = String(field.min) + '以上の数値を入力してください。';
+					result.values[field.name] = null;
+					return result;
+				}
+				if (field.max !== undefined && numericValue > Number(field.max)) {
+					result.errors[field.name] = String(field.max) + '以下の数値を入力してください。';
+					result.values[field.name] = null;
+					return result;
+				}
+				result.values[field.name] = numericValue;
+				return result;
+			}
+
+			if (field.type === 'date') {
+				const normalizedDateValue = _kc_normalizeDateInput(trimmedValue);
+				if (!normalizedDateValue || !_kc_isValidDateString(normalizedDateValue)) {
+					result.errors[field.name] = '日付を確認してください。例: 2026-06-18、20260618';
+					result.values[field.name] = null;
+					return result;
+				}
+				if (input.value !== normalizedDateValue) {
+					input.value = normalizedDateValue;
+				}
+				if (field.min !== undefined && normalizedDateValue < String(field.min)) {
+					result.errors[field.name] = String(field.min) + '以降の日付を入力してください。';
+					result.values[field.name] = null;
+					return result;
+				}
+				if (field.max !== undefined && normalizedDateValue > String(field.max)) {
+					result.errors[field.name] = String(field.max) + '以前の日付を入力してください。';
+					result.values[field.name] = null;
+					return result;
+				}
+				result.values[field.name] = normalizedDateValue;
+				return result;
+			}
+
+			if (field.maxLength !== undefined && rawValue.length > field.maxLength) {
+				result.errors[field.name] = String(field.maxLength) + '文字以内で入力してください。';
+				result.values[field.name] = null;
+				return result;
+			}
+
+			if (!_kc_matchesPattern(rawValue, field.pattern)) {
+				result.errors[field.name] = field.patternMessage || '入力形式を確認してください。';
+				result.values[field.name] = null;
+				return result;
+			}
+
+			result.values[field.name] = rawValue;
+			return result;
+		},
+		{ values: {}, errors: {} }
+	);
+};
+
+const _kc_formatInputDialogErrors = (errors, fields) => {
+	const fieldLabelMap = fields.reduce((map, field) => {
+		map[field.name] = field.label;
+		return map;
+	}, {});
+	const lines = ['入力内容を確認してください。'];
+	Object.keys(errors).forEach((fieldName) => {
+		const label = fieldLabelMap[fieldName] || fieldName;
+		lines.push(label + ': ' + errors[fieldName]);
+	});
+	return lines.join('\n');
+};
+
+const _kc_focusFirstInvalidInput = (body, fields, errors) => {
+	if (!body || !errors || typeof errors !== 'object') return;
+	const firstInvalidField = fields.find((field) =>
+		Object.prototype.hasOwnProperty.call(errors, field.name)
+	);
+	if (!firstInvalidField) return;
+	const input = body.querySelector('[name="' + firstInvalidField.name + '"]');
+	if (input && typeof input.focus === 'function') {
+		try {
+			input.focus();
+		} catch {
+			// noop
+		}
+	}
+};
+
 /**
  * 内部: ダイアログ作成＆表示の共通ロジック
  * options: {
@@ -119,25 +402,32 @@ const _kc_sanitizeHtml = (html) => {
  */
 const _kc_showDialog = (options) => {
 	if (!options || typeof options !== 'object') return Promise.resolve(undefined);
-	const { title, body } = options;
+	const {
+		title,
+		body,
+		showOkButton = true,
+		okButtonText = '閉じる',
+		showCancelButton = false,
+		cancelButtonText = '',
+		showCloseButton = false,
+		beforeClose = () => {
+			return;
+		},
+		okAriaLabel,
+	} = options;
 	const config = {
 		title: String(title || ''),
 		body: body,
-		showOkButton: true,
-		okButtonText: '閉じる',
-		showCancelButton: false,
-		cancelButtonText: '',
-		showCloseButton: false,
-		beforeClose: () => {
-			return;
-		},
+		showOkButton: showOkButton,
+		okButtonText: String(okButtonText || ''),
+		showCancelButton: showCancelButton,
+		cancelButtonText: String(cancelButtonText || ''),
+		showCloseButton: showCloseButton,
+		beforeClose: typeof beforeClose === 'function' ? beforeClose : () => {},
 	};
 
 	try {
-		const isMobilePath =
-			typeof location !== 'undefined' && typeof location.pathname === 'string'
-				? /\/k\/m\//.test(location.pathname)
-				: false;
+		const isMobilePath = _kc_isMobilePath();
 		const isMobileBottomSheetAvailable =
 			isMobilePath &&
 			typeof kintone !== 'undefined' &&
@@ -159,7 +449,7 @@ const _kc_showDialog = (options) => {
 				if (container) {
 					const okBtn = container.querySelector('button.kintone-dialog-ok-button, button');
 					if (okBtn) {
-						okBtn.setAttribute('aria-label', '閉じる');
+						okBtn.setAttribute('aria-label', String(okAriaLabel || okButtonText || 'OK'));
 					}
 				}
 			} catch {
@@ -201,6 +491,63 @@ const _kc_showDialog = (options) => {
 			/* noop */
 		}
 		return Promise.resolve(undefined);
+	}
+};
+
+const _kc_showConfirmChoice = async (message, title, options) => {
+	const dialogTitle = typeof title === 'string' && title ? title : '確認';
+	const config = options && typeof options === 'object' ? options : {};
+	const yesText = typeof config.yesText === 'string' && config.yesText ? config.yesText : 'はい';
+	const noText = typeof config.noText === 'string' && config.noText ? config.noText : 'いいえ';
+	const allowHtml = config.allowHtml === true;
+
+	try {
+		if (
+			_kc_isMobilePath() &&
+			typeof kintone !== 'undefined' &&
+			kintone.mobile &&
+			typeof kintone.mobile.showConfirmBottomSheet === 'function'
+		) {
+			const result = await kintone.mobile.showConfirmBottomSheet({
+				title: dialogTitle,
+				body: String(message),
+				okButtonText: yesText,
+				showCancelButton: true,
+				cancelButtonText: noText,
+			});
+			return result === 'OK';
+		}
+		if (typeof kintone !== 'undefined' && typeof kintone.showConfirmDialog === 'function') {
+			const result = await kintone.showConfirmDialog({
+				title: dialogTitle,
+				body: String(message),
+				okButtonText: yesText,
+				showCancelButton: true,
+				cancelButtonText: noText,
+			});
+			return result === 'OK';
+		}
+	} catch (error) {
+		console.error('確認ダイアログ表示中にエラー:', error);
+	}
+
+	const fallbackBody = _kc_createTextBody(message, allowHtml, 'kc-confirm-dialog__message');
+	const action = await _kc_showDialog({
+		title: dialogTitle,
+		body: fallbackBody,
+		showOkButton: true,
+		okButtonText: yesText,
+		showCancelButton: true,
+		cancelButtonText: noText,
+		okAriaLabel: yesText,
+	});
+	if (action !== undefined) {
+		return action === 'OK';
+	}
+	try {
+		return confirm(String(message));
+	} catch {
+		return false;
 	}
 };
 
@@ -437,6 +784,102 @@ const notifyWarning = (message, title = '注意', allowHtml = false) => {
 	body.setAttribute('aria-describedby', messageId);
 	// 共通処理でダイアログ表示
 	return _kc_showDialog({ title, body });
+};
+
+/**
+ * 「はい / いいえ」などの2択確認ダイアログを表示します。
+ * - PC では kintone.showConfirmDialog、モバイルでは kintone.mobile.showConfirmBottomSheet を優先します。
+ * - 利用できない場合は createDialog ベースの共通ダイアログにフォールバックします。
+ *
+ * @param {string} message 確認メッセージ
+ * @param {string} [title='確認'] ダイアログのタイトル
+ * @param {Object} [options] 表示オプション
+ * @param {string} [options.yesText='はい'] OK 側ボタンの表示ラベル
+ * @param {string} [options.noText='いいえ'] キャンセル側ボタンの表示ラベル
+ * @param {boolean} [options.allowHtml=false] フォールバック表示時に message を HTML として扱うか
+ * @returns {Promise<boolean>} 「はい」相当なら true、それ以外は false
+ */
+const showYesNoDialog = (message, title = '確認', options) => {
+	return _kc_showConfirmChoice(message, title, options);
+};
+
+/**
+ * 入力フォーム付きダイアログを表示します。
+ * - text / number / date / textarea の入力欄を宣言的に構築します。
+ * - OK 押下時に入力値を検証し、エラーがあればダイアログを閉じずに notifyError を表示します。
+ * - 結果は { action, values } 形式で返します。
+ *
+ * @param {Object} options 表示オプション
+ * @param {string} [options.title='入力'] ダイアログのタイトル
+ * @param {string} [options.description=''] ダイアログ先頭の補足説明
+ * @param {boolean} [options.allowHtml=false] description を HTML として扱うか
+ * @param {string} [options.okButtonText='OK'] OK ボタンラベル
+ * @param {string} [options.cancelButtonText='キャンセル'] キャンセルボタンラベル
+ * @param {Array<Object>} options.fields 入力欄定義の配列
+ * @returns {Promise<{action: string|undefined, values: Object|null}|undefined>} 実行結果
+ */
+const showInputDialog = async (options) => {
+	if (!options || typeof options !== 'object') return undefined;
+	const normalizedFields = Array.isArray(options.fields)
+		? options.fields
+				.map((field, index) => _kc_normalizeInputField(field, index))
+				.filter((field) => !!field)
+		: [];
+	if (!normalizedFields.length) {
+		console.warn('showInputDialog: fields are required');
+		return undefined;
+	}
+
+	const title = typeof options.title === 'string' && options.title ? options.title : '入力';
+	const okButtonText =
+		typeof options.okButtonText === 'string' && options.okButtonText ? options.okButtonText : 'OK';
+	const cancelButtonText =
+		typeof options.cancelButtonText === 'string' && options.cancelButtonText
+			? options.cancelButtonText
+			: 'キャンセル';
+	const body = _kc_createInputDialogBody(
+		typeof options.description === 'string' ? options.description : '',
+		options.allowHtml === true,
+		normalizedFields
+	);
+	let validatedValues = null;
+	const action = await _kc_showDialog({
+		title,
+		body,
+		showOkButton: true,
+		okButtonText,
+		showCancelButton: true,
+		cancelButtonText,
+		okAriaLabel: okButtonText,
+		beforeClose: async (dialogAction) => {
+			if (dialogAction !== 'OK') {
+				return true;
+			}
+			const collected = _kc_collectInputDialogResult(body, normalizedFields);
+			if (Object.keys(collected.errors).length > 0) {
+				validatedValues = null;
+				await notifyError(
+					_kc_formatInputDialogErrors(collected.errors, normalizedFields),
+					'入力エラー',
+					false
+				);
+				_kc_focusFirstInvalidInput(body, normalizedFields, collected.errors);
+				return false;
+			}
+			validatedValues = collected.values;
+			return true;
+		},
+	});
+	if (action !== 'OK') {
+		return {
+			action,
+			values: null,
+		};
+	}
+	return {
+		action,
+		values: validatedValues,
+	};
 };
 
 /**
@@ -1021,6 +1464,12 @@ if (typeof window !== 'undefined') {
 	} catch {}
 	try {
 		window.notifyWarning = typeof notifyWarning !== 'undefined' ? notifyWarning : undefined;
+	} catch {}
+	try {
+		window.showYesNoDialog = typeof showYesNoDialog !== 'undefined' ? showYesNoDialog : undefined;
+	} catch {}
+	try {
+		window.showInputDialog = typeof showInputDialog !== 'undefined' ? showInputDialog : undefined;
 	} catch {}
 	try {
 		window.setHeaderMenuSpaceButton =
