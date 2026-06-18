@@ -11,6 +11,8 @@
  * @constant {string} _KC_ASSET_BASE - アイコン画像のベースURL
  */
 const _KC_ASSET_BASE = 'https://js.kacsw.or.jp/image';
+const _KC_DIALOG_TEXT_FONT_SIZE = '14px';
+const _KC_DIALOG_TEXT_LINE_HEIGHT = '1.5';
 
 const _kc_isMobilePath = () => {
 	return (
@@ -129,6 +131,12 @@ const _kc_createTextBody = (message, allowHtml, className) => {
 	return body;
 };
 
+const _kc_applyDialogTextStyle = (element) => {
+	if (!element || !element.style) return;
+	element.style.fontSize = _KC_DIALOG_TEXT_FONT_SIZE;
+	element.style.lineHeight = _KC_DIALOG_TEXT_LINE_HEIGHT;
+};
+
 const _kc_isSupportedInputType = (type) => {
 	return ['text', 'number', 'date', 'textarea'].indexOf(type) !== -1;
 };
@@ -181,6 +189,7 @@ const _kc_createInputControl = (field) => {
 	input.style.width = '100%';
 	input.style.boxSizing = 'border-box';
 	input.style.marginTop = '4px';
+	_kc_applyDialogTextStyle(input);
 	if (field.type === 'textarea') {
 		input.rows = 4;
 	}
@@ -209,6 +218,7 @@ const _kc_createInputDialogBody = (description, allowHtml, fields) => {
 	body.style.gap = '12px';
 	body.style.padding = '8px 12px';
 	body.style.boxSizing = 'border-box';
+	_kc_applyDialogTextStyle(body);
 
 	if (typeof description === 'string' && description) {
 		const descriptionElement = _kc_createTextBody(
@@ -535,6 +545,7 @@ const _kc_showConfirmChoice = async (message, title, options) => {
 	const fallbackBody = _kc_createTextBody(message, allowHtml, 'kc-confirm-dialog__message');
 	fallbackBody.style.padding = '8px 12px';
 	fallbackBody.style.boxSizing = 'border-box';
+	_kc_applyDialogTextStyle(fallbackBody);
 	const action = await _kc_showDialog({
 		title: dialogTitle,
 		body: fallbackBody,
@@ -592,6 +603,7 @@ const notifyError = (message, title = 'エラー', allowHtml = false) => {
 	errorText.setAttribute('role', 'status');
 	errorText.setAttribute('aria-live', 'assertive');
 	errorText.className = 'kc-notify-error__message';
+	_kc_applyDialogTextStyle(errorText);
 	// 参照用 id を付与して dialog に関連付けられるようにする
 	const messageId = 'kc-notify-error__message-' + Math.random().toString(36).slice(2, 8);
 	errorText.id = messageId;
@@ -728,6 +740,7 @@ const notifyInfo = (message, title = '情報', allowHtml = false) => {
 	infoText.setAttribute('role', 'status');
 	infoText.setAttribute('aria-live', 'polite');
 	infoText.className = 'kc-notify-info__message';
+	_kc_applyDialogTextStyle(infoText);
 	const messageId = 'kc-notify-info__message-' + Math.random().toString(36).slice(2, 8);
 	infoText.id = messageId;
 	if (allowHtml) {
@@ -775,6 +788,7 @@ const notifyWarning = (message, title = '注意', allowHtml = false) => {
 	warnText.setAttribute('role', 'status');
 	warnText.setAttribute('aria-live', 'polite');
 	warnText.className = 'kc-notify-warning__message';
+	_kc_applyDialogTextStyle(warnText);
 	const messageId = 'kc-notify-warning__message-' + Math.random().toString(36).slice(2, 8);
 	warnText.id = messageId;
 	if (allowHtml) {

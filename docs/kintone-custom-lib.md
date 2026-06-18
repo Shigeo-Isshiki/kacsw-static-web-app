@@ -87,6 +87,7 @@ setRecordValues(r, { a: 10, c: 3 });
 ### notifyError(message, title = 'エラー', allowHtml = false)
 
 - 動作概要: 指定メッセージを表示 UI で通知します。`allowHtml` が真の場合はサニタイズした HTML を挿入し、偽の場合はプレーンテキストとして表示します。アクセシビリティ用の属性（role/aria-live等）も設定されます。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
+- 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 戻り値: `Promise<string | undefined>` を返します。`await` すると、通常は `OK` を受け取れます（notify 系は OK ボタンのみ表示）。ダイアログ API が利用できない場合や内部エラー時は `undefined` になります。`CANCEL` / `CLOSE` / `FUNCTION` は notify 系の現行設定では通常発生しません。
 
 - `message` (string | Node) — ダイアログに表示する本文。Node を渡すとそのまま挿入可能（`allowHtml` の影響を受ける）
@@ -122,6 +123,7 @@ if (action === 'OK') {
 ### notifyInfo(message, title = '情報', allowHtml = false)
 
 - 動作概要: 情報表示用の通知 UI を表示します。操作の成功通知や一般的な案内に使い、`allowHtml` に応じてサニタイズされた HTML またはプレーンテキストを挿入します。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
+- 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 戻り値: `Promise<string | undefined>` を返します。`await` すると、通常は `OK` を受け取れます（notify 系は OK ボタンのみ表示）。ダイアログ API が利用できない場合や内部エラー時は `undefined` になります。
 
 - `message` (string | Node) — ダイアログに表示する本文
@@ -140,6 +142,7 @@ console.log('notifyInfo action:', infoAction);
 ### notifyWarning(message, title = '注意', allowHtml = false)
 
 - 動作概要: 注意喚起や軽度の問題を通知するための通知 UI を表示します。処理を継続できるがユーザーの注意を促したいケースで使用します。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
+- 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 戻り値: `Promise<string | undefined>` を返します。`await` すると、通常は `OK` を受け取れます（notify 系は OK ボタンのみ表示）。ダイアログ API が利用できない場合や内部エラー時は `undefined` になります。
 
 - `message` (string | Node) — ダイアログに表示する本文
@@ -153,11 +156,19 @@ const warningAction = await notifyWarning('入力内容を確認してくださ�
 console.log('notifyWarning action:', warningAction);
 ```
 
+<a id="dialog-text-style"></a>
+### ダイアログ文字スタイル共通設定
+
+- 対象: `notifyError` / `notifyInfo` / `notifyWarning` の本文、`showYesNoDialog` のフォールバック本文、`showInputDialog` の本文コンテナと入力コントロール。
+- 適用方法: 内部関数 `_kc_applyDialogTextStyle` で文字サイズ・行間を共通適用しています。
+- 調整ポイント: 文字サイズは `_KC_DIALOG_TEXT_FONT_SIZE`、行間は `_KC_DIALOG_TEXT_LINE_HEIGHT` を変更すると、対象ダイアログにまとめて反映されます。
+
 <a id="showyesnodialog"></a>
 
 ### showYesNoDialog(message, title = '確認', options)
 
 - 動作概要: `はい / いいえ` の2択確認ダイアログを表示します。PC では `kintone.showConfirmDialog()`、モバイルでは `kintone.mobile.showConfirmBottomSheet()` を優先し、利用できない場合は共通ダイアログ実装にフォールバックします。
+- 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 戻り値: `Promise<boolean>`。`はい` 相当の操作なら `true`、`いいえ` やダイアログ表示失敗時は `false` を返します。
 
 - `message` (string) — 本文メッセージ
@@ -189,6 +200,7 @@ if (shouldUpdate) {
 ### showInputDialog(options)
 
 - 動作概要: `createDialog()` / `createBottomSheet()` を使って、入力フォーム付きダイアログを表示します。`text`、`number`、`date`、`textarea` の入力欄を宣言的に構成できます。
+- 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 入力値の扱い:
 	- `number` はライブラリ側でも数値文字列かどうかを再検証し、`NaN` や文字列混入を返しません。
 	- `date` は最終的に `YYYY-MM-DD` 形式へ正規化してから実在する日付かを再検証し、`2026-02-30` のような不正日付は返しません。
