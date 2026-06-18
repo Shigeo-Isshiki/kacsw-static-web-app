@@ -11,7 +11,7 @@
  * @constant {string} _KC_ASSET_BASE - アイコン画像のベースURL
  */
 const _KC_ASSET_BASE = 'https://js.kacsw.or.jp/image';
-const _KC_DIALOG_TEXT_FONT_SIZE = '14px';
+const _KC_DIALOG_TEXT_FONT_SIZE = '16px';
 const _KC_DIALOG_TEXT_LINE_HEIGHT = '1.5';
 
 const _kc_isMobilePath = () => {
