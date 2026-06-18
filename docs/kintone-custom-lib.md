@@ -20,6 +20,33 @@
 - [setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)](#setspacefieldbutton)
 - [setSpaceFieldText(spaceField, id, innerHTML)](#setspacefieldtext)
 - [setSpaceFieldDisplay(spaceField, display)](#setspacefielddisplay)
+- [initKintoneCustomLibRuntime(options)](#initkintonecustomlibruntime)
+- [resetKintoneCustomLibRuntime()](#resetkintonecustomlibruntime)
+
+## ランタイム初期化（推奨）
+
+PC/モバイル判定を呼び出し側で一度だけ確定したい場合は、次の初期化 API を利用します。
+
+- `initKintoneCustomLibRuntime(options)`
+  - `options.isMobilePage`（boolean）または `options.mode`（`'pc' | 'mobile'`）を受け取り、内部キャッシュに保存します。
+  - `options.version`（number）を指定すると、グローバル設定の更新世代として扱います。
+- `resetKintoneCustomLibRuntime()`
+  - 内部キャッシュをクリアします（主にテスト用）。
+
+また、`globalThis.KACSW_RUNTIME`（または `window.KACSW_RUNTIME`）に次の形式で設定すると、内部で自動同期されます。
+
+```js
+globalThis.KACSW_RUNTIME = {
+	isMobilePage: true,
+	version: Date.now(),
+};
+```
+
+判定の優先順位は次の通りです。
+
+- 明示初期化（`initKintoneCustomLibRuntime`）
+- `KACSW_RUNTIME` の設定値
+- 既存の自動判定（`location.pathname` ベース）
 
 ## 個別関数の使い方
 
@@ -86,7 +113,7 @@ setRecordValues(r, { a: 10, c: 3 });
 
 ### notifyError(message, title = 'エラー', allowHtml = false)
 
-- 動作概要: 指定メッセージを表示 UI で通知します。`allowHtml` が真の場合はサニタイズした HTML を挿入し、偽の場合はプレーンテキストとして表示します。アクセシビリティ用の属性（role/aria-live等）も設定されます。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
+- 動作概要: 指定メッセージを表示 UI で通知します。`allowHtml` が真の場合はサニタイズした HTML を挿入し、偽の場合はプレーンテキストとして表示します。アクセシビリティ用の属性（role/aria-live等）も設定されます。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します（ランタイム初期化済みの場合はその判定を優先）。
 - 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 戻り値: `Promise<string | undefined>` を返します。`await` すると、通常は `OK` を受け取れます（notify 系は OK ボタンのみ表示）。ダイアログ API が利用できない場合や内部エラー時は `undefined` になります。`CANCEL` / `CLOSE` / `FUNCTION` は notify 系の現行設定では通常発生しません。
 
@@ -122,7 +149,7 @@ if (action === 'OK') {
 
 ### notifyInfo(message, title = '情報', allowHtml = false)
 
-- 動作概要: 情報表示用の通知 UI を表示します。操作の成功通知や一般的な案内に使い、`allowHtml` に応じてサニタイズされた HTML またはプレーンテキストを挿入します。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
+- 動作概要: 情報表示用の通知 UI を表示します。操作の成功通知や一般的な案内に使い、`allowHtml` に応じてサニタイズされた HTML またはプレーンテキストを挿入します。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します（ランタイム初期化済みの場合はその判定を優先）。
 - 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 戻り値: `Promise<string | undefined>` を返します。`await` すると、通常は `OK` を受け取れます（notify 系は OK ボタンのみ表示）。ダイアログ API が利用できない場合や内部エラー時は `undefined` になります。
 
@@ -141,7 +168,7 @@ console.log('notifyInfo action:', infoAction);
 
 ### notifyWarning(message, title = '注意', allowHtml = false)
 
-- 動作概要: 注意喚起や軽度の問題を通知するための通知 UI を表示します。処理を継続できるがユーザーの注意を促したいケースで使用します。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します。
+- 動作概要: 注意喚起や軽度の問題を通知するための通知 UI を表示します。処理を継続できるがユーザーの注意を促したいケースで使用します。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します（ランタイム初期化済みの場合はその判定を優先）。
 - 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 戻り値: `Promise<string | undefined>` を返します。`await` すると、通常は `OK` を受け取れます（notify 系は OK ボタンのみ表示）。ダイアログ API が利用できない場合や内部エラー時は `undefined` になります。
 
@@ -157,6 +184,7 @@ console.log('notifyWarning action:', warningAction);
 ```
 
 <a id="dialog-text-style"></a>
+
 ### ダイアログ文字スタイル共通設定
 
 - 対象: `notifyError` / `notifyInfo` / `notifyWarning` の本文、`showYesNoDialog` のフォールバック本文、`showInputDialog` の本文コンテナと入力コントロール。
@@ -167,7 +195,7 @@ console.log('notifyWarning action:', warningAction);
 
 ### showYesNoDialog(message, title = '確認', options)
 
-- 動作概要: `はい / いいえ` の2択確認ダイアログを表示します。PC では `kintone.showConfirmDialog()`、モバイルでは `kintone.mobile.showConfirmBottomSheet()` を優先し、利用できない場合は共通ダイアログ実装にフォールバックします。
+- 動作概要: `はい / いいえ` の2択確認ダイアログを表示します。PC では `kintone.showConfirmDialog()`、モバイルでは `kintone.mobile.showConfirmBottomSheet()` を優先し、利用できない場合は共通ダイアログ実装にフォールバックします。モバイル判定はランタイム初期化済みならその設定を優先します。
 - 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 戻り値: `Promise<boolean>`。`はい` 相当の操作なら `true`、`いいえ` やダイアログ表示失敗時は `false` を返します。
 
@@ -202,12 +230,12 @@ if (shouldUpdate) {
 - 動作概要: `createDialog()` / `createBottomSheet()` を使って、入力フォーム付きダイアログを表示します。`text`、`number`、`date`、`textarea` の入力欄を宣言的に構成できます。
 - 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 入力値の扱い:
-	- `number` はライブラリ側でも数値文字列かどうかを再検証し、`NaN` や文字列混入を返しません。
-	- `date` は最終的に `YYYY-MM-DD` 形式へ正規化してから実在する日付かを再検証し、`2026-02-30` のような不正日付は返しません。
-	- `date` では `20260608`、`2026/6/8`、`2026.6.8`、`2026年6月8日`、全角数字を含む同等表記のような「西暦4桁で始まる非曖昧な入力」を受け付けます。
-	- `date` の入力エラー時は、例として `2026-06-18` や `20260618` を含む案内メッセージを表示します。
-	- `required: true` を付けた項目は空文字を許可しません。
-	- `text` / `textarea` では `maxLength` と `pattern` による追加バリデーションを指定できます。
+  - `number` はライブラリ側でも数値文字列かどうかを再検証し、`NaN` や文字列混入を返しません。
+  - `date` は最終的に `YYYY-MM-DD` 形式へ正規化してから実在する日付かを再検証し、`2026-02-30` のような不正日付は返しません。
+  - `date` では `20260608`、`2026/6/8`、`2026.6.8`、`2026年6月8日`、全角数字を含む同等表記のような「西暦4桁で始まる非曖昧な入力」を受け付けます。
+  - `date` の入力エラー時は、例として `2026-06-18` や `20260618` を含む案内メッセージを表示します。
+  - `required: true` を付けた項目は空文字を許可しません。
+  - `text` / `textarea` では `maxLength` と `pattern` による追加バリデーションを指定できます。
 - 検証エラー時の表示: 検証に失敗した場合はダイアログを閉じず、`notifyError()` を使ってフィールド名付きのエラーメッセージを統一的に表示します。ユーザーは入力値を保持したまま、その場で修正して再実行できます。
 - フォーカス制御: 検証エラー後は、最初の不正項目へフォーカスを戻します。
 - 戻り値: `Promise<{ action: string | undefined, values: Object | null } | undefined>`。`action === 'OK'` の場合に `values` に入力結果が入ります。キャンセル時は `values` は `null` です。入力エラーだけではダイアログは閉じないため、`VALIDATION_ERROR` は返しません。
@@ -358,7 +386,7 @@ setRecordHeaderMenuSpaceText('rec-text', null);
 ### setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)
 
 - 動作概要: 指定したスペースフィールドにボタンを追加または削除します。追加時は `type="button"` を設定し、`onClick` を登録します。実行環境に応じて PC / モバイルの API を自動判定して `getSpaceElement` を使用します。
-- API 選択ルール: `location.pathname` が `/k/m/` を含む場合は `kintone.mobile.app.record.getSpaceElement` を優先し、そうでない場合は `kintone.app.record.getSpaceElement` を優先します。優先先が使えない場合はもう一方へフォールバックします。
+- API 選択ルール: `initKintoneCustomLibRuntime` または `KACSW_RUNTIME` で PC/モバイルが指定されていればその設定を優先します。未設定の場合は `location.pathname` による自動判定を行います。優先先が使えない場合はもう一方へフォールバックします。
 - `getSpaceElement` が `null` を返す画面（スペースフィールド非対応画面など）では、要素追加は行われず `false` を返します。
 - 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 
@@ -397,21 +425,54 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 ### setSpaceFieldText(spaceField, id, innerHTML)
 
 - 動作概要: 指定スペースフィールドに HTML（サニタイズ済）を挿入します。`innerHTML` が null または空文字列の場合は該当要素を削除します。DOM が未準備の場合はリトライ設計を採ることを想定しています。実行環境に応じて PC / モバイルの API を自動判定して `getSpaceElement` を使用します。
-- API 選択ルールは `setSpaceFieldButton` と同じです（モバイル画面パスでは mobile API 優先）。
+- API 選択ルールは `setSpaceFieldButton` と同じです（ランタイム設定優先、未設定時は自動判定）。
 - スペース要素が取得できない場合、同期戻り値は `false` になります（内部リトライで後追い復旧する設計）。
 
 - `spaceField` (string) — スペースフィールドのコード
 - `id` (string) — 挿入する要素の ID
 - `innerHTML` (string | null) — 挿入する HTML（サニタイズ済を想定）。`null` または空文字で削除
 
-テストヒント: PC だけでなく `location.pathname = '/k/m/...'` を設定し、`kintone.mobile.app.record.getSpaceElement` が使われるケースも検証します。
+テストヒント: `initKintoneCustomLibRuntime({ isMobilePage: true })` を使うケースと、未初期化で `location.pathname = '/k/m/...'` を使うケースの両方を検証します。
 
 <a id="setspacefielddisplay"></a>
 
 ### setSpaceFieldDisplay(spaceField, display)
 
 - 動作概要: 指定したスペースフィールドの親ノードの `style.display` を切り替えます。`display` が `true` のときは表示、`false` のときは非表示に設定します。実行環境に応じて PC / モバイルの API を自動判定して `getSpaceElement` を使用します。
-- API 選択ルールは `setSpaceFieldButton` と同じです（モバイル画面パスでは mobile API 優先）。
+- API 選択ルールは `setSpaceFieldButton` と同じです（ランタイム設定優先、未設定時は自動判定）。
+
+<a id="initkintonecustomlibruntime"></a>
+
+### initKintoneCustomLibRuntime(options)
+
+- 動作概要: PC/モバイル判定を明示設定し、内部キャッシュへ保存します。
+
+- `options` (object)
+  - `options.isMobilePage` (boolean, optional) — `true` でモバイル、`false` で PC。
+  - `options.mode` (`'mobile' | 'pc'`, optional) — `isMobilePage` の代替指定。
+  - `options.version` (number, optional) — 設定の更新世代番号。
+
+- 戻り値: `boolean`（有効な判定が適用された場合 `true`）
+
+例:
+
+```js
+initKintoneCustomLibRuntime({ isMobilePage: true, version: Date.now() });
+```
+
+<a id="resetkintonecustomlibruntime"></a>
+
+### resetKintoneCustomLibRuntime()
+
+- 動作概要: 内部キャッシュされたランタイム設定をクリアします。
+- 戻り値: なし
+
+例:
+
+```js
+resetKintoneCustomLibRuntime();
+```
+
 - 取得したスペース要素またはその親ノードが存在しない場合は `false` を返します。
 
 - `spaceField` (string) — スペースフィールドのコード

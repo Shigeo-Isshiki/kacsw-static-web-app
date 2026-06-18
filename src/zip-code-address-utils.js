@@ -3,17 +3,74 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
-/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, kintoneZipSetSpaceFieldButton, kintoneZipSpaceFieldText, normalizeZipCode */
+/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, kintoneZipSetSpaceFieldButton, kintoneZipSpaceFieldText, normalizeZipCode, initZipCodeAddressUtilsRuntime, resetZipCodeAddressUtilsRuntime */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // 郵便番号APIベースURL
 const _ZC_ZIPCODE_API_BASE_URL = 'https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/digital';
+const _ZC_RUNTIME_GLOBAL_KEY = 'KACSW_RUNTIME';
+
+let _zc_runtimeMode = null;
+let _zc_runtimeVersion = null;
 
 // 郵便番号で使用される可能性のある記号を検出するための正規表現
 const _ZC_SYMBOLS_REGEX = /[\-－‐‑–—−ー― 　]/g;
 
 // 全角英数字を検出するための正規表現
 const _ZC_ZENKAKU_ALPHA_NUM_REG = /[Ａ-Ｚａ-ｚ０-９]/g;
+
+const _zc_normalizeRuntimeMode = (options) => {
+	if (!options || typeof options !== 'object') return null;
+	if (typeof options.mode === 'string') {
+		const mode = options.mode.toLowerCase();
+		if (mode === 'mobile' || mode === 'pc') return mode;
+	}
+	if (typeof options.isMobilePage === 'boolean') {
+		return options.isMobilePage ? 'mobile' : 'pc';
+	}
+	return null;
+};
+
+const _zc_applyRuntimeOptions = (options) => {
+	const mode = _zc_normalizeRuntimeMode(options);
+	if (mode) {
+		_zc_runtimeMode = mode;
+	}
+	if (
+		options &&
+		typeof options === 'object' &&
+		typeof options.version === 'number' &&
+		Number.isFinite(options.version)
+	) {
+		_zc_runtimeVersion = options.version;
+	}
+	return mode !== null;
+};
+
+const _zc_syncRuntimeFromGlobal = () => {
+	try {
+		if (typeof window === 'undefined' || !window) return;
+		const runtime = window[_ZC_RUNTIME_GLOBAL_KEY];
+		if (!runtime || typeof runtime !== 'object') return;
+		const hasVersion = typeof runtime.version === 'number' && Number.isFinite(runtime.version);
+		if (hasVersion && _zc_runtimeVersion === runtime.version) return;
+		const applied = _zc_applyRuntimeOptions(runtime);
+		if (!applied && hasVersion) {
+			_zc_runtimeVersion = runtime.version;
+		}
+	} catch {
+		return;
+	}
+};
+
+const initZipCodeAddressUtilsRuntime = (options = {}) => {
+	return _zc_applyRuntimeOptions(options);
+};
+
+const resetZipCodeAddressUtilsRuntime = () => {
+	_zc_runtimeMode = null;
+	_zc_runtimeVersion = null;
+};
 
 //　ライブラリ内の共通関数定義部
 /**
@@ -54,8 +111,13 @@ const _zc_buildZipcodeApiUrl = (normalized) => {
 const _zc_getAppNamespace = () => {
 	try {
 		if (typeof kintone === 'undefined' || !kintone) return null;
+		_zc_syncRuntimeFromGlobal();
 		const pcApp = kintone.app || null;
 		const mobileApp = kintone.mobile && kintone.mobile.app ? kintone.mobile.app : null;
+
+		if (_zc_runtimeMode === 'mobile' && mobileApp) return mobileApp;
+		if (_zc_runtimeMode === 'pc' && pcApp) return pcApp;
+
 		const isMobilePath =
 			typeof location !== 'undefined' && typeof location.pathname === 'string'
 				? /\/k\/m\//.test(location.pathname)
@@ -657,6 +719,8 @@ if (typeof window !== 'undefined') {
 	window.kintoneZipSetSpaceFieldButton = kintoneZipSetSpaceFieldButton;
 	window.kintoneZipSpaceFieldText = kintoneZipSpaceFieldText;
 	window.normalizeZipCode = normalizeZipCode;
+	window.initZipCodeAddressUtilsRuntime = initZipCodeAddressUtilsRuntime;
+	window.resetZipCodeAddressUtilsRuntime = resetZipCodeAddressUtilsRuntime;
 }
 
 // CommonJS export for Node/test environments
@@ -671,6 +735,8 @@ try {
 			kintoneZipSetSpaceFieldButton,
 			kintoneZipSpaceFieldText,
 			normalizeZipCode,
+			initZipCodeAddressUtilsRuntime,
+			resetZipCodeAddressUtilsRuntime,
 		};
 	}
 } catch (e) {}

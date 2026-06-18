@@ -17,6 +17,8 @@
   - `normalizeZipCode(zipCode, callback)`
   - `kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)`
   - `kintoneZipSpaceFieldText(spaceField, id, display)`
+  - `initZipCodeAddressUtilsRuntime(options)`
+  - `resetZipCodeAddressUtilsRuntime()`
 - 実例
 - 注意事項 / エッジケース
 
@@ -51,6 +53,20 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 - `normalizeZipCode(zipCode, callback)` — 正規化済みの7文字（半角英数字）を `callback(result)` で返す。成功: `{ zipCode: string }`、失敗: `{ error: string }`。
 - `kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)` — kintone のスペースフィールドにボタンを追加（または削除）します。
 - `kintoneZipSpaceFieldText(spaceField, id, display)` — 説明テキストをスペースフィールドに追加/削除します。
+- `initZipCodeAddressUtilsRuntime(options)` — PC/モバイル判定を明示設定して内部キャッシュに保存します。
+- `resetZipCodeAddressUtilsRuntime()` — 内部キャッシュをクリアします。
+
+ランタイム初期化（推奨）:
+
+```js
+globalThis.KACSW_RUNTIME = {
+	isMobilePage: true,
+	version: Date.now(),
+};
+initZipCodeAddressUtilsRuntime(globalThis.KACSW_RUNTIME);
+```
+
+判定優先順位は `initZipCodeAddressUtilsRuntime` の設定、`KACSW_RUNTIME`、未設定時の自動判定（`location.pathname`）です。
 
 ---
 
@@ -209,7 +225,7 @@ formatZipCode('１２３－４５６７', (res) => {
 
 - 動作:
   - 指定した `spaceField` のスペース要素にボタンを追加します。`label` が `null` または空文字の場合はボタンを削除/非表示にします。
-  - スペース要素の取得と表示/非表示は内部で PC/モバイルを自動判定します（`/k/m/` 画面では `kintone.mobile.app.record.getSpaceElement` を優先、それ以外は `kintone.app.record.getSpaceElement` を優先。優先先が使えない場合はフォールバック）。
+  - スペース要素の取得と表示/非表示は内部で PC/モバイルを自動判定します（`initZipCodeAddressUtilsRuntime` または `KACSW_RUNTIME` が設定されていればその判定を優先し、未設定時は `location.pathname` ベースで推定。優先先が使えない場合はフォールバック）。
   - ボタン押下時に `getAddressByZipCode` を呼び出し、`callback` に結果を返します。
   - 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
 
@@ -229,10 +245,40 @@ formatZipCode('１２３－４５６７', (res) => {
 
 - 動作:
   - スペースフィールドに説明テキスト用の要素を追加または削除します。
-  - 表示切り替えは内部で PC/モバイルを自動判定します（`/k/m/` 画面では mobile API を優先）。
+  - 表示切り替えは内部で PC/モバイルを自動判定します（ランタイム設定優先、未設定時は自動判定）。
 
 - 戻り値:
   - `void`（DOM に対する副作用を行います）
+
+---
+
+<a id="initZipCodeAddressUtilsRuntime"></a>
+
+### `initZipCodeAddressUtilsRuntime(options)`
+
+- 引数:
+  - `options` (object)
+  - `options.isMobilePage` (boolean, optional)
+  - `options.mode` (`'mobile' | 'pc'`, optional)
+  - `options.version` (number, optional)
+
+- 動作:
+  - PC/モバイル判定を内部キャッシュへ保存します。
+
+- 戻り値:
+  - `boolean`（有効な判定を適用できた場合 `true`）
+
+---
+
+<a id="resetZipCodeAddressUtilsRuntime"></a>
+
+### `resetZipCodeAddressUtilsRuntime()`
+
+- 動作:
+  - 内部キャッシュされたランタイム設定をクリアします。
+
+- 戻り値:
+  - `void`
 
 ---
 
@@ -283,7 +329,7 @@ zc.getAddressByZipCode('1234567', (res) => {
 
 - 入力はまず全角→半角・記号除去・大文字化されます。正規化後は必ず `^[0-9A-Z]{7}$` の形式で API に問い合わせられます。
 - API レスポンスが複数件返ってきた場合はエラー（複数見つかりました）扱いになります。実装は単一ヒットを期待しています。
-- kintone DOM ヘルパは kintone のランタイム環境に依存します。テスト時には DOM と kintone の record namespace のスタブが必要です（PC / モバイル両方）。モバイル分岐の検証時は `location.pathname` を `/k/m/...` に設定してください。
+- kintone DOM ヘルパは kintone のランタイム環境に依存します。テスト時には DOM と kintone の record namespace のスタブが必要です（PC / モバイル両方）。モバイル分岐の検証は `initZipCodeAddressUtilsRuntime({ isMobilePage: true })` と、未初期化の自動判定（`location.pathname`）の両方で確認してください。
 - ネットワークや API の異常 JSON に対しては安全に `error` オブジェクトを返すよう実装されています。
 
 ---

@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_kc_)で始める
-/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText */
+/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText, initKintoneCustomLibRuntime, resetKintoneCustomLibRuntime */
 
 // 共通定数
 /**
@@ -13,6 +13,63 @@
 const _KC_ASSET_BASE = 'https://js.kacsw.or.jp/image';
 const _KC_DIALOG_TEXT_FONT_SIZE = '16px';
 const _KC_DIALOG_TEXT_LINE_HEIGHT = '1.5';
+const _KC_RUNTIME_GLOBAL_KEY = 'KACSW_RUNTIME';
+
+let _kc_runtimeMode = null;
+let _kc_runtimeVersion = null;
+
+const _kc_normalizeRuntimeMode = (options) => {
+	if (!options || typeof options !== 'object') return null;
+	if (typeof options.mode === 'string') {
+		const mode = options.mode.toLowerCase();
+		if (mode === 'mobile' || mode === 'pc') return mode;
+	}
+	if (typeof options.isMobilePage === 'boolean') {
+		return options.isMobilePage ? 'mobile' : 'pc';
+	}
+	return null;
+};
+
+const _kc_applyRuntimeOptions = (options) => {
+	const mode = _kc_normalizeRuntimeMode(options);
+	if (mode) {
+		_kc_runtimeMode = mode;
+	}
+	if (
+		options &&
+		typeof options === 'object' &&
+		typeof options.version === 'number' &&
+		Number.isFinite(options.version)
+	) {
+		_kc_runtimeVersion = options.version;
+	}
+	return mode !== null;
+};
+
+const _kc_syncRuntimeFromGlobal = () => {
+	try {
+		if (typeof window === 'undefined' || !window) return;
+		const runtime = window[_KC_RUNTIME_GLOBAL_KEY];
+		if (!runtime || typeof runtime !== 'object') return;
+		const hasVersion = typeof runtime.version === 'number' && Number.isFinite(runtime.version);
+		if (hasVersion && _kc_runtimeVersion === runtime.version) return;
+		const applied = _kc_applyRuntimeOptions(runtime);
+		if (!applied && hasVersion) {
+			_kc_runtimeVersion = runtime.version;
+		}
+	} catch {
+		return;
+	}
+};
+
+const initKintoneCustomLibRuntime = (options = {}) => {
+	return _kc_applyRuntimeOptions(options);
+};
+
+const resetKintoneCustomLibRuntime = () => {
+	_kc_runtimeMode = null;
+	_kc_runtimeVersion = null;
+};
 
 const _kc_isMobilePath = () => {
 	return (
@@ -22,14 +79,26 @@ const _kc_isMobilePath = () => {
 	);
 };
 
+const _kc_isMobileRuntime = () => {
+	_kc_syncRuntimeFromGlobal();
+	if (_kc_runtimeMode === 'mobile') return true;
+	if (_kc_runtimeMode === 'pc') return false;
+	return _kc_isMobilePath();
+};
+
 /**
  * 内部: 実行環境（PC/モバイル）に応じた app 名前空間を返す
  * @returns {Object|null} app 名前空間、取得できない場合は null
  */
 const _kc_getAppNamespace = () => {
 	try {
+		_kc_syncRuntimeFromGlobal();
 		const pcApp = kintone.app || null;
 		const mobileApp = kintone.mobile && kintone.mobile.app ? kintone.mobile.app : null;
+
+		if (_kc_runtimeMode === 'mobile' && mobileApp) return mobileApp;
+		if (_kc_runtimeMode === 'pc' && pcApp) return pcApp;
+
 		const isMobilePath =
 			typeof location !== 'undefined' && typeof location.pathname === 'string'
 				? /\/k\/m\//.test(location.pathname)
@@ -439,7 +508,7 @@ const _kc_showDialog = (options) => {
 	};
 
 	try {
-		const isMobilePath = _kc_isMobilePath();
+		const isMobilePath = _kc_isMobileRuntime();
 		const isMobileBottomSheetAvailable =
 			isMobilePath &&
 			typeof kintone !== 'undefined' &&
@@ -515,7 +584,7 @@ const _kc_showConfirmChoice = async (message, title, options) => {
 
 	try {
 		if (
-			_kc_isMobilePath() &&
+			_kc_isMobileRuntime() &&
 			typeof kintone !== 'undefined' &&
 			kintone.mobile &&
 			typeof kintone.mobile.showConfirmBottomSheet === 'function'
@@ -1518,6 +1587,16 @@ if (typeof window !== 'undefined') {
 		window.setRecordHeaderMenuSpaceText =
 			typeof setRecordHeaderMenuSpaceText !== 'undefined'
 				? setRecordHeaderMenuSpaceText
+				: undefined;
+	} catch {}
+	try {
+		window.initKintoneCustomLibRuntime =
+			typeof initKintoneCustomLibRuntime !== 'undefined' ? initKintoneCustomLibRuntime : undefined;
+	} catch {}
+	try {
+		window.resetKintoneCustomLibRuntime =
+			typeof resetKintoneCustomLibRuntime !== 'undefined'
+				? resetKintoneCustomLibRuntime
 				: undefined;
 	} catch {}
 }

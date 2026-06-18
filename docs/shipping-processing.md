@@ -29,6 +29,20 @@
 - `getNextBusinessDay(baseDate, cutoffHour)`
 - `kintoneShippingInquiryButton(spaceField, id, label, trackingNumber, carrier)`
 - `validateTrackingNumber(trackingNumber, minLength, maxLength)`
+- `initShippingProcessingRuntime(options)`
+- `resetShippingProcessingRuntime()`
+
+ランタイム初期化（推奨）:
+
+```js
+globalThis.KACSW_RUNTIME = {
+	isMobilePage: true,
+	version: Date.now(),
+};
+initShippingProcessingRuntime(globalThis.KACSW_RUNTIME);
+```
+
+判定優先順位は `initShippingProcessingRuntime` の設定、`KACSW_RUNTIME`、未設定時の自動判定（`location.pathname`）です。
 
 （注）`getNextBusinessDay` は同期関数（**v2.0からコールバック方式から変更**）、`kintoneShippingInquiryButton` は DOM に副作用を与えます。`validateTrackingNumber` は同期関数で、入力不正時に `Error` を投げます。
 
@@ -50,7 +64,7 @@
 
 - 全角数字は半角に変換される（U+FF10–FF19 を対応）
 - 全角ハイフンや各種ダッシュ類は半角ハイフンに統一される
-- スペース要素の取得は実行環境で自動切替される（`/k/m/` 画面では `kintone.mobile.app.record.getSpaceElement` を優先、それ以外は `kintone.app.record.getSpaceElement` を優先）
+- スペース要素の取得は実行環境で自動切替される（`initShippingProcessingRuntime` または `KACSW_RUNTIME` が設定されていればその判定を優先。未設定時は `location.pathname` ベースで推定）
 - スペース要素が取得できない場合（対応外画面・要素未配置など）は、追加処理はスキップされる
 - タブ・改行・全角スペースは半角スペースに置換される
 - 半角数字・ハイフン・空白以外が含まれる場合はエラーになる
@@ -131,6 +145,32 @@ console.log(d2); // -> '2025-11-12'
 
 - `document.createElement` / kintone の record namespace をスタブして、生成される要素の `id`、`textContent`、およびクリック時に `window.open` が正しい URL を受け取ることを確認する
 - `label === null` の場合に親要素が `display: none` になる挙動を確認する
+
+---
+
+### `initShippingProcessingRuntime(options)`
+
+- 引数:
+  - `options` (object)
+  - `options.isMobilePage` (boolean, optional)
+  - `options.mode` (`'mobile' | 'pc'`, optional)
+  - `options.version` (number, optional)
+
+- 動作:
+  - PC/モバイル判定を内部キャッシュへ保存します。
+
+- 戻り値:
+  - `boolean`（有効な判定を適用できた場合 `true`）
+
+---
+
+### `resetShippingProcessingRuntime()`
+
+- 動作:
+  - 内部キャッシュされたランタイム設定をクリアします。
+
+- 戻り値:
+  - `void`
 
 ---
 
