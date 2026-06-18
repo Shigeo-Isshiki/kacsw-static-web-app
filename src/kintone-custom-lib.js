@@ -216,6 +216,7 @@ const _kc_createInputDialogBody = (description, allowHtml, fields) => {
 	body.style.display = 'flex';
 	body.style.flexDirection = 'column';
 	body.style.gap = '12px';
+	body.style.margin = '1em';
 	body.style.padding = '8px 12px';
 	body.style.boxSizing = 'border-box';
 	_kc_applyDialogTextStyle(body);
