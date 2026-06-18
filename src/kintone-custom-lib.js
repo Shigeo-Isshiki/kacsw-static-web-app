@@ -207,7 +207,8 @@ const _kc_createInputDialogBody = (description, allowHtml, fields) => {
 	body.style.display = 'flex';
 	body.style.flexDirection = 'column';
 	body.style.gap = '12px';
-	body.style.padding = '8px 0';
+	body.style.padding = '8px 12px';
+	body.style.boxSizing = 'border-box';
 
 	if (typeof description === 'string' && description) {
 		const descriptionElement = _kc_createTextBody(
@@ -532,6 +533,8 @@ const _kc_showConfirmChoice = async (message, title, options) => {
 	}
 
 	const fallbackBody = _kc_createTextBody(message, allowHtml, 'kc-confirm-dialog__message');
+	fallbackBody.style.padding = '8px 12px';
+	fallbackBody.style.boxSizing = 'border-box';
 	const action = await _kc_showDialog({
 		title: dialogTitle,
 		body: fallbackBody,
