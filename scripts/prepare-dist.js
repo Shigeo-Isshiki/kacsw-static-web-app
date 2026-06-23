@@ -16,7 +16,6 @@ const FILES = [
 	'character_handling.js',
 	'date-utils.js',
 	'text-suite.js',
-	'financial_institution_processing.js',
 	'shipping-processing.js',
 	'vc-check.js',
 	'password_generation.js',

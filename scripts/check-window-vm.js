@@ -9,7 +9,6 @@ const files = [
   'text-suite.js',
   'character_handling.js',
   'national_holiday_handling.js',
-  'financial_institution_processing.js',
   'zip-code-address-utils.js',
   'zipcode_processing.js',
   'phone-utils.js',

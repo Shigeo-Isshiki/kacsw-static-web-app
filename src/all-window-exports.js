@@ -73,12 +73,6 @@
 		'convert_to_double_byte_characters',
 		'convert_to_email_address',
 		'check_single_byte_numbers',
-		// financial_institution_processing.js
-		'convertAccountHolderKana',
-		'getByteLength',
-		'sliceByByteLength',
-		'convertJapanPostAccount',
-		'isValidTransferDate',
 		// jquery.autoKana.js
 		// note: `start` and `toggle` are defined only inside the plugin scope and
 		// are not safe to expose as globals; keep `stop` which is provided as a helper
