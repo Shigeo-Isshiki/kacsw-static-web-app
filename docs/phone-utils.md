@@ -2,7 +2,7 @@
 
 このドキュメントは `src/phone-utils.js` が公開する電話番号ユーティリティ関数の使い方、契約（引数・戻り値・副作用）をまとめたリファレンスです。
 
-電話番号の出力は、2026年6月1日時点の総務省公開情報（電気通信番号計画（令和元年総務省告示第6号）第1第4項による公表）に基づきます。
+電話番号の出力は、2026年7月1日時点の総務省公開情報（電気通信番号計画（令和元年総務省告示第6号）第1第4項による公表）に基づきます。
 
 ---
 
@@ -21,10 +21,10 @@
 
 ## 公開 API サマリ
 
-- `isValidPhoneNumber(phoneNumber)`
-- `formatPhoneNumber(phoneNumber)`
-- `getPhoneNumberType(phoneNumber)`
-- `normalizePhoneNumber(phoneNumber)`
+- [`isValidPhoneNumber(phoneNumber)`](#isvalidphonenumber)
+- [`formatPhoneNumber(phoneNumber)`](#formatphonenumber)
+- [`getPhoneNumberType(phoneNumber)`](#getphonenumbertype)
+- [`normalizePhoneNumber(phoneNumber)`](#normalizephonenumber)
 
 （全て同期関数、入力に不正がある場合は `Error` をスローします。`phoneNumber` は文字列または数値を受け取ります。）
 
@@ -32,6 +32,7 @@
 
 ## 各関数の詳細
 
+<a id="isvalidphonenumber"></a>
 ### `isValidPhoneNumber(phoneNumber)`
 
 - 概要: 与えられた値が日本国内で有効とみなせる電話番号かを判定します。
@@ -46,6 +47,7 @@
 
 テストヒント: 無効値、全角数字やハイフンを含む入力、`091` 系の特殊番号（6〜13 桁）などで境界ケースを確認してください。
 
+<a id="formatphonenumber"></a>
 ### `formatPhoneNumber(phoneNumber)`
 
 - 概要: 電話番号を正規化（記号・全角→半角化）し、ハイフン付きの表記と判定結果などの属性を含むオブジェクトを返します。
@@ -64,6 +66,7 @@
 - `091` で始まる 6～13 桁の番号は `091-xxxx...` の形式で必ず 3 桁プレフィックスを分離します。
 - 種別に応じてハイフン分割パターンを決定します（固定電話は市外局番→市内局番→加入者番号、携帯は 3-4-4 等）。
 
+<a id="getphonenumbertype"></a>
 ### `getPhoneNumberType(phoneNumber)`
 
 - 概要: 電話番号の種別（文字列）を返します。
@@ -94,6 +97,7 @@
 
 各語彙は実装中の `_PU_PHONE_NUMBER_CONFIG` の設定（`digit11PhoneNumberRange` / `notLandlinePhoneNumberRange` / `areaCodeRanges` 等）に依存します。新たなプレフィックス追加やルール変更時は該当設定を更新してください。
 
+<a id="normalizephonenumber"></a>
 ### `normalizePhoneNumber(phoneNumber)`
 
 - 概要: 電話番号を半角数字のみの文字列に正規化して返します（ハイフンや空白、全角数字を除去）。
@@ -140,7 +144,7 @@ normalizePhoneNumber('(080)-1234-5678'); // -> '08012345678'
 
 総務省（あるいは同等の公式データ）が電話番号の割当や範囲を更新した場合、`src/phone-utils.js` 内のデータと挙動を最新化する必要があります。以下は短く実務的にやるべき項目です。
 
-現状メモ: `src/phone-utils.js` のデータ定義は、2026年6月1日時点の総務省公開情報に対応しています。
+現状メモ: `src/phone-utils.js` のデータ定義は、2026年7月1日時点の総務省公開情報に対応しています。
 
 - **更新対象データ**:
   - `/_PU_PHONE_NUMBER_CONFIG.areaCodeList`（市外局番ごとの市内局番桁数）
