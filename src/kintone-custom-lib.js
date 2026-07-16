@@ -721,7 +721,8 @@ const getFieldValueOr = (record, fieldCode, defaultValue) => {
 		}
 		// value が存在する場合はそのまま返す（null や空文字も有効値として返す）
 		if (Object.prototype.hasOwnProperty.call(field, 'value')) {
-			return field.value;
+			// value が undefined のときのみ defaultValue にフォールバックする
+			return field.value === undefined ? defaultValue : field.value;
 		}
 		return defaultValue;
 	} catch (error) {

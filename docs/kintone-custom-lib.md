@@ -64,7 +64,7 @@ globalThis.KACSW_RUNTIME = {
 
 - 戻り値: フィールドの `value` または `defaultValue`。
 
-注意: `defaultValue` を指定しない（省略）した場合は `undefined` が返されます。`field.value` が `null` や空文字列 (`''`) の場合は有効な値としてそのまま返され、フィールドが存在しないケースとは区別されます。
+注意: `defaultValue` を指定しない（省略）した場合は `undefined` が返されます。`field.value` が `null` や空文字列 (`''`) の場合は有効な値としてそのまま返されます。一方で `field.value` が `undefined` の場合は `defaultValue` を返します。
 
 例:
 

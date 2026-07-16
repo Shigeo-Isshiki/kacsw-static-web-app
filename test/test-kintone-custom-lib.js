@@ -48,6 +48,16 @@ const { JSDOM } = require('jsdom');
 	}
 
 	try {
+		const rec = { a: { value: undefined } };
+		const v = getFieldValueOr(rec, 'a', 'DEF');
+		assert.strictEqual(v, 'DEF');
+		console.log('PASS: getFieldValueOr undefined value fallback');
+	} catch (e) {
+		console.error('FAIL: getFieldValueOr undefined value fallback', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
+
+	try {
 		const v = getFieldValueOr(null, 'x', 'X');
 		assert.strictEqual(v, 'X');
 		console.log('PASS: getFieldValueOr invalid record');
