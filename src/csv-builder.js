@@ -257,6 +257,10 @@ const _cb_formatDateSimple = (value, fmt) => {
 		}
 		if (fmt === 'ERA_INITIAL_YY/MM')
 			return `${era.initial}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+		if (fmt === 'ERA_INITIAL_Y/M')
+			return `${era.initialOnly}${Number(era.numberOnly)}/${d.getMonth() + 1}`;
+		if (fmt === 'ERA_INITIAL_YY年MM月')
+			return `${era.initial}年${String(d.getMonth() + 1).padStart(2, '0')}月`;
 		if (fmt === 'ERA_INITIAL_KANJI_DATE')
 			return `${era.initialOnly}${Number(era.numberOnly)}年${d.getMonth() + 1}月${d.getDate()}日`;
 		if (fmt === 'ERA_INITIAL_Y/M/D')
@@ -270,13 +274,24 @@ const _cb_formatDateSimple = (value, fmt) => {
 			return `${era.initial}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 	}
 	const yyyy = d.getFullYear();
+	const yy = String(yyyy).slice(-2);
+	const m = d.getMonth() + 1;
 	const mm = String(d.getMonth() + 1).padStart(2, '0');
 	const dd = String(d.getDate()).padStart(2, '0');
 	if (!fmt || fmt === 'YYYY-MM-DD') return `${yyyy}-${mm}-${dd}`;
 	// Japanese full-width format: 2025年12月07日
 	if (fmt === 'YYYY年MM月DD日') return `${yyyy}年${mm}月${dd}日`;
+	if (fmt === 'YYYY年MM月') return `${yyyy}年${mm}月`;
+	// Japanese year-month format: 2025年12月
+	if (fmt === 'YYYY年M月') return `${yyyy}年${m}月`;
 	// Japanese non-padded format: 2025年12月7日 (no zero padding for month/day)
-	if (fmt === 'YYYY年M月D日') return `${yyyy}年${d.getMonth() + 1}月${d.getDate()}日`;
+	if (fmt === 'YYYY年M月D日') return `${yyyy}年${m}月${d.getDate()}日`;
+	if (fmt === 'YYYY/MM') return `${yyyy}/${mm}`;
+	if (fmt === 'YYYY-M') return `${yyyy}-${m}`;
+	if (fmt === 'YYYY-MM') return `${yyyy}-${mm}`;
+	if (fmt === 'YYYYMM') return `${yyyy}${mm}`;
+	if (fmt === 'YY/MM') return `${yy}/${mm}`;
+	if (fmt === 'YYMM') return `${yy}${mm}`;
 	if (fmt === 'YYYY/MM/DD') return `${yyyy}/${mm}/${dd}`;
 	if (fmt === 'YYYYMMDD') return `${yyyy}${mm}${dd}`;
 	if (fmt === 'YMMDD') {

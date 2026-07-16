@@ -8,16 +8,17 @@
 
 ## 公開 API サマリ
 
-- `buildRow(schema, data, options) -> string`
+- [buildRow(schema, data, options) -> string](#api-buildrow)
   - 単一レコード `data` から CSV の 1 行（改行無し）を返します。
 
-- `buildCSV(schema, dataArray, options) -> string`
+- [buildCSV(schema, dataArray, options) -> string](#api-buildcsv)
   - レコード配列 `dataArray` から CSV 全体（必要ならヘッダを含む）を返します。改行は `\n` です。
 
 ブラウザでは `window.CSV.buildRow` / `window.CSV.buildCSV` として利用できます。Node で試す場合はテストと同じく `global.window = global` を行い `require('./src/csv-builder.js')` してください。
 
 ---
 
+<a id="api-buildrow"></a>
 ## 1) buildRow の詳細
 
 **シグネチャ**:
@@ -54,6 +55,7 @@ console.log(buildRow(schema, { id: 1, name: '山田' })); // "1,山田"
 
 ---
 
+<a id="api-buildcsv"></a>
 ## 2) buildCSV の詳細
 
 **シグネチャ**:
@@ -105,7 +107,7 @@ console.log(buildCSV(schema, rows, { header: true }));
   - `'string' | 'date' | 'number'`。
 
 - `format` (string | object)
-	- `type==='date'` の場合: `'YYYY-MM-DD' | 'YYYY/MM/DD' | 'YYYYMMDD' | 'YMMDD' | 'UNIX' | 'UNIX_MS' | 'YYYY年MM月DD日' | 'YYYY年M月D日' | 'ERA_KANJI' | 'ERA_INITIAL' | 'ERA_INITIAL_ONLY' | 'ERA_NUMBER_ONLY' | 'ERA_KANJI_YM' | 'ERA_KANJI_DATE' | 'ERA_KANJI_DATE_PAD' | 'ERA_INITIAL_YY/MM' | 'ERA_INITIAL_KANJI_DATE' | 'ERA_INITIAL_Y/M/D' | 'ERA_INITIAL_YY/MM/DD' | 'ERA_INITIAL_JIS_YM' | 'ERA_INITIAL_JIS_YMD'`
+	- `type==='date'` の場合: `'YYYY-MM-DD' | 'YYYY/MM/DD' | 'YYYYMMDD' | 'YMMDD' | 'UNIX' | 'UNIX_MS' | 'YYYY年MM月DD日' | 'YYYY年M月D日' | 'YYYY年MM月' | 'YYYY年M月' | 'YYYY/MM' | 'YYYY-M' | 'YYYY-MM' | 'YYYYMM' | 'YY/MM' | 'YYMM' | 'ERA_KANJI' | 'ERA_INITIAL' | 'ERA_INITIAL_ONLY' | 'ERA_NUMBER_ONLY' | 'ERA_KANJI_YM' | 'ERA_KANJI_DATE' | 'ERA_KANJI_DATE_PAD' | 'ERA_INITIAL_YY/MM' | 'ERA_INITIAL_Y/M' | 'ERA_INITIAL_YY年MM月' | 'ERA_INITIAL_KANJI_DATE' | 'ERA_INITIAL_Y/M/D' | 'ERA_INITIAL_YY/MM/DD' | 'ERA_INITIAL_JIS_YM' | 'ERA_INITIAL_JIS_YMD'`
   - `type==='number'` の場合: `{ width: N }` のように整数部の固定幅ゼロ埋めを指定。数値 `N` は埋めたい桁数です。例えば `{ width: 5 }` なら `42` は `00042` に変換されます。
 
 - `formatter` (function(value, record) => string)
@@ -230,6 +232,11 @@ console.log(buildRow(schema, { product: 'ばなな' })); // -> 'UNKNOWN'
 
 - `YYYY年MM月DD日` (ゼロパディングあり): 例 `2025年11月09日`
 - `YYYY年M月D日` (ゼロパディングなし): 例 `2025年11月9日`
+- `YYYY年MM月`: 例 `2025年11月`
+- `YYYY年M月`: 例 `2025年11月`
+- `YYYY/MM`: 例 `2025/11`
+- `YYYY-MM`: 例 `2025-11`
+- `YYYYMM`: 例 `202511`
 
 ```js
 // 例: buildRow での使用
@@ -258,6 +265,8 @@ console.log(buildCSV(schemaJP, [rec], { header: true }));
 - `ERA_KANJI_DATE`: `令和7年11月9日`
 - `ERA_KANJI_DATE_PAD`: `令和7年11月09日`
 - `ERA_INITIAL_YY/MM`: `R07/11`
+- `ERA_INITIAL_Y/M`: `R7/11`
+- `ERA_INITIAL_YY年MM月`: `R07年11月`
 - `ERA_INITIAL_KANJI_DATE`: `R7年11月9日`
 - `ERA_INITIAL_Y/M/D`: `R7/11/9`
 - `ERA_INITIAL_YY/MM/DD`: `R07/11/09`
