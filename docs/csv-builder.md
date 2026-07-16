@@ -19,6 +19,7 @@
 ---
 
 <a id="api-buildrow"></a>
+
 ## 1) buildRow の詳細
 
 **シグネチャ**:
@@ -56,6 +57,7 @@ console.log(buildRow(schema, { id: 1, name: '山田' })); // "1,山田"
 ---
 
 <a id="api-buildcsv"></a>
+
 ## 2) buildCSV の詳細
 
 **シグネチャ**:
@@ -107,7 +109,7 @@ console.log(buildCSV(schema, rows, { header: true }));
   - `'string' | 'date' | 'number'`。
 
 - `format` (string | object)
-	- `type==='date'` の場合: `'YYYY-MM-DD' | 'YYYY/MM/DD' | 'YYYYMMDD' | 'YMMDD' | 'UNIX' | 'UNIX_MS' | 'YYYY年MM月DD日' | 'YYYY年M月D日' | 'YYYY年MM月' | 'YYYY年M月' | 'YYYY/MM' | 'YYYY-M' | 'YYYY-MM' | 'YYYYMM' | 'YY/MM' | 'YYMM' | 'ERA_KANJI' | 'ERA_INITIAL' | 'ERA_INITIAL_ONLY' | 'ERA_NUMBER_ONLY' | 'ERA_KANJI_YM' | 'ERA_KANJI_DATE' | 'ERA_KANJI_DATE_PAD' | 'ERA_INITIAL_YY/MM' | 'ERA_INITIAL_Y/M' | 'ERA_INITIAL_YY年MM月' | 'ERA_INITIAL_KANJI_DATE' | 'ERA_INITIAL_Y/M/D' | 'ERA_INITIAL_YY/MM/DD' | 'ERA_INITIAL_JIS_YM' | 'ERA_INITIAL_JIS_YMD'`
+  - `type==='date'` の場合: `'YYYY-MM-DD' | 'YYYY/MM/DD' | 'YYYYMMDD' | 'YMMDD' | 'UNIX' | 'UNIX_MS' | 'YYYY年MM月DD日' | 'YYYY年M月D日' | 'YYYY年MM月' | 'YYYY年M月' | 'YYYY/MM' | 'YYYY-M' | 'YYYY-MM' | 'YYYYMM' | 'YY/MM' | 'YYMM' | 'ERA_KANJI' | 'ERA_INITIAL' | 'ERA_INITIAL_ONLY' | 'ERA_NUMBER_ONLY' | 'ERA_KANJI_YM' | 'ERA_KANJI_DATE' | 'ERA_KANJI_DATE_PAD' | 'ERA_INITIAL_YY/MM' | 'ERA_INITIAL_Y/M' | 'ERA_INITIAL_YY年MM月' | 'ERA_INITIAL_KANJI_DATE' | 'ERA_INITIAL_Y/M/D' | 'ERA_INITIAL_YY/MM/DD' | 'ERA_INITIAL_JIS_YM' | 'ERA_INITIAL_JIS_YMD'`
   - `type==='number'` の場合: `{ width: N }` のように整数部の固定幅ゼロ埋めを指定。数値 `N` は埋めたい桁数です。例えば `{ width: 5 }` なら `42` は `00042` に変換されます。
 
 - `formatter` (function(value, record) => string)
