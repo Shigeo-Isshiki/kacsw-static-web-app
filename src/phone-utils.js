@@ -1062,6 +1062,16 @@ const _pu_getHyphenPattern = (number, type) => {
 			let areaCode = num.substring(0, areaCodeLen);
 			let localLen = _pu_getAreaCodeInfo(areaCodeLen, areaCode);
 			if (localLen) {
+				const ranges = _pu_getLocalAreaCodeRange(areaCode);
+				if (ranges) {
+					if (num.length < areaCodeLen + localLen) continue;
+					const localCode = num.substring(areaCodeLen, areaCodeLen + localLen);
+					const localCodeNum = Number(localCode);
+					const inRange = ranges.some(
+						([start, end]) => localCodeNum >= start && localCodeNum <= end
+					);
+					if (!inRange) continue;
+				}
 				const subscriberLen = num.length - areaCodeLen - localLen;
 				return [areaCodeLen, localLen, subscriberLen];
 			}
@@ -1122,7 +1132,7 @@ const _pu_isValidJapanesePhoneNumber = (str) => {
 
 		const ranges = _pu_getLocalAreaCodeRange(areaCode);
 		if (ranges) {
-			if (num.length < areaCodeLen + localLen) return false;
+			if (num.length < areaCodeLen + localLen) continue;
 			let localCode = num.substring(areaCodeLen, areaCodeLen + localLen);
 			let localCodeNum = Number(localCode);
 			let inRange = false;
@@ -1132,7 +1142,7 @@ const _pu_isValidJapanesePhoneNumber = (str) => {
 					break;
 				}
 			}
-			if (!inRange) return false;
+			if (!inRange) continue;
 		}
 
 		// 10桁は原則固定電話だが、11桁/14桁専用プレフィックスは除外

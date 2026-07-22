@@ -1003,6 +1003,18 @@ const _pn_getHyphenPattern = (number, type) => {
 			let areaCode = num.substring(0, areaCodeLen);
 			let localLen = _pn_getAreaCodeInfo(areaCodeLen, areaCode);
 			if (localLen) {
+				const ranges = _pn_getLocalAreaCodeRange(areaCode);
+				if (ranges) {
+					if (num.length < areaCodeLen + localLen) continue;
+					const localCode = num.substring(areaCodeLen, areaCodeLen + localLen);
+					const padLen = localCode.length;
+					const inRange = ranges.some(([min, max]) => {
+						const minStr = String(min).padStart(padLen, '0');
+						const maxStr = String(max).padStart(padLen, '0');
+						return localCode >= minStr && localCode <= maxStr;
+					});
+					if (!inRange) continue;
+				}
 				const subscriberLen = num.length - areaCodeLen - localLen;
 				return [areaCodeLen, localLen, subscriberLen];
 			}
@@ -1227,6 +1239,17 @@ const phone_number_formatting = (telephoneNumber) => {
 		let areaCode = num.substring(0, areaCodeLen);
 		let localLen = _pn_getAreaCodeInfo(areaCodeLen, areaCode);
 		if (localLen) {
+			const range = _pn_getLocalAreaCodeRange(areaCode);
+			if (range) {
+				const local_code_str = num.substring(areaCodeLen, areaCodeLen + localLen);
+				const padLen = local_code_str.length;
+				const inRange = range.some(([min, max]) => {
+					const minStr = String(min).padStart(padLen, '0');
+					const maxStr = String(max).padStart(padLen, '0');
+					return local_code_str >= minStr && local_code_str <= maxStr;
+				});
+				if (!inRange) continue;
+			}
 			matchedAreaCodeLen = areaCodeLen;
 			matchedAreaCode = areaCode;
 			matchedLocalLen = localLen;
