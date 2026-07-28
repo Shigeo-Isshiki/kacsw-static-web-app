@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_kc_)で始める
-/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText, initKintoneCustomLibRuntime, resetKintoneCustomLibRuntime */
+/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText, initKintoneCustomLibRuntime, resetKintoneCustomLibRuntime, setupSubtableOperationControl, updateSubtableOperationControl, teardownSubtableOperationControl */
 
 // 共通定数
 /**
@@ -1536,6 +1536,524 @@ const setSpaceFieldText = (spaceField, id, innerHTML) => {
 	return setSpaceFieldDisplay(spaceField, false);
 };
 
+// --- サブテーブル操作ボタン制御 API ---
+// 使用例:
+// 320系: alwaysHide + observe true
+// const c320 = setupSubtableOperationControl({ mode: 'alwaysHide', observe: true });
+//
+// 364系: conditionalHide + observe true
+// const c364 = setupSubtableOperationControl({
+// 	mode: 'conditionalHide',
+// 	hideWhen: (ctx) => !!(ctx && ctx.context && ctx.context.shouldHide),
+// 	context: { shouldHide: true },
+// 	observe: true,
+// });
+//
+// 626系: scopedHide + target指定
+// const c626 = setupSubtableOperationControl({
+// 	mode: 'scopedHide',
+// 	target: ['SUBTABLE_CODE_1', 'SUBTABLE_CODE_2'],
+// 	observe: true,
+// });
+
+const _KC_SUBTABLE_CONTROL_DEFAULT_STYLE_ID = 'kc-subtable-operation-control-style';
+const _KC_SUBTABLE_CONTROL_DEFAULT_SELECTOR = '.subtable-operation-gaia';
+const _KC_SUBTABLE_CONTROL_DEFAULT_THROTTLE_MS = 100;
+
+const _kc_subtableControlPageState = {
+	controllerSeq: 0,
+	controllers: new Map(),
+	styleRefCount: new Map(),
+	observer: null,
+	observerConnected: false,
+	pendingTimerId: null,
+	pendingDueAt: 0,
+};
+
+const _kc_isDomAvailable = () => {
+	return typeof document !== 'undefined' && !!document;
+};
+
+const _kc_getValidHead = () => {
+	if (!_kc_isDomAvailable()) return null;
+	if (document.head) return document.head;
+	if (document.getElementsByTagName) {
+		const heads = document.getElementsByTagName('head');
+		if (heads && heads[0]) return heads[0];
+	}
+	return null;
+};
+
+const _kc_isSupportedMode = (mode) => {
+	return mode === 'alwaysHide' || mode === 'conditionalHide' || mode === 'scopedHide';
+};
+
+const _kc_normalizeMode = (mode) => {
+	if (typeof mode !== 'string') return 'alwaysHide';
+	const normalized = mode.trim();
+	return _kc_isSupportedMode(normalized) ? normalized : 'alwaysHide';
+};
+
+const _kc_normalizeStrategy = (strategy) => {
+	if (strategy === 'cssOnly' || strategy === 'cssPlusInline') return strategy;
+	return 'cssPlusInline';
+};
+
+const _kc_normalizeTarget = (target) => {
+	if (target === 'all' || target === undefined || target === null) return 'all';
+	if (!Array.isArray(target)) return 'all';
+	const normalized = target
+		.map((v) => (v === null || v === undefined ? '' : String(v).trim()))
+		.filter((v) => !!v);
+	return normalized.length ? normalized : 'all';
+};
+
+const _kc_normalizeObserverThrottleMs = (value) => {
+	if (typeof value !== 'number' || !Number.isFinite(value)) {
+		return _KC_SUBTABLE_CONTROL_DEFAULT_THROTTLE_MS;
+	}
+	return Math.max(0, Math.floor(value));
+};
+
+const _kc_normalizeSubtableControlOptions = (options) => {
+	const safe = options && typeof options === 'object' ? options : {};
+	return {
+		mode: _kc_normalizeMode(safe.mode),
+		hideWhen: safe.hideWhen,
+		target: _kc_normalizeTarget(safe.target),
+		observe: safe.observe !== false,
+		observerThrottleMs: _kc_normalizeObserverThrottleMs(safe.observerThrottleMs),
+		hideLabelAndRowOps: safe.hideLabelAndRowOps === true,
+		strategy: _kc_normalizeStrategy(safe.strategy),
+		styleId:
+			typeof safe.styleId === 'string' && safe.styleId.trim()
+				? safe.styleId.trim()
+				: _KC_SUBTABLE_CONTROL_DEFAULT_STYLE_ID,
+		debug: safe.debug === true,
+		context: safe.context,
+		allowPartialClassMatch: safe.allowPartialClassMatch === true,
+	};
+};
+
+const _kc_mergeSubtableControlOptions = (prevOptions, partialOptions) => {
+	const nextRaw = Object.assign({}, prevOptions || {}, partialOptions || {});
+	return _kc_normalizeSubtableControlOptions(nextRaw);
+};
+
+const _kc_debugSubtableControl = (controllerState, message, payload) => {
+	if (!controllerState || !controllerState.options || controllerState.options.debug !== true)
+		return;
+	try {
+		console.log('[subtable-control][' + controllerState.id + '] ' + message, payload || '');
+	} catch {
+		return;
+	}
+};
+
+const _kc_ensureStyleElement = (styleId, cssText) => {
+	if (!_kc_isDomAvailable()) return false;
+	const head = _kc_getValidHead();
+	if (!head) return false;
+
+	let styleElement = document.getElementById(styleId);
+	if (!styleElement) {
+		styleElement = document.createElement('style');
+		styleElement.id = styleId;
+		styleElement.type = 'text/css';
+		styleElement.textContent = cssText;
+		head.appendChild(styleElement);
+	} else if (styleElement.textContent !== cssText) {
+		styleElement.textContent = cssText;
+	}
+	return true;
+};
+
+const _kc_retainStyle = (styleId, cssText) => {
+	const currentCount = _kc_subtableControlPageState.styleRefCount.get(styleId) || 0;
+	const applied = _kc_ensureStyleElement(styleId, cssText);
+	if (applied) {
+		_kc_subtableControlPageState.styleRefCount.set(styleId, currentCount + 1);
+	}
+	return applied;
+};
+
+const _kc_releaseStyle = (styleId) => {
+	const currentCount = _kc_subtableControlPageState.styleRefCount.get(styleId) || 0;
+	if (currentCount <= 1) {
+		_kc_subtableControlPageState.styleRefCount.delete(styleId);
+		if (_kc_isDomAvailable()) {
+			const styleElement = document.getElementById(styleId);
+			if (styleElement && styleElement.parentNode) {
+				styleElement.parentNode.removeChild(styleElement);
+			}
+		}
+		return;
+	}
+	_kc_subtableControlPageState.styleRefCount.set(styleId, currentCount - 1);
+};
+
+const _kc_getBaseOperationSelectors = (options) => {
+	const selectors = [_KC_SUBTABLE_CONTROL_DEFAULT_SELECTOR];
+	if (options.hideLabelAndRowOps) {
+		selectors.push('.subtable-operation-label-gaia');
+		selectors.push('.subtable-row-add-gaia');
+		selectors.push('.subtable-row-remove-gaia');
+	}
+	// 部分一致セレクタはデフォルト無効。明示時のみ有効化。
+	if (options.allowPartialClassMatch) {
+		selectors.push('[class*="subtable-operation"]');
+	}
+	return selectors;
+};
+
+const _kc_buildManagedSelector = (controllerState) => {
+	return _kc_getBaseOperationSelectors(controllerState.options).join(',');
+};
+
+const _kc_evalHideWhen = (controllerState) => {
+	const hideWhen = controllerState.options.hideWhen;
+	if (typeof hideWhen === 'boolean') return hideWhen;
+	if (typeof hideWhen === 'function') {
+		try {
+			const result = hideWhen({
+				controllerId: controllerState.id,
+				options: controllerState.options,
+				context: controllerState.options.context,
+			});
+			return !!result;
+		} catch {
+			return false;
+		}
+	}
+	return false;
+};
+
+const _kc_collectNodeTokens = (node) => {
+	const tokens = new Set();
+	if (!node) return tokens;
+	const readString = (value) => {
+		if (typeof value !== 'string') return;
+		const v = value.trim();
+		if (v) tokens.add(v);
+	};
+
+	let current = node;
+	let depth = 0;
+	while (current && depth < 8) {
+		if (current.nodeType !== 1) {
+			current = current.parentElement;
+			depth += 1;
+			continue;
+		}
+		readString(current.id);
+		if (current.getAttribute) {
+			readString(current.getAttribute('data-field-code'));
+			readString(current.getAttribute('data-fieldcode'));
+			readString(current.getAttribute('data-code'));
+			readString(current.getAttribute('name'));
+		}
+		if (current.classList && current.classList.length) {
+			Array.prototype.forEach.call(current.classList, (className) => readString(className));
+		}
+		current = current.parentElement;
+		depth += 1;
+	}
+	return tokens;
+};
+
+const _kc_isTargetMatched = (target, node) => {
+	if (target === 'all') return true;
+	if (!Array.isArray(target) || !target.length) return true;
+	const tokens = _kc_collectNodeTokens(node);
+	for (let i = 0; i < target.length; i += 1) {
+		if (tokens.has(target[i])) return true;
+	}
+	return false;
+};
+
+const _kc_shouldHideElement = (controllerState, element) => {
+	const mode = controllerState.options.mode;
+	if (mode === 'alwaysHide') return true;
+	if (mode === 'conditionalHide') return _kc_evalHideWhen(controllerState);
+	if (mode === 'scopedHide') {
+		return _kc_isTargetMatched(controllerState.options.target, element);
+	}
+	return false;
+};
+
+const _kc_markOwnedByController = (controllerState, element) => {
+	if (!element || !element.dataset) return;
+	const key = 'kcSubtableOwners';
+	const current = element.dataset[key] || '';
+	const owners = current ? current.split(',').filter((v) => !!v) : [];
+	if (owners.indexOf(controllerState.id) === -1) {
+		owners.push(controllerState.id);
+		element.dataset[key] = owners.join(',');
+	}
+};
+
+const _kc_unmarkOwnedByController = (controllerState, element) => {
+	if (!element || !element.dataset) return;
+	const key = 'kcSubtableOwners';
+	const current = element.dataset[key] || '';
+	if (!current) return;
+	const owners = current.split(',').filter((v) => !!v && v !== controllerState.id);
+	if (owners.length) {
+		element.dataset[key] = owners.join(',');
+	} else {
+		delete element.dataset[key];
+	}
+};
+
+const _kc_applyInlineHidden = (controllerState, element, shouldHide) => {
+	if (!element || !element.style) return;
+	if (shouldHide) {
+		_kc_markOwnedByController(controllerState, element);
+		element.style.setProperty('display', 'none', 'important');
+		return;
+	}
+	_kc_unmarkOwnedByController(controllerState, element);
+	const owners = element.dataset ? element.dataset.kcSubtableOwners : '';
+	if (!owners) {
+		element.style.removeProperty('display');
+	}
+};
+
+const _kc_collectManagedElements = (controllerState) => {
+	if (!_kc_isDomAvailable() || !document.querySelectorAll) return [];
+	const selector = _kc_buildManagedSelector(controllerState);
+	if (!selector) return [];
+	let nodeList;
+	try {
+		nodeList = document.querySelectorAll(selector);
+	} catch {
+		return [];
+	}
+	return Array.prototype.slice.call(nodeList);
+};
+
+const _kc_getControllerStateSnapshot = (controllerState) => {
+	return {
+		id: controllerState.id,
+		isDestroyed: controllerState.isDestroyed,
+		isObserving: controllerState.isObserving,
+		styleApplied: controllerState.styleApplied,
+		managedCount: controllerState.managedElements.size,
+		options: Object.assign({}, controllerState.options),
+	};
+};
+
+const _kc_applySubtableControlInternal = (controllerState) => {
+	if (!controllerState || controllerState.isDestroyed) return;
+	const options = controllerState.options;
+	const cssText = '.' + controllerState.cssClass + '{display:none !important;}';
+	if (!controllerState.styleApplied) {
+		controllerState.styleApplied = _kc_retainStyle(options.styleId, cssText);
+	}
+
+	const nextElements = _kc_collectManagedElements(controllerState);
+	const nextSet = new Set(nextElements);
+
+	controllerState.managedElements.forEach((prevElement) => {
+		if (nextSet.has(prevElement)) return;
+		prevElement.classList.remove(controllerState.cssClass);
+		_kc_applyInlineHidden(controllerState, prevElement, false);
+	});
+
+	const shouldUseInline = options.strategy === 'cssPlusInline';
+	for (let i = 0; i < nextElements.length; i += 1) {
+		const element = nextElements[i];
+		const shouldHide = _kc_shouldHideElement(controllerState, element);
+		if (shouldHide) {
+			element.classList.add(controllerState.cssClass);
+			if (shouldUseInline) {
+				_kc_applyInlineHidden(controllerState, element, true);
+			}
+		} else {
+			element.classList.remove(controllerState.cssClass);
+			if (shouldUseInline) {
+				_kc_applyInlineHidden(controllerState, element, false);
+			}
+		}
+	}
+
+	controllerState.managedElements = nextSet;
+	controllerState.lastAppliedAt = Date.now();
+	_kc_debugSubtableControl(controllerState, 'applied', {
+		managed: controllerState.managedElements.size,
+		strategy: options.strategy,
+	});
+};
+
+const _kc_disconnectGlobalObserverIfNeeded = () => {
+	const hasActiveObserveController = Array.from(
+		_kc_subtableControlPageState.controllers.values()
+	).some((c) => !c.isDestroyed && c.isObserving);
+	if (hasActiveObserveController) return;
+	if (_kc_subtableControlPageState.pendingTimerId !== null) {
+		clearTimeout(_kc_subtableControlPageState.pendingTimerId);
+		_kc_subtableControlPageState.pendingTimerId = null;
+		_kc_subtableControlPageState.pendingDueAt = 0;
+	}
+	if (_kc_subtableControlPageState.observer && _kc_subtableControlPageState.observerConnected) {
+		_kc_subtableControlPageState.observer.disconnect();
+		_kc_subtableControlPageState.observerConnected = false;
+	}
+};
+
+const _kc_computeGlobalThrottleMs = () => {
+	const values = Array.from(_kc_subtableControlPageState.controllers.values())
+		.filter((c) => !c.isDestroyed && c.isObserving)
+		.map((c) => c.options.observerThrottleMs);
+	if (!values.length) return _KC_SUBTABLE_CONTROL_DEFAULT_THROTTLE_MS;
+	return Math.min.apply(null, values);
+};
+
+const _kc_refreshAllControllers = () => {
+	_kc_subtableControlPageState.controllers.forEach((controllerState) => {
+		if (controllerState.isDestroyed) return;
+		_kc_applySubtableControlInternal(controllerState);
+	});
+};
+
+const _kc_scheduleRefreshAll = () => {
+	if (!_kc_isDomAvailable()) return;
+	const throttleMs = _kc_computeGlobalThrottleMs();
+	const now = Date.now();
+	const dueAt = now + throttleMs;
+	if (_kc_subtableControlPageState.pendingTimerId !== null) {
+		if (dueAt >= _kc_subtableControlPageState.pendingDueAt) return;
+		clearTimeout(_kc_subtableControlPageState.pendingTimerId);
+		_kc_subtableControlPageState.pendingTimerId = null;
+	}
+	_kc_subtableControlPageState.pendingDueAt = dueAt;
+	_kc_subtableControlPageState.pendingTimerId = setTimeout(() => {
+		_kc_subtableControlPageState.pendingTimerId = null;
+		_kc_subtableControlPageState.pendingDueAt = 0;
+		_kc_refreshAllControllers();
+	}, throttleMs);
+};
+
+const _kc_ensureGlobalObserver = () => {
+	if (!_kc_isDomAvailable() || typeof MutationObserver === 'undefined') return false;
+	if (!_kc_subtableControlPageState.observer) {
+		_kc_subtableControlPageState.observer = new MutationObserver(() => {
+			_kc_scheduleRefreshAll();
+		});
+	}
+	if (_kc_subtableControlPageState.observerConnected) return true;
+	if (!document.documentElement) return false;
+	_kc_subtableControlPageState.observer.observe(document.documentElement, {
+		childList: true,
+		subtree: true,
+	});
+	_kc_subtableControlPageState.observerConnected = true;
+	return true;
+};
+
+const _kc_disconnectController = (controllerState) => {
+	if (!controllerState || controllerState.isDestroyed) return;
+	controllerState.isObserving = false;
+	_kc_disconnectGlobalObserverIfNeeded();
+};
+
+const _kc_destroyController = (controllerState) => {
+	if (!controllerState || controllerState.isDestroyed) return;
+	_kc_disconnectController(controllerState);
+
+	controllerState.managedElements.forEach((element) => {
+		element.classList.remove(controllerState.cssClass);
+		_kc_applyInlineHidden(controllerState, element, false);
+	});
+	controllerState.managedElements.clear();
+
+	if (controllerState.styleApplied) {
+		_kc_releaseStyle(controllerState.options.styleId);
+		controllerState.styleApplied = false;
+	}
+
+	controllerState.isDestroyed = true;
+	_kc_subtableControlPageState.controllers.delete(controllerState.id);
+	_kc_disconnectGlobalObserverIfNeeded();
+};
+
+const setupSubtableOperationControl = (options) => {
+	const normalizedOptions = _kc_normalizeSubtableControlOptions(options);
+	const controllerId = 'kcSubtableCtrl' + String(++_kc_subtableControlPageState.controllerSeq);
+	const controllerState = {
+		id: controllerId,
+		options: normalizedOptions,
+		cssClass: 'kc-subtable-op-hidden-' + controllerId,
+		managedElements: new Set(),
+		isDestroyed: false,
+		isObserving: normalizedOptions.observe,
+		styleApplied: false,
+		lastAppliedAt: 0,
+	};
+
+	_kc_subtableControlPageState.controllers.set(controllerId, controllerState);
+
+	const controller = {
+		apply: () => {
+			_kc_applySubtableControlInternal(controllerState);
+			if (controllerState.isObserving) {
+				_kc_ensureGlobalObserver();
+			}
+			return controller;
+		},
+		refresh: () => {
+			return controller.apply();
+		},
+		disconnect: () => {
+			_kc_disconnectController(controllerState);
+			return controller;
+		},
+		destroy: () => {
+			_kc_destroyController(controllerState);
+			return undefined;
+		},
+		getState: () => {
+			return _kc_getControllerStateSnapshot(controllerState);
+		},
+	};
+
+	controller.apply();
+	return controller;
+};
+
+const updateSubtableOperationControl = (controller, partialOptions) => {
+	if (!controller || typeof controller.getState !== 'function') return null;
+	const state = controller.getState();
+	if (!state || !state.id) return null;
+	const controllerState = _kc_subtableControlPageState.controllers.get(state.id);
+	if (!controllerState || controllerState.isDestroyed) return controller;
+
+	const previousStyleId = controllerState.options.styleId;
+	const mergedOptions = _kc_mergeSubtableControlOptions(controllerState.options, partialOptions);
+	controllerState.options = mergedOptions;
+	controllerState.isObserving = mergedOptions.observe;
+
+	if (previousStyleId !== mergedOptions.styleId && controllerState.styleApplied) {
+		_kc_releaseStyle(previousStyleId);
+		controllerState.styleApplied = false;
+	}
+
+	if (controllerState.isObserving) {
+		_kc_ensureGlobalObserver();
+	} else {
+		_kc_disconnectGlobalObserverIfNeeded();
+	}
+
+	controller.apply();
+	return controller;
+};
+
+const teardownSubtableOperationControl = (controller) => {
+	if (!controller || typeof controller.destroy !== 'function') return false;
+	controller.destroy();
+	return true;
+};
+
 // 公開: kintone 側から直接呼び出すためにグローバルに割り当てる（初期化後に安全に行う）
 if (typeof window !== 'undefined') {
 	try {
@@ -1598,6 +2116,24 @@ if (typeof window !== 'undefined') {
 		window.resetKintoneCustomLibRuntime =
 			typeof resetKintoneCustomLibRuntime !== 'undefined'
 				? resetKintoneCustomLibRuntime
+				: undefined;
+	} catch {}
+	try {
+		window.setupSubtableOperationControl =
+			typeof setupSubtableOperationControl !== 'undefined'
+				? setupSubtableOperationControl
+				: undefined;
+	} catch {}
+	try {
+		window.updateSubtableOperationControl =
+			typeof updateSubtableOperationControl !== 'undefined'
+				? updateSubtableOperationControl
+				: undefined;
+	} catch {}
+	try {
+		window.teardownSubtableOperationControl =
+			typeof teardownSubtableOperationControl !== 'undefined'
+				? teardownSubtableOperationControl
 				: undefined;
 	} catch {}
 }

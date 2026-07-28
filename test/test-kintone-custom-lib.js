@@ -19,7 +19,8 @@ const { JSDOM } = require('jsdom');
 	delete require.cache[require.resolve(path.join(__dirname, '..', 'src', 'kintone-custom-lib.js'))];
 	require(path.join(__dirname, '..', 'src', 'kintone-custom-lib.js'));
 
-	const { getFieldValueOr, kintoneEventOn, setRecordValues, showYesNoDialog, showInputDialog } = global;
+	const { getFieldValueOr, kintoneEventOn, setRecordValues, showYesNoDialog, showInputDialog } =
+		global;
 
 	if (!getFieldValueOr) {
 		console.error('kintone-custom-lib: getFieldValueOr が公開されていません');
@@ -129,6 +130,198 @@ const { JSDOM } = require('jsdom');
 	}
 
 	console.log('ALL KINTONE-CUSTOM-LIB UNIT TESTS INVOKED');
+})();
+
+// ---------------------- DOM tests: subtable operation control ----------------------
+(async function domSubtableOperationControlTests() {
+	const libPath = path.join(__dirname, '..', 'src', 'kintone-custom-lib.js');
+	const resetLib = () => {
+		delete require.cache[require.resolve(libPath)];
+	};
+	const loadLibInDom = (dom) => {
+		global.window = dom.window;
+		global.document = dom.window.document;
+		global.HTMLElement = dom.window.HTMLElement;
+		global.MutationObserver = dom.window.MutationObserver;
+		resetLib();
+		require(libPath);
+		return dom.window;
+	};
+	const createOperationNode = (doc, wrapperId, operationId) => {
+		const wrapper = doc.createElement('div');
+		wrapper.id = wrapperId;
+		const operation = doc.createElement('button');
+		operation.id = operationId;
+		operation.className = 'subtable-operation-gaia';
+		operation.textContent = 'op';
+		wrapper.appendChild(operation);
+		doc.body.appendChild(wrapper);
+		return operation;
+	};
+
+	try {
+		// 0) 例外系: document/head 未定義でも落ちない
+		global.window = global;
+		delete global.document;
+		delete global.MutationObserver;
+		resetLib();
+		require(libPath);
+		assert.strictEqual(typeof global.setupSubtableOperationControl, 'function');
+		const noDomController = global.setupSubtableOperationControl({ mode: 'alwaysHide' });
+		assert.strictEqual(typeof noDomController.getState, 'function');
+		global.teardownSubtableOperationControl(noDomController);
+		console.log('PASS: defensive guards for missing document/head');
+	} catch (e) {
+		console.error(
+			'FAIL: defensive guards for missing document/head',
+			e && e.message ? e.message : e
+		);
+		process.exitCode = 2;
+	}
+
+	try {
+		// 1) 初期適用
+		const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+		const w = loadLibInDom(dom);
+		const op = createOperationNode(w.document, 'table-initial', 'op-initial');
+		const controller = w.setupSubtableOperationControl({
+			mode: 'alwaysHide',
+			observe: true,
+			styleId: 'kc-test-style-initial',
+		});
+		assert.strictEqual(op.style.display, 'none');
+		controller.destroy();
+		console.log('PASS: initial apply hides target operation');
+	} catch (e) {
+		console.error('FAIL: initial apply', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
+
+	try {
+		// 2) 再描画時の再適用
+		const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+		const w = loadLibInDom(dom);
+		const wrapperId = 'table-redraw';
+		createOperationNode(w.document, wrapperId, 'op-redraw-1');
+		const controller = w.setupSubtableOperationControl({
+			mode: 'alwaysHide',
+			observe: true,
+			styleId: 'kc-test-style-redraw',
+		});
+		const wrapper = w.document.getElementById(wrapperId);
+		wrapper.innerHTML = '';
+		const redrawOp = w.document.createElement('button');
+		redrawOp.id = 'op-redraw-2';
+		redrawOp.className = 'subtable-operation-gaia';
+		wrapper.appendChild(redrawOp);
+		controller.refresh();
+		assert.strictEqual(redrawOp.style.display, 'none');
+		controller.destroy();
+		console.log('PASS: redraw keeps hidden state with observer');
+	} catch (e) {
+		console.error('FAIL: redraw re-apply', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
+
+	try {
+		// 3) 条件切替 (setup -> update)
+		const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+		const w = loadLibInDom(dom);
+		const op = createOperationNode(w.document, 'table-conditional', 'op-conditional');
+		const controller = w.setupSubtableOperationControl({
+			mode: 'conditionalHide',
+			hideWhen: (ctx) => !!(ctx && ctx.context && ctx.context.hide),
+			context: { hide: false },
+			observe: true,
+			styleId: 'kc-test-style-conditional',
+		});
+		assert.notStrictEqual(op.style.display, 'none');
+		w.updateSubtableOperationControl(controller, { context: { hide: true } });
+		assert.strictEqual(op.style.display, 'none');
+		w.updateSubtableOperationControl(controller, { context: { hide: false } });
+		assert.notStrictEqual(op.style.display, 'none');
+		controller.destroy();
+		console.log('PASS: conditionalHide toggles by update');
+	} catch (e) {
+		console.error('FAIL: conditional toggle', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
+
+	try {
+		// 4) スコープ限定
+		const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+		const w = loadLibInDom(dom);
+		const opInScope = createOperationNode(w.document, 'TARGET_TABLE', 'op-scope-in');
+		const opOutScope = createOperationNode(w.document, 'OTHER_TABLE', 'op-scope-out');
+		const controller = w.setupSubtableOperationControl({
+			mode: 'scopedHide',
+			target: ['TARGET_TABLE'],
+			observe: false,
+			styleId: 'kc-test-style-scoped',
+		});
+		assert.strictEqual(opInScope.style.display, 'none');
+		assert.notStrictEqual(opOutScope.style.display, 'none');
+		controller.destroy();
+		console.log('PASS: scopedHide affects only target tables');
+	} catch (e) {
+		console.error('FAIL: scoped hide', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
+
+	try {
+		// 5) teardown 後の復帰
+		const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+		const w = loadLibInDom(dom);
+		const op = createOperationNode(w.document, 'table-teardown', 'op-teardown');
+		const controller = w.setupSubtableOperationControl({
+			mode: 'alwaysHide',
+			observe: true,
+			styleId: 'kc-test-style-teardown',
+		});
+		assert.strictEqual(op.style.display, 'none');
+		w.teardownSubtableOperationControl(controller);
+		assert.notStrictEqual(op.style.display, 'none');
+		assert.strictEqual(w.document.getElementById('kc-test-style-teardown'), null);
+		console.log('PASS: teardown removes control and style');
+	} catch (e) {
+		console.error('FAIL: teardown restore', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
+
+	try {
+		// 6) 重複setup時の安定性とリーク抑止
+		const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+		const w = loadLibInDom(dom);
+		const op1 = createOperationNode(w.document, 'table-leak-1', 'op-leak-1');
+		createOperationNode(w.document, 'table-leak-2', 'op-leak-2');
+		const c1 = w.setupSubtableOperationControl({
+			mode: 'alwaysHide',
+			observe: true,
+			styleId: 'kc-test-style-shared',
+		});
+		const c2 = w.setupSubtableOperationControl({
+			mode: 'alwaysHide',
+			observe: true,
+			styleId: 'kc-test-style-shared',
+		});
+		assert.strictEqual(w.document.querySelectorAll('#kc-test-style-shared').length, 1);
+		w.updateSubtableOperationControl(c1, { mode: 'conditionalHide', hideWhen: false });
+		assert.strictEqual(op1.style.display, 'none');
+		w.updateSubtableOperationControl(c2, { mode: 'conditionalHide', hideWhen: false });
+		assert.notStrictEqual(op1.style.display, 'none');
+		w.updateSubtableOperationControl(c1, { mode: 'alwaysHide' });
+		assert.strictEqual(op1.style.display, 'none');
+		c1.destroy();
+		assert.strictEqual(w.document.querySelectorAll('#kc-test-style-shared').length, 1);
+		c2.destroy();
+		assert.strictEqual(w.document.querySelectorAll('#kc-test-style-shared').length, 0);
+		console.log('PASS: repeated setup/update/teardown stays stable');
+	} catch (e) {
+		console.error('FAIL: repeated setup stability', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
+
+	console.log('ALL SUBTABLE CONTROL TESTS INVOKED');
 })();
 
 // ---------------------- DOM tests: space field helpers ----------------------
@@ -774,10 +967,7 @@ const { JSDOM } = require('jsdom');
 			title: '日付正規化確認2',
 			fields: [{ name: 'dueDate', label: '期限', type: 'date' }],
 		});
-		assert.ok(
-			localizedDateInputResult,
-			'localized date input dialog should resolve result object'
-		);
+		assert.ok(localizedDateInputResult, 'localized date input dialog should resolve result object');
 		assert.strictEqual(localizedDateInputResult.action, 'OK');
 		assert.deepStrictEqual(localizedDateInputResult.values, {
 			dueDate: '2026-06-08',
