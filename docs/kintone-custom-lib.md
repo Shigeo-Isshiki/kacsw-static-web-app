@@ -6,32 +6,43 @@
 
 ## 公開 API サマリ
 
+### ランタイム初期化
+
+- [initKintoneCustomLibRuntime(options)](#initkintonecustomlibruntime)
+- [resetKintoneCustomLibRuntime()](#resetkintonecustomlibruntime)
+
+### 通知・ダイアログ
+
 - [notifyError(message, title = 'エラー', allowHtml = false)](#notifyerror)
 - [notifyInfo(message, title = '情報', allowHtml = false)](#notifyinfo)
 - [notifyWarning(message, title = '注意', allowHtml = false)](#notifywarning)
 - [showYesNoDialog(message, title = '確認', options)](#showyesnodialog)
 - [showInputDialog(options)](#showinputdialog)
+
+### レコード・イベント補助
+
 - [getFieldValueOr(record, fieldCode, defaultValue)](#getfieldvalueor)
 - [kintoneEventOn(events, handler)](#kintoneeventon)
 - [setRecordValues(record, values)](#setrecordvalues)
+
+### ヘッダー・スペース要素操作
+
 - [setHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)](#setheadermenuspacebutton)
 - [setRecordHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)](#setrecordheadermenuspacebutton)
 - [setRecordHeaderMenuSpaceText(id, innerHTML)](#setrecordheadermenuspacetext)
 - [setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)](#setspacefieldbutton)
 - [setSpaceFieldText(spaceField, id, innerHTML)](#setspacefieldtext)
 - [setSpaceFieldDisplay(spaceField, display)](#setspacefielddisplay)
-- [initKintoneCustomLibRuntime(options)](#initkintonecustomlibruntime)
-- [resetKintoneCustomLibRuntime()](#resetkintonecustomlibruntime)
+
+### サブテーブル操作ボタン制御
+
+- [setupSubtableOperationControl(options)](#setupsubtableoperationcontrol)
+- [updateSubtableOperationControl(controller, partialOptions)](#updatesubtableoperationcontrol)
+- [teardownSubtableOperationControl(controller)](#teardownsubtableoperationcontrol)
 
 ## ランタイム初期化（推奨）
 
 PC/モバイル判定を呼び出し側で一度だけ確定したい場合は、次の初期化 API を利用します。
-
-- `initKintoneCustomLibRuntime(options)`
-  - `options.isMobilePage`（boolean）または `options.mode`（`'pc' | 'mobile'`）を受け取り、内部キャッシュに保存します。
-  - `options.version`（number）を指定すると、グローバル設定の更新世代として扱います。
-- `resetKintoneCustomLibRuntime()`
-  - 内部キャッシュをクリアします（主にテスト用）。
 
 また、`globalThis.KACSW_RUNTIME`（または `window.KACSW_RUNTIME`）に次の形式で設定すると、内部で自動同期されます。
 
@@ -48,9 +59,110 @@ globalThis.KACSW_RUNTIME = {
 - `KACSW_RUNTIME` の設定値
 - 既存の自動判定（`location.pathname` ベース）
 
+<a id="initkintonecustomlibruntime"></a>
+
+### initKintoneCustomLibRuntime(options)
+
+- 動作概要: PC/モバイル判定を明示設定し、内部キャッシュへ保存します。
+
+- `options` (object)
+  - `options.isMobilePage` (boolean, optional) — `true` でモバイル、`false` で PC。
+  - `options.mode` (`'mobile' | 'pc'`, optional) — `isMobilePage` の代替指定。
+  - `options.version` (number, optional) — 設定の更新世代番号。
+
+- 戻り値: `boolean`（有効な判定が適用された場合 `true`）
+
+例:
+
+```js
+initKintoneCustomLibRuntime({ isMobilePage: true, version: Date.now() });
+```
+
+<a id="resetkintonecustomlibruntime"></a>
+
+### resetKintoneCustomLibRuntime()
+
+- 動作概要: 内部キャッシュされたランタイム設定をクリアします。
+- 戻り値: なし
+
+例:
+
+```js
+resetKintoneCustomLibRuntime();
+```
+
 ## 個別関数の使い方
 
 > 注意: ここに書かれた使用例はライブラリの公開 API に合わせたもので、実行環境（ブラウザ / kintone / Node+jsdom）によって前提が異なります。kintone の DOM 要素を参照する関数は、テスト時に `kintone.app` のモックや `document`（jsdom）の用意が必要です。
+
+以下では、個別の公開関数について順に説明します。まずはサブテーブル操作ボタン制御 API から整理し、その後に一般的なレコード操作・通知・ダイアログ系の関数へ続けて解説します。
+
+### サブテーブル操作ボタン制御 API
+
+<a id="setupsubtableoperationcontrol"></a>
+
+#### setupSubtableOperationControl(options)
+
+- 動作概要: サブテーブルの操作ボタン（例: `.subtable-operation-gaia`）を一括で非表示にするための共通コントローラを生成します。`observe: true` の場合は DOM 再描画後に自動で再適用されます。
+- 戻り値: `controller` オブジェクト。`apply()` / `refresh()` / `disconnect()` / `destroy()` / `getState()` を持ちます。
+- `options.mode` (string) — `alwaysHide` / `conditionalHide` / `scopedHide` のいずれか。
+- `options.hideWhen` (boolean | function(context) => boolean) — `conditionalHide` で用いる判定条件。
+- `options.target` (string | string[]) — `scopedHide` で対象とするサブテーブル識別子。`'all'` も可。
+- `options.observe` (boolean, default `true`) — DOM 再描画時に再適用するか。
+- `options.observerThrottleMs` (number, default `100`) — MutationObserver のスロットリング間隔。
+- `options.hideLabelAndRowOps` (boolean, default `false`) — 行追加や行削除ラベル等の追加セレクタも対象にするか。
+- `options.strategy` (string, default `'cssPlusInline'`) — `cssOnly` または `cssPlusInline`。
+- `options.styleId` (string) — スタイル要素の重複注入を避けるための ID。
+- `options.debug` (boolean) — デバッグログを出すか。
+- `options.context` (any) — `hideWhen` で参照する任意コンテキスト。
+
+例:
+
+```js
+// 320系: 常時非表示
+const ctrl320 = setupSubtableOperationControl({
+	mode: 'alwaysHide',
+	observe: true,
+});
+
+// 364系: 条件付き非表示
+const ctrl364 = setupSubtableOperationControl({
+	mode: 'conditionalHide',
+	hideWhen: (ctx) => !!(ctx && ctx.context && ctx.context.shouldHide),
+	context: { shouldHide: true },
+	observe: true,
+});
+
+// 626系: 対象サブテーブルだけ非表示
+const ctrl626 = setupSubtableOperationControl({
+	mode: 'scopedHide',
+	target: ['SUBTABLE_CODE_1', 'SUBTABLE_CODE_2'],
+	observe: true,
+});
+```
+
+<a id="updatesubtableoperationcontrol"></a>
+
+#### updateSubtableOperationControl(controller, partialOptions)
+
+- 動作概要: 既存の `controller` の `options` を部分更新し、即時に再適用します。
+- `partialOptions` は `setupSubtableOperationControl()` と同じキーを受け取ります。`mode` や `context` などを変えた場合は、すぐに反映されます。
+
+```js
+updateSubtableOperationControl(ctrl364, {
+	context: { shouldHide: false },
+});
+```
+
+<a id="teardownsubtableoperationcontrol"></a>
+
+#### teardownSubtableOperationControl(controller)
+
+- 動作概要: 指定した `controller` を停止し、Observer・注入スタイル・内部状態を解放します。これにより制御は解除されます。
+
+```js
+teardownSubtableOperationControl(ctrl320);
+```
 
 <a id="getfieldvalueor"></a>
 
@@ -87,27 +199,29 @@ getFieldValueOr(rec, 'missing', '不明'); // -> '不明'
 
 例:
 
-````js
-kintoneEventOn('app.record.create', function(event) {
-  return event;
+```js
+kintoneEventOn('app.record.create', function (event) {
+	return event;
 });
+```
 
 テストヒント: `global.kintone = { events: { on: (ev, h) => h({}) } }` のようにスタブして、ハンドラが呼ばれることを確認します。
 
-
 <a id="setrecordvalues"></a>
-### setRecordValues(record, values)
- - 動作概要: 指定した `values` のキーと値を `record` に反映します。既にオブジェクトで `value` プロパティがある場合は上書きし、なければ `{ value: ... }` を作成して設定します。
 
-  - `record` (Object) — 操作対象の kintone レコードオブジェクト
-  - `values` (Object) — フィールドコードをキー、設定する値を値とするオブジェクト。既に `{ value: ... }` 形式のフィールドは上書き、プリミティブ値の場合は `{ value: 値 }` を設定します。
-例:
+### setRecordValues(record, values)
+
+- 動作概要: 指定した `values` のキーと値を `record` に反映します。既にオブジェクトで `value` プロパティがある場合は上書きし、なければ `{ value: ... }` を作成して設定します。
+
+- `record` (Object) — 操作対象の kintone レコードオブジェクト
+- `values` (Object) — フィールドコードをキー、設定する値を値とするオブジェクト。既に `{ value: ... }` 形式のフィールドは上書き、プリミティブ値の場合は `{ value: 値 }` を設定します。
+  例:
 
 ```js
 const r = { a: { value: 1 }, b: 2 };
 setRecordValues(r, { a: 10, c: 3 });
 // r.a.value === 10, r.c.value === 3
-````
+```
 
 <a id="notifyerror"></a>
 
@@ -440,41 +554,7 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 
 - 動作概要: 指定したスペースフィールドの親ノードの `style.display` を切り替えます。`display` が `true` のときは表示、`false` のときは非表示に設定します。実行環境に応じて PC / モバイルの API を自動判定して `getSpaceElement` を使用します。
 - API 選択ルールは `setSpaceFieldButton` と同じです（ランタイム設定優先、未設定時は自動判定）。
-
-<a id="initkintonecustomlibruntime"></a>
-
-### initKintoneCustomLibRuntime(options)
-
-- 動作概要: PC/モバイル判定を明示設定し、内部キャッシュへ保存します。
-
-- `options` (object)
-  - `options.isMobilePage` (boolean, optional) — `true` でモバイル、`false` で PC。
-  - `options.mode` (`'mobile' | 'pc'`, optional) — `isMobilePage` の代替指定。
-  - `options.version` (number, optional) — 設定の更新世代番号。
-
-- 戻り値: `boolean`（有効な判定が適用された場合 `true`）
-
-例:
-
-```js
-initKintoneCustomLibRuntime({ isMobilePage: true, version: Date.now() });
-```
-
-<a id="resetkintonecustomlibruntime"></a>
-
-### resetKintoneCustomLibRuntime()
-
-- 動作概要: 内部キャッシュされたランタイム設定をクリアします。
-- 戻り値: なし
-
-例:
-
-```js
-resetKintoneCustomLibRuntime();
-```
-
 - 取得したスペース要素またはその親ノードが存在しない場合は `false` を返します。
-
 - `spaceField` (string) — スペースフィールドのコード
 - `display` (boolean) — true で表示、false で非表示にする指定
 
