@@ -139,6 +139,13 @@ const ctrl626 = setupSubtableOperationControl({
 	target: ['SUBTABLE_CODE_1', 'SUBTABLE_CODE_2'],
 	observe: true,
 });
+
+// 行追加/行削除ボタンや操作ラベルもまとめて非表示
+const ctrlRowOps = setupSubtableOperationControl({
+	mode: 'alwaysHide',
+	hideLabelAndRowOps: true,
+	observe: true,
+});
 ```
 
 <a id="updatesubtableoperationcontrol"></a>
