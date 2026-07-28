@@ -224,6 +224,39 @@ const { JSDOM } = require('jsdom');
 	}
 
 	try {
+		// 2.5) hideLabelAndRowOps で add/delete ボタンも対象化される
+		const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+		const w = loadLibInDom(dom);
+		const wrapper = w.document.createElement('div');
+		wrapper.id = 'table-row-ops';
+
+		const addBtn = w.document.createElement('button');
+		addBtn.className = 'subtable-row-add-gaia';
+		wrapper.appendChild(addBtn);
+
+		const deleteBtn = w.document.createElement('button');
+		deleteBtn.className = 'subtable-row-delete-gaia';
+		wrapper.appendChild(deleteBtn);
+
+		w.document.body.appendChild(wrapper);
+
+		const controller = w.setupSubtableOperationControl({
+			mode: 'alwaysHide',
+			hideLabelAndRowOps: true,
+			observe: false,
+			styleId: 'kc-test-style-row-ops',
+		});
+
+		assert.strictEqual(addBtn.style.display, 'none');
+		assert.strictEqual(deleteBtn.style.display, 'none');
+		controller.destroy();
+		console.log('PASS: hideLabelAndRowOps hides add/delete row buttons');
+	} catch (e) {
+		console.error('FAIL: hideLabelAndRowOps add/delete', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
+
+	try {
 		// 3) 条件切替 (setup -> update)
 		const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
 		const w = loadLibInDom(dom);

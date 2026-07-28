@@ -1698,6 +1698,8 @@ const _kc_getBaseOperationSelectors = (options) => {
 		selectors.push('.subtable-operation-label-gaia');
 		selectors.push('.subtable-row-add-gaia');
 		selectors.push('.subtable-row-remove-gaia');
+		// Mobile UI variants may use "delete" instead of "remove".
+		selectors.push('.subtable-row-delete-gaia');
 	}
 	// 部分一致セレクタはデフォルト無効。明示時のみ有効化。
 	if (options.allowPartialClassMatch) {
