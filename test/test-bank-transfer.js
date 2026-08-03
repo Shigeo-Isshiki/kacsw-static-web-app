@@ -112,6 +112,41 @@ try {
 	process.exitCode = 2;
 }
 
+try {
+	const out = BANK.normalizePayeeName('か）ねっとぷろてくしょんず');
+	assert.strictEqual(typeof out, 'string', '戻り値は文字列であること');
+	assert.ok(out.length > 0, '戻り値は空文字ではないこと');
+	assert.ok(/\)/.test(out), '全角閉じ括弧は半角閉じ括弧として扱われること');
+	console.log('PASS: normalizePayeeName accepts fullwidth closing parenthesis after normalization');
+} catch (e) {
+	console.error(
+		'FAIL: normalizePayeeName fullwidth closing parenthesis normalization',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	let threw = false;
+	try {
+		BANK.normalizePayeeName('ｶ)ﾈｯﾄ☆');
+	} catch (e) {
+		threw = true;
+		assert.ok(
+			String(e && e.message ? e.message : e).includes('☆'),
+			'許容外文字は正規化後ではなく元の文字で表示されること'
+		);
+	}
+	assert.ok(threw, '許容外文字を含むとエラーになること');
+	console.log('PASS: normalizePayeeName reports invalid original characters');
+} catch (e) {
+	console.error(
+		'FAIL: normalizePayeeName reports invalid originals',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
 // ---------------------- normalizePayeeName skipAbbreviation test ----------------------
 try {
 	// 全てカタカナで入力すると、略語マップの半角カナキーにマッチして
@@ -165,6 +200,18 @@ try {
 	console.log('PASS: normalizeEdiInfo rejects kanji');
 } catch (e) {
 	console.error('FAIL: normalizeEdiInfo kanji', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const out = BANK.normalizeEdiInfo('（Ａ）', { padToBytes: false, bytes: 20 });
+	assert.strictEqual(out, '(A)', '全角括弧と全角英字は半角化されること');
+	console.log('PASS: normalizeEdiInfo normalizes fullwidth symbols to halfwidth');
+} catch (e) {
+	console.error(
+		'FAIL: normalizeEdiInfo normalizes fullwidth symbols',
+		e && e.message ? e.message : e
+	);
 	process.exitCode = 2;
 }
 

@@ -2288,6 +2288,45 @@ const normalizeAccountNumber = (input) => {
 	return normalized.padStart(7, '0');
 };
 
+/**
+ * 内部: 文字列を半角許容文字へ正規化しつつ、許容外文字（元文字）を収集する。
+ * - 判定は正規化後の文字で行う
+ * - エラー表示は入力時の元文字で行う
+ * @private
+ * @param {string} input
+ * @returns {{normalized:string, invalidOriginalChars:string[]}}
+ */
+const _bt_normalizeAllowedHalfWidthWithOriginals = (input) => {
+	const src = _bt_toStr(input || '');
+	let normalized = '';
+	const invalidOriginalChars = [];
+	for (const original of src) {
+		let chunk = original;
+		try {
+			chunk = _bt_toHalfWidthKana(chunk, false);
+		} catch (e) {
+			chunk = original;
+		}
+		// 全角ASCII記号/英数は半角へ（例: （）！，． など）
+		chunk = chunk.replace(/[！-～]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+		// 全角スペースと日本語読点を正規化
+		chunk = chunk.replace(/　/g, ' ').replace(/[，、]/g, ',');
+
+		let allowed = true;
+		for (const ch of chunk) {
+			if (!_bt_isAllowedHalfWidthChar(ch)) {
+				allowed = false;
+				break;
+			}
+		}
+		if (!allowed && invalidOriginalChars.indexOf(original) === -1) {
+			invalidOriginalChars.push(original);
+		}
+		normalized += chunk;
+	}
+	return { normalized, invalidOriginalChars };
+};
+
 /** 公開: normalizeEdiInfo — EDI 補助情報を銀行提出向けに簡易正規化します（詳細: docs/bank-transfer.md）。 */
 /**
  * @param {string} input 入力文字列
@@ -2296,35 +2335,20 @@ const normalizeAccountNumber = (input) => {
  */
 const normalizeEdiInfo = (input, options = {}) => {
 	const opt = Object.assign({ padToBytes: false, bytes: 20 }, options || {});
-	let s = _bt_toStr(input || '').trim();
-	try {
-		s = _bt_toHalfWidthKana(s, false);
-	} catch (e) {
-		// ignore and continue with raw string
-	}
+	const raw = _bt_toStr(input || '').trim();
+	const normalizedInfo = _bt_normalizeAllowedHalfWidthWithOriginals(raw);
+	let s = normalizedInfo.normalized;
 	// EDI 特有の禁止文字チェック: コンマは許容しない
-	if (/,|，/.test(s)) {
+	if (/,|，/.test(raw) || /,/.test(s)) {
 		throw new Error('EDI情報にコンマ(, または ，)は使用できません');
 	}
 
 	// validate allowed characters similar to normalizePayeeName
-	if (typeof _bt_isAllowedHalfWidthString === 'function') {
-		if (!_bt_isAllowedHalfWidthString(s)) {
-			const invalidChars = [];
-			for (const ch of s) {
-				if (typeof _bt_isAllowedHalfWidthChar === 'function') {
-					if (!_bt_isAllowedHalfWidthChar(ch) && invalidChars.indexOf(ch) === -1)
-						invalidChars.push(ch);
-				} else {
-					if (ch && ch.charCodeAt(0) > 0x7f && invalidChars.indexOf(ch) === -1)
-						invalidChars.push(ch);
-				}
-			}
-			const msg =
-				'EDI情報に銀行振込で許容されない文字が含まれています: ' +
-				(invalidChars.length ? invalidChars.join(',') : '不明');
-			throw new Error(msg);
-		}
+	if (normalizedInfo.invalidOriginalChars.length > 0) {
+		const msg =
+			'EDI情報に銀行振込で許容されない文字が含まれています: ' +
+			normalizedInfo.invalidOriginalChars.join(',');
+		throw new Error(msg);
 	}
 
 	// truncate to requested byte length first
@@ -2439,25 +2463,22 @@ const normalizePayeeName = (input, options = {}) => {
 	}
 	// 3) 英小文字は大文字化
 	work = work.replace(/[a-z]/g, (c) => c.toUpperCase());
-
-	// 全角カンマ（，）や日本語読点（、）は半角カンマに正規化して許容する
-	work = work.replace(/[，、]/g, ',');
+	const normalizedName = _bt_normalizeAllowedHalfWidthWithOriginals(work);
+	work = normalizedName.normalized;
 
 	// 4) 検査
-	if (_bt_isAllowedHalfWidthString(work)) {
+	if (normalizedName.invalidOriginalChars.length === 0) {
 		// 成功時は Shift_JIS 単位で先頭 30 バイトに切り詰めて返す
 		const truncated = _bt_sjisTruncate(work, 30);
 		return truncated;
 	}
 
 	// 5) 許容外文字の列挙して Error を投げる（normalizeAccountNumber と同様の挙動）
-	const invalidChars = [];
-	for (const ch of work) {
-		if (!_bt_isAllowedHalfWidthChar(ch) && invalidChars.indexOf(ch) === -1) invalidChars.push(ch);
-	}
 	const msg =
 		'口座名義に銀行振込で許容されない文字が含まれています: ' +
-		(invalidChars.length ? invalidChars.join(',') : '不明');
+		(normalizedName.invalidOriginalChars.length
+			? normalizedName.invalidOriginalChars.join(',')
+			: '不明');
 	// シンプルにメッセージだけを投げる（仕様に合わせる）
 	throw new Error(msg);
 };
