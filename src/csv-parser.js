@@ -173,39 +173,87 @@ const _cp_pickCsvFile = async (accept) => {
 		body.appendChild(input);
 
 		let settled = false;
-		const cleanup = () => {
-			if (settled) return;
-			settled = true;
-			if (input.parentNode) input.parentNode.removeChild(input);
-		};
+		let fallbackTimer = null;
+		let fallbackInterval = null;
+		let focusBound = false;
 
-		input.addEventListener('change', () => {
+		const onChange = () => {
 			const file = input.files && input.files[0] ? input.files[0] : null;
 			cleanup();
 			resolve(file);
-		});
+		};
+
+		const onCancel = () => {
+			cleanup();
+			resolve(null);
+		};
+
+		const clearFallbackWatch = () => {
+			if (fallbackTimer) {
+				clearTimeout(fallbackTimer);
+				fallbackTimer = null;
+			}
+			if (fallbackInterval) {
+				clearInterval(fallbackInterval);
+				fallbackInterval = null;
+			}
+		};
+
+		const stopWindowFallback = () => {
+			if (focusBound && typeof window !== 'undefined') {
+				window.removeEventListener('focus', onWindowFocus);
+				focusBound = false;
+			}
+		};
+
+		const cleanup = () => {
+			if (settled) return;
+			settled = true;
+			clearFallbackWatch();
+			stopWindowFallback();
+			input.removeEventListener('change', onChange);
+			input.removeEventListener('cancel', onCancel);
+			if (input.parentNode) input.parentNode.removeChild(input);
+		};
 
 		const onWindowFocus = () => {
-			setTimeout(() => {
-				if (!settled) {
+			if (settled) return;
+			clearFallbackWatch();
+
+			// cancel イベント非対応ブラウザ向け。focus 復帰直後の反映遅延を吸収するため短時間監視する。
+			fallbackTimer = setTimeout(() => {
+				if (settled) return;
+				const startedAt = Date.now();
+				const maxWaitMs = 2500;
+				const tickMs = 100;
+
+				fallbackInterval = setInterval(() => {
+					if (settled) {
+						clearFallbackWatch();
+						return;
+					}
+
 					const selected = input.files && input.files[0] ? input.files[0] : null;
 					if (selected) {
 						cleanup();
 						resolve(selected);
 						return;
 					}
-					setTimeout(() => {
-						if (settled) return;
-						const selectedLater = input.files && input.files[0] ? input.files[0] : null;
+
+					if (Date.now() - startedAt >= maxWaitMs) {
 						cleanup();
-						resolve(selectedLater || null);
-					}, 350);
-				}
-			}, 350);
+						resolve(null);
+					}
+				}, tickMs);
+			}, 0);
 		};
 
-		if (typeof window !== 'undefined') {
-			window.addEventListener('focus', onWindowFocus, { once: true });
+		input.addEventListener('change', onChange);
+		input.addEventListener('cancel', onCancel);
+
+		if (typeof window !== 'undefined' && !('oncancel' in input)) {
+			window.addEventListener('focus', onWindowFocus);
+			focusBound = true;
 		}
 
 		input.click();
