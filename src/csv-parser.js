@@ -211,8 +211,10 @@ const _cp_pickCsvFile = async (accept) => {
 			settled = true;
 			clearFallbackWatch();
 			stopWindowFallback();
-			input.removeEventListener('change', onChange);
-			input.removeEventListener('cancel', onCancel);
+			if (typeof input.removeEventListener === 'function') {
+				input.removeEventListener('change', onChange);
+				input.removeEventListener('cancel', onCancel);
+			}
 			if (input.parentNode) input.parentNode.removeChild(input);
 		};
 
