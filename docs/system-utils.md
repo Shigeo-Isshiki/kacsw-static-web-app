@@ -1,9 +1,9 @@
 **System Utils**
 
 - **説明**: `system-utils.js` は kintone カスタマイズ等で使う軽量ユーティリティ群です。主に次の機能を提供します:
-  - `generatePassword` : 規則に沿ったセキュアなパスワード生成
-  - `maskPassword` : パスワードの一部をマスク表示
-  - `toKanaReading` : 英数字・記号を読み仮名に変換（既定マップ付属）
+  - [`generatePassword`](#generatepassword) : 規則に沿ったセキュアなパスワード生成
+  - [`maskPassword`](#maskpassword) : パスワードの一部をマスク表示
+  - [`toKanaReading`](#tokanareading) : 英数字・記号を読み仮名に変換（既定マップ付属）
 
 **インポート / 利用方法（ブラウザ/Node 共通）**
 
@@ -21,6 +21,8 @@ const pw2 = sys.generatePassword({ length: 16, useSymbols: false });
 
 **API リファレンス**
 
+<a id="generatepassword"></a>
+
 - `generatePassword(options)`
   - 目的: 指定ルールに従い、安全なパスワードを生成します。
   - 注意: 関数はオプションオブジェクトを直接受け取ります。誤って二重にラップして
@@ -37,8 +39,28 @@ const pw2 = sys.generatePassword({ length: 16, useSymbols: false });
     - `useUpper` (boolean) : 大文字を含めるか（既定 true）。
     - `useNumbers` (boolean) : 数字を含めるか（既定 true）。
     - `useSymbols` (boolean) : 記号を含めるか（既定 false）。
+  - 生成できる文字:
+    - 小文字（`useLower: true`）:
+      ```text
+      abcdefghjkmnpqrstuvwxyz
+      ```
+    - 大文字（`useUpper: true`）:
+      ```text
+      ABCDEFGHJKMNPQRSTUVWXYZ
+      ```
+    - 数字（`useNumbers: true`）:
+      ```text
+      23456789
+      ```
+    - 記号（`useSymbols: true`）:
+      ```text
+      #$%&=@+*/?
+      ```
+    - 有効にした各カテゴリから最低1文字が含まれます。`useSymbols` の既定値は `false` です。
   - 特記事項: 視認で混同しやすい文字は既定で除外しています（例: 小文字 `i,l,o`、大文字 `I,L,O`、数字 `0,1`）。
   - 実装のポイント: 各選択種から最低1文字を確保し、残りを合成文字集合から選び、最後に Fisher–Yates でシャッフルします。乱数にはブラウザ `crypto.getRandomValues` / Node `crypto.randomBytes` を用い、モジュロバイアスを回避するために拒否サンプリング（`_su_randomIndex`）を使っています。
+
+<a id="maskpassword"></a>
 
 - `maskPassword(pw, visible)`
   - 目的: パスワードを部分的にマスクして表示用に整形します。
@@ -46,6 +68,8 @@ const pw2 = sys.generatePassword({ length: 16, useSymbols: false });
     - `pw` (string) : 元のパスワード
     - `visible` (number) : 左右に残す文字数（既定 2）
   - 例: `maskPassword('Secr3tPW', 2)` -> `'Se****PW'`。長さが `visible*2` 以下の場合はすべて `*` に置換されます。
+
+<a id="tokanareading"></a>
 
 - `toKanaReading(str, options)`
   - 目的: 入力文字列中の英数字・記号を読み仮名（ヨミガナ）に置換して返します。
