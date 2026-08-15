@@ -64,8 +64,6 @@
 		'normalizeZipCode',
 		// national_holiday_handling.js
 		'getNationalHolidayName',
-		// password_generation.js
-		'getPassword',
 		// zipcode_processing.js
 		'getZipcodeAddress',
 		// character_handling.js

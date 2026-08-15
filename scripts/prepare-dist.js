@@ -18,7 +18,6 @@ const FILES = [
 	'text-suite.js',
 	'shipping-processing.js',
 	'vc-check.js',
-	'password_generation.js',
 	'jquery.autoKana.js',
 	'national_holiday_handling.js',
 	'all-window-exports.js',
