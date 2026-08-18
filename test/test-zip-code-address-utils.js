@@ -160,7 +160,18 @@ const makeFetchStub = (status, jsonBody) => {
 		});
 		console.log('PASS: normalizeZipCode fullwidth input');
 
-		// 9) invalid input (not 7 chars) -> formatZipCode returns error in callback
+		// 9) hasPrefectureName: 住所の先頭にある正式な都道府県名だけを許可する
+		assert.strictEqual(zc.hasPrefectureName('東京都千代田区千代田1-1'), true);
+		assert.strictEqual(zc.hasPrefectureName('北海道札幌市中央区北一条'), true);
+		assert.strictEqual(zc.hasPrefectureName('沖縄県那覇市泉崎1-1'), true);
+		assert.strictEqual(zc.hasPrefectureName('千代田区東京都千代田1-1'), false);
+		assert.strictEqual(zc.hasPrefectureName('東京千代田区千代田1-1'), false);
+		assert.strictEqual(zc.hasPrefectureName(' 東京都千代田区千代田1-1'), false);
+		assert.strictEqual(zc.hasPrefectureName(''), false);
+		assert.strictEqual(zc.hasPrefectureName(null), false);
+		console.log('PASS: hasPrefectureName strict prefix check');
+
+		// 10) invalid input (not 7 chars) -> formatZipCode returns error in callback
 		await new Promise((resolve) => {
 			zc.formatZipCode('123', (res) => {
 				assert.ok(res.error);
@@ -169,7 +180,7 @@ const makeFetchStub = (status, jsonBody) => {
 		});
 		console.log('PASS: formatZipCode invalid input');
 
-		// 10) kintone DOM helpers: basic invocation (we'll stub kintone.app.record.getSpaceElement)
+		// 11) kintone DOM helpers: basic invocation (we'll stub kintone.app.record.getSpaceElement)
 		// prepare a fake DOM element and kintone
 		global.document = global.document || {
 			createElement: () => ({
@@ -193,7 +204,7 @@ const makeFetchStub = (status, jsonBody) => {
 		zc.kintoneZipSpaceFieldText('S', 'txt-id', true);
 		console.log('PASS: kintone DOM helper basic calls');
 
-		// 11) モバイル画面パスでは mobile.app.record.getSpaceElement を利用する
+		// 12) モバイル画面パスでは mobile.app.record.getSpaceElement を利用する
 		const originalLocation = global.location;
 		const mobileSpaceElement = {
 			parentNode: { style: { display: 'none' } },
@@ -224,7 +235,7 @@ const makeFetchStub = (status, jsonBody) => {
 		global.location = originalLocation;
 		console.log('PASS: kintone ZIP helpers support mobile getSpaceElement');
 
-		// 12) /k/m/ 以外でも mobile 側しか使えない場合に fallback できる
+		// 13) /k/m/ 以外でも mobile 側しか使えない場合に fallback できる
 		const originalLocationFallback = global.location;
 		const fallbackSpaceElement = {
 			parentNode: { style: { display: 'none' } },

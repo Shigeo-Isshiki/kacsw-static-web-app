@@ -9,16 +9,17 @@
 - 概要
 - 公開 API サマリ
 - 各関数の引数・戻り値詳細（戻り値の形を必ず記載）
-  - `checkZipCodeExists(zipCode, callback)`
-  - `formatZipCode(zipCode, callback)`
-  - `getAddressByZipCode(zipCode, callback)`
-  - `getCityByZipCode(zipCode, callback)`
-  - `getPrefectureByZipCode(zipCode, callback)`
-  - `normalizeZipCode(zipCode, callback)`
-  - `kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)`
-  - `kintoneZipSpaceFieldText(spaceField, id, display)`
-  - `initZipCodeAddressUtilsRuntime(options)`
-  - `resetZipCodeAddressUtilsRuntime()`
+  - [`checkZipCodeExists(zipCode, callback)`](#checkZipCodeExists)
+  - [`formatZipCode(zipCode, callback)`](#formatZipCode)
+  - [`getAddressByZipCode(zipCode, callback)`](#getAddressByZipCode)
+  - [`getCityByZipCode(zipCode, callback)`](#getCityByZipCode)
+  - [`getPrefectureByZipCode(zipCode, callback)`](#getPrefectureByZipCode)
+  - [`hasPrefectureName(address)`](#hasPrefectureName)
+  - [`normalizeZipCode(zipCode, callback)`](#normalizeZipCode)
+  - [`kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)`](#kintoneZipSetSpaceFieldButton)
+  - [`kintoneZipSpaceFieldText(spaceField, id, display)`](#kintoneZipSpaceFieldText)
+  - [`initZipCodeAddressUtilsRuntime(options)`](#initZipCodeAddressUtilsRuntime)
+  - [`resetZipCodeAddressUtilsRuntime()`](#resetZipCodeAddressUtilsRuntime)
 - 実例
 - 注意事項 / エッジケース
 
@@ -50,6 +51,7 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 - `getAddressByZipCode(zipCode, callback)` — 住所情報オブジェクトを `callback(result)` で返す。成功時は詳細フィールドを含むオブジェクトを返す（下記参照）。失敗時は `{ error: string }`。
 - `getCityByZipCode(zipCode, callback)` — 市区町村名を `callback(cityName|string|null)` で返す（見つからなければ `null`）。
 - `getPrefectureByZipCode(zipCode, callback)` — 都道府県名を `callback(prefName|string|null)` で返す（見つからなければ `null`）。
+- `hasPrefectureName(address)` — 住所が47都道府県の正式名称で始まるかを厳密に判定する。
 - `normalizeZipCode(zipCode, callback)` — 正規化済みの7文字（半角英数字）を `callback(result)` で返す。成功: `{ zipCode: string }`、失敗: `{ error: string }`。
 - `kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)` — kintone のスペースフィールドにボタンを追加（または削除）します。
 - `kintoneZipSpaceFieldText(spaceField, id, display)` — 説明テキストをスペースフィールドに追加/削除します。
@@ -195,6 +197,31 @@ formatZipCode('１２３－４５６７', (res) => {
 
 ---
 
+<a id="hasPrefectureName"></a>
+
+### `hasPrefectureName(address)`
+
+- 引数:
+  - `address` (string) — 判定対象の住所文字列。
+
+- 戻り値:
+  - `boolean` — 住所の先頭が47都道府県の正式名称なら `true`、それ以外は `false`。
+
+- 動作:
+  - `北海道`、`東京都`、`京都府`、`大阪府`、および `○○県` を含む、47都道府県の正式名称だけを許可します。
+  - 都道府県名が住所の途中にある場合、略称の場合、先頭に半角・全角を問わず空白がある場合は `false` です。
+  - `null`、`undefined`、数値など文字列以外の値は `false` です。
+
+```js
+hasPrefectureName('東京都千代田区千代田1-1'); // true
+hasPrefectureName('北海道札幌市中央区北一条'); // true
+hasPrefectureName('千代田区東京都千代田1-1'); // false
+hasPrefectureName('東京千代田区千代田1-1'); // false
+hasPrefectureName(' 東京都千代田区千代田1-1'); // false
+```
+
+---
+
 <a id="normalizeZipCode"></a>
 
 ### `normalizeZipCode(zipCode, callback)`
@@ -298,6 +325,10 @@ zc.getAddressByZipCode('1234567', (res) => {
 	if (res.error) console.error(res.error);
 	else console.log(res.prefName, res.cityName, res.townName);
 });
+
+if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
+  console.error('住所の先頭に都道府県名を入力してください');
+}
 ```
 
 ### ブラウザ / kintone 環境
@@ -309,6 +340,10 @@ zc.getAddressByZipCode('1234567', (res) => {
 	window.formatZipCode('1234567', function (res) {
 		console.log(res);
 	});
+
+  if (!window.hasPrefectureName(event.record.住所.value)) {
+    event.error = '住所の先頭に都道府県名を入力してください。';
+  }
 
 	// スペースフィールドにボタンを追加
 	window.kintoneZipSetSpaceFieldButton(

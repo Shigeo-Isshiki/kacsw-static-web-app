@@ -59,6 +59,7 @@
 		'getAddressByZipCode',
 		'getCityByZipCode',
 		'getPrefectureByZipCode',
+		'hasPrefectureName',
 		'kintoneZipSetSpaceFieldButton',
 		'kintoneZipSpaceFieldText',
 		'normalizeZipCode',

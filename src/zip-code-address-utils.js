@@ -3,12 +3,61 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
-/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, kintoneZipSetSpaceFieldButton, kintoneZipSpaceFieldText, normalizeZipCode, initZipCodeAddressUtilsRuntime, resetZipCodeAddressUtilsRuntime */
+/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, kintoneZipSetSpaceFieldButton, kintoneZipSpaceFieldText, normalizeZipCode, initZipCodeAddressUtilsRuntime, resetZipCodeAddressUtilsRuntime */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // 郵便番号APIベースURL
 const _ZC_ZIPCODE_API_BASE_URL = 'https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/digital';
 const _ZC_RUNTIME_GLOBAL_KEY = 'KACSW_RUNTIME';
+const _ZC_PREFECTURE_NAMES = [
+	'北海道',
+	'青森県',
+	'岩手県',
+	'宮城県',
+	'秋田県',
+	'山形県',
+	'福島県',
+	'茨城県',
+	'栃木県',
+	'群馬県',
+	'埼玉県',
+	'千葉県',
+	'東京都',
+	'神奈川県',
+	'新潟県',
+	'富山県',
+	'石川県',
+	'福井県',
+	'山梨県',
+	'長野県',
+	'岐阜県',
+	'静岡県',
+	'愛知県',
+	'三重県',
+	'滋賀県',
+	'京都府',
+	'大阪府',
+	'兵庫県',
+	'奈良県',
+	'和歌山県',
+	'鳥取県',
+	'島根県',
+	'岡山県',
+	'広島県',
+	'山口県',
+	'徳島県',
+	'香川県',
+	'愛媛県',
+	'高知県',
+	'福岡県',
+	'佐賀県',
+	'長崎県',
+	'熊本県',
+	'大分県',
+	'宮崎県',
+	'鹿児島県',
+	'沖縄県',
+];
 
 let _zc_runtimeMode = null;
 let _zc_runtimeVersion = null;
@@ -198,6 +247,16 @@ const _zc_setSpaceFieldDisplay = (spaceField, display) => {
 		return false;
 	}
 	return true;
+};
+
+/**
+ * 住所が正式な都道府県名で始まるかを厳密に判定します。
+ * @param {string} address 判定対象の住所
+ * @returns {boolean} 住所の先頭が47都道府県の正式名称なら true
+ */
+const hasPrefectureName = (address) => {
+	if (typeof address !== 'string') return false;
+	return _ZC_PREFECTURE_NAMES.some((prefectureName) => address.startsWith(prefectureName));
 };
 
 //　ライブラリ本体部
@@ -716,6 +775,7 @@ if (typeof window !== 'undefined') {
 	window.getAddressByZipCode = getAddressByZipCode;
 	window.getCityByZipCode = getCityByZipCode;
 	window.getPrefectureByZipCode = getPrefectureByZipCode;
+	window.hasPrefectureName = hasPrefectureName;
 	window.kintoneZipSetSpaceFieldButton = kintoneZipSetSpaceFieldButton;
 	window.kintoneZipSpaceFieldText = kintoneZipSpaceFieldText;
 	window.normalizeZipCode = normalizeZipCode;
@@ -732,6 +792,7 @@ try {
 			getAddressByZipCode,
 			getCityByZipCode,
 			getPrefectureByZipCode,
+			hasPrefectureName,
 			kintoneZipSetSpaceFieldButton,
 			kintoneZipSpaceFieldText,
 			normalizeZipCode,
