@@ -259,6 +259,12 @@ const hasPrefectureName = (address) => {
 	return _ZC_PREFECTURE_NAMES.some((prefectureName) => address.startsWith(prefectureName));
 };
 
+// 同期・非同期どちらの判定結果でも、必ず次のマクロタスクでcallbackを呼び出す（kintoneイベントハンドラ内での同期実行によるエラーを防ぐため）
+const _zc_invokeCallback = (callback, result) => {
+	if (typeof callback !== 'function') return;
+	setTimeout(() => callback(result), 0);
+};
+
 //　ライブラリ本体部
 /**
  * 郵便番号の存在チェック（APIで該当データがあるかだけ返す）
@@ -268,31 +274,31 @@ const hasPrefectureName = (address) => {
 const checkZipCodeExists = (zipCode, callback) => {
 	const v = _zc_getValidatedNormalized(zipCode);
 	if (!v.ok) {
-		if (typeof callback === 'function') callback(false);
+		_zc_invokeCallback(callback, false);
 		return;
 	}
 	const normalized = v.normalized;
 	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
-				callback(false);
+				_zc_invokeCallback(callback, false);
 				return null;
 			}
 			if (!response.ok) {
-				callback(false);
+				_zc_invokeCallback(callback, false);
 				return null;
 			}
 			return response.json();
 		})
 		.then((data) => {
 			if (!data || !data.addresses || data.addresses.length === 0) {
-				callback(false);
+				_zc_invokeCallback(callback, false);
 				return null;
 			}
-			callback(true);
+			_zc_invokeCallback(callback, true);
 		})
 		.catch(() => {
-			callback(false);
+			_zc_invokeCallback(callback, false);
 		});
 };
 
@@ -304,38 +310,38 @@ const checkZipCodeExists = (zipCode, callback) => {
 const formatZipCode = (zipCode, callback) => {
 	const v = _zc_getValidatedNormalized(zipCode);
 	if (!v.ok) {
-		if (typeof callback === 'function') callback({ error: v.error });
+		_zc_invokeCallback(callback, { error: v.error });
 		return;
 	}
 	const normalized = v.normalized;
 	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
-				callback({ error: '郵便番号が存在しません' });
+				_zc_invokeCallback(callback, { error: '郵便番号が存在しません' });
 				return null;
 			}
 			if (!response.ok) {
-				callback({ error: `APIエラー（${response.status}）` });
+				_zc_invokeCallback(callback, { error: `APIエラー（${response.status}）` });
 				return null;
 			}
 			return response.json();
 		})
 		.then((data) => {
 			if (!data || !data.addresses || data.addresses.length === 0) {
-				callback({ error: '郵便番号が存在しません' });
+				_zc_invokeCallback(callback, { error: '郵便番号が存在しません' });
 				return null;
 			}
 			// 数字7桁ならハイフン付き、それ以外はそのまま
 			if (/^\d{7}$/.test(normalized)) {
-				callback({
+				_zc_invokeCallback(callback, {
 					zipCode: normalized.slice(0, 3) + '-' + normalized.slice(3),
 				});
 			} else {
-				callback({ zipCode: normalized });
+				_zc_invokeCallback(callback, { zipCode: normalized });
 			}
 		})
 		.catch(() => {
-			callback({ error: 'API接続エラー' });
+			_zc_invokeCallback(callback, { error: 'API接続エラー' });
 		});
 };
 
@@ -374,7 +380,7 @@ const formatZipCode = (zipCode, callback) => {
 const getAddressByZipCode = (zipCode, callback) => {
 	const v = _zc_getValidatedNormalized(zipCode);
 	if (!v.ok) {
-		if (typeof callback === 'function') callback({ error: v.error });
+		_zc_invokeCallback(callback, { error: v.error });
 		return;
 	}
 	const normalized = v.normalized;
@@ -383,28 +389,28 @@ const getAddressByZipCode = (zipCode, callback) => {
 		.then((response) => {
 			if (!response.ok) {
 				if (response.status === 404) {
-					callback({
+					_zc_invokeCallback(callback, {
 						error: `郵便番号／デジタルアドレス「${zipCode}」に該当する住所が見つかりません`,
 					});
 					return null;
 				} else if (response.status >= 500) {
-					callback({ error: 'サーバーエラーが発生しました' });
+					_zc_invokeCallback(callback, { error: 'サーバーエラーが発生しました' });
 					return null;
 				} else {
-					callback({ error: `通信エラー（${response.status}）` });
+					_zc_invokeCallback(callback, { error: `通信エラー（${response.status}）` });
 					return null;
 				}
 			}
 			// JSONパースエラーも個別に捕捉
 			return response.json().catch(() => {
-				callback({ error: 'APIレスポンスのJSONパースに失敗しました' });
+				_zc_invokeCallback(callback, { error: 'APIレスポンスのJSONパースに失敗しました' });
 				return null;
 			});
 		})
 		.then((result) => {
 			if (!result) return;
 			if (!result.addresses || result.addresses.length === 0) {
-				callback({
+				_zc_invokeCallback(callback, {
 					error:
 						'該当する住所データが見つかりませんでした。郵便番号／デジタルアドレスを確認してください。',
 				});
@@ -431,7 +437,7 @@ const getAddressByZipCode = (zipCode, callback) => {
 				}
 			});
 			if (invalid) {
-				callback({
+				_zc_invokeCallback(callback, {
 					error: 'APIレスポンスが不正です（郵便番号・デジタルアドレス情報）',
 				});
 				return null;
@@ -439,7 +445,7 @@ const getAddressByZipCode = (zipCode, callback) => {
 			if (result.addresses.length === 1) {
 				if (!result) return null;
 				if (!result.addresses || result.addresses.length === 0) {
-					callback({
+					_zc_invokeCallback(callback, {
 						error:
 							'該当する住所データが見つかりませんでした。郵便番号／デジタルアドレスを確認してください。',
 					});
@@ -466,7 +472,7 @@ const getAddressByZipCode = (zipCode, callback) => {
 					}
 				});
 				if (isInvalid) {
-					callback({
+					_zc_invokeCallback(callback, {
 						error: 'APIレスポンスが不正です（郵便番号・デジタルアドレス情報）',
 					});
 					return null;
@@ -492,7 +498,7 @@ const getAddressByZipCode = (zipCode, callback) => {
 					}
 				}
 				formatZipCode(addressObj.zip_code, (zipResult) => {
-					callback({
+					_zc_invokeCallback(callback, {
 						originalZipCode: zipCode,
 						normalizedZipCode: normalized,
 						apiZipCode: addressObj.zip_code,
@@ -529,13 +535,13 @@ const getAddressByZipCode = (zipCode, callback) => {
 					});
 				});
 			} else {
-				callback({
+				_zc_invokeCallback(callback, {
 					error: `郵便番号／デジタルアドレス「${result.addresses[0].zip_code}」に該当する住所が複数見つかりました。郵便番号／デジタルアドレスを確認して再検索してください。`,
 				});
 			}
 		})
 		.catch((error) => {
-			callback({ error: `APIへの接続に失敗しました: ${error.message}` });
+			_zc_invokeCallback(callback, { error: `APIへの接続に失敗しました: ${error.message}` });
 		});
 };
 
@@ -547,31 +553,31 @@ const getAddressByZipCode = (zipCode, callback) => {
 const getCityByZipCode = (zipCode, callback) => {
 	const v = _zc_getValidatedNormalized(zipCode);
 	if (!v.ok) {
-		if (typeof callback === 'function') callback(null);
+		_zc_invokeCallback(callback, null);
 		return;
 	}
 	const normalized = v.normalized;
 	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
-				callback(null);
+				_zc_invokeCallback(callback, null);
 				return null;
 			}
 			if (!response.ok) {
-				callback(null);
+				_zc_invokeCallback(callback, null);
 				return null;
 			}
 			return response.json();
 		})
 		.then((data) => {
 			if (!data || !data.addresses || data.addresses.length === 0) {
-				callback(null);
+				_zc_invokeCallback(callback, null);
 				return null;
 			}
-			callback(data.addresses[0].city_name || null);
+			_zc_invokeCallback(callback, data.addresses[0].city_name || null);
 		})
 		.catch(() => {
-			callback(null);
+			_zc_invokeCallback(callback, null);
 		});
 };
 
@@ -583,31 +589,31 @@ const getCityByZipCode = (zipCode, callback) => {
 const getPrefectureByZipCode = (zipCode, callback) => {
 	const v = _zc_getValidatedNormalized(zipCode);
 	if (!v.ok) {
-		if (typeof callback === 'function') callback(null);
+		_zc_invokeCallback(callback, null);
 		return;
 	}
 	const normalized = v.normalized;
 	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
-				callback(null);
+				_zc_invokeCallback(callback, null);
 				return null;
 			}
 			if (!response.ok) {
-				callback(null);
+				_zc_invokeCallback(callback, null);
 				return null;
 			}
 			return response.json();
 		})
 		.then((data) => {
 			if (!data || !data.addresses || data.addresses.length === 0) {
-				callback(null);
+				_zc_invokeCallback(callback, null);
 				return null;
 			}
-			callback(data.addresses[0].pref_name || null);
+			_zc_invokeCallback(callback, data.addresses[0].pref_name || null);
 		})
 		.catch(() => {
-			callback(null);
+			_zc_invokeCallback(callback, null);
 		});
 };
 
@@ -739,18 +745,18 @@ const kintoneZipSpaceFieldText = (spaceField, id, display) => {
 const normalizeZipCode = (zipCode, callback) => {
 	const v = _zc_getValidatedNormalized(zipCode);
 	if (!v.ok) {
-		if (typeof callback === 'function') callback({ error: v.error });
+		_zc_invokeCallback(callback, { error: v.error });
 		return;
 	}
 	const normalized = v.normalized;
 	fetch(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
-				callback({ error: '郵便番号が存在しません' });
+				_zc_invokeCallback(callback, { error: '郵便番号が存在しません' });
 				return null;
 			}
 			if (!response.ok) {
-				callback({ error: `APIエラー（${response.status}）` });
+				_zc_invokeCallback(callback, { error: `APIエラー（${response.status}）` });
 				return null;
 			}
 			return response.json();
@@ -758,13 +764,13 @@ const normalizeZipCode = (zipCode, callback) => {
 		.then((data) => {
 			if (!data) return;
 			if (!data.addresses || data.addresses.length === 0) {
-				callback({ error: '郵便番号が存在しません' });
+				_zc_invokeCallback(callback, { error: '郵便番号が存在しません' });
 				return null;
 			}
-			callback({ zipCode: normalized });
+			_zc_invokeCallback(callback, { zipCode: normalized });
 		})
 		.catch(() => {
-			callback({ error: 'API接続エラー' });
+			_zc_invokeCallback(callback, { error: 'API接続エラー' });
 		});
 };
 
