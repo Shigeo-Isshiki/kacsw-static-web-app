@@ -551,8 +551,13 @@ const _bt_sjisTruncate = (s, maxBytes) => {
  * @param {*} res 成功時の結果
  */
 const _bt_invokeCallback = (cb, err, res) => {
+	if (typeof cb !== 'function') return;
+	// 同期・非同期どちらの判定結果でも、必ず次のマクロタスクでcbを呼び出す（kintoneイベントハンドラ内での同期実行によるエラーを防ぐため）
+	setTimeout(() => _bt_invokeCallbackNow(cb, err, res), 0);
+};
+
+const _bt_invokeCallbackNow = (cb, err, res) => {
 	try {
-		if (typeof cb !== 'function') return;
 		if ((cb && typeof cb.length === 'number' && cb.length >= 2) || false) {
 			// Node 風
 			cb(err || null, res || null);
