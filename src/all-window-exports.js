@@ -67,11 +67,6 @@
 		'getNationalHolidayName',
 		// zipcode_processing.js
 		'getZipcodeAddress',
-		// character_handling.js
-		'convert_to_hiragana',
-		'convert_to_double_byte_characters',
-		'convert_to_email_address',
-		'check_single_byte_numbers',
 		// jquery.autoKana.js
 		// note: `start` and `toggle` are defined only inside the plugin scope and
 		// are not safe to expose as globals; keep `stop` which is provided as a helper

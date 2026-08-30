@@ -13,7 +13,6 @@ const FILES = [
 	'zipcode_processing.js',
 	'phone_number_translation.js',
 	'phone-utils.js',
-	'character_handling.js',
 	'date-utils.js',
 	'text-suite.js',
 	'shipping-processing.js',

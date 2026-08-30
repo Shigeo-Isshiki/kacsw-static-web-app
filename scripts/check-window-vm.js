@@ -7,7 +7,6 @@ const files = [
 	'kintone-custom-lib.js',
 	'date-utils.js',
 	'text-suite.js',
-	'character_handling.js',
 	'national_holiday_handling.js',
 	'zip-code-address-utils.js',
 	'zipcode_processing.js',
@@ -25,7 +24,6 @@ const namesToCheck = [
 	'toFullWidthKatakana',
 	'toFullWidth',
 	'toHalfWidth',
-	'convert_to_hiragana',
 	'start',
 ];
 
