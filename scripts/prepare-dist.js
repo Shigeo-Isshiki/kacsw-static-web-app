@@ -10,8 +10,6 @@ const DIST = path.join(ROOT, 'dist');
 const FILES = [
 	'kintone-custom-lib.js',
 	'zip-code-address-utils.js',
-	'zipcode_processing.js',
-	'phone_number_translation.js',
 	'phone-utils.js',
 	'date-utils.js',
 	'text-suite.js',

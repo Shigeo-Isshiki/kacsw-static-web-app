@@ -9,9 +9,7 @@ const files = [
 	'text-suite.js',
 	'national_holiday_handling.js',
 	'zip-code-address-utils.js',
-	'zipcode_processing.js',
 	'phone-utils.js',
-	'phone_number_translation.js',
 	'shipping-processing.js',
 	'vc-check.js',
 	// do NOT load jquery.autoKana.js because it expects jQuery
