@@ -63,8 +63,10 @@
 		'kintoneZipSetSpaceFieldButton',
 		'kintoneZipSpaceFieldText',
 		'normalizeZipCode',
-		// national_holiday_handling.js
-		'getNationalHolidayName',
+		// national-holidays.js
+		'isNationalHoliday',
+		'getNationalHolidayNameByLaw',
+		'getNationalHolidaysInYear',
 		// jquery.autoKana.js
 		// note: `start` and `toggle` are defined only inside the plugin scope and
 		// are not safe to expose as globals; keep `stop` which is provided as a helper

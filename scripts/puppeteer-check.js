@@ -101,7 +101,7 @@ function createStaticServer(root) {
     console.log(out);
     console.log('---- window check via page.evaluate ----');
     const results = await page.evaluate((maybeNames) => {
-      const fallback = ['getNationalHolidayName','isSingleByteAlnumOnly','toFullWidthKatakana','toFullWidth','toHalfWidth','start'];
+      const fallback = ['isNationalHoliday','getNationalHolidayNameByLaw','isSingleByteAlnumOnly','toFullWidthKatakana','toFullWidth','toHalfWidth','start'];
       const names = Array.isArray(maybeNames) && maybeNames.length ? maybeNames : fallback;
       const res = {};
       names.forEach(n => {

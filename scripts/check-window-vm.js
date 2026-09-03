@@ -7,7 +7,7 @@ const files = [
 	'kintone-custom-lib.js',
 	'date-utils.js',
 	'text-suite.js',
-	'national_holiday_handling.js',
+	'national-holidays.js',
 	'zip-code-address-utils.js',
 	'phone-utils.js',
 	'shipping-processing.js',
@@ -17,7 +17,8 @@ const files = [
 ];
 
 const namesToCheck = [
-	'getNationalHolidayName',
+	'isNationalHoliday',
+	'getNationalHolidayNameByLaw',
 	'isSingleByteAlnumOnly',
 	'toFullWidthKatakana',
 	'toFullWidth',

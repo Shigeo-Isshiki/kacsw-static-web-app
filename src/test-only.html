@@ -25,14 +25,15 @@ loading...
 		<script src="jquery.autoKana.js"></script>
 		<script src="kintone-custom-lib.js"></script>
 		<script src="text-suite.js"></script>
-		<script src="national_holiday_handling.js"></script>
+		<script src="national-holidays.js"></script>
 		<script src="all-window-exports.js"></script>
 
 		<script>
 			(function () {
 				var out = document.getElementById('out');
 				var names = [
-					'getNationalHolidayName',
+					'isNationalHoliday',
+					'getNationalHolidayNameByLaw',
 					'isSingleByteAlnumOnly',
 					'toFullWidthKatakana',
 					'toFullWidth',

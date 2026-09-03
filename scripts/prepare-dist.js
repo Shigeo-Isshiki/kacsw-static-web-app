@@ -16,7 +16,7 @@ const FILES = [
 	'shipping-processing.js',
 	'vc-check.js',
 	'jquery.autoKana.js',
-	'national_holiday_handling.js',
+	'national-holidays.js',
 	'all-window-exports.js',
 	'index.html',
 	'test.html',
