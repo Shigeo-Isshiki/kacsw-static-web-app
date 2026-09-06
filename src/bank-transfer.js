@@ -237,6 +237,8 @@ const _BT_HALF_WIDTH_KANA_MAP = new Map(Object.entries(_BT_CONVERT_CHARACTER_LIS
 const _BT_FULL_WIDTH_KANA_MAP = new Map(Object.entries(_BT_CONVERT_CHARACTER_LIST.fullWidthKana));
 // 濁点・半濁点の変換テーブルから生成するマップ（各種変換処理で利用）
 const _BT_TURBIDITY_KANA_MAP = new Map(Object.entries(_BT_CONVERT_CHARACTER_LIST.turbidityKana));
+const _BT_KINTONE_BANK_API_BASE_URL = 'https://bank.teraren.com';
+const _BT_BROWSER_BANK_API_BASE_URL = 'https://api.kacsw.or.jp/bank/index.php';
 /**
  * 法人略語変換用のリスト
  * 漢字及び半角カナ文字から法人略語への変換をサポートします。
@@ -400,6 +402,12 @@ const _BT_BUSINESS_LIST = {
  */
 const _bt_toStr = (v) => (v == null ? '' : String(v));
 
+const _bt_hasKintoneProxy = () =>
+	typeof kintone !== 'undefined' && kintone && typeof kintone.proxy === 'function';
+
+const _bt_getDefaultApiBaseUrl = () =>
+	_bt_hasKintoneProxy() ? _BT_KINTONE_BANK_API_BASE_URL : _BT_BROWSER_BANK_API_BASE_URL;
+
 /**
  * 外部JSON APIへの通信を実行します。
  * kintone環境ではCORS回避のため kintone.proxy を優先し、それ以外では fetch を使います。
@@ -409,8 +417,7 @@ const _bt_requestJson = (url, options = {}) => {
 	const method = options.method || 'GET';
 	const body = options.body || '';
 	const timeout = Number.isFinite(Number(options.timeout)) ? Number(options.timeout) : 10000;
-	const hasKintoneProxy =
-		typeof kintone !== 'undefined' && kintone && typeof kintone.proxy === 'function';
+	const hasKintoneProxy = _bt_hasKintoneProxy();
 	if (!hasKintoneProxy) return fetch(url, options);
 
 	return new Promise((resolve, reject) => {
@@ -941,7 +948,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 			options = {};
 		}
 		const {
-			apiBaseUrl = 'https://bank.teraren.com',
+			apiBaseUrl = _bt_getDefaultApiBaseUrl(),
 			apiKey,
 			timeout = 5000,
 			pathTemplate = '/banks/{code}.json',
@@ -1170,7 +1177,7 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 		callback = options;
 		options = {};
 	}
-	const { apiBaseUrl = 'https://bank.teraren.com', apiKey, timeout = 5000 } = options;
+	const { apiBaseUrl = _bt_getDefaultApiBaseUrl(), apiKey, timeout = 5000 } = options;
 	const q = _bt_toStr(name).trim();
 	if (!q) {
 		_bt_invokeCallback(callback, { success: false, error: '検索語が空です' });
@@ -2094,7 +2101,7 @@ const getBranch = (bankCode, branchCodeOrName, options = {}, callback) => {
 		return;
 	}
 
-	const apiBase = (options.apiBaseUrl || 'https://bank.teraren.com').replace(/\/$/, '');
+	const apiBase = (options.apiBaseUrl || _bt_getDefaultApiBaseUrl()).replace(/\/$/, '');
 	const timeout = Number.isFinite(Number(options.timeout)) ? Number(options.timeout) : 5000;
 
 	// 支店コード検索: /banks/{bank_code}/branches/{branch_code}.json

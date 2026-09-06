@@ -71,6 +71,13 @@
 
 銀行・支店検索の外部API通信は、kintone環境で `kintone.proxy` が利用できる場合は自動的にプロキシ経由で実行します。その他の環境では通常の `fetch` を使用します。これにより、外部APIがブラウザ向けCORSヘッダーを返さないkintone環境でも検索できる構成にしています。
 
+`apiBaseUrl` を指定しない場合、実行環境に応じて次の参照先を自動選択します。呼び出し側の `getBank` / `getBranch` の引数形式を変更する必要はありません。
+
+- `kintone.proxy` が利用できる kintone: `https://bank.teraren.com`
+- `kintone.proxy` が利用できないブラウザ環境（FormBridge等）: `https://api.kacsw.or.jp/bank/index.php`
+
+FormBridge向け中継APIは Bank Teraren API 互換のパス・応答形式を提供し、未登録時の HTTP 404 を含む全応答に CORS ヘッダーを付与します。特定の接続先を使う必要がある場合のみ、従来どおり `options.apiBaseUrl` で上書きできます。
+
 `kintone.proxy` 経由の通信には10秒のタイムアウトを設けています。応答がない場合は、通常の通信エラーではなくタイムアウトとして扱います。内部デバッグログは `window.BANK._bt_debugLogs` に保存される場合がありますが、保持件数は最大200件です。
 
 ## 将来の確認事項
