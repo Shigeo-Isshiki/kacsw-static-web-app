@@ -329,7 +329,7 @@ zc.getAddressByZipCode('1234567', (res) => {
 });
 
 if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
-  console.error('住所の先頭に都道府県名を入力してください');
+	console.error('住所の先頭に都道府県名を入力してください');
 }
 ```
 
@@ -343,9 +343,9 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 		console.log(res);
 	});
 
-  if (!window.hasPrefectureName(event.record.住所.value)) {
-    event.error = '住所の先頭に都道府県名を入力してください。';
-  }
+	if (!window.hasPrefectureName(event.record.住所.value)) {
+		event.error = '住所の先頭に都道府県名を入力してください。';
+	}
 
 	// スペースフィールドにボタンを追加
 	window.kintoneZipSetSpaceFieldButton(
