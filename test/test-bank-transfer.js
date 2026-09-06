@@ -168,6 +168,46 @@ try {
 }
 
 try {
+	window.BANK.getBank = defaultStubBank;
+	window.BANK.getBranch = defaultStubBranch;
+	BANK.convertYucho('23456', '1234567', (result) => {
+		try {
+			assert.strictEqual(result.error, 'invalid_format');
+			assert.strictEqual(result.field, 'kigou');
+			assert.strictEqual(result.code, 'kigou.invalid_lead');
+			assert.ok(result.message, '記号エラーにはmessageがあること');
+			console.log('PASS: convertYucho preserves kigou error field');
+		} catch (e) {
+			console.error('FAIL: convertYucho kigou error field', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		}
+	});
+} catch (e) {
+	console.error('FAIL: convertYucho kigou error setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	window.BANK.getBank = defaultStubBank;
+	window.BANK.getBranch = defaultStubBranch;
+	BANK.convertYucho('12345', '123456789', (result) => {
+		try {
+			assert.strictEqual(result.error, 'invalid_account');
+			assert.strictEqual(result.field, 'bangou');
+			assert.strictEqual(result.code, 'bangou.too_long');
+			assert.ok(result.message, '番号エラーにはmessageがあること');
+			console.log('PASS: convertYucho preserves bangou error field');
+		} catch (e) {
+			console.error('FAIL: convertYucho bangou error field', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		}
+	});
+} catch (e) {
+	console.error('FAIL: convertYucho bangou error setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
 	const previousFetch = global.fetch;
 	global.fetch = () =>
 		Promise.resolve({
@@ -620,6 +660,8 @@ try {
 		try {
 			assert.strictEqual(result.error, '銀行が見つかりません');
 			assert.strictEqual(result.message, '銀行が見つかりません');
+			assert.strictEqual(result.field, 'kigou');
+			assert.strictEqual(result.details.originalField, 'bank');
 			console.log('PASS: convertYucho propagates bank not-found message');
 		} catch (e) {
 			console.error('FAIL: convertYucho bank error message', e && e.message ? e.message : e);
@@ -640,6 +682,8 @@ try {
 		try {
 			assert.strictEqual(result.error, '支店が見つかりません');
 			assert.strictEqual(result.message, '支店が見つかりません');
+			assert.strictEqual(result.field, 'kigou');
+			assert.strictEqual(result.details.originalField, 'branch');
 			console.log('PASS: convertYucho propagates branch not-found message');
 		} catch (e) {
 			console.error('FAIL: convertYucho branch error message', e && e.message ? e.message : e);

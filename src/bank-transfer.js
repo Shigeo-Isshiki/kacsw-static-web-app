@@ -705,6 +705,19 @@ const _bt_enrichError = (err, defaults = {}) => {
 	}
 };
 
+/** ゆうちょ変換の内部エラーを、入力欄（kigou/bangou）向けに正規化します。 */
+const _bt_enrichYuchoError = (err, defaults = {}) => {
+	const enriched = _bt_enrichError(err, defaults);
+	const originalField = enriched.field || defaults.field || '';
+	const mappedField = originalField === 'bangou' ? 'bangou' : 'kigou';
+	return Object.assign({}, enriched, {
+		field: mappedField,
+		details: Object.assign({}, enriched.details || {}, {
+			originalField,
+		}),
+	});
+};
+
 /**
  * イテラブルな文字列集合から正規表現パターンを構築する関数
  * @param {Iterable<string>} keys イテラブルな文字列集合
@@ -2278,7 +2291,7 @@ const convertYucho = (kigou, bangou, callback) => {
 			missingK && missingB ? 'kigou_and_bangou.empty' : missingK ? 'kigou.empty' : 'bangou.empty';
 		_bt_invokeCallback(
 			callback,
-			_bt_enrichError(null, {
+			_bt_enrichYuchoError(null, {
 				error: 'invalid_format',
 				code: code,
 				field: fld,
@@ -2324,7 +2337,7 @@ const convertYucho = (kigou, bangou, callback) => {
 			if (!bankRes || bankRes.error) {
 				_bt_invokeCallback(
 					callback,
-					_bt_enrichError(bankRes, {
+					_bt_enrichYuchoError(bankRes, {
 						code: 'bank.fetch_failed',
 						field: 'bank',
 						message: '銀行情報の取得に失敗しました',
@@ -2341,7 +2354,7 @@ const convertYucho = (kigou, bangou, callback) => {
 				// conv の返却は既に構造化されている想定
 				_bt_invokeCallback(
 					callback,
-					_bt_enrichError(conv, {
+					_bt_enrichYuchoError(conv, {
 						code: conv && conv.code ? conv.code : 'kigou.convert_failed',
 						field: 'kigou',
 						message: conv && conv.message ? conv.message : '記号から支店への変換に失敗しました',
@@ -2361,7 +2374,7 @@ const convertYucho = (kigou, bangou, callback) => {
 			if (!rawNum) {
 				_bt_invokeCallback(
 					callback,
-					_bt_enrichError(null, {
+					_bt_enrichYuchoError(null, {
 						error: 'invalid_account',
 						code: 'bangou.empty',
 						field: 'bangou',
@@ -2376,7 +2389,7 @@ const convertYucho = (kigou, bangou, callback) => {
 				if (rawNum.length > 6) {
 					_bt_invokeCallback(
 						callback,
-						_bt_enrichError(null, {
+						_bt_enrichYuchoError(null, {
 							error: 'invalid_account',
 							code: 'bangou.too_long',
 							field: 'bangou',
@@ -2392,7 +2405,7 @@ const convertYucho = (kigou, bangou, callback) => {
 				if (rawNum.length > 8) {
 					_bt_invokeCallback(
 						callback,
-						_bt_enrichError(null, {
+						_bt_enrichYuchoError(null, {
 							error: 'invalid_account',
 							code: 'bangou.too_long',
 							field: 'bangou',
@@ -2408,7 +2421,7 @@ const convertYucho = (kigou, bangou, callback) => {
 				if (padded8.charAt(7) !== '1') {
 					_bt_invokeCallback(
 						callback,
-						_bt_enrichError(null, {
+						_bt_enrichYuchoError(null, {
 							error: 'invalid_account_format',
 							code: 'bangou.must_end_with_1',
 							field: 'bangou',
@@ -2423,7 +2436,7 @@ const convertYucho = (kigou, bangou, callback) => {
 			} else {
 				_bt_invokeCallback(
 					callback,
-					_bt_enrichError(null, {
+					_bt_enrichYuchoError(null, {
 						error: 'invalid_account_type',
 						code: 'kigou.unknown_account_type',
 						field: 'kigou',
@@ -2464,7 +2477,7 @@ const convertYucho = (kigou, bangou, callback) => {
 					// 支店が見つからない/エラーの場合はエラーを返す
 					_bt_invokeCallback(
 						callback,
-						_bt_enrichError(branchRes, {
+						_bt_enrichYuchoError(branchRes, {
 							code: 'branch.fetch_failed',
 							field: 'branch',
 							message: '支店情報の取得に失敗しました',
