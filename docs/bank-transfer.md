@@ -69,6 +69,8 @@
 （非同期 API のコールバックは単一引数 `callback(result)` に統一し、常に次のタスクで実行します。callback を指定しない呼び出しは `TypeError` になります）
 `parseZenginFile` は Promise を返します。
 
+銀行・支店検索の外部API通信は、kintone環境で `kintone.proxy` が利用できる場合は自動的にプロキシ経由で実行します。その他の環境では通常の `fetch` を使用します。これにより、外部APIがブラウザ向けCORSヘッダーを返さないkintone環境でも検索できる構成にしています。
+
 ---
 
 ## 公開関数の引数詳細

@@ -400,6 +400,42 @@ const _BT_BUSINESS_LIST = {
  */
 const _bt_toStr = (v) => (v == null ? '' : String(v));
 
+/**
+ * 外部JSON APIへの通信を実行します。
+ * kintone環境ではCORS回避のため kintone.proxy を優先し、それ以外では fetch を使います。
+ */
+const _bt_requestJson = (url, options = {}) => {
+	const headers = options.headers || {};
+	const method = options.method || 'GET';
+	const body = options.body || '';
+	const hasKintoneProxy =
+		typeof kintone !== 'undefined' && kintone && typeof kintone.proxy === 'function';
+	if (!hasKintoneProxy) return fetch(url, options);
+
+	return new Promise((resolve, reject) => {
+		const createResponse = (responseBody, status) => ({
+			ok: Number(status) >= 200 && Number(status) < 300,
+			status: Number(status) || 0,
+			json: () => {
+				if (responseBody && typeof responseBody === 'object') return Promise.resolve(responseBody);
+				return Promise.resolve().then(() => JSON.parse(String(responseBody || '')));
+			},
+		});
+		try {
+			kintone.proxy(
+				url,
+				method,
+				headers,
+				body,
+				(responseBody, status) => resolve(createResponse(responseBody, status)),
+				(responseBody, status) => resolve(createResponse(responseBody, status))
+			);
+		} catch (error) {
+			reject(error);
+		}
+	});
+};
+
 /** HTTP 5xx を利用者向けのサーバー障害メッセージへ変換します。 */
 const _bt_getHttpServerErrorMessage = (error, serviceName) => {
 	const message = error && error.message ? String(error.message) : String(error || '');
@@ -999,7 +1035,10 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 			} catch {}
 			_bt_safeLog('[BANK] _bt_loadBankByCode: attempting fetch with signal ' + url);
 			_bt_performFetch(
-				fetch(url, { headers, signal: abortController ? abortController.signal : undefined })
+				_bt_requestJson(url, {
+					headers,
+					signal: abortController ? abortController.signal : undefined,
+				})
 			);
 		} catch (e) {
 			// 一部環境では fetch に signal を渡すと同期例外が発生することがあるため、
@@ -1019,7 +1058,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 				if (typeof console !== 'undefined' && typeof console.debug === 'function')
 					console.debug('[BANK] _bt_loadBankByCode: attempting fetch without signal', url);
 				_bt_safeLog('[BANK] _bt_loadBankByCode: attempting fetch without signal ' + url);
-				_bt_performFetch(fetch(url, { headers }));
+				_bt_performFetch(_bt_requestJson(url, { headers }));
 			} catch (e2) {
 				// 最悪同期的に fetch が失敗する場合はエラーハンドリングへ送る
 				try {
@@ -1078,7 +1117,7 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 	let timer = null;
 	if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
 
-	fetch(url, { headers, signal: abortController ? abortController.signal : undefined })
+	_bt_requestJson(url, { headers, signal: abortController ? abortController.signal : undefined })
 		.then((res) => {
 			if (!res.ok)
 				return Promise.reject(
@@ -2006,7 +2045,7 @@ const getBranch = (bankCode, branchCodeOrName, options = {}, callback) => {
 		let timer = null;
 		if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
 		const perform = () =>
-			fetch(url, { signal: abortController ? abortController.signal : undefined })
+			_bt_requestJson(url, { signal: abortController ? abortController.signal : undefined })
 				.then((res) => {
 					if (!res.ok)
 						return Promise.reject(new Error(`支店情報の取得に失敗しました（HTTP: ${res.status}）`));
@@ -2093,7 +2132,7 @@ const getBranch = (bankCode, branchCodeOrName, options = {}, callback) => {
 	let timer = null;
 	if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
 	try {
-		fetch(url, { signal: abortController ? abortController.signal : undefined })
+		_bt_requestJson(url, { signal: abortController ? abortController.signal : undefined })
 			.then((res) => {
 				if (!res.ok)
 					return Promise.reject(new Error(`支店検索の実行に失敗しました（HTTP: ${res.status}）`));
