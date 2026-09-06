@@ -408,11 +408,26 @@ const _bt_requestJson = (url, options = {}) => {
 	const headers = options.headers || {};
 	const method = options.method || 'GET';
 	const body = options.body || '';
+	const timeout = Number.isFinite(Number(options.timeout)) ? Number(options.timeout) : 10000;
 	const hasKintoneProxy =
 		typeof kintone !== 'undefined' && kintone && typeof kintone.proxy === 'function';
 	if (!hasKintoneProxy) return fetch(url, options);
 
 	return new Promise((resolve, reject) => {
+		let settled = false;
+		const timer = setTimeout(() => {
+			if (settled) return;
+			settled = true;
+			const error = new Error('外部APIへの接続がタイムアウトしました');
+			error.name = 'AbortError';
+			reject(error);
+		}, timeout);
+		const settle = (fn, value) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			fn(value);
+		};
 		const createResponse = (responseBody, status) => ({
 			ok: Number(status) >= 200 && Number(status) < 300,
 			status: Number(status) || 0,
@@ -427,11 +442,11 @@ const _bt_requestJson = (url, options = {}) => {
 				method,
 				headers,
 				body,
-				(responseBody, status) => resolve(createResponse(responseBody, status)),
-				(responseBody, status) => resolve(createResponse(responseBody, status))
+				(responseBody, status) => settle(resolve, createResponse(responseBody, status)),
+				(responseBody, status) => settle(resolve, createResponse(responseBody, status))
 			);
 		} catch (error) {
-			reject(error);
+			settle(reject, error);
 		}
 	});
 };
@@ -472,6 +487,9 @@ const _bt_safeLog = (msg) => {
 			window.BANK = window.BANK || {};
 			window.BANK._bt_debugLogs = window.BANK._bt_debugLogs || [];
 			window.BANK._bt_debugLogs.push(String(msg));
+			if (window.BANK._bt_debugLogs.length > 200) {
+				window.BANK._bt_debugLogs.splice(0, window.BANK._bt_debugLogs.length - 200);
+			}
 		}
 	} catch {}
 	try {
