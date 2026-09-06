@@ -192,7 +192,7 @@ try {
 	window.BANK.getBranch = defaultStubBranch;
 	BANK.convertYucho('12345', '123456789', (result) => {
 		try {
-			assert.strictEqual(result.error, 'invalid_account');
+			assert.strictEqual(result.error, 'ゆうちょ口座番号が不正です');
 			assert.strictEqual(result.field, 'bangou');
 			assert.strictEqual(result.code, 'bangou.too_long');
 			assert.ok(result.message, '番号エラーにはmessageがあること');
@@ -204,6 +204,26 @@ try {
 	});
 } catch (e) {
 	console.error('FAIL: convertYucho bangou error setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	window.BANK.getBank = defaultStubBank;
+	window.BANK.getBranch = defaultStubBranch;
+	BANK.convertYucho('12345', '1234567', (result) => {
+		try {
+			assert.strictEqual(result.error, 'ゆうちょ口座番号の形式が不正です');
+			assert.strictEqual(result.message, 'ゆうちょ番号の末尾は1である必要があります');
+			assert.strictEqual(result.code, 'bangou.must_end_with_1');
+			assert.strictEqual(result.field, 'bangou');
+			console.log('PASS: convertYucho returns Japanese invalid-account-format error');
+		} catch (e) {
+			console.error('FAIL: convertYucho invalid-account-format message', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		}
+	});
+} catch (e) {
+	console.error('FAIL: convertYucho invalid-account-format setup', e && e.message ? e.message : e);
 	process.exitCode = 2;
 }
 

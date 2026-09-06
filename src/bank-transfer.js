@@ -2292,7 +2292,7 @@ const convertYucho = (kigou, bangou, callback) => {
 		_bt_invokeCallback(
 			callback,
 			_bt_enrichYuchoError(null, {
-				error: 'invalid_format',
+				error: '記号/番号の形式が不正です',
 				code: code,
 				field: fld,
 				message: '記号/番号の形式が不正です',
@@ -2375,7 +2375,7 @@ const convertYucho = (kigou, bangou, callback) => {
 				_bt_invokeCallback(
 					callback,
 					_bt_enrichYuchoError(null, {
-						error: 'invalid_account',
+						error: 'ゆうちょ口座番号が不正です',
 						code: 'bangou.empty',
 						field: 'bangou',
 						message: 'ゆうちょ番号が空です',
@@ -2390,7 +2390,7 @@ const convertYucho = (kigou, bangou, callback) => {
 					_bt_invokeCallback(
 						callback,
 						_bt_enrichYuchoError(null, {
-							error: 'invalid_account',
+							error: 'ゆうちょ口座番号が不正です',
 							code: 'bangou.too_long',
 							field: 'bangou',
 							message: 'ゆうちょ番号が長すぎます（最大6桁）',
@@ -2406,7 +2406,7 @@ const convertYucho = (kigou, bangou, callback) => {
 					_bt_invokeCallback(
 						callback,
 						_bt_enrichYuchoError(null, {
-							error: 'invalid_account',
+							error: 'ゆうちょ口座番号が不正です',
 							code: 'bangou.too_long',
 							field: 'bangou',
 							message: 'ゆうちょ番号が長すぎます（最大8桁）',
@@ -2422,7 +2422,7 @@ const convertYucho = (kigou, bangou, callback) => {
 					_bt_invokeCallback(
 						callback,
 						_bt_enrichYuchoError(null, {
-							error: 'invalid_account_format',
+							error: 'ゆうちょ口座番号の形式が不正です',
 							code: 'bangou.must_end_with_1',
 							field: 'bangou',
 							message: 'ゆうちょ番号の末尾は1である必要があります',
@@ -2437,7 +2437,7 @@ const convertYucho = (kigou, bangou, callback) => {
 				_bt_invokeCallback(
 					callback,
 					_bt_enrichYuchoError(null, {
-						error: 'invalid_account_type',
+						error: 'ゆうちょ記号から口座種別を判定できません',
 						code: 'kigou.unknown_account_type',
 						field: 'kigou',
 						message: '不明な口座種別です',
