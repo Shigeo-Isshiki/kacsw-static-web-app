@@ -42,6 +42,8 @@
 
 API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/digital?search_code=xxxxxxx`
 
+通信方式は実行環境で自動選択します。kintone で `kintone.proxy` が利用できる場合は同 API をプロキシ経由で呼び出し、FormBridge を含むその他のブラウザ環境では従来どおり `fetch` で直接呼び出します。公開関数の引数・コールバック形式は環境にかかわらず同じです。
+
 ---
 
 ## 公開 API サマリ

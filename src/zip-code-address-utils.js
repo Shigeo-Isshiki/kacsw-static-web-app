@@ -157,6 +157,36 @@ const _zc_buildZipcodeApiUrl = (normalized) => {
 	return `${_ZC_ZIPCODE_API_BASE_URL}?search_code=${encodeURIComponent(normalized)}`;
 };
 
+const _zc_hasKintoneProxy = () =>
+	typeof kintone !== 'undefined' && kintone && typeof kintone.proxy === 'function';
+
+const _zc_requestJson = (url) => {
+	if (!_zc_hasKintoneProxy()) return fetch(url);
+
+	return new Promise((resolve, reject) => {
+		const createResponse = (body, status) => ({
+			ok: Number(status) >= 200 && Number(status) < 300,
+			status: Number(status) || 0,
+			json: () => {
+				if (body && typeof body === 'object') return Promise.resolve(body);
+				return Promise.resolve().then(() => JSON.parse(String(body || '')));
+			},
+		});
+		try {
+			kintone.proxy(
+				url,
+				'GET',
+				{},
+				'',
+				(body, status) => resolve(createResponse(body, status)),
+				(body, status) => resolve(createResponse(body, status))
+			);
+		} catch (error) {
+			reject(error);
+		}
+	});
+};
+
 const _zc_getAppNamespace = () => {
 	try {
 		if (typeof kintone === 'undefined' || !kintone) return null;
@@ -278,7 +308,7 @@ const checkZipCodeExists = (zipCode, callback) => {
 		return;
 	}
 	const normalized = v.normalized;
-	fetch(_zc_buildZipcodeApiUrl(normalized))
+	_zc_requestJson(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
 				_zc_invokeCallback(callback, false);
@@ -314,7 +344,7 @@ const formatZipCode = (zipCode, callback) => {
 		return;
 	}
 	const normalized = v.normalized;
-	fetch(_zc_buildZipcodeApiUrl(normalized))
+	_zc_requestJson(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
 				_zc_invokeCallback(callback, { error: '郵便番号が存在しません' });
@@ -385,7 +415,7 @@ const getAddressByZipCode = (zipCode, callback) => {
 	}
 	const normalized = v.normalized;
 	// 正規化後は7文字の半角英数字であることが保証されている
-	fetch(_zc_buildZipcodeApiUrl(normalized))
+	_zc_requestJson(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (!response.ok) {
 				if (response.status === 404) {
@@ -557,7 +587,7 @@ const getCityByZipCode = (zipCode, callback) => {
 		return;
 	}
 	const normalized = v.normalized;
-	fetch(_zc_buildZipcodeApiUrl(normalized))
+	_zc_requestJson(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
 				_zc_invokeCallback(callback, null);
@@ -593,7 +623,7 @@ const getPrefectureByZipCode = (zipCode, callback) => {
 		return;
 	}
 	const normalized = v.normalized;
-	fetch(_zc_buildZipcodeApiUrl(normalized))
+	_zc_requestJson(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
 				_zc_invokeCallback(callback, null);
@@ -749,7 +779,7 @@ const normalizeZipCode = (zipCode, callback) => {
 		return;
 	}
 	const normalized = v.normalized;
-	fetch(_zc_buildZipcodeApiUrl(normalized))
+	_zc_requestJson(_zc_buildZipcodeApiUrl(normalized))
 		.then((response) => {
 			if (response.status === 404) {
 				_zc_invokeCallback(callback, { error: '郵便番号が存在しません' });
