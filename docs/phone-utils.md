@@ -33,6 +33,7 @@
 ## 各関数の詳細
 
 <a id="isvalidphonenumber"></a>
+
 ### `isValidPhoneNumber(phoneNumber)`
 
 - 概要: 与えられた値が日本国内で有効とみなせる電話番号かを判定します。
@@ -48,6 +49,7 @@
 テストヒント: 無効値、全角数字やハイフンを含む入力、`091` 系の特殊番号（6〜13 桁）などで境界ケースを確認してください。
 
 <a id="formatphonenumber"></a>
+
 ### `formatPhoneNumber(phoneNumber)`
 
 - 概要: 電話番号を正規化（記号・全角→半角化）し、ハイフン付きの表記と判定結果などの属性を含むオブジェクトを返します。
@@ -67,6 +69,7 @@
 - 種別に応じてハイフン分割パターンを決定します（固定電話は市外局番→市内局番→加入者番号、携帯は 3-4-4 等）。
 
 <a id="getphonenumbertype"></a>
+
 ### `getPhoneNumberType(phoneNumber)`
 
 - 概要: 電話番号の種別（文字列）を返します。
@@ -98,6 +101,7 @@
 各語彙は実装中の `_PU_PHONE_NUMBER_CONFIG` の設定（`digit11PhoneNumberRange` / `notLandlinePhoneNumberRange` / `areaCodeRanges` 等）に依存します。新たなプレフィックス追加やルール変更時は該当設定を更新してください。
 
 <a id="normalizephonenumber"></a>
+
 ### `normalizePhoneNumber(phoneNumber)`
 
 - 概要: 電話番号を半角数字のみの文字列に正規化して返します（ハイフンや空白、全角数字を除去）。
