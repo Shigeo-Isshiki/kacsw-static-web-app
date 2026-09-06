@@ -400,6 +400,24 @@ const _BT_BUSINESS_LIST = {
  */
 const _bt_toStr = (v) => (v == null ? '' : String(v));
 
+/** HTTP 5xx を利用者向けのサーバー障害メッセージへ変換します。 */
+const _bt_getHttpServerErrorMessage = (error, serviceName) => {
+	const message = error && error.message ? String(error.message) : String(error || '');
+	if (/HTTP(?:ステータス)?\s*[：:]\s*5\d{2}/i.test(message)) {
+		return `${serviceName}でサーバーエラーが発生しました。しばらく時間をおいて再試行してください。`;
+	}
+	return null;
+};
+
+/** 外部APIの応答形式エラーを利用者向けメッセージへ変換します。 */
+const _bt_getResponseFormatErrorMessage = (error, serviceName) => {
+	const message = error && error.message ? String(error.message) : String(error || '');
+	if (error instanceof SyntaxError || /json|unexpected token|unexpected end/i.test(message)) {
+		return `${serviceName}から正しい応答を受け取れませんでした。しばらく時間をおいて再試行してください。`;
+	}
+	return null;
+};
+
 /**
  * 内部: 安全にログを残すユーティリティ。
  * - ブラウザ環境では window.BANK._bt_debugLogs にも保存し、console.debug が使える場合は出力します。
@@ -514,7 +532,9 @@ const _bt_isAllowedHalfWidthString = (s) => {
 /** encoding.js が公開する Encoding オブジェクトを取得します。 */
 const _bt_getEncodingJs = () => {
 	if (typeof Encoding === 'undefined' || !Encoding || typeof Encoding.convert !== 'function') {
-		throw new Error('ENCODING_JS_UNAVAILABLE');
+		const error = new Error('encoding.jsが読み込まれていないため、Shift_JIS変換を実行できません');
+		error.code = 'ENCODING_JS_UNAVAILABLE';
+		throw error;
 	}
 	return Encoding;
 };
@@ -531,7 +551,9 @@ const _bt_encodeSjisBytes = (s) => {
 	if (ArrayBuffer.isView(converted))
 		return new Uint8Array(converted.buffer, converted.byteOffset, converted.byteLength);
 	if (Array.isArray(converted)) return Uint8Array.from(converted);
-	throw new Error('ENCODING_JS_INVALID_RESULT');
+	const error = new Error('encoding.jsから有効な変換結果を取得できませんでした');
+	error.code = 'ENCODING_JS_INVALID_RESULT';
+	throw error;
 };
 
 /**
@@ -594,7 +616,11 @@ const encodeSjis = (input) => _bt_encodeSjisBytes(_bt_toStr(input));
  */
 const _bt_invokeCallback = (cb, result) => {
 	if (typeof cb !== 'function') return;
-	setTimeout(() => cb(result), 0);
+	const normalizedResult =
+		result && typeof result === 'object' && result.error && !result.message
+			? Object.assign({}, result, { message: String(result.error) })
+			: result;
+	setTimeout(() => cb(normalizedResult), 0);
 };
 
 /** callback を一度だけ実行するラッパーを作成します。 */
@@ -621,16 +647,19 @@ const _bt_enrichError = (err, defaults = {}) => {
 			if (err.code || err.field || err.details) return err;
 			// err.error / err.message を保持しつつ構造化オブジェクトを構築する
 			const message = err.message || err.error || defaults.message || String(err);
-			return Object.assign({ error: err.error || message, message: message }, defaults, {
+			return Object.assign({}, defaults, {
+				error: err.error || defaults.error || message,
+				message,
 				// details: 既存の details があればマージする
 				details: Object.assign({}, defaults.details || {}, err.details || {}),
 			});
 		}
 		// primitive
 		const message = err && err.message ? err.message : err ? String(err) : defaults.message || '';
-		return Object.assign({ error: message, message: message }, defaults);
+		return Object.assign({}, defaults, { error: defaults.error || message, message });
 	} catch (e) {
-		return Object.assign({ error: String(err || e), message: String(err || e) }, defaults);
+		const message = String(err || e);
+		return Object.assign({}, defaults, { error: defaults.error || message, message });
 	}
 };
 
@@ -872,6 +901,17 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 						return res.json();
 					})
 					.then((j) => {
+						if (!j || !j.code || !j.name) {
+							const notFoundError = {
+								error: '銀行が見つかりません',
+								message: `銀行コード「${code}」の銀行が見つかりません`,
+								code: 'bank.not_found',
+								field: 'bankCode',
+								details: { bankCode: code },
+							};
+							_bt_invokeCallback(callback, notFoundError);
+							return;
+						}
 						let bankObj = {
 							code: _bt_toStr(j.code).padStart(4, '0'),
 							name: _bt_toStr(j.normalize && j.normalize.name ? j.normalize.name : j.name),
@@ -898,11 +938,23 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 							} else if (err && err.message) {
 								// ブラウザの fetch が失敗すると 'Failed to fetch' や TypeError になることがある
 								var m = String(err.message || err);
-								if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
+								const serverError = _bt_getHttpServerErrorMessage(err, '銀行情報サービス');
+								const formatError = _bt_getResponseFormatErrorMessage(err, '銀行情報サービス');
+								if (serverError) {
+									message = serverError;
+								} else if (formatError) {
+									message = formatError;
+								} else if (
+									/failed to fetch/i.test(m) ||
+									/network/i.test(m) ||
+									err instanceof TypeError
+								) {
 									message =
 										'銀行情報の取得に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
 								} else {
-									message = m;
+									message = /[ぁ-んァ-ン一-龥]/.test(m)
+										? m
+										: '銀行情報サービスで予期しないエラーが発生しました。しばらく時間をおいて再試行してください。';
 								}
 							} else {
 								message = '銀行情報の取得中に不明なエラーが発生しました';
@@ -1092,11 +1144,19 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 					message = '検索がタイムアウトしました（指定時間内に応答がありません）';
 				else if (err && err.message) {
 					const m = String(err.message || err);
-					if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
+					const serverError = _bt_getHttpServerErrorMessage(err, '銀行名検索サービス');
+					const formatError = _bt_getResponseFormatErrorMessage(err, '銀行名検索サービス');
+					if (serverError) {
+						message = serverError;
+					} else if (formatError) {
+						message = formatError;
+					} else if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
 						message =
 							'銀行名検索に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
 					} else {
-						message = m;
+						message = /[ぁ-んァ-ン一-龥]/.test(m)
+							? m
+							: '銀行名検索サービスで予期しないエラーが発生しました。しばらく時間をおいて再試行してください。';
 					}
 				} else message = '銀行名検索中に不明なエラーが発生しました';
 			} catch {
@@ -1796,6 +1856,7 @@ const getBank = (bankCodeOrName, options = {}, callback) => {
 		// 既存と同じくコールバック必須で早期返却（エラーオブジェクトを返す）
 		throw new TypeError('第二引数はコールバック関数である必要があります');
 	}
+	callback = _bt_onceCallback(callback);
 	if (!s) {
 		// single-arg スタイルでエラーを返す
 		_bt_invokeCallback(callback, { error: '検索語が空です' });
@@ -1809,11 +1870,24 @@ const getBank = (bankCodeOrName, options = {}, callback) => {
 			return;
 		}
 		if (!bank) {
-			_bt_invokeCallback(cb, { error: '銀行情報の取得結果が空です' });
+			_bt_invokeCallback(cb, {
+				error: '銀行情報を取得できませんでした',
+				message: '銀行情報を取得できませんでした',
+				code: 'bank.empty_result',
+			});
 			return;
 		}
 		// bank が { success:true, bank } の形で渡される可能性があるため対応
 		const b = bank && bank.bank ? bank.bank : bank;
+		if (!b.code || !b.name) {
+			_bt_invokeCallback(cb, {
+				error: '銀行が見つかりません',
+				message: '指定された銀行が見つかりません',
+				code: 'bank.not_found',
+				field: 'bankCode',
+			});
+			return;
+		}
 		let kanaOut = _bt_toStr(b.kana);
 		try {
 			kanaOut = _bt_toHalfWidthKana(kanaOut, false);
@@ -1914,8 +1988,14 @@ const getBranch = (bankCode, branchCodeOrName, options = {}, callback) => {
 					return res.json();
 				})
 				.then((j) => {
-					if (!j) {
-						_bt_invokeCallback(callback, { error: '支店情報が空です' });
+					if (!j || !j.code || !j.name) {
+						_bt_invokeCallback(callback, {
+							error: '支店が見つかりません',
+							message: `銀行コード「${bankKey}」の支店コード「${branchCode}」の支店が見つかりません`,
+							code: 'branch.not_found',
+							field: 'branchCode',
+							details: { bankCode: bankKey, branchCode },
+						});
 						return;
 					}
 					let kanaOut = _bt_toStr(j.kana);
@@ -1936,11 +2016,23 @@ const getBranch = (bankCode, branchCodeOrName, options = {}, callback) => {
 							message = '取得がタイムアウトしました（指定時間内に応答がありません）';
 						else if (err && err.message) {
 							const m = String(err.message || err);
-							if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
+							const serverError = _bt_getHttpServerErrorMessage(err, '支店情報サービス');
+							const formatError = _bt_getResponseFormatErrorMessage(err, '支店情報サービス');
+							if (serverError) {
+								message = serverError;
+							} else if (formatError) {
+								message = formatError;
+							} else if (
+								/failed to fetch/i.test(m) ||
+								/network/i.test(m) ||
+								err instanceof TypeError
+							) {
 								message =
 									'支店データの取得に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
 							} else {
-								message = m;
+								message = /[ぁ-んァ-ン一-龥]/.test(m)
+									? m
+									: '支店情報サービスで予期しないエラーが発生しました。しばらく時間をおいて再試行してください。';
 							}
 						} else message = '支店データ取得中に不明なエラーが発生しました';
 					} catch {
@@ -1982,6 +2074,16 @@ const getBranch = (bankCode, branchCodeOrName, options = {}, callback) => {
 				}
 				if (arr.length === 1) {
 					const j = arr[0];
+					if (!j || !j.code || !j.name) {
+						_bt_invokeCallback(callback, {
+							error: '支店が見つかりません',
+							message: `銀行コード「${bankKey}」の支店名「${qRaw}」の支店が見つかりません`,
+							code: 'branch.not_found',
+							field: 'branchName',
+							details: { bankCode: bankKey, branchName: qRaw },
+						});
+						return;
+					}
 					let kanaOut = _bt_toStr(j.kana);
 					try {
 						kanaOut = _bt_toHalfWidthKana(kanaOut, false);
@@ -2032,11 +2134,23 @@ const getBranch = (bankCode, branchCodeOrName, options = {}, callback) => {
 						message = '検索がタイムアウトしました（指定時間内に応答がありません）';
 					else if (err && err.message) {
 						const m = String(err.message || err);
-						if (/failed to fetch/i.test(m) || /network/i.test(m) || err instanceof TypeError) {
+						const serverError = _bt_getHttpServerErrorMessage(err, '支店検索サービス');
+						const formatError = _bt_getResponseFormatErrorMessage(err, '支店検索サービス');
+						if (serverError) {
+							message = serverError;
+						} else if (formatError) {
+							message = formatError;
+						} else if (
+							/failed to fetch/i.test(m) ||
+							/network/i.test(m) ||
+							err instanceof TypeError
+						) {
 							message =
 								'支店検索に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。';
 						} else {
-							message = m;
+							message = /[ぁ-んァ-ン一-龥]/.test(m)
+								? m
+								: '支店検索サービスで予期しないエラーが発生しました。しばらく時間をおいて再試行してください。';
 						}
 					} else message = '支店検索中に不明なエラーが発生しました';
 				} catch {

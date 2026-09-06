@@ -102,6 +102,24 @@ const bytes = window.BANK.encodeSjis('ﾔﾏﾀﾞﾀﾛｳ');
 - 成功: `{ bankCode: '0001', bankName: 'みどり銀行', bankKana: 'ﾐﾄﾞﾘｷﾞﾝｺｳ' }`
 - 失敗: `{ error: 'not_found', message: '銀行が見つかりません', code: 'bank.not_found' }`
 
+銀行コードが存在しない場合は、次のようなエラーを返します。
+
+```js
+{
+  error: '銀行が見つかりません',
+  message: '銀行コード「0002」の銀行が見つかりません',
+  code: 'bank.not_found',
+  field: 'bankCode',
+  details: { bankCode: '0002' },
+}
+```
+
+外部APIがHTTP 500系のサーバーエラーを返した場合は、利用者向けには次のように表示します。HTTPステータスの詳細は内部ログや通信結果で確認できます。
+
+```text
+銀行情報サービスでサーバーエラーが発生しました。しばらく時間をおいて再試行してください。
+```
+
 戻り値オブジェクトの各プロパティ（成功時）:
 
 - `bankCode` (string) — 銀行コード（4桁、例: "0001"）。全銀フォーマット用にゼロ埋め済みのコードが返ります。

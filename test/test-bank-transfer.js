@@ -6,6 +6,9 @@ global.window = global;
 require(path.join(__dirname, '..', 'src', 'bank-transfer.js'));
 const BANK = global.BANK;
 
+const realGetBank = BANK && BANK.getBank;
+const realGetBranch = BANK && BANK.getBranch;
+
 if (!BANK) throw new Error('BANK がグローバルに公開されていません');
 
 // --- Helpers: default stubs to keep tests deterministic ---
@@ -95,6 +98,25 @@ try {
 			return [0x41, 0x42];
 		},
 	};
+
+	try {
+		const previousEncoding = global.Encoding;
+		delete global.Encoding;
+		assert.throws(
+			() => BANK.encodeSjis('テスト'),
+			(error) =>
+				error &&
+				error.code === 'ENCODING_JS_UNAVAILABLE' &&
+				error.message === 'encoding.jsが読み込まれていないため、Shift_JIS変換を実行できません'
+		);
+		if (previousEncoding === undefined) delete global.Encoding;
+		else global.Encoding = previousEncoding;
+		console.log('PASS: encodeSjis reports Japanese missing-library error');
+	} catch (e) {
+		delete global.Encoding;
+		console.error('FAIL: encodeSjis missing-library error', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
 	const encoded = BANK.encodeSjis('AB');
 	assert.ok(encoded instanceof Uint8Array, 'encodeSjis は Uint8Array を返すこと');
 	assert.deepStrictEqual(Array.from(encoded), [0x41, 0x42]);
@@ -142,6 +164,129 @@ try {
 	console.log('PASS: async APIs reject missing callbacks');
 } catch (e) {
 	console.error('FAIL: missing callback validation', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const previousFetch = global.fetch;
+	global.fetch = () =>
+		Promise.resolve({
+			ok: true,
+			json: () => Promise.resolve({}),
+		});
+	realGetBank('0002', { apiBaseUrl: 'https://example.test' }, (result) => {
+		try {
+			assert.strictEqual(result.error, '銀行が見つかりません');
+			assert.strictEqual(result.message, '銀行コード「0002」の銀行が見つかりません');
+			assert.strictEqual(result.code, 'bank.not_found');
+			console.log('PASS: getBank returns Japanese not-found error');
+		} catch (e) {
+			console.error('FAIL: getBank not-found error', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		} finally {
+			if (previousFetch === undefined) delete global.fetch;
+			else global.fetch = previousFetch;
+			const branchFetch = global.fetch;
+			global.fetch = () =>
+				Promise.resolve({
+					ok: true,
+					json: () => Promise.resolve({}),
+				});
+			realGetBranch('0005', '999', (branchResult) => {
+				try {
+					assert.strictEqual(branchResult.error, '支店が見つかりません');
+					assert.strictEqual(
+						branchResult.message,
+						'銀行コード「0005」の支店コード「999」の支店が見つかりません'
+					);
+					console.log('PASS: getBranch returns Japanese not-found message');
+				} catch (e) {
+					console.error('FAIL: getBranch empty-result message', e && e.message ? e.message : e);
+					process.exitCode = 2;
+				} finally {
+					if (branchFetch === undefined) delete global.fetch;
+					else global.fetch = branchFetch;
+				}
+			});
+		}
+	});
+} catch (e) {
+	console.error('FAIL: getBank not-found setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const previousFetch = global.fetch;
+	global.fetch = () =>
+		Promise.resolve({
+			ok: true,
+			json: () => Promise.resolve([]),
+		});
+	realGetBank('存在しない銀行', { apiBaseUrl: 'https://example.test' }, (result) => {
+		try {
+			assert.strictEqual(result.error, '該当する銀行が見つかりませんでした');
+			assert.strictEqual(result.message, '該当する銀行が見つかりませんでした');
+			console.log('PASS: getBank name search returns Japanese not-found message');
+		} catch (e) {
+			console.error('FAIL: getBank name not-found message', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		} finally {
+			if (previousFetch === undefined) delete global.fetch;
+			else global.fetch = previousFetch;
+		}
+	});
+} catch (e) {
+	console.error('FAIL: getBank name not-found setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const previousFetch = global.fetch;
+	global.fetch = () => Promise.resolve({ ok: false, status: 500 });
+	realGetBank('0005', { apiBaseUrl: 'https://example.test' }, (result) => {
+		try {
+			assert.strictEqual(
+				result.message,
+				'銀行情報サービスでサーバーエラーが発生しました。しばらく時間をおいて再試行してください。'
+			);
+			console.log('PASS: getBank maps HTTP 500 to Japanese server-error message');
+		} catch (e) {
+			console.error('FAIL: getBank HTTP 500 message', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		} finally {
+			if (previousFetch === undefined) delete global.fetch;
+			else global.fetch = previousFetch;
+		}
+	});
+} catch (e) {
+	console.error('FAIL: getBank HTTP 500 setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const previousFetch = global.fetch;
+	global.fetch = () =>
+		Promise.resolve({
+			ok: true,
+			json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON')),
+		});
+	realGetBank('0005', { apiBaseUrl: 'https://example.test' }, (result) => {
+		try {
+			assert.strictEqual(
+				result.message,
+				'銀行情報サービスから正しい応答を受け取れませんでした。しばらく時間をおいて再試行してください。'
+			);
+			console.log('PASS: getBank maps malformed JSON to Japanese message');
+		} catch (e) {
+			console.error('FAIL: getBank malformed JSON message', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		} finally {
+			if (previousFetch === undefined) delete global.fetch;
+			else global.fetch = previousFetch;
+		}
+	});
+} catch (e) {
+	console.error('FAIL: getBank malformed JSON setup', e && e.message ? e.message : e);
 	process.exitCode = 2;
 }
 
@@ -443,6 +588,46 @@ try {
 	});
 } catch (e) {
 	console.error('FAIL: convertYucho/test setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	window.BANK.getBank = (code, cb) => cb({ error: '銀行が見つかりません' });
+	window.BANK.getBranch = defaultStubBranch;
+	BANK.convertYucho('12345', '12345671', (result) => {
+		try {
+			assert.strictEqual(result.error, '銀行が見つかりません');
+			assert.strictEqual(result.message, '銀行が見つかりません');
+			console.log('PASS: convertYucho propagates bank not-found message');
+		} catch (e) {
+			console.error('FAIL: convertYucho bank error message', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		}
+	});
+	window.BANK.getBank = defaultStubBank;
+	window.BANK.getBranch = defaultStubBranch;
+} catch (e) {
+	console.error('FAIL: convertYucho bank error setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	window.BANK.getBank = defaultStubBank;
+	window.BANK.getBranch = (bankCode, branchCode, cb) => cb({ error: '支店が見つかりません' });
+	BANK.convertYucho('12345', '12345671', (result) => {
+		try {
+			assert.strictEqual(result.error, '支店が見つかりません');
+			assert.strictEqual(result.message, '支店が見つかりません');
+			console.log('PASS: convertYucho propagates branch not-found message');
+		} catch (e) {
+			console.error('FAIL: convertYucho branch error message', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		}
+	});
+	window.BANK.getBank = defaultStubBank;
+	window.BANK.getBranch = defaultStubBranch;
+} catch (e) {
+	console.error('FAIL: convertYucho branch error setup', e && e.message ? e.message : e);
 	process.exitCode = 2;
 }
 
