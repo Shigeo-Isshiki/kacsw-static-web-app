@@ -658,11 +658,40 @@ const encodeSjis = (input) => _bt_encodeSjisBytes(_bt_toStr(input));
  */
 const _bt_invokeCallback = (cb, result) => {
 	if (typeof cb !== 'function') return;
-	const normalizedResult =
-		result && typeof result === 'object' && result.error && !result.message
-			? Object.assign({}, result, { message: String(result.error) })
-			: result;
+	const normalizedResult = _bt_normalizeUserError(result);
 	setTimeout(() => cb(normalizedResult), 0);
+};
+
+/** 利用者向けエラーと内部診断情報を分離します。 */
+const _bt_normalizeUserError = (result) => {
+	if (!result || typeof result !== 'object' || !result.error) return result;
+	const errorText = String(result.error);
+	const messageText = result.message ? String(result.message) : '';
+	const hasJapaneseError = /[ぁ-んァ-ン一-龥]/.test(errorText);
+	const hasJapaneseMessage = /[ぁ-んァ-ン一-龥]/.test(messageText);
+	const machineCode = /^(invalid_|bank\.|branch\.|ENCODING_|FILE_|TEXT_|PARSE_)/i.test(errorText);
+	const technicalMessage =
+		/(Unexpected|Failed to fetch|NetworkError|TypeError|SyntaxError|ENCODING_|FILE_|TEXT_|PARSE_|HTTP error|fetch\s|network\s)/i.test(
+			messageText
+		);
+	const technicalPattern = technicalMessage || (machineCode && !hasJapaneseMessage);
+	if (hasJapaneseError && !technicalMessage) {
+		return Object.assign({}, result, { message: messageText || errorText });
+	}
+	if (hasJapaneseMessage && !technicalPattern) {
+		return result;
+	}
+	const originalError = messageText || errorText;
+	const details = Object.assign({}, result.details || {}, { originalError });
+	const userMessage =
+		result.code === 'bank.not_found' || result.code === 'branch.not_found'
+			? messageText || errorText
+			: 'システムエラーが発生しました。しばらく時間をおいて再試行してください。';
+	return Object.assign({}, result, {
+		error: userMessage,
+		message: userMessage,
+		details,
+	});
 };
 
 /** callback を一度だけ実行するラッパーを作成します。 */
@@ -686,22 +715,28 @@ const _bt_enrichError = (err, defaults = {}) => {
 	try {
 		if (err && typeof err === 'object') {
 			// 既に構造化されている場合はそのまま返す
-			if (err.code || err.field || err.details) return err;
+			if (err.code || err.field || err.details) return _bt_normalizeUserError(err);
 			// err.error / err.message を保持しつつ構造化オブジェクトを構築する
 			const message = err.message || err.error || defaults.message || String(err);
-			return Object.assign({}, defaults, {
-				error: err.error || defaults.error || message,
-				message,
-				// details: 既存の details があればマージする
-				details: Object.assign({}, defaults.details || {}, err.details || {}),
-			});
+			return _bt_normalizeUserError(
+				Object.assign({}, defaults, {
+					error: err.error || defaults.error || message,
+					message,
+					// details: 既存の details があればマージする
+					details: Object.assign({}, defaults.details || {}, err.details || {}),
+				})
+			);
 		}
 		// primitive
 		const message = err && err.message ? err.message : err ? String(err) : defaults.message || '';
-		return Object.assign({}, defaults, { error: defaults.error || message, message });
+		return _bt_normalizeUserError(
+			Object.assign({}, defaults, { error: defaults.error || message, message })
+		);
 	} catch (e) {
 		const message = String(err || e);
-		return Object.assign({}, defaults, { error: defaults.error || message, message });
+		return _bt_normalizeUserError(
+			Object.assign({}, defaults, { error: defaults.error || message, message })
+		);
 	}
 };
 
@@ -1259,7 +1294,7 @@ const _bt_yuchoKigouToBranch = (kigouRaw) => {
 	// 前提: 記号は必ず5桁でなければならない（それ以外は処理不能）
 	if (!/^[0-9]{5}$/.test(kigou))
 		return {
-			error: 'invalid_format',
+			error: 'ゆうちょ記号の形式が不正です',
 			code: 'kigou.not_5_digits',
 			field: 'kigou',
 			message: '記号は5桁の数字である必要があります',
@@ -1269,7 +1304,7 @@ const _bt_yuchoKigouToBranch = (kigouRaw) => {
 	// 先頭桁ルール: 1桁目は 0 または 1 のみ許可
 	if (!/^[01]/.test(kigou.charAt(0)))
 		return {
-			error: 'invalid_format',
+			error: 'ゆうちょ記号の形式が不正です',
 			code: 'kigou.invalid_lead',
 			field: 'kigou',
 			message: '記号の先頭桁は0または1である必要があります',

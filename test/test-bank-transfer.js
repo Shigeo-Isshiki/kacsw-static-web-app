@@ -172,7 +172,7 @@ try {
 	window.BANK.getBranch = defaultStubBranch;
 	BANK.convertYucho('23456', '1234567', (result) => {
 		try {
-			assert.strictEqual(result.error, 'invalid_format');
+			assert.strictEqual(result.error, 'ゆうちょ記号の形式が不正です');
 			assert.strictEqual(result.field, 'kigou');
 			assert.strictEqual(result.code, 'kigou.invalid_lead');
 			assert.ok(result.message, '記号エラーにはmessageがあること');
