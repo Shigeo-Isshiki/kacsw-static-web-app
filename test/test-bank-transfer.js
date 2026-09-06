@@ -265,6 +265,28 @@ try {
 
 try {
 	const previousFetch = global.fetch;
+	global.fetch = () => Promise.resolve({ ok: false, status: 404 });
+	realGetBank('0002', { apiBaseUrl: 'https://example.test' }, (result) => {
+		try {
+			assert.strictEqual(result.error, '銀行が見つかりません');
+			assert.strictEqual(result.message, '銀行コード「0002」の銀行が見つかりません');
+			assert.strictEqual(result.code, 'bank.not_found');
+			console.log('PASS: getBank maps HTTP 404 to Japanese not-found message');
+		} catch (e) {
+			console.error('FAIL: getBank HTTP 404 message', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		} finally {
+			if (previousFetch === undefined) delete global.fetch;
+			else global.fetch = previousFetch;
+		}
+	});
+} catch (e) {
+	console.error('FAIL: getBank HTTP 404 setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const previousFetch = global.fetch;
 	global.fetch = () =>
 		Promise.resolve({
 			ok: true,

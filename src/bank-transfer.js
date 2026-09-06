@@ -418,6 +418,12 @@ const _bt_getResponseFormatErrorMessage = (error, serviceName) => {
 	return null;
 };
 
+/** HTTP 404 応答かどうかを判定します。 */
+const _bt_isHttpNotFound = (error) => {
+	const message = error && error.message ? String(error.message) : String(error || '');
+	return /HTTP(?:ステータス)?\s*[：:]\s*404/i.test(message);
+};
+
 /**
  * 内部: 安全にログを残すユーティリティ。
  * - ブラウザ環境では window.BANK._bt_debugLogs にも保存し、console.debug が使える場合は出力します。
@@ -962,7 +968,17 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 						} catch {
 							message = '銀行情報の取得中にエラーが発生しました';
 						}
-						let e = { error: message };
+						const errorText = err && err.message ? String(err.message) : '';
+						const notFound = /HTTP(?:ステータス)?\s*[：:]\s*404/i.test(errorText);
+						const e = notFound
+							? {
+									error: '銀行が見つかりません',
+									message: `銀行コード「${code}」の銀行が見つかりません`,
+									code: 'bank.not_found',
+									field: 'bankCode',
+									details: { bankCode: code, httpStatus: 404 },
+								}
+							: { error: message };
 						_bt_invokeCallback(callback, e);
 					})
 					.finally(() => {
@@ -1162,7 +1178,16 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 			} catch {
 				message = '銀行名検索中にエラーが発生しました';
 			}
-			const e = { success: false, error: message };
+			const e = _bt_isHttpNotFound(err)
+				? {
+						success: false,
+						error: '銀行が見つかりません',
+						message: `銀行名「${q}」の銀行が見つかりません`,
+						code: 'bank.not_found',
+						field: 'bankName',
+						details: { bankName: q, httpStatus: 404 },
+					}
+				: { success: false, error: message };
 			_bt_invokeCallback(callback, e);
 		})
 		.finally(() => {
@@ -2038,7 +2063,18 @@ const getBranch = (bankCode, branchCodeOrName, options = {}, callback) => {
 					} catch {
 						message = '支店データ取得中にエラーが発生しました';
 					}
-					_bt_invokeCallback(callback, { error: message });
+					_bt_invokeCallback(
+						callback,
+						_bt_isHttpNotFound(err)
+							? {
+									error: '支店が見つかりません',
+									message: `銀行コード「${bankKey}」の支店コード「${branchCode}」の支店が見つかりません`,
+									code: 'branch.not_found',
+									field: 'branchCode',
+									details: { bankCode: bankKey, branchCode, httpStatus: 404 },
+								}
+							: { error: message }
+					);
 				})
 				.finally(() => {
 					if (timer) clearTimeout(timer);
@@ -2156,7 +2192,18 @@ const getBranch = (bankCode, branchCodeOrName, options = {}, callback) => {
 				} catch {
 					message = '支店検索中にエラーが発生しました';
 				}
-				_bt_invokeCallback(callback, { error: message });
+				_bt_invokeCallback(
+					callback,
+					_bt_isHttpNotFound(err)
+						? {
+								error: '支店が見つかりません',
+								message: `銀行コード「${bankKey}」の支店名「${qRaw}」の支店が見つかりません`,
+								code: 'branch.not_found',
+								field: 'branchName',
+								details: { bankCode: bankKey, branchName: qRaw, httpStatus: 404 },
+							}
+						: { error: message }
+				);
 			})
 			.finally(() => {
 				if (timer) clearTimeout(timer);
