@@ -531,8 +531,8 @@ console.log(resDate); // '2026-01-05' など（YYYY-MM-DD 形式）
 ```js
 const result = await window.BANK.generateZenginDataAsync(headerData, records);
 if (result.error) {
-  console.error(result.error);
-  return;
+	console.error(result.error);
+	return;
 }
 console.log(result.content);
 ```
