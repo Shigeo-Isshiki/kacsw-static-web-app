@@ -3513,6 +3513,17 @@ const generateZenginData = (headerData, records, callback) => {
 	}
 };
 
+/** 公開: generateZenginDataAsync — 全銀データ生成結果を Promise で返します。 */
+/**
+ * @param {object} headerData ヘッダ生成用データ
+ * @param {Array<object>} records 振込明細配列
+ * @returns {Promise<object>} generateZenginData と同じ結果オブジェクト
+ */
+const generateZenginDataAsync = (headerData, records) =>
+	new Promise((resolve) => {
+		generateZenginData(headerData, records, resolve);
+	});
+
 /** 公開: nextBankBusinessDay — 次の銀行営業日を計算して返します（詳細: docs/bank-transfer.md）。 */
 /**
  * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）
@@ -3857,6 +3868,7 @@ if (typeof window !== 'undefined') {
 		generateTrailer,
 		generateEndRecord,
 		generateZenginData,
+		generateZenginDataAsync,
 		nextBankBusinessDay,
 	});
 }
@@ -3881,6 +3893,7 @@ try {
 						generateTrailer,
 						generateEndRecord,
 						generateZenginData,
+						generateZenginDataAsync,
 						nextBankBusinessDay,
 					};
 	}

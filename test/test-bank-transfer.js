@@ -779,6 +779,59 @@ try {
 	process.exitCode = 2;
 }
 
+try {
+	BANK.generateZenginDataAsync({}, []).then((res) => {
+		try {
+			assert.ok(res && res.error, 'generateZenginDataAsync はエラー結果を resolve すること');
+			console.log('PASS: generateZenginDataAsync resolves error result');
+		} catch (e) {
+			console.error('FAIL: generateZenginDataAsync error result', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		}
+	});
+} catch (e) {
+	console.error('FAIL: generateZenginDataAsync invocation', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	BANK.generateZenginDataAsync(
+		{
+			typeCode: '11',
+			requesterCode: '1',
+			requesterName: 'テストカイシャ',
+			tradeDate: '20251109',
+			fromBankNo: '9900',
+			fromBranchNo: '001',
+			depositType: '普通',
+			accountNumber: '1234567',
+		},
+		[
+			{
+				toBankNo: '9900',
+				toBranchNo: '001',
+				toAccountType: '普通',
+				toAccountNumber: '1234567',
+				amount: 1000,
+				customerName: 'ヤマダタロウ',
+			},
+		]
+	).then((res) => {
+		try {
+			assert.strictEqual(res.success, true);
+			assert.strictEqual(typeof res.content, 'string');
+			assert.ok(res.parts && res.parts.header && res.parts.data);
+			console.log('PASS: generateZenginDataAsync resolves success result');
+		} catch (e) {
+			console.error('FAIL: generateZenginDataAsync success result', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		}
+	});
+} catch (e) {
+	console.error('FAIL: generateZenginDataAsync success invocation', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
 // ---------------------- generateHeader smoke test ----------------------
 try {
 	const headerData = {

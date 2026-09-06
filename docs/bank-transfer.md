@@ -20,6 +20,7 @@
   - [`convertYucho(kigou, bangou, callback)`](#convertYucho)
   - [`parseZenginFile(options)`](#parseZenginFile)
   - [`generateZenginData(headerData, records, callback)`](#generateZenginData)
+  - [`generateZenginDataAsync(headerData, records)`](#generateZenginDataAsync)
   - [`generateHeader(headerData, callback)`](#generateHeader)
   - [`generateDataRecords(records, fromBankNo, callback)`](#generateDataRecords)
   - [`normalizeEdiInfo(input, options)`](#normalizeEdiInfo)
@@ -61,6 +62,7 @@
 - `generateTrailer(summaryData, callback)`
 - `generateEndRecord(callback)`
 - `generateZenginData(headerData, records, callback)`
+- `generateZenginDataAsync(headerData, records)`
   - `normalizeEdiInfo(input, options)`
   - `normalizePayeeName(name, options)`
 - `normalizeAccountNumber(input)`
@@ -68,6 +70,8 @@
 
 （非同期 API のコールバックは単一引数 `callback(result)` に統一し、常に次のタスクで実行します。callback を指定しない呼び出しは `TypeError` になります）
 `parseZenginFile` は Promise を返します。
+
+全銀データ生成では、kintone のボタン押下処理から `await` で利用するための `generateZenginDataAsync` も提供します。成功・失敗のいずれも Promise を reject せず、`generateZenginData` の callback に渡すものと同じ結果オブジェクトで resolve します。
 
 銀行・支店検索の外部API通信は、kintone環境で `kintone.proxy` が利用できる場合は自動的にプロキシ経由で実行します。その他の環境では通常の `fetch` を使用します。これにより、外部APIがブラウザ向けCORSヘッダーを返さないkintone環境でも検索できる構成にしています。
 
@@ -513,6 +517,25 @@ console.log(resDate); // '2026-01-05' など（YYYY-MM-DD 形式）
 
 - `content` は CRLF で結合された文字列です。Shift_JIS 変換やファイル出力は呼び出し側で行ってください。
 - `parts` は個別レコード（120 バイト固定長）の断片が返るため、デバッグや個別検査に便利です。
+
+<a id="generateZenginDataAsync"></a>
+
+### `generateZenginDataAsync(headerData, records)`
+
+`generateZenginData` の Promise 版です。kintone のボタン押下イベントなど、`async` / `await` を利用できる箇所ではこちらを推奨します。
+
+- 引数: `generateZenginData` の `headerData` と `records` と同じです。
+- 戻り値: `Promise<object>`。成功時は `{ success: true, content, parts }`、失敗時は `{ error, message?, code?, field?, details? }` を resolve します。
+- 例:
+
+```js
+const result = await window.BANK.generateZenginDataAsync(headerData, records);
+if (result.error) {
+  console.error(result.error);
+  return;
+}
+console.log(result.content);
+```
 
 ---
 
