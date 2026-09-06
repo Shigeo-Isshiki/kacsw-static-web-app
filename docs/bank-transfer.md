@@ -51,10 +51,11 @@
 
 ## 公開 API サマリ
 
-- `getBank(bankCodeOrName, callback)`
-- `getBranch(bankCode, branchCodeOrName, callback)`
+- `getBank(bankCodeOrName, options?, callback)`
+- `getBranch(bankCode, branchCodeOrName, options?, callback)`
 - `convertYucho(kigou, bangou, callback)`
 - `parseZenginFile(options)`
+- `encodeSjis(input)`
 - `generateHeader(headerData, callback)`
 - `generateDataRecords(records, fromBankNo, callback)`
 - `generateTrailer(summaryData, callback)`
@@ -65,15 +66,36 @@
 - `normalizeAccountNumber(input)`
 - `nextBankBusinessDay(baseDate, cutoffHour, callback)`
 
-（`parseZenginFile` を除く各関数はコールバック単一引数スタイルを基本にしています。Node 風の (err, res) も互換的に扱える場合があります。`parseZenginFile` は Promise を返します）
+（非同期 API のコールバックは単一引数 `callback(result)` に統一し、常に次のタスクで実行します。callback を指定しない呼び出しは `TypeError` になります）
+`parseZenginFile` は Promise を返します。
+
+銀行・支店検索の外部API通信は、kintone環境で `kintone.proxy` が利用できる場合は自動的にプロキシ経由で実行します。その他の環境では通常の `fetch` を使用します。これにより、外部APIがブラウザ向けCORSヘッダーを返さないkintone環境でも検索できる構成にしています。
+
+`kintone.proxy` 経由の通信には10秒のタイムアウトを設けています。応答がない場合は、通常の通信エラーではなくタイムアウトとして扱います。内部デバッグログは `window.BANK._bt_debugLogs` に保存される場合がありますが、保持件数は最大200件です。
+
+## 将来の確認事項
+
+- Promiseベースの非同期API（`getBankAsync` など）は、kintoneのイベント種別と既存callback APIへの影響を確認してから追加します。
+- `window.BANK` を標準名前空間とし、グローバル関数を段階的に廃止する移行は、アプリ側の利用箇所を確認してから実施します。
+- `parseZenginFile` のShift_JIS実データ読み込みは、実ファイルと対象ブラウザでのスモークテストが未実施です。エラー発生時に実データで確認します。
 
 ---
 
 ## 公開関数の引数詳細
 
+### `encodeSjis(input)`
+
+`encoding.js` の `Encoding.convert` を使って、Unicode 文字列を Shift_JIS の `Uint8Array` に変換します。
+この関数を利用する場合は、`bank-transfer.js` より前に `encoding.js` を読み込んで `window.Encoding` を公開してください。
+`encoding.js` が読み込まれていない場合は `ENCODING_JS_UNAVAILABLE` エラーになります。
+
+```js
+const bytes = window.BANK.encodeSjis('ﾔﾏﾀﾞﾀﾛｳ');
+```
+
 <a id="getBank"></a>
 
-### `getBank(bankCodeOrName, callback)`
+### `getBank(bankCodeOrName, options?, callback)`
 
 概要:
 
@@ -82,12 +104,31 @@
 引数:
 
 - `bankCodeOrName` (string|number) — 銀行コード（例: '0001'）または検索文字列（例: '横浜'）。必須。
-- `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `BankResult`、失敗時は `ErrorResult` を返します。
+- `options` (object, optional) — `apiBaseUrl`、`apiKey`、`timeout`、`pathTemplate` を指定できます。
+- `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `BankResult`、失敗時は `ErrorResult` を返します。従来の `getBank(query, callback)` も利用できます。
 
 戻り値（コールバックに渡すオブジェクトの例）:
 
 - 成功: `{ bankCode: '0001', bankName: 'みどり銀行', bankKana: 'ﾐﾄﾞﾘｷﾞﾝｺｳ' }`
 - 失敗: `{ error: 'not_found', message: '銀行が見つかりません', code: 'bank.not_found' }`
+
+銀行コードが存在しない場合は、次のようなエラーを返します。
+
+```js
+{
+  error: '銀行が見つかりません',
+  message: '銀行コード「0002」の銀行が見つかりません',
+  code: 'bank.not_found',
+  field: 'bankCode',
+  details: { bankCode: '0002' },
+}
+```
+
+外部APIがHTTP 500系のサーバーエラーを返した場合は、利用者向けには次のように表示します。HTTPステータスの詳細は内部ログや通信結果で確認できます。
+
+```text
+銀行情報サービスでサーバーエラーが発生しました。しばらく時間をおいて再試行してください。
+```
 
 戻り値オブジェクトの各プロパティ（成功時）:
 
@@ -115,7 +156,7 @@ window.BANK.getBank('横浜', (res) => {
 
 <a id="getBranch"></a>
 
-### `getBranch(bankCode, branchCodeOrName, callback)`
+### `getBranch(bankCode, branchCodeOrName, options?, callback)`
 
 概要:
 
@@ -125,7 +166,8 @@ window.BANK.getBank('横浜', (res) => {
 
 - `bankCode` (string|number) — 銀行コード（4桁）。必須。
 - `branchCodeOrName` (string|number) — 支店コード（3桁）または検索文字列。必須。
-- `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `BranchResult`、失敗時は `ErrorResult` を返します。
+- `options` (object, optional) — `apiBaseUrl` と `timeout` を指定できます。
+- `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `BranchResult`、失敗時は `ErrorResult` を返します。従来の `getBranch(bankCode, query, callback)` も利用できます。
 
 戻り値の例:
 
@@ -142,6 +184,7 @@ window.BANK.getBank('横浜', (res) => {
 
 - `bankCode` が存在しない場合は早期にエラーを返します。
 - 部分一致で複数候補が見つかる場合は代表候補を返します。詳細な候補リストが必要な場合は将来的に別 API を提供する可能性があります。
+- 銀行コード・支店コードに含まれる区切り文字や英字は自動除去せず、エラーとして返します。全角数字は半角数字へ変換されます。
 
 例:
 

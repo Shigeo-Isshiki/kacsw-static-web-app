@@ -751,11 +751,28 @@ const kintoneEventOn = (events, handler) => {
 		console.warn('kintoneEventOn: invalid arguments', { events, handler });
 		return false;
 	}
+	const eventNames = Array.isArray(events) ? events : [events];
+	const isChangeEvent = eventNames.some((eventName) => /\.change\./.test(eventName));
 
 	try {
 		kintone.events.on(events, (event) => {
 			try {
-				return handler(event);
+				const result = handler(event);
+				if (result && typeof result.catch === 'function') {
+					return result.catch((error) => {
+						console.error('kintone event handler error', { events, error });
+						try {
+							notifyError(
+								'システムエラーが発生しました。詳細はコンソールを確認してください。',
+								undefined,
+								true
+							);
+						} catch {}
+						if (!isChangeEvent) return Promise.reject(error);
+						return event;
+					});
+				}
+				return result;
 			} catch (error) {
 				console.error('kintone event handler error', { events, error });
 				try {
