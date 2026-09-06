@@ -110,7 +110,9 @@ const { JSDOM } = require('jsdom');
 		global.kintone.events.on = (events, handler) => {
 			registeredResult = handler({ _test: 'rejected-promise' });
 		};
-		const ok = kintoneEventOn('app.record.detail.show', () => Promise.reject(new Error('test rejection')));
+		const ok = kintoneEventOn('app.record.detail.show', () =>
+			Promise.reject(new Error('test rejection'))
+		);
 		assert.strictEqual(ok, true);
 		assert.ok(registeredResult && typeof registeredResult.then === 'function');
 		registeredResult.then(
@@ -119,13 +121,16 @@ const { JSDOM } = require('jsdom');
 				process.exitCode = 2;
 			},
 			(error) => {
-			try {
-				assert.strictEqual(error.message, 'test rejection');
-				console.log('PASS: kintoneEventOn catches rejected promises');
-			} catch (e) {
-				console.error('FAIL: kintoneEventOn rejected promise handling', e && e.message ? e.message : e);
-				process.exitCode = 2;
-			}
+				try {
+					assert.strictEqual(error.message, 'test rejection');
+					console.log('PASS: kintoneEventOn catches rejected promises');
+				} catch (e) {
+					console.error(
+						'FAIL: kintoneEventOn rejected promise handling',
+						e && e.message ? e.message : e
+					);
+					process.exitCode = 2;
+				}
 			}
 		);
 	} catch (e) {

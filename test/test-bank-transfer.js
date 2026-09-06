@@ -218,7 +218,10 @@ try {
 			assert.strictEqual(result.field, 'bangou');
 			console.log('PASS: convertYucho returns Japanese invalid-account-format error');
 		} catch (e) {
-			console.error('FAIL: convertYucho invalid-account-format message', e && e.message ? e.message : e);
+			console.error(
+				'FAIL: convertYucho invalid-account-format message',
+				e && e.message ? e.message : e
+			);
 			process.exitCode = 2;
 		}
 	});
@@ -444,13 +447,19 @@ try {
 				assert.ok(result && result.error, '不正な仕向銀行番号はエラーになること');
 				console.log('PASS: generateDataRecords rejects malformed origin bank codes');
 			} catch (e) {
-				console.error('FAIL: generateDataRecords origin code validation', e && e.message ? e.message : e);
+				console.error(
+					'FAIL: generateDataRecords origin code validation',
+					e && e.message ? e.message : e
+				);
 				process.exitCode = 2;
 			}
 		}
 	);
 } catch (e) {
-	console.error('FAIL: generateDataRecords origin code validation setup', e && e.message ? e.message : e);
+	console.error(
+		'FAIL: generateDataRecords origin code validation setup',
+		e && e.message ? e.message : e
+	);
 	process.exitCode = 2;
 }
 
