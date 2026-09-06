@@ -446,6 +446,20 @@ const _bt_checkBoolean = (val) => {
 const _bt_toHalfWidthDigits = (str = '') =>
 	_bt_toStr(str).replace(/[\uFF10-\uFF19]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
 
+/** 全角数字だけを半角化し、指定桁の数字として検証します。 */
+const _bt_normalizeNumericCode = (value, digits, fieldName, { allowShort = false } = {}) => {
+	const normalized = _bt_toHalfWidthDigits(_bt_toStr(value)).trim();
+	const pattern = allowShort
+		? new RegExp(`^[0-9]{1,${digits}}$`)
+		: new RegExp(`^[0-9]{${digits}}$`);
+	if (!pattern.test(normalized)) {
+		throw new Error(
+			`${fieldName}は${allowShort ? `1～${digits}` : digits}桁の数字で指定してください`
+		);
+	}
+	return normalized.padStart(digits, '0');
+};
+
 /** 指定文字が銀行振込で許容される半角文字集合に含まれるか判定する（内部ユーティリティ）。 */
 /**
  * @private
@@ -497,15 +511,42 @@ const _bt_isAllowedHalfWidthString = (s) => {
 	return true;
 };
 
+/** encoding.js が公開する Encoding オブジェクトを取得します。 */
+const _bt_getEncodingJs = () => {
+	if (typeof Encoding === 'undefined' || !Encoding || typeof Encoding.convert !== 'function') {
+		throw new Error('ENCODING_JS_UNAVAILABLE');
+	}
+	return Encoding;
+};
+
+/** encoding.js を使って Unicode 文字列を Shift_JIS のバイト列へ変換します。 */
+const _bt_encodeSjisBytes = (s) => {
+	const encoding = _bt_getEncodingJs();
+	const converted = encoding.convert(String(s), {
+		to: 'SJIS',
+		from: 'UNICODE',
+		type: 'array',
+	});
+	if (converted instanceof ArrayBuffer) return new Uint8Array(converted);
+	if (ArrayBuffer.isView(converted))
+		return new Uint8Array(converted.buffer, converted.byteOffset, converted.byteLength);
+	if (Array.isArray(converted)) return Uint8Array.from(converted);
+	throw new Error('ENCODING_JS_INVALID_RESULT');
+};
+
 /**
- * Shift_JIS 相当のバイト長を簡易計算するヘルパ
- * - ASCII (U+0000..U+007F) および半角カタカナ (U+FF61..U+FF9F) は 1 バイトとカウント
- * - それ以外（全角カタカナ・ひらがな・漢字・全角英数等）は 2 バイトとカウント
- * 注: 実際の Shift_JIS マッピングはさらに細かいが、振込名義の切り詰め用途での簡易実装です。
+ * Shift_JIS のバイト長を返します。
+ * encoding.js が利用可能な場合は実際の変換結果を使い、未読み込み時だけ従来の推定値へフォールバックします。
  * @param {string} s
- * @returns {number} 推定バイト長
+ * @returns {number} バイト長
  */
 const _bt_sjisByteLength = (s) => {
+	if (!_bt_checkString(s) || s.length === 0) return 0;
+	try {
+		return _bt_encodeSjisBytes(s).byteLength;
+	} catch (e) {
+		// encoding.js は外部 script のため、未読み込み環境では互換用の推定値を使う
+	}
 	if (!_bt_checkString(s) || s.length === 0) return 0;
 	let len = 0;
 	for (const ch of s) {
@@ -534,8 +575,7 @@ const _bt_sjisTruncate = (s, maxBytes) => {
 	let out = '';
 	let used = 0;
 	for (const ch of s) {
-		const cp = ch.codePointAt(0);
-		const add = cp <= 0x7f || (cp >= 0xff61 && cp <= 0xff9f) ? 1 : 2;
+		const add = _bt_sjisByteLength(out + ch) - used;
 		if (used + add > maxBytes) break;
 		out += ch;
 		used += add;
@@ -543,72 +583,28 @@ const _bt_sjisTruncate = (s, maxBytes) => {
 	return out;
 };
 
-/** 内部: _bt_invokeCallback — Node 風 / single-arg 両対応のコールバック互換ヘルパ。 */
+/** 公開: encoding.js を使って Shift_JIS バイト列を生成します。 */
+const encodeSjis = (input) => _bt_encodeSjisBytes(_bt_toStr(input));
+
+/** 内部: _bt_invokeCallback — 単一引数コールバックを次のタスクで一度だけ実行します。 */
 /**
  * @private
  * @param {Function} cb コールバック関数
- * @param {*} err エラー情報（構造化オブジェクトまたはプリミティブ）
- * @param {*} res 成功時の結果
+ * @param {*} result 成功または失敗の結果
  */
-const _bt_invokeCallback = (cb, err, res) => {
+const _bt_invokeCallback = (cb, result) => {
 	if (typeof cb !== 'function') return;
-	// 同期・非同期どちらの判定結果でも、必ず次のマクロタスクでcbを呼び出す（kintoneイベントハンドラ内での同期実行によるエラーを防ぐため）
-	setTimeout(() => _bt_invokeCallbackNow(cb, err, res), 0);
+	setTimeout(() => cb(result), 0);
 };
 
-const _bt_invokeCallbackNow = (cb, err, res) => {
-	try {
-		if ((cb && typeof cb.length === 'number' && cb.length >= 2) || false) {
-			// Node 風
-			cb(err || null, res || null);
-		} else {
-			// single-arg スタイル（成功時はオブジェクト、失敗時は { error: '...' }）
-			if (err) {
-				// err は { success:false, error: '...' } 形式で来る想定
-				// もし err が構造化オブジェクトであればそのまま透過する。文字列などの場合は既存互換でラップする。
-				if (typeof err === 'object' && err !== null) {
-					// code/field/details を含む構造化エラーオブジェクトはそのまま扱う
-					if (err.error || err.message || err.code || err.field || err.details) {
-						// 正規化: `error`（識別子）と `message`（人向けメッセージ）の両方が存在するようにする
-						try {
-							if (!err.message) {
-								err.message = err.error ? String(err.error) : '';
-							}
-							if (!err.error) {
-								err.error = err.message ? String(err.message) : '';
-							}
-						} catch (e) {
-							// 正規化中のエラーは無視
-						}
-						cb(err);
-					} else {
-						// 不明なオブジェクトは文字列化して error/message に格納する
-						try {
-							const txt = JSON.stringify(err);
-							cb({ error: txt, message: txt });
-						} catch (e) {
-							const txt = String(err);
-							cb({ error: txt, message: txt });
-						}
-					}
-				} else {
-					// プリミティブ値（文字列/数値 等）は文字列化して error と message の両方に設定する
-					const txt = err && err.message ? err.message : String(err);
-					cb({ error: txt, message: txt });
-				}
-			} else if (res) {
-				// res は { success:true, bank } 形式のことが多い -> zip-style の期待に合わせて bank オブジェクトを返す
-				if (res && res.bank) cb(res.bank);
-				else cb(res);
-			} else {
-				cb(null);
-			}
-		}
-	} catch (e) {
-		try {
-			_bt_safeLog('[BANK] _bt_invokeCallback error: ' + (e && e.message ? e.message : e));
-		} catch {}
-	}
+/** callback を一度だけ実行するラッパーを作成します。 */
+const _bt_onceCallback = (cb) => {
+	let called = false;
+	return (result) => {
+		if (called) return;
+		called = true;
+		cb(result);
+	};
 };
 
 /** 内部: _bt_enrichError — エラーオブジェクト/値を SDK で使う構造化エラーに変換します。 */
@@ -798,7 +794,7 @@ const _bt_toHalfWidthKana = (str = '', throwOnError = true) => {
 /**
  * @param {string} bankCode 銀行コード
  * @param {object} [options] オプション（{ apiBaseUrl, apiKey, timeout, pathTemplate } 等）
- * @param {LoadBankByCodeCallback} callback 単一引数または Node 風のシグネチャを受け付けるコールバック
+ * @param {LoadBankByCodeCallback} callback 単一引数のコールバック
  * @private
  */
 const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
@@ -892,7 +888,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 							_bt_safeLog('[BANK] _bt_loadBankByCode: fetch success ' + bankObj.code);
 						} catch {}
 						// キャッシュを保持しないため、受け取ったオブジェクトをそのまま返す
-						if (typeof callback === 'function') callback(bankObj);
+						_bt_invokeCallback(callback, bankObj);
 					})
 					.catch((err) => {
 						let message = null;
@@ -915,7 +911,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 							message = '銀行情報の取得中にエラーが発生しました';
 						}
 						let e = { error: message };
-						if (typeof callback === 'function') callback(e);
+						_bt_invokeCallback(callback, e);
 					})
 					.finally(() => {
 						if (timer) clearTimeout(timer);
@@ -923,7 +919,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 			} catch (syncErr) {
 				// 同期例外が発生した場合はコールバックで返す
 				let se = { error: syncErr && syncErr.message ? syncErr.message : String(syncErr) };
-				if (typeof callback === 'function') callback(se);
+				_bt_invokeCallback(callback, se);
 			}
 		};
 
@@ -970,7 +966,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 						(e2 && e2.message ? e2.message : e2)
 				);
 				const err = { success: false, error: e2 && e2.message ? e2.message : String(e2) };
-				if (typeof callback === 'function') callback(err, null);
+				_bt_invokeCallback(callback, err);
 				if (timer) clearTimeout(timer);
 			}
 		}
@@ -982,11 +978,10 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
 					topErr && topErr.message ? topErr.message : topErr
 				);
 		} catch {}
-		if (typeof callback === 'function')
-			callback(
-				{ success: false, error: topErr && topErr.message ? topErr.message : String(topErr) },
-				null
-			);
+		_bt_invokeCallback(callback, {
+			success: false,
+			error: topErr && topErr.message ? topErr.message : String(topErr),
+		});
 	}
 };
 
@@ -994,7 +989,7 @@ const _bt_loadBankByCode = (bankCode, options = {}, callback) => {
  * 内部: 銀行名による検索（BankKun 検索 API を利用）
  * @param {string} name 検索語
  * @param {object} [options]
- * @param {function} callback 単一引数または Node 風のコールバック
+ * @param {function} callback 単一引数のコールバック
  * @private
  */
 const _bt_searchBankByName = (name, options = {}, callback) => {
@@ -1005,7 +1000,7 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 	const { apiBaseUrl = 'https://bank.teraren.com', apiKey, timeout = 5000 } = options;
 	const q = _bt_toStr(name).trim();
 	if (!q) {
-		if (typeof callback === 'function') callback({ success: false, error: '検索語が空です' }, null);
+		_bt_invokeCallback(callback, { success: false, error: '検索語が空です' });
 		return;
 	}
 	const base = apiBaseUrl.replace(/\/$/, '');
@@ -1026,8 +1021,10 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 		.then((arr) => {
 			if (!Array.isArray(arr)) return Promise.reject(new Error('検索結果の形式が不正です'));
 			if (arr.length === 0) {
-				if (typeof callback === 'function')
-					callback({ success: false, error: '該当する銀行が見つかりませんでした' }, null);
+				_bt_invokeCallback(callback, {
+					success: false,
+					error: '該当する銀行が見つかりませんでした',
+				});
 				return;
 			}
 			// 単一結果はそのまま採用
@@ -1049,7 +1046,7 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 				try {
 					_bt_safeLog('[BANK] _bt_searchBankByName: success ' + bankObj.code);
 				} catch {}
-				if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
+				_bt_invokeCallback(callback, { success: true, bank: bankObj });
 				return;
 			}
 			// 複数件: 完全一致を探す（normalize.name / name の両方をチェック）
@@ -1072,26 +1069,21 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 				try {
 					bankObj.kana = _bt_toHalfWidthKana(bankObj.kana, false);
 				} catch {}
-				if (typeof callback === 'function') callback(null, { success: true, bank: bankObj });
+				_bt_invokeCallback(callback, { success: true, bank: bankObj });
 				return;
 			}
 			if (exact.length > 1) {
-				if (typeof callback === 'function')
-					callback(
-						{
-							success: false,
-							error: '検索結果が複数あります（完全一致の候補が複数見つかりました）',
-						},
-						null
-					);
+				_bt_invokeCallback(callback, {
+					success: false,
+					error: '検索結果が複数あります（完全一致の候補が複数見つかりました）',
+				});
 				return;
 			}
 			// 完全一致なし -> エラーとする（仕様）
-			if (typeof callback === 'function')
-				callback(
-					{ success: false, error: '検索結果が複数あります（完全一致する銀行名が見つかりません）' },
-					null
-				);
+			_bt_invokeCallback(callback, {
+				success: false,
+				error: '検索結果が複数あります（完全一致する銀行名が見つかりません）',
+			});
 		})
 		.catch((err) => {
 			let message = null;
@@ -1111,7 +1103,7 @@ const _bt_searchBankByName = (name, options = {}, callback) => {
 				message = '銀行名検索中にエラーが発生しました';
 			}
 			const e = { success: false, error: message };
-			if (typeof callback === 'function') callback(e, null);
+			_bt_invokeCallback(callback, e);
 		})
 		.finally(() => {
 			if (timer) clearTimeout(timer);
@@ -1169,9 +1161,9 @@ const _bt_yuchoKigouToBranch = (kigouRaw) => {
  */
 const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 	if (typeof callback !== 'function')
-		return { success: false, error: '第二引数はコールバック関数である必要があります' };
+		throw new TypeError('第二引数はコールバック関数である必要があります');
 	if (!Array.isArray(dataRecords)) {
-		_bt_invokeCallback(callback, { error: 'dataRecords は配列である必要があります' }, null);
+		_bt_invokeCallback(callback, { error: 'dataRecords は配列である必要があります' });
 		return;
 	}
 	const out = [];
@@ -1188,7 +1180,7 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 				.replace(/[^0-9]/g, '')
 				.padStart(4, '0');
 			if (!/^[0-9]{4}$/.test(toBankNo)) {
-				_bt_invokeCallback(callback, { error: '被仕向銀行番号が不正', index: i }, null);
+				_bt_invokeCallback(callback, { error: '被仕向銀行番号が不正', index: i });
 				return;
 			}
 
@@ -1197,6 +1189,13 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 			try {
 				toBankName = _bt_toHalfWidthKana(toBankName, false);
 			} catch (e) {}
+			if (!_bt_isAllowedHalfWidthString(toBankName)) {
+				_bt_invokeCallback(callback, {
+					error: '被仕向銀行名に許容外文字が含まれています',
+					index: i,
+				});
+				return;
+			}
 			let toBankNameTrunc = _bt_sjisTruncate(toBankName, 15);
 			let toBankNameBytes = _bt_sjisByteLength(toBankNameTrunc);
 			if (toBankNameBytes < 15)
@@ -1209,7 +1208,7 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 			const originBankNo = _bt_toStr(r.originBankNo || '');
 			if (!(originBankNo === '9900' && toBankNo === '9900')) {
 				if (!/^[0-9]{3}$/.test(toBranchNo)) {
-					_bt_invokeCallback(callback, { error: '被仕向支店番号が不正', index: i }, null);
+					_bt_invokeCallback(callback, { error: '被仕向支店番号が不正', index: i });
 					return;
 				}
 			}
@@ -1223,6 +1222,13 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 				try {
 					toBranchName = _bt_toHalfWidthKana(toBranchName, false);
 				} catch (e) {}
+				if (!_bt_isAllowedHalfWidthString(toBranchName)) {
+					_bt_invokeCallback(callback, {
+						error: '被仕向支店名に許容外文字が含まれています',
+						index: i,
+					});
+					return;
+				}
 				toBranchNameTrunc = _bt_sjisTruncate(toBranchName, 15);
 				let toBranchBytes = _bt_sjisByteLength(toBranchNameTrunc);
 				if (toBranchBytes < 15)
@@ -1240,7 +1246,7 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 				.replace(/[^0-9]/g, '')
 				.padStart(7, '0');
 			if (_bt_sjisByteLength(acct) > 7) {
-				_bt_invokeCallback(callback, { error: '口座番号が長すぎる', index: i }, null);
+				_bt_invokeCallback(callback, { error: '口座番号が長すぎる', index: i });
 				return;
 			}
 
@@ -1256,12 +1262,12 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 			// 振込金額 (10 bytes) — 数値、小数は想定外。
 			const amtNum = Number(r.amount || 0);
 			if (!Number.isFinite(amtNum) || amtNum < 0) {
-				_bt_invokeCallback(callback, { error: '金額が不正', index: i }, null);
+				_bt_invokeCallback(callback, { error: '金額が不正', index: i });
 				return;
 			}
 			const amtStr = String(Math.round(amtNum));
 			if (amtStr.length > 10) {
-				_bt_invokeCallback(callback, { error: '振込金額が10桁を超える', index: i }, null);
+				_bt_invokeCallback(callback, { error: '振込金額が10桁を超える', index: i });
 				return;
 			}
 			const amtField = amtStr.padStart(10, '0');
@@ -1335,7 +1341,7 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 
 	// join records into a single string with CRLF between records for compatibility
 	const joined = out.join('\r\n');
-	_bt_invokeCallback(callback, null, { success: true, records: joined });
+	_bt_invokeCallback(callback, { success: true, records: joined });
 };
 
 /** 内部: _bt_generateTrailerString — トレーラ情報を全銀フォーマットの固定長文字列に変換します（内部ユーティリティ）。 */
@@ -1776,29 +1782,34 @@ const parseZenginFile = async (options = {}) => {
 /** 公開: getBank — 銀行コード/銀行名で検索し結果をコールバックで返します（詳細: docs/bank-transfer.md）。 */
 /**
  * @param {string} bankCodeOrName 銀行コードまたは銀行名
+ * @param {object} [options] API 設定（apiBaseUrl, apiKey, timeout, pathTemplate）
  * @param {BankCallback} callback single-arg スタイルのコールバック
  */
-const getBank = (bankCodeOrName, callback) => {
+const getBank = (bankCodeOrName, options = {}, callback) => {
+	if (typeof options === 'function') {
+		callback = options;
+		options = {};
+	}
 	// 全角数字を半角化してからトリム（例: '１２３４' -> '1234'）
 	const s = _bt_toHalfWidthDigits(_bt_toStr(bankCodeOrName)).trim();
 	if (typeof callback !== 'function') {
 		// 既存と同じくコールバック必須で早期返却（エラーオブジェクトを返す）
-		return { success: false, error: '第二引数はコールバック関数である必要があります' };
+		throw new TypeError('第二引数はコールバック関数である必要があります');
 	}
 	if (!s) {
 		// single-arg スタイルでエラーを返す
-		_bt_invokeCallback(callback, { error: '検索語が空です' }, null);
+		_bt_invokeCallback(callback, { error: '検索語が空です' });
 		return;
 	}
 
 	// 内部で一貫した出力を返すヘルパ
 	const _emitBank = (cb, err, bank) => {
 		if (err) {
-			_bt_invokeCallback(cb, err, null);
+			_bt_invokeCallback(cb, err);
 			return;
 		}
 		if (!bank) {
-			_bt_invokeCallback(cb, { error: '銀行情報の取得結果が空です' }, null);
+			_bt_invokeCallback(cb, { error: '銀行情報の取得結果が空です' });
 			return;
 		}
 		// bank が { success:true, bank } の形で渡される可能性があるため対応
@@ -1807,106 +1818,42 @@ const getBank = (bankCodeOrName, callback) => {
 		try {
 			kanaOut = _bt_toHalfWidthKana(kanaOut, false);
 		} catch {}
-		_bt_invokeCallback(cb, null, { bankCode: b.code, bankName: b.name, bankKana: kanaOut });
+		_bt_invokeCallback(cb, { bankCode: b.code, bankName: b.name, bankKana: kanaOut });
 	};
 
 	const digitsOnly = /^[0-9]+$/.test(s);
+	if (digitsOnly && s.length > 4) {
+		_bt_invokeCallback(callback, { error: '銀行コードは4桁以内の数字で指定してください' });
+		return;
+	}
 
 	if (digitsOnly && s.length <= 4) {
-		const key = s.padStart(4, '0');
-		_bt_loadBankByCode(key, {}, function (/* flexible args from loader */) {
-			// single-arg スタイル
-			if (arguments.length === 1) {
-				const out = arguments[0];
-				if (!out) {
-					_emitBank(callback, { error: '銀行情報の取得結果が空です' }, null);
-					return;
-				}
-				if (out && out.error) {
-					_emitBank(callback, out, null);
-					return;
-				}
-				const b = out && out.bank ? out.bank : out;
-				_emitBank(callback, null, b);
+		const key = _bt_normalizeNumericCode(s, 4, '銀行コード', { allowShort: true });
+		_bt_loadBankByCode(key, options, (out) => {
+			if (!out) {
+				_emitBank(callback, { error: '銀行情報の取得結果が空です' });
 				return;
 			}
-			// node-style (err, res)
-			const err = arguments[0];
-			const res = arguments[1];
-			if (err) {
-				_emitBank(
-					callback,
-					{ error: err && err.error ? err.error : err && err.message ? err.message : String(err) },
-					null
-				);
+			if (out.error || out.success === false) {
+				_emitBank(callback, out);
 				return;
 			}
-			if (!res) {
-				_emitBank(callback, { error: '銀行情報の取得結果が空です' }, null);
-				return;
-			}
-			if (res && res.success === false) {
-				_emitBank(
-					callback,
-					{
-						error:
-							res.error ||
-							'銀行情報の取得に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。',
-					},
-					null
-				);
-				return;
-			}
-			if (!res.bank) {
-				_emitBank(callback, { error: '銀行データがレスポンスに含まれていません' }, null);
-				return;
-			}
-			_emitBank(callback, null, res.bank);
-			return;
+			_emitBank(callback, null, out.bank ? out.bank : out);
 		});
 		return;
 	}
 
 	// 名前検索（非同期）
-	_bt_searchBankByName(s, {}, function (/* flexible args from search */) {
-		if (arguments.length === 1) {
-			const out = arguments[0];
-			if (!out) {
-				_emitBank(callback, { error: '検索結果が空です' }, null);
-				return;
-			}
-			if (out && out.error) {
-				_emitBank(callback, out, null);
-				return;
-			}
-			const b = out && out.bank ? out.bank : out;
-			_emitBank(callback, null, b);
+	_bt_searchBankByName(s, options, (out) => {
+		if (!out) {
+			_emitBank(callback, { error: '検索結果が空です' });
 			return;
 		}
-		const err = arguments[0];
-		const res = arguments[1];
-		if (err) {
-			_emitBank(
-				callback,
-				{ error: err && err.error ? err.error : err && err.message ? err.message : String(err) },
-				null
-			);
+		if (out.error || out.success === false) {
+			_emitBank(callback, out);
 			return;
 		}
-		if (!res || res.success === false) {
-			_emitBank(
-				callback,
-				{
-					error:
-						(res && res.error) ||
-						'銀行名検索に失敗しました。ネットワークまたは外部サービスの問題が考えられます。接続を確認してください。',
-				},
-				null
-			);
-			return;
-		}
-		_emitBank(callback, null, res.bank);
-		return;
+		_emitBank(callback, null, out.bank ? out.bank : out);
 	});
 	return;
 };
@@ -1915,36 +1862,50 @@ const getBank = (bankCodeOrName, callback) => {
 /**
  * @param {string} bankCode 銀行コード
  * @param {string} branchCodeOrName 支店コードまたは支店名
+ * @param {object} [options] API 設定（apiBaseUrl, timeout）
  * @param {BranchCallback} callback single-arg スタイルのコールバック
  */
-const getBranch = (bankCode, branchCodeOrName, callback) => {
-	if (typeof callback !== 'function') {
-		return { success: false, error: '第三引数はコールバック関数である必要があります' };
+const getBranch = (bankCode, branchCodeOrName, options = {}, callback) => {
+	if (typeof options === 'function') {
+		callback = options;
+		options = {};
 	}
+	if (typeof callback !== 'function') {
+		throw new TypeError('第三引数はコールバック関数である必要があります');
+	}
+	callback = _bt_onceCallback(callback);
 	// 全角数字を半角化してから処理
-	const bCodeRaw = _bt_toHalfWidthDigits(_bt_toStr(bankCode)).trim();
-	if (!bCodeRaw) {
-		_bt_invokeCallback(callback, { error: '銀行コードが空です' }, null);
+	let bankKey;
+	try {
+		bankKey = _bt_normalizeNumericCode(bankCode, 4, '銀行コード', { allowShort: true });
+	} catch (e) {
+		_bt_invokeCallback(callback, { error: e.message });
 		return;
 	}
-	const bankKey = bCodeRaw.padStart(4, '0');
 
 	// 全角数字を半角化してから処理
 	const qRaw = _bt_toHalfWidthDigits(_bt_toStr(branchCodeOrName)).trim();
 	if (!qRaw) {
-		_bt_invokeCallback(callback, { error: '検索語が空です' }, null);
+		_bt_invokeCallback(callback, { error: '検索語が空です' });
 		return;
 	}
 
-	const apiBase = 'https://bank.teraren.com';
+	const apiBase = (options.apiBaseUrl || 'https://bank.teraren.com').replace(/\/$/, '');
+	const timeout = Number.isFinite(Number(options.timeout)) ? Number(options.timeout) : 5000;
 
 	// 支店コード検索: /banks/{bank_code}/branches/{branch_code}.json
 	if (/^[0-9]+$/.test(qRaw)) {
-		const branchCode = qRaw.padStart(3, '0');
-		const url = apiBase.replace(/\/$/, '') + `/banks/${bankKey}/branches/${branchCode}.json`;
+		let branchCode;
+		try {
+			branchCode = _bt_normalizeNumericCode(qRaw, 3, '支店コード', { allowShort: true });
+		} catch (e) {
+			_bt_invokeCallback(callback, { error: e.message });
+			return;
+		}
+		const url = `${apiBase}/banks/${bankKey}/branches/${branchCode}.json`;
 		const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
 		let timer = null;
-		if (abortController) timer = setTimeout(() => abortController.abort(), 5000);
+		if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
 		const perform = () =>
 			fetch(url, { signal: abortController ? abortController.signal : undefined })
 				.then((res) => {
@@ -1954,7 +1915,7 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 				})
 				.then((j) => {
 					if (!j) {
-						_bt_invokeCallback(callback, { error: '支店情報が空です' }, null);
+						_bt_invokeCallback(callback, { error: '支店情報が空です' });
 						return;
 					}
 					let kanaOut = _bt_toStr(j.kana);
@@ -1966,7 +1927,7 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 						branchName: _bt_toStr(j.name),
 						branchKana: kanaOut,
 					};
-					_bt_invokeCallback(callback, null, out);
+					_bt_invokeCallback(callback, out);
 				})
 				.catch((err) => {
 					let message = null;
@@ -1985,7 +1946,7 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 					} catch {
 						message = '支店データ取得中にエラーが発生しました';
 					}
-					_bt_invokeCallback(callback, { error: message }, null);
+					_bt_invokeCallback(callback, { error: message });
 				})
 				.finally(() => {
 					if (timer) clearTimeout(timer);
@@ -1993,19 +1954,16 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 		try {
 			perform();
 		} catch (e) {
-			_bt_invokeCallback(callback, { error: '支店データ取得中にエラーが発生しました' }, null);
+			_bt_invokeCallback(callback, { error: '支店データ取得中にエラーが発生しました' });
 		}
 		return;
 	}
 
 	// 支店名検索: /banks/{bank_code}/branches/search.json?name={branch_name}
-	const url =
-		apiBase.replace(/\/$/, '') +
-		`/banks/${bankKey}/branches/search.json?name=` +
-		encodeURIComponent(qRaw);
+	const url = `${apiBase}/banks/${bankKey}/branches/search.json?name=` + encodeURIComponent(qRaw);
 	const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
 	let timer = null;
-	if (abortController) timer = setTimeout(() => abortController.abort(), 5000);
+	if (abortController) timer = setTimeout(() => abortController.abort(), timeout);
 	try {
 		fetch(url, { signal: abortController ? abortController.signal : undefined })
 			.then((res) => {
@@ -2015,11 +1973,11 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 			})
 			.then((arr) => {
 				if (!Array.isArray(arr)) {
-					_bt_invokeCallback(callback, { error: '支店検索のレスポンス形式が不正です' }, null);
+					_bt_invokeCallback(callback, { error: '支店検索のレスポンス形式が不正です' });
 					return;
 				}
 				if (arr.length === 0) {
-					_bt_invokeCallback(callback, { error: '該当する支店が見つかりませんでした' }, null);
+					_bt_invokeCallback(callback, { error: '該当する支店が見つかりませんでした' });
 					return;
 				}
 				if (arr.length === 1) {
@@ -2033,7 +1991,7 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 						branchName: _bt_toStr(j.name),
 						branchKana: kanaOut,
 					};
-					_bt_invokeCallback(callback, null, out);
+					_bt_invokeCallback(callback, out);
 					return;
 				}
 				// 複数件: 完全一致を探す（name / normalize.name をチェック）
@@ -2053,7 +2011,7 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 						branchName: _bt_toStr(j.name),
 						branchKana: kanaOut,
 					};
-					_bt_invokeCallback(callback, null, out);
+					_bt_invokeCallback(callback, out);
 					return;
 				}
 				if (exact.length > 1) {
@@ -2065,7 +2023,7 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 					return;
 				}
 				// 完全一致なし -> 特定不可
-				_bt_invokeCallback(callback, { error: '支店が特定できません（候補が複数あります）' }, null);
+				_bt_invokeCallback(callback, { error: '支店が特定できません（候補が複数あります）' });
 			})
 			.catch((err) => {
 				let message = null;
@@ -2084,13 +2042,13 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 				} catch {
 					message = '支店検索中にエラーが発生しました';
 				}
-				_bt_invokeCallback(callback, { error: message }, null);
+				_bt_invokeCallback(callback, { error: message });
 			})
 			.finally(() => {
 				if (timer) clearTimeout(timer);
 			});
 	} catch (e) {
-		_bt_invokeCallback(callback, { error: '支店検索中に例外が発生しました' }, null);
+		_bt_invokeCallback(callback, { error: '支店検索中に例外が発生しました' });
 	}
 	return;
 };
@@ -2104,15 +2062,16 @@ const getBranch = (bankCode, branchCodeOrName, callback) => {
 const convertYucho = (kigou, bangou, callback) => {
 	// callback 必須の非同期 API に変更
 	if (typeof callback !== 'function') {
-		return { success: false, error: '第三引数はコールバック関数である必要があります' };
+		throw new TypeError('第三引数はコールバック関数である必要があります');
 	}
+	callback = _bt_onceCallback(callback);
 
-	// 全角数字を半角に直してから数字以外を除去
-	const k = _bt_toHalfWidthDigits(_bt_toStr(kigou)).replace(/[^0-9]/g, '');
-	const b = _bt_toHalfWidthDigits(_bt_toStr(bangou)).replace(/[^0-9]/g, '');
+	// 全角数字だけを半角化し、区切り文字や空白は入力エラーにする
+	const k = _bt_toHalfWidthDigits(_bt_toStr(kigou)).trim();
+	const b = _bt_toHalfWidthDigits(_bt_toStr(bangou)).trim();
 	// 明確にどちらが不正か判別できるように field を付与して返す
-	const missingK = k.length < 1;
-	const missingB = b.length < 1;
+	const missingK = !/^[0-9]{5}$/.test(k);
+	const missingB = !/^[0-9]+$/.test(b);
 	if (missingK || missingB) {
 		const fld = missingK && missingB ? 'both' : missingK ? 'kigou' : 'bangou';
 		const code =
@@ -2198,7 +2157,7 @@ const convertYucho = (kigou, bangou, callback) => {
 			// - accountType === '1': ゆうちょ番号は最大8桁で末尾が必ず '1'。8桁に0埋めしてから末尾を除いた先頭7桁を口座番号とする。
 			let acctNum = null;
 			const acctType = conv && conv.accountType ? String(conv.accountType) : '';
-			const rawNum = _bt_toStr(b).replace(/[^0-9]/g, '');
+			const rawNum = b;
 			if (!rawNum) {
 				_bt_invokeCallback(
 					callback,
@@ -2317,11 +2276,11 @@ const convertYucho = (kigou, bangou, callback) => {
 				}
 				out.branchName = branchRes.branchName || out.branchName;
 				out.branchKana = branchRes.branchKana || out.branchKana;
-				_bt_invokeCallback(callback, null, out);
+				_bt_invokeCallback(callback, out);
 			});
 		});
 	} catch (e) {
-		_bt_invokeCallback(callback, { error: e && e.message ? e.message : String(e) }, null);
+		_bt_invokeCallback(callback, { error: e && e.message ? e.message : String(e) });
 	}
 };
 
@@ -2337,7 +2296,7 @@ const normalizeAccountNumber = (input) => {
 	const s = _bt_toStr(input).trim();
 	if (!s) throw new Error('口座番号が空です');
 	// 全角数字を半角に変換（既存ユーティリティを利用）
-	const normalized = _bt_toHalfWidthDigits(s).replace(/\s+/g, '');
+	const normalized = _bt_toHalfWidthDigits(s);
 	if (!/^[0-9]+$/.test(normalized)) throw new Error('口座番号は数字のみである必要があります');
 	if (normalized.length > 7) throw new Error('口座番号が長すぎます（最大7桁）');
 	return normalized.padStart(7, '0');
@@ -2549,10 +2508,11 @@ const generateHeader = (data, callback) => {
 	//   fromBankNo, fromBranchNo, depositType, accountNumber
 	// }
 	if (typeof callback !== 'function')
-		return { success: false, error: '第二引数はコールバック関数である必要があります' };
+		throw new TypeError('第二引数はコールバック関数である必要があります');
+	callback = _bt_onceCallback(callback);
 	try {
 		if (!data || typeof data !== 'object') {
-			_bt_invokeCallback(callback, { error: 'データがオブジェクトである必要があります' }, null);
+			_bt_invokeCallback(callback, { error: 'データがオブジェクトである必要があります' });
 			return;
 		}
 
@@ -2580,18 +2540,22 @@ const generateHeader = (data, callback) => {
 			if (TYPE_CODE_MAP[key]) typeCode = TYPE_CODE_MAP[key];
 		}
 		if (!/^[0-9]{2}$/.test(typeCode)) {
-			_bt_invokeCallback(callback, { error: '種別コードが不正です' }, null);
+			_bt_invokeCallback(callback, { error: '種別コードが不正です' });
 			return;
 		}
 
 		// requesterCode (10バイト)
-		let requesterCode = _bt_toHalfWidthDigits(_bt_toStr(data.requesterCode || '')).replace(
-			/[^0-9]/g,
-			''
-		);
-		requesterCode = requesterCode.padStart(10, '0');
+		let requesterCode;
+		try {
+			requesterCode = _bt_normalizeNumericCode(data.requesterCode, 10, '振込依頼人コード', {
+				allowShort: true,
+			});
+		} catch (e) {
+			_bt_invokeCallback(callback, { error: e.message });
+			return;
+		}
 		if (_bt_sjisByteLength(requesterCode) > 10) {
-			_bt_invokeCallback(callback, { error: '振込依頼人コードが長すぎます（最大10バイト）' }, null);
+			_bt_invokeCallback(callback, { error: '振込依頼人コードが長すぎます（最大10バイト）' });
 			return;
 		}
 
@@ -2600,6 +2564,10 @@ const generateHeader = (data, callback) => {
 		try {
 			requesterName = _bt_toHalfWidthKana(requesterName, false);
 		} catch (e) {}
+		if (!_bt_isAllowedHalfWidthString(requesterName)) {
+			_bt_invokeCallback(callback, { error: '振込依頼人名に許容外文字が含まれています' });
+			return;
+		}
 		let reqNameTrunc = _bt_sjisTruncate(requesterName, 40);
 		let reqNameBytes = _bt_sjisByteLength(reqNameTrunc);
 		if (reqNameBytes < 40) reqNameTrunc = reqNameTrunc + ' '.repeat(40 - reqNameBytes);
@@ -2615,7 +2583,7 @@ const generateHeader = (data, callback) => {
 			// - 'MMDD' (e.g. '1108')
 			// - 'YYYYMMDD' (e.g. '20251108')
 			// - 'YYYY-MM-DD' or 'YYYY/MM/DD' (kintone date field)
-			let s = _bt_toStr(data.tradeDate || '').trim();
+			let s = _bt_toHalfWidthDigits(_bt_toStr(data.tradeDate || '')).trim();
 			if (/^[0-9]{8}$/.test(s)) {
 				// YYYYMMDD -> extract MMDD
 				trade = s.slice(4, 6) + s.slice(6, 8);
@@ -2625,16 +2593,21 @@ const generateHeader = (data, callback) => {
 			) {
 				// YYYY-MM-DD or YYYY/MM/DD
 				trade = s.slice(5, 7) + s.slice(8, 10);
+			} else if (/^[0-9]{4}$/.test(s)) {
+				trade = s;
 			} else {
-				trade = s.replace(/[^0-9]/g, '');
+				_bt_invokeCallback(callback, {
+					error: '取組日は MMDD、YYYYMMDD、YYYY-MM-DD、YYYY/MM/DD のいずれかで指定してください',
+				});
+				return;
 			}
 		}
-		if (!/^[0-9]{4}$/.test(trade)) {
-			_bt_invokeCallback(callback, { error: '取組日は MMDD 形式（4桁）で指定してください' }, null);
+		if (!/^(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])$/.test(trade)) {
+			_bt_invokeCallback(callback, { error: '取組日は MMDD 形式（4桁）で指定してください' });
 			return;
 		}
 		if (_bt_sjisByteLength(trade) > 4) {
-			_bt_invokeCallback(callback, { error: '取組日のバイト長が長すぎます（最大4バイト）' }, null);
+			_bt_invokeCallback(callback, { error: '取組日のバイト長が長すぎます（最大4バイト）' });
 			return;
 		}
 
@@ -2666,21 +2639,37 @@ const generateHeader = (data, callback) => {
 		const rawBankNo = _bt_toStr(data.fromBankNo || '');
 		const rawBranchNo = _bt_toStr(data.fromBranchNo || '');
 
-		// fromBankNo (4 bytes)
-		const fromBankNo = _bt_toHalfWidthDigits(rawBankNo)
-			.replace(/[^0-9]/g, '')
-			.padStart(4, '0');
+		// fromBankNo (4 bytes). 未指定は固定長維持のため従来どおりゼロ埋めする。
+		let fromBankNo = '';
+		try {
+			if (rawBankNo.trim()) {
+				fromBankNo = _bt_normalizeNumericCode(rawBankNo, 4, '仕向銀行番号', {
+					allowShort: true,
+				});
+			} else fromBankNo = '0000';
+		} catch (e) {
+			_bt_invokeCallback(callback, { error: e.message });
+			return;
+		}
 		if (_bt_sjisByteLength(fromBankNo) > 4) {
-			_bt_invokeCallback(callback, { error: '仕向銀行番号が長すぎます（最大4バイト）' }, null);
+			_bt_invokeCallback(callback, { error: '仕向銀行番号が長すぎます（最大4バイト）' });
 			return;
 		}
 
-		// fromBranchNo (3 bytes)
-		const fromBranchNo = _bt_toHalfWidthDigits(rawBranchNo)
-			.replace(/[^0-9]/g, '')
-			.padStart(3, '0');
+		// fromBranchNo (3 bytes). 未指定は固定長維持のため従来どおりゼロ埋めする。
+		let fromBranchNo = '';
+		try {
+			if (rawBranchNo.trim()) {
+				fromBranchNo = _bt_normalizeNumericCode(rawBranchNo, 3, '仕向支店番号', {
+					allowShort: true,
+				});
+			} else fromBranchNo = '000';
+		} catch (e) {
+			_bt_invokeCallback(callback, { error: e.message });
+			return;
+		}
 		if (_bt_sjisByteLength(fromBranchNo) > 3) {
-			_bt_invokeCallback(callback, { error: '仕向支店番号が長すぎます（最大3バイト）' }, null);
+			_bt_invokeCallback(callback, { error: '仕向支店番号が長すぎます（最大3バイト）' });
 			return;
 		}
 
@@ -2692,11 +2681,15 @@ const generateHeader = (data, callback) => {
 		else depCode = '9';
 
 		// account number (7 bytes)
-		let acct = _bt_toHalfWidthDigits(_bt_toStr(data.accountNumber || ''))
-			.replace(/[^0-9]/g, '')
-			.padStart(7, '0');
+		let acct;
+		try {
+			acct = normalizeAccountNumber(data.accountNumber);
+		} catch (e) {
+			_bt_invokeCallback(callback, { error: `依頼人の口座番号が不正です: ${e.message}` });
+			return;
+		}
 		if (_bt_sjisByteLength(acct) > 7) {
-			_bt_invokeCallback(callback, { error: '依頼人の口座番号が長すぎます（最大7バイト）' }, null);
+			_bt_invokeCallback(callback, { error: '依頼人の口座番号が長すぎます（最大7バイト）' });
 			return;
 		}
 
@@ -2705,7 +2698,7 @@ const generateHeader = (data, callback) => {
 		// resolve bank/branch names asynchronously
 		_callGetBank(fromBankNo, (bankRes) => {
 			if (!bankRes || bankRes.error) {
-				_bt_invokeCallback(callback, { error: '仕向銀行情報を取得できませんでした' }, null);
+				_bt_invokeCallback(callback, { error: '仕向銀行情報を取得できませんでした' });
 				return;
 			}
 			const bankCodeForBranch = bankRes.bankCode || fromBankNo;
@@ -2728,6 +2721,10 @@ const generateHeader = (data, callback) => {
 				try {
 					toBankName = _bt_toHalfWidthKana(toBankName, false);
 				} catch (e) {}
+				if (!_bt_isAllowedHalfWidthString(toBankName)) {
+					_bt_invokeCallback(callback, { error: '仕向銀行名に許容外文字が含まれています' });
+					return;
+				}
 				let toBankNameTrunc = _bt_sjisTruncate(toBankName, 15);
 				let toBankNameBytes = _bt_sjisByteLength(toBankNameTrunc);
 				if (toBankNameBytes < 15)
@@ -2736,6 +2733,10 @@ const generateHeader = (data, callback) => {
 				try {
 					toBranchName = _bt_toHalfWidthKana(toBranchName, false);
 				} catch (e) {}
+				if (!_bt_isAllowedHalfWidthString(toBranchName)) {
+					_bt_invokeCallback(callback, { error: '仕向支店名に許容外文字が含まれています' });
+					return;
+				}
 				let toBranchNameTrunc = _bt_sjisTruncate(toBranchName, 15);
 				let toBranchNameBytes = _bt_sjisByteLength(toBranchNameTrunc);
 				if (toBranchNameBytes < 15)
@@ -2771,7 +2772,7 @@ const generateHeader = (data, callback) => {
 					);
 					return;
 				}
-				_bt_invokeCallback(callback, null, { success: true, header: line });
+				_bt_invokeCallback(callback, { success: true, header: line });
 			};
 
 			// ゆうちょ銀行（9900）は、支店情報が口座記号の一部で渡されることがあるため
@@ -2783,7 +2784,7 @@ const generateHeader = (data, callback) => {
 
 			_callGetBranch(bankCodeForBranch, fromBranchNo, (branchRes) => {
 				if (!branchRes || branchRes.error) {
-					_bt_invokeCallback(callback, { error: '仕向支店情報を取得できませんでした' }, null);
+					_bt_invokeCallback(callback, { error: '仕向支店情報を取得できませんでした' });
 					return;
 				}
 				const resolvedBranchKana = _bt_toStr(branchRes.branchKana || '');
@@ -2800,7 +2801,7 @@ const generateHeader = (data, callback) => {
 		});
 		return;
 	} catch (err) {
-		_bt_invokeCallback(callback, { error: 'ヘッダ生成に失敗しました' }, null);
+		_bt_invokeCallback(callback, { error: 'ヘッダ生成に失敗しました' });
 	}
 };
 /** 公開: generateDataRecords — 振込明細配列から全銀データレコード文字列を生成します（詳細: docs/bank-transfer.md）。 */
@@ -2812,12 +2813,21 @@ const generateHeader = (data, callback) => {
  */
 const generateDataRecords = (records, fromBankNo = '', callback) => {
 	if (typeof callback !== 'function')
-		return { success: false, error: '第三引数はコールバック関数である必要があります' };
+		throw new TypeError('第三引数はコールバック関数である必要があります');
+	callback = _bt_onceCallback(callback);
 	if (!Array.isArray(records)) {
-		_bt_invokeCallback(callback, { error: 'records は配列である必要があります' }, null);
+		_bt_invokeCallback(callback, { error: 'records は配列である必要があります' });
 		return;
 	}
-	const originBankNo = _bt_toStr(fromBankNo || '').padStart(4, '0');
+	let originBankNo = '';
+	try {
+		originBankNo = _bt_toStr(fromBankNo || '').trim()
+			? _bt_normalizeNumericCode(fromBankNo, 4, '仕向銀行番号', { allowShort: true })
+			: '0000';
+	} catch (e) {
+		_bt_invokeCallback(callback, { error: e.message });
+		return;
+	}
 	const out = [];
 
 	// helper to prefer window.BANK stubs in tests
@@ -2860,12 +2870,12 @@ const generateDataRecords = (records, fromBankNo = '', callback) => {
 		const i = idx++;
 		const r = records[i] || {};
 		try {
-			const toBankNo = _bt_toHalfWidthDigits(_bt_toStr(r.toBankNo || ''))
-				.replace(/[^0-9]/g, '')
-				.padStart(4, '0');
-			const toBranchNo = _bt_toHalfWidthDigits(_bt_toStr(r.toBranchNo || ''))
-				.replace(/[^0-9]/g, '')
-				.padStart(3, '0');
+			const toBankNo = _bt_normalizeNumericCode(r.toBankNo, 4, '被仕向銀行番号', {
+				allowShort: true,
+			});
+			const toBranchNo = _bt_normalizeNumericCode(r.toBranchNo, 3, '被仕向支店番号', {
+				allowShort: true,
+			});
 			const accountNumber = normalizeAccountNumber(r.toAccountNumber || r.accountNumber || '');
 			const amountNum = Number(r.amount || 0);
 			if (!Number.isFinite(amountNum) || amountNum < 0) throw new Error('金額が不正です');
@@ -3019,7 +3029,8 @@ const generateDataRecords = (records, fromBankNo = '', callback) => {
  */
 const generateTrailer = (dataRecords, callback) => {
 	if (typeof callback !== 'function')
-		return { success: false, error: '第二引数はコールバック関数である必要があります' };
+		throw new TypeError('第二引数はコールバック関数である必要があります');
+	callback = _bt_onceCallback(callback);
 
 	// Accept either:
 	// - string: CRLF-joined records produced by generateDataRecords
@@ -3099,7 +3110,7 @@ const generateTrailer = (dataRecords, callback) => {
 	// Convert trailer object to fixed-length trailer record string and return that result
 	try {
 		const line = _bt_generateTrailerString(trailer);
-		_bt_invokeCallback(callback, null, { success: true, trailerRecord: line });
+		_bt_invokeCallback(callback, { success: true, trailerRecord: line });
 		return;
 	} catch (e) {
 		_bt_invokeCallback(
@@ -3117,10 +3128,11 @@ const generateTrailer = (dataRecords, callback) => {
  */
 const generateEndRecord = (callback) => {
 	if (typeof callback !== 'function')
-		return { success: false, error: '第一引数はコールバック関数である必要があります' };
+		throw new TypeError('第一引数はコールバック関数である必要があります');
+	callback = _bt_onceCallback(callback);
 	try {
 		const line = _bt_generateEndRecordString();
-		_bt_invokeCallback(callback, null, { success: true, endRecord: line });
+		_bt_invokeCallback(callback, { success: true, endRecord: line });
 		return;
 	} catch (e) {
 		_bt_invokeCallback(
@@ -3143,7 +3155,8 @@ const generateEndRecord = (callback) => {
  */
 const generateZenginData = (headerData, records, callback) => {
 	if (typeof callback !== 'function')
-		return { success: false, error: '第三引数はコールバック関数である必要があります' };
+		throw new TypeError('第三引数はコールバック関数である必要があります');
+	callback = _bt_onceCallback(callback);
 
 	// 1) header
 	try {
@@ -3208,7 +3221,7 @@ const generateZenginData = (headerData, records, callback) => {
 						contentPieces.push(trailerLine);
 						contentPieces.push(endLine);
 						const content = contentPieces.join('\r\n');
-						_bt_invokeCallback(callback, null, { success: true, content, parts });
+						_bt_invokeCallback(callback, { success: true, content, parts });
 						return;
 					});
 				});
@@ -3562,6 +3575,7 @@ if (typeof window !== 'undefined') {
 		getBranch,
 		convertYucho,
 		parseZenginFile,
+		encodeSjis,
 		normalizeAccountNumber,
 		normalizePayeeName,
 		normalizeEdiInfo,
@@ -3585,6 +3599,7 @@ try {
 						getBranch,
 						convertYucho,
 						parseZenginFile,
+						encodeSjis,
 						normalizeAccountNumber,
 						normalizePayeeName,
 						normalizeEdiInfo,

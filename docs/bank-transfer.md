@@ -51,10 +51,11 @@
 
 ## 公開 API サマリ
 
-- `getBank(bankCodeOrName, callback)`
-- `getBranch(bankCode, branchCodeOrName, callback)`
+- `getBank(bankCodeOrName, options?, callback)`
+- `getBranch(bankCode, branchCodeOrName, options?, callback)`
 - `convertYucho(kigou, bangou, callback)`
 - `parseZenginFile(options)`
+- `encodeSjis(input)`
 - `generateHeader(headerData, callback)`
 - `generateDataRecords(records, fromBankNo, callback)`
 - `generateTrailer(summaryData, callback)`
@@ -65,15 +66,26 @@
 - `normalizeAccountNumber(input)`
 - `nextBankBusinessDay(baseDate, cutoffHour, callback)`
 
-（`parseZenginFile` を除く各関数はコールバック単一引数スタイルを基本にしています。Node 風の (err, res) も互換的に扱える場合があります。`parseZenginFile` は Promise を返します）
+（非同期 API のコールバックは単一引数 `callback(result)` に統一し、常に次のタスクで実行します。callback を指定しない呼び出しは `TypeError` になります）
+`parseZenginFile` は Promise を返します。
 
 ---
 
 ## 公開関数の引数詳細
 
+### `encodeSjis(input)`
+
+`encoding.js` の `Encoding.convert` を使って、Unicode 文字列を Shift_JIS の `Uint8Array` に変換します。
+この関数を利用する場合は、`bank-transfer.js` より前に `encoding.js` を読み込んで `window.Encoding` を公開してください。
+`encoding.js` が読み込まれていない場合は `ENCODING_JS_UNAVAILABLE` エラーになります。
+
+```js
+const bytes = window.BANK.encodeSjis('ﾔﾏﾀﾞﾀﾛｳ');
+```
+
 <a id="getBank"></a>
 
-### `getBank(bankCodeOrName, callback)`
+### `getBank(bankCodeOrName, options?, callback)`
 
 概要:
 
@@ -82,7 +94,8 @@
 引数:
 
 - `bankCodeOrName` (string|number) — 銀行コード（例: '0001'）または検索文字列（例: '横浜'）。必須。
-- `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `BankResult`、失敗時は `ErrorResult` を返します。
+- `options` (object, optional) — `apiBaseUrl`、`apiKey`、`timeout`、`pathTemplate` を指定できます。
+- `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `BankResult`、失敗時は `ErrorResult` を返します。従来の `getBank(query, callback)` も利用できます。
 
 戻り値（コールバックに渡すオブジェクトの例）:
 
@@ -115,7 +128,7 @@ window.BANK.getBank('横浜', (res) => {
 
 <a id="getBranch"></a>
 
-### `getBranch(bankCode, branchCodeOrName, callback)`
+### `getBranch(bankCode, branchCodeOrName, options?, callback)`
 
 概要:
 
@@ -125,7 +138,8 @@ window.BANK.getBank('横浜', (res) => {
 
 - `bankCode` (string|number) — 銀行コード（4桁）。必須。
 - `branchCodeOrName` (string|number) — 支店コード（3桁）または検索文字列。必須。
-- `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `BranchResult`、失敗時は `ErrorResult` を返します。
+- `options` (object, optional) — `apiBaseUrl` と `timeout` を指定できます。
+- `callback` (function(result)) — single-arg スタイルのコールバック。成功時は `BranchResult`、失敗時は `ErrorResult` を返します。従来の `getBranch(bankCode, query, callback)` も利用できます。
 
 戻り値の例:
 
@@ -142,6 +156,7 @@ window.BANK.getBank('横浜', (res) => {
 
 - `bankCode` が存在しない場合は早期にエラーを返します。
 - 部分一致で複数候補が見つかる場合は代表候補を返します。詳細な候補リストが必要な場合は将来的に別 API を提供する可能性があります。
+- 銀行コード・支店コードに含まれる区切り文字や英字は自動除去せず、エラーとして返します。全角数字は半角数字へ変換されます。
 
 例:
 

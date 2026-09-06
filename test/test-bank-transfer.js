@@ -72,6 +72,161 @@ try {
 	process.exitCode = 2;
 }
 
+try {
+	let threw = false;
+	try {
+		BANK.normalizeAccountNumber('12 34');
+	} catch (e) {
+		threw = true;
+	}
+	assert.ok(threw, '口座番号内の空白は除去せずエラーにすること');
+	console.log('PASS: normalizeAccountNumber rejects embedded whitespace');
+} catch (e) {
+	console.error('FAIL: normalizeAccountNumber embedded whitespace', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const previousEncoding = global.Encoding;
+	global.Encoding = {
+		convert(input, options) {
+			assert.strictEqual(input, 'AB');
+			assert.deepStrictEqual(options, { to: 'SJIS', from: 'UNICODE', type: 'array' });
+			return [0x41, 0x42];
+		},
+	};
+	const encoded = BANK.encodeSjis('AB');
+	assert.ok(encoded instanceof Uint8Array, 'encodeSjis は Uint8Array を返すこと');
+	assert.deepStrictEqual(Array.from(encoded), [0x41, 0x42]);
+	if (previousEncoding === undefined) delete global.Encoding;
+	else global.Encoding = previousEncoding;
+	console.log('PASS: encodeSjis uses encoding.js compatible API');
+} catch (e) {
+	delete global.Encoding;
+	console.error('FAIL: encodeSjis', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	BANK.generateDataRecords(
+		[
+			{
+				toBankNo: 'ABCD',
+				toBranchNo: 'XYZ',
+				toAccountType: '普通',
+				toAccountNumber: '123',
+				amount: 1000,
+				customerName: 'ヤマダタロウ',
+			},
+		],
+		'0001',
+		(result) => {
+			try {
+				assert.ok(result && result.error, '不正な銀行・支店コードはエラーになること');
+				console.log('PASS: generateDataRecords rejects non-numeric bank and branch codes');
+			} catch (e) {
+				console.error('FAIL: generateDataRecords code validation', e && e.message ? e.message : e);
+				process.exitCode = 2;
+			}
+		}
+	);
+} catch (e) {
+	console.error('FAIL: generateDataRecords code validation', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	assert.throws(() => BANK.getBank('0005'), TypeError);
+	assert.throws(() => BANK.getBranch('0005', '123'), TypeError);
+	assert.throws(() => BANK.convertYucho('12345', '12345671'), TypeError);
+	console.log('PASS: async APIs reject missing callbacks');
+} catch (e) {
+	console.error('FAIL: missing callback validation', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	BANK.generateHeader(
+		{
+			typeCode: '11',
+			requesterCode: '1',
+			requesterName: 'テストカイシャ',
+			tradeDate: '20251109',
+			fromBankNo: 'ABCD',
+			fromBranchNo: 'XYZ',
+			depositType: '普通',
+			accountNumber: '1234567',
+		},
+		(result) => {
+			try {
+				assert.ok(result && result.error, 'ヘッダの不正な仕向コードはエラーになること');
+				console.log('PASS: generateHeader rejects non-numeric origin codes');
+			} catch (e) {
+				console.error('FAIL: generateHeader code validation', e && e.message ? e.message : e);
+				process.exitCode = 2;
+			}
+		}
+	);
+} catch (e) {
+	console.error('FAIL: generateHeader code validation', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	BANK.generateHeader(
+		{
+			typeCode: '11',
+			requesterCode: '1',
+			requesterName: 'テストカイシャ',
+			tradeDate: '20-25',
+			fromBankNo: '0001',
+			fromBranchNo: '001',
+			depositType: '普通',
+			accountNumber: '1234567',
+		},
+		(result) => {
+			try {
+				assert.ok(result && result.error, '不正な取組日はエラーになること');
+				console.log('PASS: generateHeader rejects malformed trade dates');
+			} catch (e) {
+				console.error('FAIL: generateHeader date validation', e && e.message ? e.message : e);
+				process.exitCode = 2;
+			}
+		}
+	);
+} catch (e) {
+	console.error('FAIL: generateHeader date validation setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	BANK.generateDataRecords(
+		[
+			{
+				toBankNo: '0005',
+				toBranchNo: '123',
+				toAccountType: '普通',
+				toAccountNumber: '1234567',
+				amount: 1000,
+				customerName: 'ヤマダタロウ',
+			},
+		],
+		'ABCD',
+		(result) => {
+			try {
+				assert.ok(result && result.error, '不正な仕向銀行番号はエラーになること');
+				console.log('PASS: generateDataRecords rejects malformed origin bank codes');
+			} catch (e) {
+				console.error('FAIL: generateDataRecords origin code validation', e && e.message ? e.message : e);
+				process.exitCode = 2;
+			}
+		}
+	);
+} catch (e) {
+	console.error('FAIL: generateDataRecords origin code validation setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
 // ---------------------- normalizePayeeName tests ----------------------
 try {
 	const out = BANK.normalizePayeeName('ヤマダタロウ');
@@ -229,9 +384,8 @@ try {
 	window.BANK.getBranch = stubBranch;
 
 	// Test convertYucho
-	BANK.convertYucho('12345', '12345671', (err, out) => {
+	BANK.convertYucho('12345', '12345671', (out) => {
 		try {
-			assert.strictEqual(err, null, 'convertYucho should not return error for valid kigou/bangou');
 			assert.ok(out && typeof out === 'object', 'convertYucho should return an object');
 			// Minimum presence checks for expected fields
 			const required = [
@@ -504,6 +658,51 @@ try {
 		});
 } catch (e) {
 	console.error('FAIL: parseZenginFile setup', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const previousGetBank = window.BANK.getBank;
+	const previousGetBranch = window.BANK.getBranch;
+	window.BANK.getBank = (code, cb) => {
+		const result = { bankCode: code, bankName: 'テスト銀行', bankKana: 'ﾃｽﾄｷﾞﾝｺｳ' };
+		cb(result);
+		cb(result);
+	};
+	window.BANK.getBranch = (bankCode, code, cb) => {
+		const result = { branchCode: code, branchName: '本店', branchKana: 'ﾎﾝﾃﾝ' };
+		cb(result);
+		cb(result);
+	};
+	let callbackCount = 0;
+	BANK.generateHeader(
+		{
+			typeCode: '11',
+			requesterCode: '1',
+			requesterName: 'テストカイシャ',
+			tradeDate: '20251109',
+			fromBankNo: '0001',
+			fromBranchNo: '001',
+			depositType: '普通',
+			accountNumber: '1234567',
+		},
+		() => {
+			callbackCount += 1;
+		}
+	);
+	window.BANK.getBank = previousGetBank;
+	window.BANK.getBranch = previousGetBranch;
+	setTimeout(() => {
+		try {
+			assert.strictEqual(callbackCount, 1, '公開 API の callback は一度だけ呼ばれること');
+			console.log('PASS: public callback is invoked once');
+		} catch (e) {
+			console.error('FAIL: public callback once guard', e && e.message ? e.message : e);
+			process.exitCode = 2;
+		}
+	}, 10);
+} catch (e) {
+	console.error('FAIL: public callback once guard', e && e.message ? e.message : e);
 	process.exitCode = 2;
 }
 
