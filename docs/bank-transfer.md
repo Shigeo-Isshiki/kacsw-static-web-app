@@ -26,6 +26,8 @@
   - [`normalizeEdiInfo(input, options)`](#normalizeEdiInfo)
   - [`normalizePayeeName(name)`](#normalizePayeeName)
   - [`normalizeAccountNumber(input)`](#normalizeAccountNumber)
+  - [`nextBankBusinessDay(baseDate, cutoffHour)`](#nextBankBusinessDay)
+  - [`nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)`](#nextPayrollTransferDate)
 - エラー形式
 - 実例
 - 注意事項 / エッジケース
@@ -42,7 +44,7 @@
 - ゆうちょ変換（`convertYucho`）
 - 全銀フォーマット（Zengin）用のレコード生成（`generateZenginData` など）
 - 受取人名・口座番号の正規化ヘルパ
-- 銀行営業日の算出（`nextBankBusinessDay`）
+- 銀行営業日・給与振込日の算出（`nextBankBusinessDay`, `nextPayrollTransferDate`）
 
 **祝日判定について**: 営業日算出で必要な祝日判定は、[national-holidays.js](../src/national-holidays.js) のローカルロジックを内部に組み込んでいます。外部APIを使用せず、オフラインでも動作します。
 
@@ -66,7 +68,8 @@
   - `normalizeEdiInfo(input, options)`
   - `normalizePayeeName(name, options)`
 - `normalizeAccountNumber(input)`
-- `nextBankBusinessDay(baseDate, cutoffHour, callback)`
+- `nextBankBusinessDay(baseDate, cutoffHour)`
+- `nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)`
 
 （非同期 API のコールバックは単一引数 `callback(result)` に統一し、常に次のタスクで実行します。callback を指定しない呼び出しは `TypeError` になります）
 `parseZenginFile` は Promise を返します。
@@ -274,7 +277,7 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
 
 ---
 
-<a id="nextBankBusinessDay"></a>
+<a id="parseZenginFile"></a>
 
 ### `parseZenginFile(options)`
 
@@ -474,6 +477,34 @@ try {
 const d = new Date('2025-12-31T19:00:00');
 const resDate = window.BANK.nextBankBusinessDay(d, 18);
 console.log(resDate); // '2026-01-05' など（YYYY-MM-DD 形式）
+```
+
+---
+
+<a id="nextPayrollTransferDate"></a>
+
+### `nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)`
+
+概要:
+
+- 給与振込の受付期限を意識して、基準日時から最短で指定できる振込日を同期的に返します。既定では「振込日の3営業日前18時まで」を期限として扱います。
+
+引数:
+
+- `baseDate` (Date|string) — 基準日時。Date オブジェクトまたは解析可能な日付文字列を受け付けます。省略時は現在日時を使用します。
+- `cutoffHour` (number) — 受付日の締切時刻（0-23、省略時は 18）。基準時刻がこの時刻以降であれば、次の銀行営業日を受付日として扱います。
+- `leadBusinessDays` (number) — 振込指定日の何営業日前を期限とするか（省略時は 3）。
+
+戻り値:
+
+- `string` — 'YYYY-MM-DD' 形式の日付文字列。
+
+例:
+
+```js
+const d = new Date('2025-11-10T17:59:00');
+const payDate = window.BANK.nextPayrollTransferDate(d, 18);
+console.log(payDate); // '2025-11-13'
 ```
 
 ---

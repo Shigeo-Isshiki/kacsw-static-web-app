@@ -832,6 +832,43 @@ try {
 	process.exitCode = 2;
 }
 
+// ---------------------- nextPayrollTransferDate tests ----------------------
+try {
+	assert.strictEqual(
+		BANK.nextPayrollTransferDate('2025-11-10T17:59:00', 18),
+		'2025-11-13',
+		'締め前の営業日は3営業日後を返すこと'
+	);
+	console.log('PASS: nextPayrollTransferDate before cutoff');
+} catch (e) {
+	console.error('FAIL: nextPayrollTransferDate before cutoff', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	assert.strictEqual(
+		BANK.nextPayrollTransferDate('2025-11-10T18:00:00', 18),
+		'2025-11-14',
+		'締め以降は翌営業日受付として3営業日後を返すこと'
+	);
+	console.log('PASS: nextPayrollTransferDate after cutoff');
+} catch (e) {
+	console.error('FAIL: nextPayrollTransferDate after cutoff', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	assert.strictEqual(
+		BANK.nextPayrollTransferDate('2025-11-08T10:00:00', 18),
+		'2025-11-13',
+		'休業日は次の営業日受付として3営業日後を返すこと'
+	);
+	console.log('PASS: nextPayrollTransferDate holiday start');
+} catch (e) {
+	console.error('FAIL: nextPayrollTransferDate holiday start', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
 // ---------------------- generateHeader smoke test ----------------------
 try {
 	const headerData = {

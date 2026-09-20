@@ -7,6 +7,8 @@
  *  - getBranch(bankCode, branchCodeOrName, callback)
  *  - convertYucho(kigou, bangou, callback)
  *  - parseZenginFile(options?) -> Promise<{ success, headerData, records, meta }>
+ *  - nextBankBusinessDay(baseDate?, cutoffHour?) -> string
+ *  - nextPayrollTransferDate(baseDate?, cutoffHour?, leadBusinessDays?) -> string
  
  *  - loadBankByCode(bankCode, options?, callback)
  *
@@ -3524,6 +3526,151 @@ const generateZenginDataAsync = (headerData, records) =>
 		generateZenginData(headerData, records, resolve);
 	});
 
+const _bt_formatLocalDate = (date) =>
+	`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const _bt_parseLocalDateString = (dateString) => {
+	const value = _bt_toStr(dateString).trim();
+	const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+	if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+	return new Date(value);
+};
+
+const _bt_getSimpleHolidayDate = (year, holiday) => {
+	if (holiday.since > year || (holiday.until && year > holiday.until)) return null;
+	if (holiday.excludeYears && holiday.excludeYears.includes(year)) return null;
+	if (holiday.type === 'fixed') return new Date(year, holiday.month - 1, holiday.date);
+	if (holiday.type === 'variable') {
+		const firstDay = new Date(year, holiday.month - 1, 1).getDay();
+		const diff = (holiday.dayOfWeek - firstDay + 7) % 7;
+		return new Date(year, holiday.month - 1, 1 + diff + (holiday.week - 1) * 7);
+	}
+	if (holiday.type === 'equinox') {
+		const coeffs =
+			holiday.calculator === 'vernal'
+				? [
+						{ startYear: 1948, endYear: 1979, constant: 20.8357 },
+						{ startYear: 1980, endYear: 2099, constant: 20.8431 },
+						{ startYear: 2100, endYear: 2150, constant: 21.851 },
+					]
+				: [
+						{ startYear: 1948, endYear: 1979, constant: 23.2588 },
+						{ startYear: 1980, endYear: 2099, constant: 23.2488 },
+						{ startYear: 2100, endYear: 2150, constant: 24.2488 },
+					];
+		const coeff = coeffs.find((c) => year >= c.startYear && year <= c.endYear);
+		if (!coeff) return null;
+		const day = Math.floor(
+			coeff.constant + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4)
+		);
+		return new Date(year, holiday.month - 1, day);
+	}
+	return null;
+};
+
+const _bt_buildSimpleHolidayMap = (year) => {
+	const holidays = [
+		{ type: 'fixed', month: 1, date: 1, since: 1949 },
+		{ type: 'fixed', month: 1, date: 15, since: 1949, until: 1999 },
+		{ type: 'variable', month: 1, week: 2, dayOfWeek: 1, since: 2000 },
+		{ type: 'fixed', month: 2, date: 11, since: 1966 },
+		{ type: 'fixed', month: 2, date: 23, since: 2020 },
+		{ type: 'equinox', month: 3, calculator: 'vernal', since: 1949 },
+		{ type: 'fixed', month: 4, date: 29, since: 1949 },
+		{ type: 'fixed', month: 5, date: 1, since: 2019, until: 2019 },
+		{ type: 'fixed', month: 5, date: 3, since: 1949 },
+		{ type: 'fixed', month: 5, date: 4, since: 2007 },
+		{ type: 'fixed', month: 5, date: 5, since: 1949 },
+		{ type: 'fixed', month: 7, date: 20, since: 1996, until: 2002 },
+		{ type: 'variable', month: 7, week: 3, dayOfWeek: 1, since: 2003, excludeYears: [2020, 2021] },
+		{ type: 'fixed', month: 7, date: 23, since: 2020, until: 2020 },
+		{ type: 'fixed', month: 7, date: 22, since: 2021, until: 2021 },
+		{ type: 'fixed', month: 7, date: 24, since: 2020, until: 2020 },
+		{ type: 'fixed', month: 7, date: 23, since: 2021, until: 2021 },
+		{ type: 'fixed', month: 8, date: 11, since: 2016, excludeYears: [2020, 2021] },
+		{ type: 'fixed', month: 8, date: 10, since: 2020, until: 2020 },
+		{ type: 'fixed', month: 8, date: 8, since: 2021, until: 2021 },
+		{ type: 'fixed', month: 9, date: 15, since: 1966, until: 2002 },
+		{ type: 'variable', month: 9, week: 3, dayOfWeek: 1, since: 2003 },
+		{ type: 'equinox', month: 9, calculator: 'autumnal', since: 1949 },
+		{ type: 'fixed', month: 10, date: 10, since: 1966, until: 1999 },
+		{ type: 'variable', month: 10, week: 2, dayOfWeek: 1, since: 2000, until: 2019 },
+		{ type: 'variable', month: 10, week: 2, dayOfWeek: 1, since: 2020, excludeYears: [2020, 2021] },
+		{ type: 'fixed', month: 10, date: 22, since: 2019, until: 2019 },
+		{ type: 'fixed', month: 11, date: 3, since: 1949 },
+		{ type: 'fixed', month: 11, date: 23, since: 1949 },
+		{ type: 'fixed', month: 12, date: 23, since: 1989, until: 2018 },
+	];
+	const map = new Map();
+	for (const holiday of holidays) {
+		const date = _bt_getSimpleHolidayDate(year, holiday);
+		if (date) map.set(_bt_formatLocalDate(date), true);
+	}
+	if (year >= 1985) {
+		for (
+			let date = new Date(year, 0, 1);
+			date.getFullYear() === year;
+			date.setDate(date.getDate() + 1)
+		) {
+			const key = _bt_formatLocalDate(date);
+			if (map.has(key)) continue;
+			const prev = new Date(date);
+			prev.setDate(prev.getDate() - 1);
+			const next = new Date(date);
+			next.setDate(next.getDate() + 1);
+			if (map.has(_bt_formatLocalDate(prev)) && map.has(_bt_formatLocalDate(next)))
+				map.set(key, true);
+		}
+	}
+	if (year >= 1973) {
+		const workingMap = new Map(map);
+		for (const dateStr of Array.from(map.keys())) {
+			const date = _bt_parseLocalDateString(dateStr);
+			if (date.getDay() !== 0) continue;
+			let substitute = new Date(date);
+			substitute.setDate(substitute.getDate() + 1);
+			if (year <= 2006) {
+				const substituteKey = _bt_formatLocalDate(substitute);
+				if (!workingMap.has(substituteKey)) map.set(substituteKey, true);
+				continue;
+			}
+			while (workingMap.has(_bt_formatLocalDate(substitute))) {
+				substitute.setDate(substitute.getDate() + 1);
+			}
+			const substituteKey = _bt_formatLocalDate(substitute);
+			workingMap.set(substituteKey, true);
+			map.set(substituteKey, true);
+		}
+	}
+	return map;
+};
+
+const _bt_isBankBusinessDate = (date) => {
+	const dow = date.getDay();
+	const month = date.getMonth() + 1;
+	const day = date.getDate();
+	if (dow === 0 || dow === 6) return false;
+	if ((month === 12 && day >= 31) || (month === 1 && day <= 3)) return false;
+	if (date.getFullYear() < 1949) return true;
+	return !_bt_buildSimpleHolidayMap(date.getFullYear()).has(_bt_formatLocalDate(date));
+};
+
+const _bt_findNextBankBusinessDate = (startDate) => {
+	const date = new Date(startDate);
+	while (!_bt_isBankBusinessDate(date)) date.setDate(date.getDate() + 1);
+	return date;
+};
+
+const _bt_addBankBusinessDays = (startDate, days) => {
+	const date = new Date(startDate);
+	let remaining = days;
+	while (remaining > 0) {
+		date.setDate(date.getDate() + 1);
+		if (_bt_isBankBusinessDate(date)) remaining--;
+	}
+	return date;
+};
+
 /** 公開: nextBankBusinessDay — 次の銀行営業日を計算して返します（詳細: docs/bank-transfer.md）。 */
 /**
  * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）
@@ -3849,6 +3996,50 @@ const nextBankBusinessDay = (baseDate = new Date(), cutoffHour = 18) => {
 	}
 };
 
+/** 公開: nextPayrollTransferDate — 給与振込の最短振込日を計算して返します（詳細: docs/bank-transfer.md）。 */
+/**
+ * @param {Date|string} [baseDate=new Date()] 基準日時（Date または 日付文字列）
+ * @param {number} [cutoffHour=18] 締め時刻（0-23）
+ * @param {number} [leadBusinessDays=3] 振込指定日の何営業日前を期限とするか
+ * @returns {string} 結果を 'YYYY-MM-DD' 形式で返す
+ */
+const nextPayrollTransferDate = (baseDate = new Date(), cutoffHour = 18, leadBusinessDays = 3) => {
+	const cutoffHourNum = Number(cutoffHour);
+	if (!Number.isInteger(cutoffHourNum) || cutoffHourNum < 0 || cutoffHourNum > 23) {
+		throw new Error('締め時刻は0～23の整数である必要があります');
+	}
+	const leadDays = Number(leadBusinessDays);
+	if (!Number.isInteger(leadDays) || leadDays < 0) {
+		throw new Error('必要営業日数は0以上の整数である必要があります');
+	}
+
+	let targetDate;
+	let hasTimeInfo = false;
+	if (typeof baseDate === 'string') {
+		targetDate = _bt_parseLocalDateString(baseDate);
+		hasTimeInfo = /T\d{2}:\d{2}|\d{2}:\d{2}/.test(baseDate);
+	} else if (baseDate instanceof Date) {
+		targetDate = new Date(baseDate);
+		hasTimeInfo =
+			targetDate.getHours() !== 0 || targetDate.getMinutes() !== 0 || targetDate.getSeconds() !== 0;
+	} else {
+		throw new Error('基準日時は日付文字列、またはDate型である必要があります');
+	}
+	if (isNaN(targetDate.getTime())) {
+		throw new Error('基準日時は有効な日付である必要があります');
+	}
+
+	const canAcceptToday =
+		_bt_isBankBusinessDate(targetDate) && !(hasTimeInfo && targetDate.getHours() >= cutoffHourNum);
+	let acceptedDate = new Date(targetDate);
+	if (!canAcceptToday) {
+		acceptedDate.setDate(acceptedDate.getDate() + 1);
+		acceptedDate = _bt_findNextBankBusinessDate(acceptedDate);
+	}
+
+	return _bt_formatLocalDate(_bt_addBankBusinessDays(acceptedDate, leadDays));
+};
+
 // kintone 向けに window に公開します
 if (typeof window !== 'undefined') {
 	// 利用者向けに簡潔なグローバル名で公開します: window.BANK
@@ -3870,6 +4061,7 @@ if (typeof window !== 'undefined') {
 		generateZenginData,
 		generateZenginDataAsync,
 		nextBankBusinessDay,
+		nextPayrollTransferDate,
 	});
 }
 
@@ -3895,6 +4087,7 @@ try {
 						generateZenginData,
 						generateZenginDataAsync,
 						nextBankBusinessDay,
+						nextPayrollTransferDate,
 					};
 	}
 } catch (e) {}
