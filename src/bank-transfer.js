@@ -9,6 +9,7 @@
  *  - parseZenginFile(options?) -> Promise<{ success, headerData, records, meta }>
  *  - nextBankBusinessDay(baseDate?, cutoffHour?) -> string
  *  - nextPayrollTransferDate(baseDate?, cutoffHour?, leadBusinessDays?) -> string
+ *  - isBankBusinessDay(targetDate?) -> boolean
  
  *  - loadBankByCode(bankCode, options?, callback)
  *
@@ -4124,6 +4125,27 @@ const nextPayrollTransferDate = (baseDate = new Date(), cutoffHour = 18, leadBus
 	return _bt_formatLocalDate(_bt_addBankBusinessDays(acceptedDate, leadDays));
 };
 
+/** 公開: isBankBusinessDay — 指定日が銀行営業日かどうかを判定します（詳細: docs/bank-transfer.md）。 */
+/**
+ * @param {Date|string} [targetDate=new Date()] 判定対象の日付（Date または 'YYYY-MM-DD' 等の日付文字列）
+ * @returns {boolean} 銀行営業日であれば true、そうでなければ false
+ */
+const isBankBusinessDay = (targetDate = new Date()) => {
+	let date;
+	if (typeof targetDate === 'string') {
+		date = _bt_parseLocalDateString(targetDate);
+	} else if (targetDate instanceof Date) {
+		date = new Date(targetDate);
+	} else {
+		throw new Error('判定対象の日付は日付文字列、またはDate型である必要があります');
+	}
+	if (isNaN(date.getTime())) {
+		throw new Error('判定対象の日付は有効な日付である必要があります');
+	}
+
+	return _bt_isBankBusinessDate(date);
+};
+
 // kintone 向けに window に公開します
 if (typeof window !== 'undefined') {
 	// 利用者向けに簡潔なグローバル名で公開します: window.BANK
@@ -4146,6 +4168,7 @@ if (typeof window !== 'undefined') {
 		generateZenginDataAsync,
 		nextBankBusinessDay,
 		nextPayrollTransferDate,
+		isBankBusinessDay,
 	});
 }
 
@@ -4172,6 +4195,7 @@ try {
 						generateZenginDataAsync,
 						nextBankBusinessDay,
 						nextPayrollTransferDate,
+						isBankBusinessDay,
 					};
 	}
 } catch (e) {}

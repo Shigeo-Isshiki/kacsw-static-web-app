@@ -28,6 +28,7 @@
   - [`normalizeAccountNumber(input)`](#normalizeAccountNumber)
   - [`nextBankBusinessDay(baseDate, cutoffHour)`](#nextBankBusinessDay)
   - [`nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)`](#nextPayrollTransferDate)
+  - [`isBankBusinessDay(targetDate)`](#isBankBusinessDay)
 - エラー形式
 - 実例
 - 注意事項 / エッジケース
@@ -44,7 +45,7 @@
 - ゆうちょ変換（`convertYucho`）
 - 全銀フォーマット（Zengin）用のレコード生成（`generateZenginData` など）
 - 受取人名・口座番号の正規化ヘルパ
-- 銀行営業日・給与振込日の算出（`nextBankBusinessDay`, `nextPayrollTransferDate`）
+- 銀行営業日・給与振込日の算出（`nextBankBusinessDay`, `nextPayrollTransferDate`, `isBankBusinessDay`）
 
 **祝日判定について**: 営業日算出で必要な祝日判定は、[national-holidays.js](../src/national-holidays.js) のローカルロジックを内部に組み込んでいます。外部APIを使用せず、オフラインでも動作します。
 
@@ -70,6 +71,7 @@
 - `normalizeAccountNumber(input)`
 - `nextBankBusinessDay(baseDate, cutoffHour)`
 - `nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)`
+- `isBankBusinessDay(targetDate)`
 
 （非同期 API のコールバックは単一引数 `callback(result)` に統一し、常に次のタスクで実行します。callback を指定しない呼び出しは `TypeError` になります）
 `parseZenginFile` は Promise を返します。
@@ -522,6 +524,36 @@ console.log(resDate); // '2026-01-05' など（YYYY-MM-DD 形式）
 const d = new Date('2025-11-10T17:59:00');
 const payDate = window.BANK.nextPayrollTransferDate(d, 18);
 console.log(payDate); // '2025-11-13'
+```
+
+---
+
+<a id="isBankBusinessDay"></a>
+
+### `isBankBusinessDay(targetDate)`
+
+概要:
+
+- 指定した日付が銀行営業日かどうかを同期的に判定します。土日・年末年始（12/31〜1/3）・国民の祝日（ローカルロジックを使用）を非営業日として扱います。
+
+引数:
+
+- `targetDate` (Date|string) — 判定対象の日付。Date オブジェクトまたは解析可能な日付文字列を受け付けます。省略時は現在日時を使用します。
+
+戻り値:
+
+- `boolean` — 銀行営業日であれば `true`、そうでなければ `false`。
+
+挙動・注意点:
+
+- 祝日判定は [national-holidays.js](../src/national-holidays.js) のローカルロジックを内部に組み込んで使用します。外部APIへの依存はありません。
+- 時刻情報は判定に使用しません（日付のみで判定します）。
+
+例:
+
+```js
+window.BANK.isBankBusinessDay('2025-11-08'); // false（土曜日）
+window.BANK.isBankBusinessDay('2025-11-10'); // true（月曜日）
 ```
 
 ---

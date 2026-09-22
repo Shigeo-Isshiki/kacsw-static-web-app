@@ -869,6 +869,39 @@ try {
 	process.exitCode = 2;
 }
 
+// ---------------------- isBankBusinessDay tests ----------------------
+try {
+	assert.strictEqual(BANK.isBankBusinessDay('2025-11-10'), true, '月曜(平日)は営業日であること');
+	console.log('PASS: isBankBusinessDay weekday');
+} catch (e) {
+	console.error('FAIL: isBankBusinessDay weekday', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	assert.strictEqual(BANK.isBankBusinessDay('2025-11-08'), false, '土曜日は非営業日であること');
+	console.log('PASS: isBankBusinessDay weekend');
+} catch (e) {
+	console.error('FAIL: isBankBusinessDay weekend', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	assert.strictEqual(BANK.isBankBusinessDay('2026-01-01'), false, '元日は非営業日であること');
+	console.log('PASS: isBankBusinessDay national holiday');
+} catch (e) {
+	console.error('FAIL: isBankBusinessDay national holiday', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	assert.strictEqual(BANK.isBankBusinessDay(new Date(2025, 10, 10)), true, 'Date型引数でも判定できること');
+	console.log('PASS: isBankBusinessDay Date argument');
+} catch (e) {
+	console.error('FAIL: isBankBusinessDay Date argument', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
 // ---------------------- generateHeader smoke test ----------------------
 try {
 	const headerData = {
