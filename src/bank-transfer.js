@@ -3525,61 +3525,66 @@ const generateZenginData = (headerData, records, callback) => {
 
 			// 2) data records — use fromBankNo from headerData if present
 			const fromBankNo = headerData && headerData.fromBankNo ? headerData.fromBankNo : '';
-			// headerData.typeCode（'11'=給与振込, '12'=賞与振込 等）から総合振込/給与振込のデータレコード様式を自動判定する
-			const transferType = _bt_resolveTransferType(headerData && headerData.typeCode);
-			generateDataRecords(records, fromBankNo, { transferType }, (dres) => {
-				if (dres && dres.error) {
-					_bt_invokeCallback(
-						callback,
-						{ error: 'データレコードの生成に失敗しました', detail: dres },
-						null
-					);
-					return;
-				}
-				const dataJoined = dres && dres.records ? dres.records : '';
-
-				// 3) trailer (accept joined string)
-				generateTrailer(dataJoined, (tres) => {
-					if (tres && tres.error) {
+			// generateDataRecords の options.transferType は headerData.typeCode と同じ生の値（'11'/'12'/'21' 等）を期待するため、
+			// ここで 'payroll'/'total' へ解決してしまうと二重解決になり常に 'total' 扱いになってしまう。生値のまま渡す。
+			generateDataRecords(
+				records,
+				fromBankNo,
+				{ transferType: headerData && headerData.typeCode },
+				(dres) => {
+					if (dres && dres.error) {
 						_bt_invokeCallback(
 							callback,
-							{ error: 'トレーラレコードの生成に失敗しました', detail: tres },
+							{ error: 'データレコードの生成に失敗しました', detail: dres },
 							null
 						);
 						return;
 					}
-					const trailerLine = tres && tres.trailerRecord ? tres.trailerRecord : '';
+					const dataJoined = dres && dres.records ? dres.records : '';
 
-					// 4) end record
-					generateEndRecord((eres) => {
-						if (eres && eres.error) {
+					// 3) trailer (accept joined string)
+					generateTrailer(dataJoined, (tres) => {
+						if (tres && tres.error) {
 							_bt_invokeCallback(
 								callback,
-								{ error: 'エンドレコードの生成に失敗しました', detail: eres },
+								{ error: 'トレーラレコードの生成に失敗しました', detail: tres },
 								null
 							);
 							return;
 						}
-						const endLine = eres && eres.endRecord ? eres.endRecord : '';
+						const trailerLine = tres && tres.trailerRecord ? tres.trailerRecord : '';
 
-						// assemble: header + CRLF + data (already CRLF joined, may contain multiple lines) + CRLF + trailer + CRLF + end
-						const parts = {
-							header: headerLine,
-							data: dataJoined,
-							trailer: trailerLine,
-							end: endLine,
-						};
-						// avoid extra empty lines when dataJoined is empty
-						const contentPieces = [headerLine];
-						if (dataJoined && String(dataJoined).length > 0) contentPieces.push(dataJoined);
-						contentPieces.push(trailerLine);
-						contentPieces.push(endLine);
-						const content = contentPieces.join('\r\n');
-						_bt_invokeCallback(callback, { success: true, content, parts });
-						return;
+						// 4) end record
+						generateEndRecord((eres) => {
+							if (eres && eres.error) {
+								_bt_invokeCallback(
+									callback,
+									{ error: 'エンドレコードの生成に失敗しました', detail: eres },
+									null
+								);
+								return;
+							}
+							const endLine = eres && eres.endRecord ? eres.endRecord : '';
+
+							// assemble: header + CRLF + data (already CRLF joined, may contain multiple lines) + CRLF + trailer + CRLF + end
+							const parts = {
+								header: headerLine,
+								data: dataJoined,
+								trailer: trailerLine,
+								end: endLine,
+							};
+							// avoid extra empty lines when dataJoined is empty
+							const contentPieces = [headerLine];
+							if (dataJoined && String(dataJoined).length > 0) contentPieces.push(dataJoined);
+							contentPieces.push(trailerLine);
+							contentPieces.push(endLine);
+							const content = contentPieces.join('\r\n');
+							_bt_invokeCallback(callback, { success: true, content, parts });
+							return;
+						});
 					});
-				});
-			});
+				}
+			);
 		});
 	} catch (e) {
 		_bt_invokeCallback(
