@@ -547,6 +547,60 @@ const _bt_normalizeNumericCode = (value, digits, fieldName, { allowShort = false
 	return normalized.padStart(digits, '0');
 };
 
+/** ヘッダ種別コード（typeCode）を全銀の2桁コードに解決する（内部ユーティリティ）。給与振込/総合振込の判定に共用する。 */
+/**
+ * @private
+ * @param {string} typeCodeRaw '11'/'21' 等の生コード、または '給与振込'/'総合振込' 等のラベル
+ * @returns {string} 解決できた場合は2桁の数字コード、できない場合は空文字
+ */
+const _BT_TYPE_CODE_MAP = {
+	給与振込: '11',
+	賞与振込: '12',
+	総合振込: '21',
+};
+const _bt_resolveTypeCode = (typeCodeRaw) => {
+	const raw = _bt_toStr(typeCodeRaw || '').trim();
+	if (/^[0-9]{2}$/.test(raw)) return raw;
+	if (raw) {
+		const key = String(raw).toUpperCase();
+		if (_BT_TYPE_CODE_MAP[key]) return _BT_TYPE_CODE_MAP[key];
+	}
+	return '';
+};
+
+/** 給与振込/賞与振込の種別コード（typeCode解決後）の集合。データレコードの従業員コード様式判定に使用する。 */
+const _BT_PAYROLL_TYPE_CODES = new Set(['11', '12']);
+
+/** transferType（headerData.typeCode と同じ生コード/ラベル）を内部の 'payroll'|'total' に解決する（内部ユーティリティ）。 */
+/**
+ * @private
+ * @param {string} value headerData.typeCode と同じ値（'11'/'12'/'21'、'給与振込'/'賞与振込'/'総合振込' 等）
+ * @returns {string} 'payroll' または 'total'
+ */
+const _bt_resolveTransferType = (value) => {
+	const typeCode = _bt_resolveTypeCode(value);
+	return _BT_PAYROLL_TYPE_CODES.has(typeCode) ? 'payroll' : 'total';
+};
+
+/** 給与振込の従業員コード（10桁数字、オールスペース可）を固定長フィールドに整形する（内部ユーティリティ）。 */
+/**
+ * @private
+ * @param {string|number} value 従業員コード
+ * @param {number} digits フィールド長（バイト数）
+ * @param {string} fieldName エラーメッセージ用のフィールド名
+ * @returns {string} digits バイトに整形された文字列
+ */
+const _bt_formatEmployeeCode = (value, digits, fieldName) => {
+	const raw = _bt_toStr(value == null ? '' : value).trim();
+	if (!raw) return ' '.repeat(digits);
+	const normalized = _bt_toHalfWidthDigits(raw).trim();
+	const pattern = new RegExp(`^[0-9]{1,${digits}}$`);
+	if (!pattern.test(normalized)) {
+		throw new Error(`${fieldName}は${digits}桁以内の数字、またはオールスペースで指定してください`);
+	}
+	return normalized.padStart(digits, '0');
+};
+
 /** 指定文字が銀行振込で許容される半角文字集合に含まれるか判定する（内部ユーティリティ）。 */
 /**
  * @private
@@ -1356,15 +1410,17 @@ const _bt_yuchoKigouToBranch = (kigouRaw) => {
 /**
  * @private
  * @param {Array<object>} dataRecords 整形済みレコード配列
+ * @param {string} transferType 'total'（総合振込・既定）または 'payroll'（給与振込）
  * @param {function(result)} callback single-arg スタイルのコールバック（成功: { success:true, records: string[], skipped: Array<{index:number, reason:string}> }）
  */
-const _bt_generateDataRecordStrings = (dataRecords, callback) => {
+const _bt_generateDataRecordStrings = (dataRecords, transferType, callback) => {
 	if (typeof callback !== 'function')
-		throw new TypeError('第二引数はコールバック関数である必要があります');
+		throw new TypeError('第三引数はコールバック関数である必要があります');
 	if (!Array.isArray(dataRecords)) {
 		_bt_invokeCallback(callback, { error: 'dataRecords は配列である必要があります' });
 		return;
 	}
+	const isPayroll = transferType === 'payroll';
 	const out = [];
 	const skipped = [];
 
@@ -1474,27 +1530,38 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 			// 新規コード (1 byte)
 			const newCode = '1';
 
-			// EDI情報 (20 bytes) — normalize via public helper so kintone と整合する
-			let ediTrunc;
-			try {
-				// normalizeEdiInfo returns padded string when padToBytes=true
-				ediTrunc = normalizeEdiInfo(r.ediInfo || '', { padToBytes: true, bytes: 20 });
-			} catch (e) {
-				// fallback to raw handling
-				let edi = _bt_toStr(r.ediInfo || '');
+			// 92～113バイト（22バイト）: 総合振込は EDI情報+振込指定区分+識別表示、給与振込は従業員コード1/2+予備
+			let middleFields;
+			if (isPayroll) {
+				// 従業員コード1/2 (各10 bytes) + 予備 (2 bytes)
+				const emp1 = _bt_formatEmployeeCode(r.employeeCode1, 10, '従業員コード1');
+				const emp2 = _bt_formatEmployeeCode(r.employeeCode2, 10, '従業員コード2');
+				middleFields = [emp1, emp2, ' '.repeat(2)];
+			} else {
+				// EDI情報 (20 bytes) — normalize via public helper so kintone と整合する
+				let ediTrunc;
 				try {
-					edi = _bt_toHalfWidthKana(edi, false);
-				} catch (e) {}
-				ediTrunc = _bt_sjisTruncate(edi, 20);
-				const ediBytes = _bt_sjisByteLength(ediTrunc);
-				if (ediBytes < 20) ediTrunc = ediTrunc + ' '.repeat(20 - ediBytes);
+					// normalizeEdiInfo returns padded string when padToBytes=true
+					ediTrunc = normalizeEdiInfo(r.ediInfo || '', { padToBytes: true, bytes: 20 });
+				} catch (e) {
+					// fallback to raw handling
+					let edi = _bt_toStr(r.ediInfo || '');
+					try {
+						edi = _bt_toHalfWidthKana(edi, false);
+					} catch (e) {}
+					ediTrunc = _bt_sjisTruncate(edi, 20);
+					const ediBytes = _bt_sjisByteLength(ediTrunc);
+					if (ediBytes < 20) ediTrunc = ediTrunc + ' '.repeat(20 - ediBytes);
+				}
+
+				// 振込指定区分 (1 byte)
+				const specify = '7';
+
+				// 識別表示 (1 byte)
+				const ident = 'Y';
+
+				middleFields = [ediTrunc, specify, ident];
 			}
-
-			// 振込指定区分 (1 byte)
-			const specify = '7';
-
-			// 識別表示 (1 byte)
-			const ident = 'Y';
 
 			// ダミー (7 bytes)
 			const dummy = ' '.repeat(7);
@@ -1511,9 +1578,7 @@ const _bt_generateDataRecordStrings = (dataRecords, callback) => {
 				custTrunc,
 				amtField,
 				newCode,
-				ediTrunc,
-				specify,
-				ident,
+				...middleFields,
 				dummy,
 			];
 
@@ -1924,6 +1989,9 @@ const parseZenginFile = async (options = {}) => {
 			};
 		}
 
+		// headerData.typeCode（'11'/'12'=給与・賞与振込）からデータレコードの92～111バイト目の解釈を切り替える
+		const isPayrollFile = _bt_resolveTransferType(headerData && headerData.typeCode) === 'payroll';
+
 		const records = dataLines.map((line) => {
 			const bankNo = _bt_toStr(line.slice(1, 5)).trim();
 			const branchNo = _bt_toStr(line.slice(20, 23)).trim();
@@ -1931,7 +1999,15 @@ const parseZenginFile = async (options = {}) => {
 			const accountNo = _bt_toStr(line.slice(43, 50)).trim();
 			const customerKana = _bt_toStr(line.slice(50, 80)).trim();
 			const amountRaw = _bt_toStr(line.slice(80, 90)).trim();
-			const ediInfo = _bt_toStr(line.slice(91, 111)).trimEnd();
+			let ediInfo = '';
+			let employeeCode1 = '';
+			let employeeCode2 = '';
+			if (isPayrollFile) {
+				employeeCode1 = _bt_toStr(line.slice(91, 101)).trim();
+				employeeCode2 = _bt_toStr(line.slice(101, 111)).trim();
+			} else {
+				ediInfo = _bt_toStr(line.slice(91, 111)).trimEnd();
+			}
 
 			// 振込結果コードの既定位置は 114桁目（1-based）
 			let resultRaw = _bt_toStr(line.slice(113, 114)).trim();
@@ -1954,6 +2030,8 @@ const parseZenginFile = async (options = {}) => {
 				amount: Number(amountRaw || '0'),
 				customerKana,
 				ediInfo,
+				employeeCode1,
+				employeeCode2,
 				processResultCode: processResult.processResultCode,
 				processResultLabel: processResult.processResultLabel,
 			};
@@ -2791,11 +2869,6 @@ const generateHeader = (data, callback) => {
 			return;
 		}
 
-		const TYPE_CODE_MAP = {
-			給与振込: '11',
-			賞与振込: '12',
-			総合振込: '21',
-		};
 		const DEPOSIT_TYPE_MAP = {
 			普通: '1',
 			普通預金: '1',
@@ -2807,13 +2880,7 @@ const generateHeader = (data, callback) => {
 		const codeClass = '0';
 
 		// typeCode
-		let typeCodeRaw = _bt_toStr(data.typeCode || '').trim();
-		let typeCode = '';
-		if (/^[0-9]{2}$/.test(typeCodeRaw)) typeCode = typeCodeRaw;
-		else if (typeCodeRaw) {
-			const key = String(typeCodeRaw).toUpperCase();
-			if (TYPE_CODE_MAP[key]) typeCode = TYPE_CODE_MAP[key];
-		}
+		const typeCode = _bt_resolveTypeCode(data.typeCode);
 		if (!/^[0-9]{2}$/.test(typeCode)) {
 			_bt_invokeCallback(callback, { error: '種別コードが不正です' });
 			return;
@@ -3080,15 +3147,21 @@ const generateHeader = (data, callback) => {
 	}
 };
 /** 公開: generateDataRecords — 振込明細配列から全銀データレコード文字列を生成します（詳細: docs/bank-transfer.md）。 */
-/** 公開: generateDataRecords — 振込明細配列から全銀データレコード文字列を生成します（詳細: docs/bank-transfer.md）。 */
 /**
  * @param {Array<object>} records 振込明細の配列
  * @param {string} [fromBankNo] 仕向金融機関コード
+ * @param {object} [options] { transferType: headerData.typeCode と同じ値（'11'/'12'/'21'、'給与振込'/'賞与振込'/'総合振込' 等）。'11'/'12'（給与振込/賞与振込）は従業員コード様式、それ以外は総合振込様式（既定） }
  * @param {function(result)} callback single-arg スタイルのコールバック
  */
-const generateDataRecords = (records, fromBankNo = '', callback) => {
+const generateDataRecords = (records, fromBankNo = '', options, callback) => {
+	if (typeof options === 'function') {
+		callback = options;
+		options = {};
+	}
+	options = options || {};
+	const transferType = _bt_resolveTransferType(options.transferType);
 	if (typeof callback !== 'function')
-		throw new TypeError('第三引数はコールバック関数である必要があります');
+		throw new TypeError('コールバック関数を指定する必要があります');
 	callback = _bt_onceCallback(callback);
 	if (!Array.isArray(records)) {
 		_bt_invokeCallback(callback, { error: 'records は配列である必要があります' });
@@ -3139,7 +3212,7 @@ const generateDataRecords = (records, fromBankNo = '', callback) => {
 	const processNext = () => {
 		if (idx >= records.length) {
 			// 生成した整形済みレコードを固定長文字列に変換して返す
-			_bt_generateDataRecordStrings(out, callback);
+			_bt_generateDataRecordStrings(out, transferType, callback);
 			return;
 		}
 		const i = idx++;
@@ -3229,6 +3302,8 @@ const generateDataRecords = (records, fromBankNo = '', callback) => {
 						toBankKana: _bt_toHalfWidthKana(resolvedBankKana, false),
 						toBranchKana: '',
 						ediInfo: _bt_toStr(r.ediInfo || ''),
+						employeeCode1: r.employeeCode1,
+						employeeCode2: r.employeeCode2,
 						depositType: depCode,
 						accountNumber,
 						amount: Math.round(amountNum),
@@ -3270,6 +3345,8 @@ const generateDataRecords = (records, fromBankNo = '', callback) => {
 						toBankKana: _bt_toHalfWidthKana(resolvedBankKana, false),
 						toBranchKana: _bt_toHalfWidthKana(resolvedBranchKana, false),
 						ediInfo: _bt_toStr(r.ediInfo || ''),
+						employeeCode1: r.employeeCode1,
+						employeeCode2: r.employeeCode2,
 						depositType: depCode,
 						accountNumber,
 						amount: Math.round(amountNum),
@@ -3448,7 +3525,9 @@ const generateZenginData = (headerData, records, callback) => {
 
 			// 2) data records — use fromBankNo from headerData if present
 			const fromBankNo = headerData && headerData.fromBankNo ? headerData.fromBankNo : '';
-			generateDataRecords(records, fromBankNo, (dres) => {
+			// headerData.typeCode（'11'=給与振込, '12'=賞与振込 等）から総合振込/給与振込のデータレコード様式を自動判定する
+			const transferType = _bt_resolveTransferType(headerData && headerData.typeCode);
+			generateDataRecords(records, fromBankNo, { transferType }, (dres) => {
 				if (dres && dres.error) {
 					_bt_invokeCallback(
 						callback,

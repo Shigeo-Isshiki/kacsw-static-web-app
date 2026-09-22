@@ -22,7 +22,7 @@
   - [`generateZenginData(headerData, records, callback)`](#generateZenginData)
   - [`generateZenginDataAsync(headerData, records)`](#generateZenginDataAsync)
   - [`generateHeader(headerData, callback)`](#generateHeader)
-  - [`generateDataRecords(records, fromBankNo, callback)`](#generateDataRecords)
+  - [`generateDataRecords(records, fromBankNo, options?, callback)`](#generateDataRecords)
   - [`normalizeEdiInfo(input, options)`](#normalizeEdiInfo)
   - [`normalizePayeeName(name)`](#normalizePayeeName)
   - [`normalizeAccountNumber(input)`](#normalizeAccountNumber)
@@ -60,7 +60,7 @@
 - `parseZenginFile(options)`
 - `encodeSjis(input)`
 - `generateHeader(headerData, callback)`
-- `generateDataRecords(records, fromBankNo, callback)`
+- `generateDataRecords(records, fromBankNo, options?, callback)`
 - `generateTrailer(summaryData, callback)`
 - `generateEndRecord(callback)`
 - `generateZenginData(headerData, records, callback)`
@@ -266,6 +266,7 @@ window.BANK.getBranch('0005', '横浜', (res) => {
 
 - 入力の数字がミスフォーマット（全角数字やハイフン混入等）の場合は内部で半角化・除去処理を行いますが、ルール外の値はエラーになります。
 - 戻り値には全銀向けに整形した `accountNumber`（7 桁ゼロ埋め）や、対応する銀行コード/支店コードが含まれる場合があります（外部 API 依存）。
+- **`generateZenginData` / `generateZenginDataAsync` / `generateDataRecords` はこの変換を内部で自動的には行いません。** ゆうちょ口座を記号・番号形式（例: 記号 `12345` + 番号 `1234567`）でしか持っていない場合は、必ず本関数で全銀手順形式（支店コード3桁＋口座番号7桁）に変換してから `toBranchNo`/`toAccountNumber`（または依頼人側の `fromBranchNo`/`accountNumber`）に渡してください。記号・番号の生データをそのまま渡すと、エラーにならず誤った支店コード・口座番号としてデータが生成されてしまいます。
 
 例:
 
@@ -326,6 +327,8 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
       amount,
       customerKana,
       ediInfo,
+      employeeCode1,
+      employeeCode2,
       processResultCode,
       processResultLabel
     }
@@ -366,7 +369,8 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
   - `toAccountNumber` (string) — 受取人口座番号。7桁文字列です。
   - `amount` (number) — 振込金額。文字列ではなく数値に変換して返します。
   - `customerKana` (string) — 受取人名義カナ。行末スペースを除去した値です。
-  - `ediInfo` (string) — EDI 情報欄。空欄の場合は空文字です。
+  - `ediInfo` (string) — EDI 情報欄。`headerData.typeCode` が `'11'`/`'12'`（給与振込・賞与振込）の場合は常に空文字になります（92～111バイト目は従業員コードとして解釈されるため）。それ以外（総合振込）では空欄の場合も含め、当該バイト列をそのまま返します。
+  - `employeeCode1` / `employeeCode2` (string) — 従業員コード1/2。`headerData.typeCode` が `'11'`/`'12'`（給与振込・賞与振込）の場合にデータレコードの92～101バイト目/102～111バイト目からそれぞれ抽出します。総合振込の場合は常に空文字です。
   - `processResultCode` (string) — 処理結果コード。既定では114桁目（1-based）の1文字を読みます。例: `"0"`, `"1"`, `"2"`, `"8"`, `"9"`。
   - `processResultLabel` (string) — `processResultCode` を業務上読みやすい文言へ変換したラベルです。例: `"正常"`, `"該当口座なし"`, `"氏名相違"`。
 
@@ -386,6 +390,7 @@ window.BANK.convertYucho('12345', '1234567', (res) => {
 
 - 返却される `records` はデータ区分 `2` のレコードのみです。ヘッダ・トレーラ・エンドは `records` に含みません。
 - `headerData` は `generateZenginData` に渡すヘッダ項目と照合しやすいように整形して返します。
+- `headerData.typeCode` が `'11'`/`'12'`（給与振込・賞与振込）の場合、データレコードの92～111バイト目を `employeeCode1`/`employeeCode2`（各10byte）として解釈します。それ以外（総合振込）の場合は同じバイト範囲を `ediInfo`（20byte）として解釈します。呼び出し側で切り替えを指定する必要はなく、読み込んだファイルのヘッダから自動判定されます。ヘッダが存在しないファイルは総合振込として扱われます。
 - `trailerData` はトレーラレコード（データ区分 `8`）から、処理済/処理不能の件数・金額を抽出した要約です。
 - 処理結果コードは既定で114桁目（1-based）の1文字を読みます。
 - 文字コードは現状 `TextDecoder` による `UTF-8` / `Shift_JIS` 判定です。
@@ -529,6 +534,10 @@ console.log(payDate); // '2025-11-13'
   - depositType: string|number — 預金種目（'普通'/'当座' またはコード '1'/'2' 等）。
   - accountNumber: string|number — 依頼人口座番号。
 
+> **注意（ゆうちょ銀行宛の場合）**: `fromBranchNo` / `accountNumber` も `records` 側と同様に、常に全銀手順形式（支店コード3桁＋口座番号7桁）として扱われます。記号・番号形式からの自動変換は行われないため、必要な場合は事前に [`convertYucho`](#convertYucho) で変換してください。
+
+> **総合振込 / 給与振込の自動判定**: `headerData.typeCode` が `'11'`/`'12'`（または `'給与振込'`/`'賞与振込'`）の場合はデータレコードのフォーマットを給与振込様式（下記 [`generateDataRecords`](#generateDataRecords) 参照）に切り替えます。それ以外（`'21'` / `'総合振込'` 等）は従来どおり総合振込様式（EDI情報モード）になります。
+
 - records (Array<object>) — 振込明細の配列。各要素の主要プロパティ:
   - toBankNo: string — 受取側銀行コード（4桁）。必須。
   - toBranchNo: string — 受取側支店コード（3桁）。必須。
@@ -537,7 +546,11 @@ console.log(payDate); // '2025-11-13'
   - amount: number — 振込金額（整数）。必須。
   - customerName: string — 振込先氏名（日本語）。内部で正規化・SJIS 切り詰めされます。
   - customerKana: string — 受取人カナ（任意）。
-  - ediInfo / reference: object|string — EDI 補助情報（任意）。
+  - ediInfo / reference: object|string — EDI 補助情報（任意。総合振込のみ使用）。
+  - employeeCode1 / employeeCode2: string|number — 従業員コード1/2（各最大10桁の数字、任意。給与振込・賞与振込（`headerData.typeCode` が `'11'`/`'12'`）のときのみ使用）。空またはオールスペースも可。
+
+> **注意（ゆうちょ銀行宛の場合）**: `toBranchNo` / `toAccountNumber` は常に**全銀手順形式（支店コード3桁＋口座番号7桁）で指定してください**。ゆうちょの「記号（5桁）+ 番号（最大8桁）」形式のデータをそのまま渡しても自動変換は行われません。記号/番号形式しか手元にない場合は、事前に [`convertYucho(kigou, bangou, callback)`](#convertYucho) で全銀手順形式に変換してから渡してください。
+> また、依頼人・受取人の双方がゆうちょ銀行（銀行コード `9900`）の場合、受取側の支店名カナ照会（API）は行われず `toBranchKana` は空文字として扱われます。
 
 - callback (function(result)) — single-arg スタイルを推奨。成功時は次の形式を返します:
   { success: true, content: '<CRLF 結合文字列>', parts: { header, data, trailer, end } }
@@ -586,11 +599,18 @@ console.log(result.content);
 
 <a id="generateDataRecords"></a>
 
-##### `generateDataRecords(records, fromBankNo, callback)`
+##### `generateDataRecords(records, fromBankNo, options?, callback)`
 
 - 概要: `records` 配列からデータ行群（CRLFで結合）を生成します。`fromBankNo` があると仕向銀行情報を参照します。
+- 引数:
+  - `options` (object, optional) — `transferType` に `headerData.typeCode` と完全に同じ値（`'11'`/`'12'`/`'21'`、`'給与振込'`/`'賞与振込'`/`'総合振込'`）を指定します。`'11'`/`'12'`（給与振込/賞与振込）は従業員コード様式、それ以外（`'21'`等、未指定を含む）は総合振込様式（既定）です。省略時・第三引数にコールバック関数を渡した場合は従来どおり総合振込様式として動作します（後方互換）。
 - 戻り値（コールバック）: `{ data: '<CRLFで結合されたデータ行>' }`
-- 例: `window.BANK.generateDataRecords(records, '0001', res => console.log(res.data));`
+- 例（総合振込・従来どおり）: `window.BANK.generateDataRecords(records, '0001', res => console.log(res.data));`
+- 例（給与振込）: `window.BANK.generateDataRecords(records, '0001', { transferType: '11' }, res => console.log(res.data));`
+- 注意: `toBranchNo`/`toAccountNumber` は常に全銀手順形式（支店コード3桁＋口座番号7桁）として解釈されます。ゆうちょの記号/番号形式からの自動変換は行われないため、必要な場合は事前に [`convertYucho`](#convertYucho) で変換してください。仕向・被仕向の双方がゆうちょ銀行（`9900`）の場合は支店情報の API 照会自体をスキップし、受取側の支店カナ（`toBranchKana`）は空文字として扱われます。
+- 総合振込（`headerData.typeCode` が `'21'`等・既定）ではデータレコードの92～113バイト目に EDI情報（20byte）＋振込指定区分（1byte, 固定 `'7'`）＋識別表示（1byte, 固定 `'Y'`）が設定されます（従来どおり）。
+- 給与振込（`headerData.typeCode` が `'11'`/`'12'`）ではデータレコードの92～113バイト目に `employeeCode1`（10byte）＋`employeeCode2`（10byte）＋予備（2byte, スペース固定）が設定されます。`ediInfo` は無視されます。`employeeCode1`/`employeeCode2` は全角数字の半角化・左ゼロ埋めを行い、未指定またはオールスペース入力も許容します。
+- `generateZenginData` / `generateZenginDataAsync` 経由で呼び出す場合は、`headerData.typeCode` から `transferType` 相当の値が自動判定されるため、この `options` を明示的に渡す必要はありません。
 
 <a id="generateTrailer"></a>
 

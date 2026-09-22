@@ -908,7 +908,7 @@ try {
 
 	const headerArr = makeFixedLine();
 	put(headerArr, 0, '1');
-	put(headerArr, 1, '11');
+	put(headerArr, 1, '21');
 	put(headerArr, 3, '0');
 	put(headerArr, 4, '1234567890');
 	put(headerArr, 14, 'ﾃｽﾄｲﾗｲﾆﾝ');
@@ -988,7 +988,7 @@ try {
 				assert.ok(res && res.success, 'parseZenginFile should resolve success:true');
 				assert.ok(res.headerData, 'headerData should exist');
 				assert.ok(res.trailerData, 'trailerData should exist');
-				assert.strictEqual(res.headerData.typeCode, '11');
+				assert.strictEqual(res.headerData.typeCode, '21');
 				assert.strictEqual(res.headerData.requesterCode, '1234567890');
 				assert.strictEqual(res.headerData.fromBankNo, '0001');
 				assert.strictEqual(res.headerData.depositType, '1');
@@ -1006,6 +1006,8 @@ try {
 				assert.strictEqual(res.records[0].amount, 1000);
 				assert.strictEqual(res.records[0].customerKana, 'ﾔﾏﾀﾞﾀﾛｳ');
 				assert.strictEqual(res.records[0].ediInfo.trim(), 'EDI-TEST');
+				assert.strictEqual(res.records[0].employeeCode1, '');
+				assert.strictEqual(res.records[0].employeeCode2, '');
 				assert.strictEqual(res.records[0].processResultCode, '2');
 				assert.strictEqual(res.records[0].processResultLabel, '氏名相違');
 				assert.strictEqual(res.meta.detectedEncoding, 'UTF8');
@@ -1025,10 +1027,118 @@ try {
 			global.document = originalDocument;
 			global.addEventListener = originalAddEventListener;
 			global.removeEventListener = originalRemoveEventListener;
+		})
+		.finally(() => {
+			runParseZenginFilePayrollTest();
 		});
 } catch (e) {
 	console.error('FAIL: parseZenginFile setup', e && e.message ? e.message : e);
 	process.exitCode = 2;
+}
+
+// ---------------------- parseZenginFile (給与振込) test ----------------------
+// 上記テストの finally 後に直列実行し、document/addEventListener モックの上書き竞合を避ける
+function runParseZenginFilePayrollTest() {
+	try {
+	const originalDocument = global.document;
+	const originalAddEventListener = global.addEventListener;
+	const originalRemoveEventListener = global.removeEventListener;
+
+	const makeFixedLine = () => new Array(120).fill(' ');
+	const put = (arr, start, text) => {
+		for (let i = 0; i < String(text).length; i++) arr[start + i] = String(text).charAt(i);
+	};
+	const toLine = (arr) => arr.join('');
+
+	const headerArr = makeFixedLine();
+	put(headerArr, 0, '1');
+	put(headerArr, 1, '11');
+	put(headerArr, 95, '1');
+	const headerLine = toLine(headerArr);
+
+	const dataArr = makeFixedLine();
+	put(dataArr, 0, '2');
+	put(dataArr, 1, '0005');
+	put(dataArr, 20, '123');
+	put(dataArr, 42, '1');
+	put(dataArr, 43, '7654321');
+	put(dataArr, 80, '0000001000');
+	put(dataArr, 91, '123'); // employeeCode1
+	put(dataArr, 101, '456'); // employeeCode2
+	const dataLine = toLine(dataArr);
+
+	const content = headerLine + '\r\n' + dataLine;
+	const fakeFile = {
+		arrayBuffer: async () => new TextEncoder().encode(content).buffer,
+	};
+
+	const body = {
+		appendChild(node) {
+			node.parentNode = this;
+		},
+		removeChild(node) {
+			node.parentNode = null;
+		},
+	};
+
+	global.document = {
+		body,
+		documentElement: body,
+		createElement(tag) {
+			assert.strictEqual(tag, 'input', 'file picker should create input element');
+			const listeners = {};
+			return {
+				type: '',
+				accept: '',
+				style: {},
+				files: null,
+				parentNode: null,
+				addEventListener(name, handler) {
+					listeners[name] = handler;
+				},
+				click() {
+					this.files = [fakeFile];
+					if (listeners.change) listeners.change();
+				},
+			};
+		},
+	};
+	global.addEventListener = () => {};
+	global.removeEventListener = () => {};
+
+	BANK.parseZenginFile({ encoding: 'UTF8', strict: true })
+		.then((res) => {
+			try {
+				assert.ok(res && res.success, 'parseZenginFile should resolve success:true');
+				assert.strictEqual(res.headerData.typeCode, '11');
+				assert.strictEqual(res.records.length, 1);
+				assert.strictEqual(res.records[0].employeeCode1, '123');
+				assert.strictEqual(res.records[0].employeeCode2, '456');
+				assert.strictEqual(res.records[0].ediInfo, '');
+				console.log('PASS: parseZenginFile parses payroll employee codes');
+			} catch (e) {
+				console.error(
+					'FAIL: parseZenginFile payroll assertions',
+					e && e.message ? e.message : e
+				);
+				process.exitCode = 2;
+			} finally {
+				global.document = originalDocument;
+				global.addEventListener = originalAddEventListener;
+				global.removeEventListener = originalRemoveEventListener;
+			}
+		})
+		.catch((e) => {
+			console.error('FAIL: parseZenginFile payroll invocation', e && e.message ? e.message : e);
+			process.exitCode = 2;
+			global.document = originalDocument;
+			global.addEventListener = originalAddEventListener;
+			global.removeEventListener = originalRemoveEventListener;
+		});
+	} catch (e) {
+		console.error('FAIL: parseZenginFile payroll setup', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
 }
 
 try {
