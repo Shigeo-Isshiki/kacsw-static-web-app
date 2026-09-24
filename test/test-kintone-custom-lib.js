@@ -703,13 +703,20 @@ const { JSDOM } = require('jsdom');
 	let showConfirmBottomSheetCalled = 0;
 	let nextConfirmAction = 'OK';
 	let lastConfirmConfig = null;
+	let lastDialogContainer = null;
 	global.kintone = global.kintone || {};
 	global.kintone.createDialog = (config) => {
 		createDialogCalled += 1;
 		const container = document.createElement('div');
+		lastDialogContainer = container;
 		const okBtn = document.createElement('button');
 		okBtn.className = 'kintone-dialog-ok-button';
 		container.appendChild(okBtn);
+		if (config && config.showCancelButton) {
+			const cancelBtn = document.createElement('button');
+			cancelBtn.className = 'kintone-dialog-cancel-button';
+			container.appendChild(cancelBtn);
+		}
 		if (config && config.body) container.appendChild(config.body);
 		return {
 			element: container,
@@ -751,6 +758,12 @@ const { JSDOM } = require('jsdom');
 		const errMsg = document.querySelector('.kc-notify-error__message');
 		assert.ok(errMsg, 'error message element exists');
 		assert.strictEqual(errMsg.textContent, '単純なエラー');
+		const firstOkButton = lastDialogContainer.querySelector('.kintone-dialog-ok-button');
+		assert.ok(firstOkButton, 'dialog OK button should exist');
+		assert.ok(
+			firstOkButton.classList.contains('kintoneplugin-button-dialog-ok'),
+			'dialog OK button should use 51-modern-default OK button class'
+		);
 
 		// HTML with potentially dangerous content should be sanitized
 		const malicious = '<span onclick="alert(1)">X</span><script>evil()</script>';
@@ -812,6 +825,11 @@ const { JSDOM } = require('jsdom');
 			const okBtn = document.createElement('button');
 			okBtn.className = 'kintone-dialog-ok-button';
 			container.appendChild(okBtn);
+			if (config && config.showCancelButton) {
+				const cancelBtn = document.createElement('button');
+				cancelBtn.className = 'kintone-dialog-cancel-button';
+				container.appendChild(cancelBtn);
+			}
 			if (config && config.body) container.appendChild(config.body);
 			return {
 				element: container,
@@ -968,6 +986,11 @@ const { JSDOM } = require('jsdom');
 		assert.ok(cancelledInputResult, 'cancelled input dialog should resolve result object');
 		assert.strictEqual(cancelledInputResult.action, 'CANCEL');
 		assert.strictEqual(cancelledInputResult.values, null);
+		const cancelButton = document.querySelector('.kintone-dialog-cancel-button');
+		assert.ok(
+			cancelButton.classList.contains('kintoneplugin-button-dialog-cancel'),
+			'dialog cancel button should use 51-modern-default cancel button class'
+		);
 
 		global.kintone.createDialog = (config) => {
 			createDialogCalled += 1;

@@ -744,13 +744,18 @@ const _kc_showDialog = (options) => {
 			return null;
 		};
 		const dialog = createUi();
-		const setOkAriaLabel = (dialogObj) => {
+		const enhanceDialogButtons = (dialogObj) => {
 			try {
 				const container = dialogObj.element || dialogObj.dialog || dialogObj.container || null;
 				if (container) {
 					const okBtn = container.querySelector('button.kintone-dialog-ok-button, button');
 					if (okBtn) {
 						okBtn.setAttribute('aria-label', String(okAriaLabel || okButtonText || 'OK'));
+						okBtn.classList.add('kintoneplugin-button-dialog-ok');
+					}
+					const cancelBtn = container.querySelector('button.kintone-dialog-cancel-button');
+					if (cancelBtn) {
+						cancelBtn.classList.add('kintoneplugin-button-dialog-cancel');
 					}
 				}
 			} catch {
@@ -761,7 +766,7 @@ const _kc_showDialog = (options) => {
 			if (!object || typeof object.show !== 'function') return Promise.resolve(undefined);
 			try {
 				const showResult = object.show();
-				setOkAriaLabel(object);
+				enhanceDialogButtons(object);
 				return Promise.resolve(showResult).catch((error) => {
 					console.error('ダイアログ/ボトムシート表示中にエラー:', error);
 					return undefined;

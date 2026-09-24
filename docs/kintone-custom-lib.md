@@ -235,6 +235,7 @@ setRecordValues(r, { a: 10, c: 3 });
 ### notifyError(message, title = 'エラー', allowHtml = false)
 
 - 動作概要: 指定メッセージを表示 UI で通知します。`allowHtml` が真の場合はサニタイズした HTML を挿入し、偽の場合はプレーンテキストとして表示します。アクセシビリティ用の属性（role/aria-live等）も設定されます。実行環境に応じて PC では `kintone.createDialog`、モバイルでは `kintone.mobile.createBottomSheet` を自動的に使用します（ランタイム初期化済みの場合はその判定を優先）。
+- ダイアログ API が返す OK ボタンには、可能な範囲で **「51-modern-default」スタイルシート**の `kintoneplugin-button-dialog-ok` クラスを付与します。
 - 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 戻り値: `Promise<string | undefined>` を返します。`await` すると、通常は `OK` を受け取れます（notify 系は OK ボタンのみ表示）。ダイアログ API が利用できない場合や内部エラー時は `undefined` になります。`CANCEL` / `CLOSE` / `FUNCTION` は notify 系の現行設定では通常発生しません。
 
@@ -317,6 +318,7 @@ console.log('notifyWarning action:', warningAction);
 ### showYesNoDialog(message, title = '確認', options)
 
 - 動作概要: `はい / いいえ` の2択確認ダイアログを表示します。PC では `kintone.showConfirmDialog()`、モバイルでは `kintone.mobile.showConfirmBottomSheet()` を優先し、利用できない場合は共通ダイアログ実装にフォールバックします。モバイル判定はランタイム初期化済みならその設定を優先します。
+- 共通ダイアログ実装を使う場合、OK 側ボタンには `kintoneplugin-button-dialog-ok`、キャンセル側ボタンには `kintoneplugin-button-dialog-cancel` を付与します。kintone と調和した外観にするには、アプリに `https://js.kacsw.or.jp/51-modern-default.css` を適用してください。
 - 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 戻り値: `Promise<boolean>`。`はい` 相当の操作なら `true`、`いいえ` やダイアログ表示失敗時は `false` を返します。
 
@@ -349,7 +351,7 @@ if (shouldUpdate) {
 ### showInputDialog(options)
 
 - 動作概要: `createDialog()` / `createBottomSheet()` を使って、入力フォーム付きダイアログを表示します。kintone のフィールド型に合わせて、`SINGLE_LINE_TEXT`、`NUMBER`、`DATE`、`MULTI_LINE_TEXT`、`RADIO_BUTTON`、`CHECK_BOX`、`DROP_DOWN` の入力欄を宣言的に構成できます。後方互換のため、従来の `text`、`number`、`date`、`textarea`、`radio`、`checkbox`、`dropdown` も指定できます。
-- 生成される入力欄には、可能な範囲で **「51-modern-default」スタイルシート**のクラス（例: `kintoneplugin-input-text`、`kintoneplugin-select`、`kintoneplugin-input-radio`、`kintoneplugin-input-checkbox`）を付与します。kintone と調和した外観にするには、アプリに `https://js.kacsw.or.jp/51-modern-default.css` を適用してください。
+- 生成される入力欄とダイアログボタンには、可能な範囲で **「51-modern-default」スタイルシート**のクラス（例: `kintoneplugin-input-text`、`kintoneplugin-select`、`kintoneplugin-input-radio`、`kintoneplugin-input-checkbox`、`kintoneplugin-button-dialog-ok`、`kintoneplugin-button-dialog-cancel`）を付与します。kintone と調和した外観にするには、アプリに `https://js.kacsw.or.jp/51-modern-default.css` を適用してください。
 - 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 入力値の扱い:
   - `number` はライブラリ側でも数値文字列かどうかを再検証し、`NaN` や文字列混入を返しません。
@@ -376,27 +378,27 @@ if (shouldUpdate) {
 
 `fields[].type` は kintone のフィールド形式を表す文字列として指定します。基本的には kintone REST API やフィールド設定で使われるフィールド形式名に合わせ、英大文字とアンダースコアの形式で指定してください。
 
-| 指定する文字列 | 対応する入力欄 | `values[name]` の型 | 備考 |
-| --- | --- | --- | --- |
-| `SINGLE_LINE_TEXT` | 1行テキスト | `string` / 未入力時 `null` | `maxLength`、`pattern` を指定できます。 |
-| `NUMBER` | 数値 | `number` / 未入力時 `null` | `min`、`max`、`step` を指定できます。 |
-| `DATE` | 日付 | `string` / 未入力時 `null` | 入力値は `YYYY-MM-DD` 形式へ正規化されます。 |
-| `MULTI_LINE_TEXT` | 複数行テキスト | `string` / 未入力時 `null` | `maxLength`、`pattern` を指定できます。 |
-| `RADIO_BUTTON` | ラジオボタン | `string` / 未選択時 `null` | `options` が必要です。 |
-| `CHECK_BOX` | チェックボックス | `Array<string>` | `options` が必要です。未選択時は `[]` を返します。 |
-| `DROP_DOWN` | ドロップダウン | `string` / 未選択時 `null` | `options` が必要です。 |
+| 指定する文字列     | 対応する入力欄   | `values[name]` の型        | 備考                                               |
+| ------------------ | ---------------- | -------------------------- | -------------------------------------------------- |
+| `SINGLE_LINE_TEXT` | 1行テキスト      | `string` / 未入力時 `null` | `maxLength`、`pattern` を指定できます。            |
+| `NUMBER`           | 数値             | `number` / 未入力時 `null` | `min`、`max`、`step` を指定できます。              |
+| `DATE`             | 日付             | `string` / 未入力時 `null` | 入力値は `YYYY-MM-DD` 形式へ正規化されます。       |
+| `MULTI_LINE_TEXT`  | 複数行テキスト   | `string` / 未入力時 `null` | `maxLength`、`pattern` を指定できます。            |
+| `RADIO_BUTTON`     | ラジオボタン     | `string` / 未選択時 `null` | `options` が必要です。                             |
+| `CHECK_BOX`        | チェックボックス | `Array<string>`            | `options` が必要です。未選択時は `[]` を返します。 |
+| `DROP_DOWN`        | ドロップダウン   | `string` / 未選択時 `null` | `options` が必要です。                             |
 
 後方互換のため、従来の短い指定も受け付けます。
 
-| 従来指定 | 正規化後の扱い |
-| --- | --- |
-| `text` | `SINGLE_LINE_TEXT` 相当 |
-| `number` | `NUMBER` 相当 |
-| `date` | `DATE` 相当 |
-| `textarea` | `MULTI_LINE_TEXT` 相当 |
-| `radio` | `RADIO_BUTTON` 相当 |
-| `checkbox` | `CHECK_BOX` 相当 |
-| `dropdown` / `select` | `DROP_DOWN` 相当 |
+| 従来指定              | 正規化後の扱い          |
+| --------------------- | ----------------------- |
+| `text`                | `SINGLE_LINE_TEXT` 相当 |
+| `number`              | `NUMBER` 相当           |
+| `date`                | `DATE` 相当             |
+| `textarea`            | `MULTI_LINE_TEXT` 相当  |
+| `radio`               | `RADIO_BUTTON` 相当     |
+| `checkbox`            | `CHECK_BOX` 相当        |
+| `dropdown` / `select` | `DROP_DOWN` 相当        |
 
 - `fields[].value` (string | number | Array<string>, optional) — 初期値。`CHECK_BOX` では配列指定できます。
 - `fields[].placeholder` (string, optional) — プレースホルダー
