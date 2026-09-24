@@ -348,7 +348,8 @@ if (shouldUpdate) {
 
 ### showInputDialog(options)
 
-- 動作概要: `createDialog()` / `createBottomSheet()` を使って、入力フォーム付きダイアログを表示します。`text`、`number`、`date`、`textarea` の入力欄を宣言的に構成できます。
+- 動作概要: `createDialog()` / `createBottomSheet()` を使って、入力フォーム付きダイアログを表示します。kintone のフィールド型に合わせて、`SINGLE_LINE_TEXT`、`NUMBER`、`DATE`、`MULTI_LINE_TEXT`、`RADIO_BUTTON`、`CHECK_BOX`、`DROP_DOWN` の入力欄を宣言的に構成できます。後方互換のため、従来の `text`、`number`、`date`、`textarea`、`radio`、`checkbox`、`dropdown` も指定できます。
+- 生成される入力欄には、可能な範囲で **「51-modern-default」スタイルシート**のクラス（例: `kintoneplugin-input-text`、`kintoneplugin-select`、`kintoneplugin-input-radio`、`kintoneplugin-input-checkbox`）を付与します。kintone と調和した外観にするには、アプリに `https://js.kacsw.or.jp/51-modern-default.css` を適用してください。
 - 文字サイズ・行間: 共通設定（[ダイアログ文字スタイル共通設定](#dialog-text-style)）を参照してください。
 - 入力値の扱い:
   - `number` はライブラリ側でも数値文字列かどうかを再検証し、`NaN` や文字列混入を返しません。
@@ -357,6 +358,8 @@ if (shouldUpdate) {
   - `date` の入力エラー時は、例として `2026-06-18` や `20260618` を含む案内メッセージを表示します。
   - `required: true` を付けた項目は空文字を許可しません。
   - `text` / `textarea` では `maxLength` と `pattern` による追加バリデーションを指定できます。
+  - `RADIO_BUTTON` / `DROP_DOWN` は選択値を文字列で返します。未選択かつ必須でない場合は `null` を返します。
+  - `CHECK_BOX` は選択値を文字列配列で返します。未選択の場合は空配列 `[]` を返します。
 - 検証エラー時の表示: 検証に失敗した場合はダイアログを閉じず、`notifyError()` を使ってフィールド名付きのエラーメッセージを統一的に表示します。ユーザーは入力値を保持したまま、その場で修正して再実行できます。
 - フォーカス制御: 検証エラー後は、最初の不正項目へフォーカスを戻します。
 - 戻り値: `Promise<{ action: string | undefined, values: Object | null } | undefined>`。`action === 'OK'` の場合に `values` に入力結果が入ります。キャンセル時は `values` は `null` です。入力エラーだけではダイアログは閉じないため、`VALIDATION_ERROR` は返しません。
@@ -369,10 +372,36 @@ if (shouldUpdate) {
 - `options.fields` (Array<Object>) — 入力欄定義
 - `fields[].name` (string) — 返却値オブジェクトのキーになる名前
 - `fields[].label` (string) — 表示ラベル
-- `fields[].type` (string) — `text` / `number` / `date` / `textarea`
-- `fields[].value` (string | number, optional) — 初期値
+- `fields[].type` (string) — `SINGLE_LINE_TEXT` / `NUMBER` / `DATE` / `MULTI_LINE_TEXT` / `RADIO_BUTTON` / `CHECK_BOX` / `DROP_DOWN`（従来形式として `text` / `number` / `date` / `textarea` / `radio` / `checkbox` / `dropdown` も可）
+
+`fields[].type` は kintone のフィールド形式を表す文字列として指定します。基本的には kintone REST API やフィールド設定で使われるフィールド形式名に合わせ、英大文字とアンダースコアの形式で指定してください。
+
+| 指定する文字列 | 対応する入力欄 | `values[name]` の型 | 備考 |
+| --- | --- | --- | --- |
+| `SINGLE_LINE_TEXT` | 1行テキスト | `string` / 未入力時 `null` | `maxLength`、`pattern` を指定できます。 |
+| `NUMBER` | 数値 | `number` / 未入力時 `null` | `min`、`max`、`step` を指定できます。 |
+| `DATE` | 日付 | `string` / 未入力時 `null` | 入力値は `YYYY-MM-DD` 形式へ正規化されます。 |
+| `MULTI_LINE_TEXT` | 複数行テキスト | `string` / 未入力時 `null` | `maxLength`、`pattern` を指定できます。 |
+| `RADIO_BUTTON` | ラジオボタン | `string` / 未選択時 `null` | `options` が必要です。 |
+| `CHECK_BOX` | チェックボックス | `Array<string>` | `options` が必要です。未選択時は `[]` を返します。 |
+| `DROP_DOWN` | ドロップダウン | `string` / 未選択時 `null` | `options` が必要です。 |
+
+後方互換のため、従来の短い指定も受け付けます。
+
+| 従来指定 | 正規化後の扱い |
+| --- | --- |
+| `text` | `SINGLE_LINE_TEXT` 相当 |
+| `number` | `NUMBER` 相当 |
+| `date` | `DATE` 相当 |
+| `textarea` | `MULTI_LINE_TEXT` 相当 |
+| `radio` | `RADIO_BUTTON` 相当 |
+| `checkbox` | `CHECK_BOX` 相当 |
+| `dropdown` / `select` | `DROP_DOWN` 相当 |
+
+- `fields[].value` (string | number | Array<string>, optional) — 初期値。`CHECK_BOX` では配列指定できます。
 - `fields[].placeholder` (string, optional) — プレースホルダー
 - `fields[].required` (boolean, optional) — 必須属性
+- `fields[].options` (Array<string | Object> | Object, optional) — `RADIO_BUTTON` / `CHECK_BOX` / `DROP_DOWN` の選択肢。配列または kintone フィールド設定の `options` 形式を指定できます。
 - `fields[].min` / `fields[].max` / `fields[].step` — `number` や `date` に渡す属性値
 - `fields[].maxLength` (number, optional) — `text` / `textarea` の最大文字数
 - `fields[].pattern` (string, optional) — 入力値が一致すべき正規表現パターン
@@ -390,6 +419,30 @@ const result = await showInputDialog({
 		{ name: 'count', label: '件数', type: 'number', min: 1, step: 1 },
 		{ name: 'dueDate', label: '期限', type: 'date' },
 		{
+			name: 'priority',
+			label: '優先度',
+			type: 'RADIO_BUTTON',
+			options: ['低', '中', '高'],
+			value: '中',
+		},
+		{
+			name: 'tags',
+			label: '分類',
+			type: 'CHECK_BOX',
+			options: ['至急', '確認待ち', '請求関連'],
+			value: ['至急'],
+		},
+		{
+			name: 'status',
+			label: '状態',
+			type: 'DROP_DOWN',
+			required: true,
+			options: [
+				{ label: '未対応', value: 'open' },
+				{ label: '完了', value: 'done' },
+			],
+		},
+		{
 			name: 'memo',
 			label: 'メモ',
 			type: 'textarea',
@@ -403,6 +456,9 @@ if (result && result.action === 'OK') {
 	console.log(result.values.title);
 	console.log(result.values.count);
 	console.log(result.values.dueDate);
+	console.log(result.values.priority);
+	console.log(result.values.tags);
+	console.log(result.values.status);
 	console.log(result.values.memo);
 }
 ```

@@ -834,11 +834,12 @@ const { JSDOM } = require('jsdom');
 
 		const inputResult = await window.showInputDialog({
 			title: 'タスク登録',
+			description: '必要な項目を入力してください。',
 			okButtonText: '登録',
 			fields: [
-				{ name: 'title', label: 'タイトル', type: 'text' },
-				{ name: 'count', label: '件数', type: 'number' },
-				{ name: 'dueDate', label: '期限', type: 'date' },
+				{ name: 'title', label: 'タイトル', type: 'SINGLE_LINE_TEXT', required: true },
+				{ name: 'count', label: '件数', type: 'NUMBER' },
+				{ name: 'dueDate', label: '期限', type: 'DATE' },
 			],
 		});
 		assert.ok(inputResult, 'showInputDialog should resolve result object');
@@ -848,6 +849,102 @@ const { JSDOM } = require('jsdom');
 			count: 3,
 			dueDate: '2026-06-18',
 		});
+		assert.ok(
+			document.querySelector('.kc-input-dialog .kintoneplugin-desc'),
+			'input dialog description should use kintone plugin description class'
+		);
+		assert.ok(
+			document.querySelector('.kc-input-dialog__field.kintoneplugin-row'),
+			'input dialog field should use kintone plugin row class'
+		);
+		assert.ok(
+			document.querySelector('.kc-input-dialog__label .kintoneplugin-require'),
+			'required field label should show kintone plugin required mark'
+		);
+		assert.ok(
+			document.querySelector('.kintoneplugin-input-outer .kintoneplugin-input-text[name="title"]'),
+			'text input should use kintone plugin text input classes'
+		);
+
+		global.kintone.createDialog = (config) => {
+			createDialogCalled += 1;
+			const container = document.createElement('div');
+			const okBtn = document.createElement('button');
+			okBtn.className = 'kintone-dialog-ok-button';
+			container.appendChild(okBtn);
+			if (config && config.body) container.appendChild(config.body);
+			return {
+				element: container,
+				show: async () => {
+					const priorityRadio = config.body.querySelector('[name="priority"][value="高"]');
+					const invoiceCheckbox = config.body.querySelector('[name="tags"][value="請求関連"]');
+					const reviewCheckbox = config.body.querySelector('[name="tags"][value="確認待ち"]');
+					const statusSelect = config.body.querySelector('[name="status"]');
+					if (priorityRadio) priorityRadio.checked = true;
+					if (invoiceCheckbox) invoiceCheckbox.checked = true;
+					if (reviewCheckbox) reviewCheckbox.checked = true;
+					if (statusSelect) statusSelect.value = 'done';
+					document.body.appendChild(container);
+					const canClose = config.beforeClose ? await config.beforeClose('OK') : true;
+					assert.strictEqual(canClose, true, 'choice input should allow dialog close');
+					return 'OK';
+				},
+			};
+		};
+		const choiceInputResult = await window.showInputDialog({
+			title: '選択肢入力',
+			fields: [
+				{
+					name: 'priority',
+					label: '優先度',
+					type: 'RADIO_BUTTON',
+					required: true,
+					options: ['低', '中', '高'],
+				},
+				{
+					name: 'tags',
+					label: '分類',
+					type: 'CHECK_BOX',
+					options: ['至急', '確認待ち', '請求関連'],
+					value: ['至急'],
+				},
+				{
+					name: 'status',
+					label: '状態',
+					type: 'DROP_DOWN',
+					required: true,
+					options: {
+						open: { label: '未対応', index: '0' },
+						done: { label: '完了', index: '1' },
+					},
+				},
+			],
+		});
+		assert.ok(choiceInputResult, 'choice input dialog should resolve result object');
+		assert.strictEqual(choiceInputResult.action, 'OK');
+		assert.deepStrictEqual(choiceInputResult.values, {
+			priority: '高',
+			tags: ['至急', '確認待ち', '請求関連'],
+			status: 'done',
+		});
+		assert.ok(
+			document.querySelector(
+				'.kintoneplugin-input-radio .kintoneplugin-input-radio-item input[name="priority"] + label'
+			),
+			'radio input should use 51-modern-default structure'
+		);
+		assert.ok(
+			document.querySelector(
+				'.kintoneplugin-input-checkbox .kintoneplugin-input-checkbox-item input[name="tags"] + label'
+			),
+			'checkbox input should use 51-modern-default structure'
+		);
+		assert.ok(
+			document.querySelector(
+				'.kintoneplugin-select-outer .kintoneplugin-select select[name="status"]'
+			),
+			'dropdown should use kintone plugin select structure'
+		);
 
 		global.kintone.createDialog = (config) => {
 			createDialogCalled += 1;

@@ -206,25 +206,117 @@ const _kc_applyDialogTextStyle = (element) => {
 	element.style.lineHeight = _KC_DIALOG_TEXT_LINE_HEIGHT;
 };
 
+const _KC_INPUT_TYPE_ALIASES = {
+	text: 'text',
+	SINGLE_LINE_TEXT: 'text',
+	number: 'number',
+	NUMBER: 'number',
+	date: 'date',
+	DATE: 'date',
+	textarea: 'textarea',
+	MULTI_LINE_TEXT: 'textarea',
+	radio: 'radio',
+	RADIO_BUTTON: 'radio',
+	checkbox: 'checkbox',
+	CHECK_BOX: 'checkbox',
+	dropdown: 'dropdown',
+	select: 'dropdown',
+	DROP_DOWN: 'dropdown',
+};
+
+const _kc_normalizeInputType = (type) => {
+	const rawType = typeof type === 'string' && type.trim() ? type.trim() : 'text';
+	return _KC_INPUT_TYPE_ALIASES[rawType] || _KC_INPUT_TYPE_ALIASES[rawType.toUpperCase()] || null;
+};
+
 const _kc_isSupportedInputType = (type) => {
-	return ['text', 'number', 'date', 'textarea'].indexOf(type) !== -1;
+	return (
+		['text', 'number', 'date', 'textarea', 'radio', 'checkbox', 'dropdown'].indexOf(type) !== -1
+	);
+};
+
+const _kc_isChoiceInputType = (type) => {
+	return ['radio', 'checkbox', 'dropdown'].indexOf(type) !== -1;
+};
+
+const _kc_normalizeInputChoice = (choice) => {
+	if (choice === undefined || choice === null) return null;
+	if (typeof choice !== 'object') {
+		const value = String(choice);
+		return { label: value, value, disabled: false };
+	}
+	const rawValue =
+		choice.value !== undefined && choice.value !== null ? choice.value : choice.label;
+	const value = rawValue !== undefined && rawValue !== null ? String(rawValue) : '';
+	if (!value) return null;
+	const label =
+		typeof choice.label === 'string' && choice.label.trim() ? choice.label : String(value);
+	return {
+		label,
+		value,
+		disabled: choice.disabled === true,
+	};
+};
+
+const _kc_normalizeInputChoices = (options) => {
+	if (Array.isArray(options)) {
+		return options.map((choice) => _kc_normalizeInputChoice(choice)).filter((choice) => !!choice);
+	}
+	if (options && typeof options === 'object') {
+		return Object.keys(options)
+			.sort((left, right) => {
+				const leftIndex = Number(options[left] && options[left].index);
+				const rightIndex = Number(options[right] && options[right].index);
+				if (Number.isFinite(leftIndex) && Number.isFinite(rightIndex))
+					return leftIndex - rightIndex;
+				if (Number.isFinite(leftIndex)) return -1;
+				if (Number.isFinite(rightIndex)) return 1;
+				return 0;
+			})
+			.map((key) => {
+				const option = options[key];
+				if (option && typeof option === 'object') {
+					return _kc_normalizeInputChoice({
+						label: option.label || key,
+						value: option.value || key,
+						disabled: option.disabled === true,
+					});
+				}
+				return _kc_normalizeInputChoice(key);
+			})
+			.filter((choice) => !!choice);
+	}
+	return [];
 };
 
 const _kc_normalizeInputField = (field, index) => {
 	if (!field || typeof field !== 'object') return null;
 	const name = typeof field.name === 'string' ? field.name.trim() : '';
 	if (!name) return null;
-	const type = typeof field.type === 'string' ? field.type.trim().toLowerCase() : 'text';
+	const type = _kc_normalizeInputType(field.type);
 	if (!_kc_isSupportedInputType(type)) return null;
+	const choices = _kc_isChoiceInputType(type) ? _kc_normalizeInputChoices(field.options) : [];
+	if (_kc_isChoiceInputType(type) && choices.length === 0) return null;
 	const label =
 		typeof field.label === 'string' && field.label.trim()
 			? field.label
 			: '入力' + String(index + 1);
+	const value =
+		type === 'checkbox'
+			? Array.isArray(field.value)
+				? field.value.map((item) => String(item))
+				: field.value === undefined || field.value === null || field.value === ''
+					? []
+					: [String(field.value)]
+			: field.value === undefined || field.value === null
+				? ''
+				: String(field.value);
 	return {
 		name,
 		label,
 		type,
-		value: field.value === undefined || field.value === null ? '' : String(field.value),
+		value,
+		options: choices,
 		placeholder:
 			typeof field.placeholder === 'string' && field.placeholder.trim() ? field.placeholder : '',
 		required: field.required === true,
@@ -245,7 +337,86 @@ const _kc_normalizeInputField = (field, index) => {
 	};
 };
 
+const _kc_makeInputChoiceId = (field, index) => {
+	return (
+		'kc-input-dialog-' + String(field.name).replace(/[^A-Za-z0-9_-]/g, '-') + '-' + String(index)
+	);
+};
+
+const _kc_createChoiceControl = (field) => {
+	if (field.type === 'dropdown') {
+		const outer = document.createElement('div');
+		outer.className = 'kintoneplugin-select-outer kc-input-dialog__control-outer';
+		outer.style.marginTop = '4px';
+		const selectWrapper = document.createElement('div');
+		selectWrapper.className = 'kintoneplugin-select';
+		const select = document.createElement('select');
+		select.name = field.name;
+		select.required = field.required;
+		select.className = 'kc-input-dialog__control';
+		_kc_applyDialogTextStyle(select);
+		const emptyOption = document.createElement('option');
+		emptyOption.value = '';
+		emptyOption.textContent = field.placeholder || '選択してください';
+		select.appendChild(emptyOption);
+		field.options.forEach((choice) => {
+			const option = document.createElement('option');
+			option.value = choice.value;
+			option.textContent = choice.label;
+			option.disabled = choice.disabled;
+			option.selected = choice.value === field.value;
+			select.appendChild(option);
+		});
+		selectWrapper.appendChild(select);
+		outer.appendChild(selectWrapper);
+		return outer;
+	}
+
+	const container = document.createElement('div');
+	container.className =
+		field.type === 'radio'
+			? 'kintoneplugin-input-radio kc-input-dialog__choice-group'
+			: 'kintoneplugin-input-checkbox kc-input-dialog__choice-group';
+	container.style.marginTop = '4px';
+	_kc_applyDialogTextStyle(container);
+	field.options.forEach((choice, index) => {
+		const choiceItem = document.createElement('span');
+		choiceItem.className =
+			field.type === 'radio'
+				? 'kintoneplugin-input-radio-item kc-input-dialog__choice'
+				: 'kintoneplugin-input-checkbox-item kc-input-dialog__choice';
+		const input = document.createElement('input');
+		input.type = field.type;
+		input.name = field.name;
+		input.id = _kc_makeInputChoiceId(field, index);
+		input.value = choice.value;
+		input.disabled = choice.disabled;
+		input.required = field.required && field.type === 'radio';
+		input.className = 'kc-input-dialog__choice-control';
+		if (field.type === 'radio') {
+			input.checked = choice.value === field.value;
+		} else {
+			input.checked = Array.isArray(field.value) && field.value.indexOf(choice.value) !== -1;
+		}
+		if (index === 0) input.setAttribute('data-kc-input-primary', 'true');
+		const label = document.createElement('label');
+		label.setAttribute('for', input.id);
+		label.textContent = choice.label;
+		choiceItem.appendChild(input);
+		choiceItem.appendChild(label);
+		container.appendChild(choiceItem);
+	});
+	return container;
+};
+
 const _kc_createInputControl = (field) => {
+	if (_kc_isChoiceInputType(field.type)) {
+		return _kc_createChoiceControl(field);
+	}
+	const outer = document.createElement('div');
+	outer.className = 'kintoneplugin-input-outer kc-input-dialog__control-outer';
+	outer.style.display = 'block';
+	outer.style.marginTop = '4px';
 	const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
 	if (field.type !== 'textarea') {
 		input.type = field.type;
@@ -254,20 +425,24 @@ const _kc_createInputControl = (field) => {
 	input.value = field.value;
 	input.placeholder = field.placeholder;
 	input.required = field.required;
-	input.className = 'kc-input-dialog__control';
+	input.className = 'kintoneplugin-input-text kc-input-dialog__control';
 	input.style.width = '100%';
 	input.style.boxSizing = 'border-box';
-	input.style.marginTop = '4px';
 	_kc_applyDialogTextStyle(input);
 	if (field.type === 'textarea') {
 		input.rows = 4;
+		input.style.height = 'auto';
+		input.style.minHeight = '96px';
+		input.style.paddingTop = '8px';
+		input.style.paddingBottom = '8px';
 	}
 	if (field.min !== undefined) input.min = String(field.min);
 	if (field.max !== undefined) input.max = String(field.max);
 	if (field.step !== undefined) input.step = String(field.step);
 	if (field.maxLength !== undefined) input.maxLength = field.maxLength;
 	if (field.pattern !== undefined && field.type !== 'textarea') input.pattern = field.pattern;
-	return input;
+	outer.appendChild(input);
+	return outer;
 };
 
 const _kc_matchesPattern = (value, pattern) => {
@@ -294,20 +469,27 @@ const _kc_createInputDialogBody = (description, allowHtml, fields) => {
 		const descriptionElement = _kc_createTextBody(
 			description,
 			allowHtml,
-			'kc-input-dialog__description'
+			'kintoneplugin-desc kc-input-dialog__description'
 		);
 		descriptionElement.style.margin = '0';
 		body.appendChild(descriptionElement);
 	}
 
 	fields.forEach((field) => {
-		const fieldWrapper = document.createElement('label');
-		fieldWrapper.className = 'kc-input-dialog__field';
+		const fieldWrapper = document.createElement('div');
+		fieldWrapper.className = 'kintoneplugin-row kc-input-dialog__field';
 		fieldWrapper.style.display = 'block';
+		fieldWrapper.style.marginBottom = '0';
 
 		const labelText = document.createElement('div');
-		labelText.className = 'kc-input-dialog__label';
-		labelText.textContent = field.label;
+		labelText.className = 'kintoneplugin-label kc-input-dialog__label';
+		labelText.appendChild(document.createTextNode(field.label));
+		if (field.required) {
+			const requiredMark = document.createElement('span');
+			requiredMark.className = 'kintoneplugin-require';
+			requiredMark.textContent = '*';
+			labelText.appendChild(requiredMark);
+		}
 		fieldWrapper.appendChild(labelText);
 		fieldWrapper.appendChild(_kc_createInputControl(field));
 		body.appendChild(fieldWrapper);
@@ -367,6 +549,42 @@ const _kc_collectInputDialogResult = (body, fields) => {
 			if (!input) {
 				result.values[field.name] = null;
 				result.errors[field.name] = '入力欄を取得できませんでした。';
+				return result;
+			}
+
+			if (field.type === 'radio') {
+				const checked = body.querySelector('[name="' + field.name + '"]:checked');
+				const value = checked ? checked.value : '';
+				if (!value && field.required) {
+					result.errors[field.name] = '選択してください。';
+					result.values[field.name] = null;
+					return result;
+				}
+				result.values[field.name] = value || null;
+				return result;
+			}
+
+			if (field.type === 'checkbox') {
+				const checkedValues = Array.prototype.slice
+					.call(body.querySelectorAll('[name="' + field.name + '"]:checked'))
+					.map((checkedInput) => checkedInput.value);
+				if (checkedValues.length === 0 && field.required) {
+					result.errors[field.name] = '1つ以上選択してください。';
+					result.values[field.name] = null;
+					return result;
+				}
+				result.values[field.name] = checkedValues;
+				return result;
+			}
+
+			if (field.type === 'dropdown') {
+				const value = typeof input.value === 'string' ? input.value : '';
+				if (!value && field.required) {
+					result.errors[field.name] = '選択してください。';
+					result.values[field.name] = null;
+					return result;
+				}
+				result.values[field.name] = value || null;
 				return result;
 			}
 
@@ -464,7 +682,9 @@ const _kc_focusFirstInvalidInput = (body, fields, errors) => {
 		Object.prototype.hasOwnProperty.call(errors, field.name)
 	);
 	if (!firstInvalidField) return;
-	const input = body.querySelector('[name="' + firstInvalidField.name + '"]');
+	const input =
+		body.querySelector('[name="' + firstInvalidField.name + '"][data-kc-input-primary="true"]') ||
+		body.querySelector('[name="' + firstInvalidField.name + '"]');
 	if (input && typeof input.focus === 'function') {
 		try {
 			input.focus();
