@@ -151,7 +151,101 @@ const { JSDOM } = require('jsdom');
 	}
 
 	try {
+		const originalWarn = console.warn;
+		const originalDebug = console.debug;
+		const originalNotifyError = global.notifyError;
+		const warnings = [];
+		let notifyCount = 0;
+		console.warn = (message) => warnings.push(String(message));
+		console.debug = () => {};
+		global.dependencyPresentForTest = () => true;
+		delete global.dependencyMissingForTest;
+		global.notifyError = () => {
+			notifyCount += 1;
+		};
+
+		try {
+			const checkDependencies = global.createDependencyChecker([
+				{ name: 'dependencyPresentForTest', source: 'present.js' },
+				{ name: 'dependencyMissingForTest', source: 'missing.js' },
+			]);
+			assert.strictEqual(checkDependencies(), false);
+			assert.strictEqual(warnings.length, 1);
+			assert.ok(warnings[0].includes('missing.js (dependencyMissingForTest)'));
+			assert.ok(!warnings[0].includes('present.js (dependencyPresentForTest)'));
+			assert.strictEqual(notifyCount, 1);
+		} finally {
+			console.warn = originalWarn;
+			console.debug = originalDebug;
+			global.notifyError = originalNotifyError;
+			delete global.dependencyPresentForTest;
+			delete global.dependencyMissingForTest;
+		}
+		console.log('PASS: createDependencyChecker reports only missing dependencies');
+	} catch (e) {
+		console.error(
+			'FAIL: createDependencyChecker missing dependency list',
+			e && e.message ? e.message : e
+		);
+		process.exitCode = 2;
+	}
+
+	try {
+		const originalWarn = console.warn;
+		const originalNotifyError = global.notifyError;
+		console.warn = () => {};
+		delete global.strictMissingForTest;
+		global.notifyError = () => {};
+		try {
+			const checkDependencies = global.createDependencyChecker([
+				{ name: 'strictMissingForTest', source: 'strict.js' },
+			]);
+			assert.throws(
+				() => checkDependencies({ strict: true }),
+				/外部依存ファイル\/関数が不足している可能性があります: strict\.js \(strictMissingForTest\)/
+			);
+		} finally {
+			console.warn = originalWarn;
+			global.notifyError = originalNotifyError;
+			delete global.strictMissingForTest;
+		}
+		console.log('PASS: createDependencyChecker throws in strict mode');
+	} catch (e) {
+		console.error('FAIL: createDependencyChecker strict mode', e && e.message ? e.message : e);
+		process.exitCode = 2;
+	}
+
+	try {
+		const originalWarn = console.warn;
+		const originalNotifyError = global.notifyError;
+		const warnings = [];
+		console.warn = (message) => warnings.push(String(message));
+		delete global.notifyError;
+		delete global.notifyMissingForTest;
+		try {
+			const checkDependencies = global.createDependencyChecker([
+				{ name: 'notifyMissingForTest', source: 'notify-missing.js' },
+			]);
+			assert.strictEqual(checkDependencies(), false);
+			assert.strictEqual(warnings.length, 1);
+			assert.ok(warnings[0].includes('notify-missing.js (notifyMissingForTest)'));
+		} finally {
+			console.warn = originalWarn;
+			global.notifyError = originalNotifyError;
+			delete global.notifyMissingForTest;
+		}
+		console.log('PASS: createDependencyChecker works without global notifyError');
+	} catch (e) {
+		console.error(
+			'FAIL: createDependencyChecker without notifyError',
+			e && e.message ? e.message : e
+		);
+		process.exitCode = 2;
+	}
+
+	try {
 		assert.strictEqual(typeof global.getFieldValueOr, 'function');
+		assert.strictEqual(typeof global.createDependencyChecker, 'function');
 		assert.strictEqual(typeof global.setRecordValues, 'function');
 		assert.strictEqual(typeof global.kintoneEventOn, 'function');
 		assert.strictEqual(typeof showYesNoDialog, 'function');

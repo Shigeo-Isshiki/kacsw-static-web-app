@@ -93,7 +93,7 @@ FormBridge向け中継APIは Bank Teraren API 互換のパス・応答形式を�
 
 - Promiseベースの非同期API（`getBankAsync` など）は、kintoneのイベント種別と既存callback APIへの影響を確認してから追加します。
 - `window.BANK` を標準名前空間とし、グローバル関数を段階的に廃止する移行は、アプリ側の利用箇所を確認してから実施します。
-- `parseZenginFile` のShift_JIS実データ読み込みは、実ファイルと対象ブラウザでのスモークテストが未実施です。エラー発生時に実データで確認します。
+- `parseZenginFile` の Shift_JIS 実データ読み込みは、実ファイルを用いた確認で問題なく動作することを確認済みです。
 
 ## 更新履歴
 

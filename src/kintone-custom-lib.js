@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_kc_)で始める
-/* exported notifyError, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText, initKintoneCustomLibRuntime, resetKintoneCustomLibRuntime, setupSubtableOperationControl, updateSubtableOperationControl, teardownSubtableOperationControl */
+/* exported notifyError, createDependencyChecker, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText, initKintoneCustomLibRuntime, resetKintoneCustomLibRuntime, setupSubtableOperationControl, updateSubtableOperationControl, teardownSubtableOperationControl */
 
 // 共通定数
 /**
@@ -915,6 +915,41 @@ const notifyError = (message, title = 'エラー', allowHtml = false) => {
 	body.setAttribute('aria-describedby', messageId);
 	// 共通処理でダイアログ表示
 	return _kc_showDialog({ title, body });
+};
+
+/**
+ * createDependencyChecker - 依存チェック関数を生成します。
+ * - requirements に指定されたグローバル関数の存在を確認し、不足があれば警告します。
+ * - strict が true の場合は不足時に Error を投げます。
+ *
+ * @param {Array<{name: string, source: string}>} requirements 必須のグローバル関数定義
+ * @returns {function(Object=): boolean} 依存関数がそろっていれば true、不足があれば false
+ */
+const createDependencyChecker = (requirements) => {
+	const normalizedRequirements = Array.isArray(requirements) ? requirements : [];
+	return (options = { strict: false }) => {
+		const missing = normalizedRequirements
+			.filter((req) => req && typeof globalThis[req.name] !== 'function')
+			.map((req) => String(req.source) + ' (' + String(req.name) + ')');
+
+		if (missing.length === 0) return true;
+
+		const message = '外部依存ファイル/関数が不足している可能性があります: ' + missing.join(', ');
+		console.warn(message);
+		try {
+			if (typeof globalThis.notifyError === 'function') {
+				globalThis.notifyError(
+					'外部依存が不足しています。詳細はコンソールを確認してください。',
+					undefined,
+					true
+				);
+			}
+		} catch (error) {
+			console.debug('notifyError threw an error:', error);
+		}
+		if (options && options.strict) throw new Error(message);
+		return false;
+	};
 };
 
 /**
@@ -2302,6 +2337,10 @@ const teardownSubtableOperationControl = (controller) => {
 if (typeof window !== 'undefined') {
 	try {
 		window.notifyError = typeof notifyError !== 'undefined' ? notifyError : undefined;
+	} catch {}
+	try {
+		window.createDependencyChecker =
+			typeof createDependencyChecker !== 'undefined' ? createDependencyChecker : undefined;
 	} catch {}
 	try {
 		window.getFieldValueOr = typeof getFieldValueOr !== 'undefined' ? getFieldValueOr : undefined;

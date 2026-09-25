@@ -21,6 +21,7 @@
 
 ### レコード・イベント補助
 
+- [createDependencyChecker(requirements)](#createdependencychecker)
 - [getFieldValueOr(record, fieldCode, defaultValue)](#getfieldvalueor)
 - [kintoneEventOn(events, handler)](#kintoneeventon)
 - [setRecordValues(record, values)](#setrecordvalues)
@@ -96,6 +97,35 @@ resetKintoneCustomLibRuntime();
 > 注意: ここに書かれた使用例はライブラリの公開 API に合わせたもので、実行環境（ブラウザ / kintone / Node+jsdom）によって前提が異なります。kintone の DOM 要素を参照する関数は、テスト時に `kintone.app` のモックや `document`（jsdom）の用意が必要です。
 
 以下では、個別の公開関数について順に説明します。まずはサブテーブル操作ボタン制御 API から整理し、その後に一般的なレコード操作・通知・ダイアログ系の関数へ続けて解説します。
+
+<a id="createdependencychecker"></a>
+
+### createDependencyChecker(requirements)
+
+- 動作概要: アプリ側で必要な外部関数がグローバルスコープに読み込まれているかを確認する `checkDependencies` 関数を生成します。
+- 戻り値: `checkDependencies(options)` 関数。依存関数がすべて存在すれば `true`、不足があれば `false` を返します。
+- `requirements` (Array<Object>) — 必須関数の定義配列。
+- `requirements[].name` (string) — `globalThis` 上に存在するはずの関数名。
+- `requirements[].source` (string) — 不足時のメッセージに表示する出典ファイル名。
+- `options.strict` (boolean, optional) — `true` の場合、不足時に `Error` を投げます。省略時や `false` の場合は `false` を返すだけです。
+
+不足がある場合は、未定義の関数だけを `source (name)` 形式で列挙して `console.warn` に出力します。`notifyError` がグローバル関数として利用できる場合は、ユーザー向けの通知も試みます。`notifyError` が未定義、または通知中に例外が発生した場合でも依存チェック自体は継続します。
+
+例:
+
+```js
+const checkDependencies = createDependencyChecker([
+	{ name: 'notifyError', source: 'kintone-custom-lib.js' },
+	{ name: 'buildCSV', source: 'csv-builder.js' },
+]);
+
+if (!checkDependencies()) {
+	return;
+}
+
+// 初期化時に不足を致命的エラーとして扱う場合
+checkDependencies({ strict: true });
+```
 
 ### サブテーブル操作ボタン制御 API
 

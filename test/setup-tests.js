@@ -7,14 +7,6 @@ global.fetch = function (url) {
 	// Simple routing for known external services used in tests
 	try {
 		const u = String(url);
-		// National holidays API -> always not found (not a holiday)
-		if (u.indexOf('api.national-holidays.jp') !== -1) {
-			return Promise.resolve({
-				ok: false,
-				status: 404,
-				json: async () => ({ error: 'not_found' }),
-			});
-		}
 		// bank.teraren.com -> provide minimal stubbed bank/branch data used by tests
 		if (u.indexOf('bank.teraren.com') !== -1) {
 			// /banks/{code}.json

@@ -24,6 +24,7 @@
 		'convertToAge',
 		// kintone-custom-lib.js
 		'notifyError',
+		'createDependencyChecker',
 		'getFieldValueOr',
 		'kintoneEventOn',
 		'notifyInfo',

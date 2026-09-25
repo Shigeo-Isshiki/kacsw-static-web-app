@@ -176,7 +176,6 @@ console.log(d2); // -> '2025-11-12'
 
 ## 既知の内部定数
 
-- `_SP_HOLIDAY_API_BASE_URL` — 祝日判定に使う API のベース URL（デフォルト: `https://api.national-holidays.jp`）
 - `_SP_SHIPPING_INQUIRY_URL_MAP` — 運送会社ごとの問い合わせ URL テンプレート（`yamato` = ヤマト運輸, `japanpost` = 日本郵便, `sagawa` = 佐川急便）
 
 ---
