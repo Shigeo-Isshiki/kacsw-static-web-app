@@ -23,6 +23,7 @@
 		'convertToYearMonth',
 		'convertToAge',
 		// kintone-custom-lib.js
+		'escapeKintoneQueryValue',
 		'notifyError',
 		'createDependencyChecker',
 		'getFieldValueOr',

@@ -19,13 +19,36 @@ const { JSDOM } = require('jsdom');
 	delete require.cache[require.resolve(path.join(__dirname, '..', 'src', 'kintone-custom-lib.js'))];
 	require(path.join(__dirname, '..', 'src', 'kintone-custom-lib.js'));
 
-	const { getFieldValueOr, kintoneEventOn, setRecordValues, showYesNoDialog, showInputDialog } =
-		global;
+	const {
+		escapeKintoneQueryValue,
+		getFieldValueOr,
+		kintoneEventOn,
+		setRecordValues,
+		showYesNoDialog,
+		showInputDialog,
+	} = global;
 
 	if (!getFieldValueOr) {
 		console.error('kintone-custom-lib: getFieldValueOr が公開されていません');
 		process.exitCode = 2;
 		return;
+	}
+
+	try {
+		assert.strictEqual(escapeKintoneQueryValue(null), '');
+		assert.strictEqual(escapeKintoneQueryValue(undefined), '');
+		assert.strictEqual(escapeKintoneQueryValue('ABC'), 'ABC');
+		assert.strictEqual(escapeKintoneQueryValue('A"B'), 'A\\"B');
+		assert.strictEqual(escapeKintoneQueryValue('A\\B'), 'A\\\\B');
+		assert.strictEqual(escapeKintoneQueryValue('A\r\nB'), 'A B');
+		assert.strictEqual(escapeKintoneQueryValue('A\rB'), 'A B');
+		assert.strictEqual(escapeKintoneQueryValue('A\nB'), 'A B');
+		assert.strictEqual(escapeKintoneQueryValue(123), '123');
+		assert.strictEqual(typeof global.window.escapeKintoneQueryValue, 'function');
+		console.log('PASS: escapeKintoneQueryValue escapes query string values and is globally exported');
+	} catch (e) {
+		console.error('FAIL: escapeKintoneQueryValue', e && e.message ? e.message : e);
+		process.exitCode = 2;
 	}
 
 	try {

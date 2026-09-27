@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_kc_)で始める
-/* exported notifyError, createDependencyChecker, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText, initKintoneCustomLibRuntime, resetKintoneCustomLibRuntime, setupSubtableOperationControl, updateSubtableOperationControl, teardownSubtableOperationControl */
+/* exported escapeKintoneQueryValue, notifyError, createDependencyChecker, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText, initKintoneCustomLibRuntime, resetKintoneCustomLibRuntime, setupSubtableOperationControl, updateSubtableOperationControl, teardownSubtableOperationControl */
 
 // 共通定数
 /**
@@ -14,6 +14,14 @@ const _KC_ASSET_BASE = 'https://js.kacsw.or.jp/image';
 const _KC_DIALOG_TEXT_FONT_SIZE = '16px';
 const _KC_DIALOG_TEXT_LINE_HEIGHT = '1.5';
 const _KC_RUNTIME_GLOBAL_KEY = 'KACSW_RUNTIME';
+
+const escapeKintoneQueryValue = (value) => {
+	if (value === null || value === undefined) return '';
+	return String(value)
+		.replace(/\\/g, '\\\\')
+		.replace(/"/g, '\\"')
+		.replace(/\r\n|\r|\n/g, ' ');
+};
 
 let _kc_runtimeMode = null;
 let _kc_runtimeVersion = null;
@@ -2335,6 +2343,10 @@ const teardownSubtableOperationControl = (controller) => {
 
 // 公開: kintone 側から直接呼び出すためにグローバルに割り当てる（初期化後に安全に行う）
 if (typeof window !== 'undefined') {
+	try {
+		window.escapeKintoneQueryValue =
+			typeof escapeKintoneQueryValue !== 'undefined' ? escapeKintoneQueryValue : undefined;
+	} catch {}
 	try {
 		window.notifyError = typeof notifyError !== 'undefined' ? notifyError : undefined;
 	} catch {}

@@ -21,6 +21,7 @@
 
 ### レコード・イベント補助
 
+- [escapeKintoneQueryValue(value)](#escapekintonequeryvalue)
 - [createDependencyChecker(requirements)](#createdependencychecker)
 - [getFieldValueOr(record, fieldCode, defaultValue)](#getfieldvalueor)
 - [kintoneEventOn(events, handler)](#kintoneeventon)
@@ -97,6 +98,21 @@ resetKintoneCustomLibRuntime();
 > 注意: ここに書かれた使用例はライブラリの公開 API に合わせたもので、実行環境（ブラウザ / kintone / Node+jsdom）によって前提が異なります。kintone の DOM 要素を参照する関数は、テスト時に `kintone.app` のモックや `document`（jsdom）の用意が必要です。
 
 以下では、個別の公開関数について順に説明します。まずはサブテーブル操作ボタン制御 API から整理し、その後に一般的なレコード操作・通知・ダイアログ系の関数へ続けて解説します。
+
+<a id="escapekintonequeryvalue"></a>
+
+### escapeKintoneQueryValue(value)
+
+- 動作概要: 文字列値を kintone クエリへ埋め込むため、バックスラッシュとダブルクォートをエスケープし、改行を半角スペースへ変換します。`null` / `undefined` は空文字列として扱います。
+- `value` (any) — クエリに埋め込む文字列値。
+- 戻り値: `string`。クエリ値を囲む引用符は追加しません。
+
+例:
+
+```js
+const escapedName = escapeKintoneQueryValue(name);
+const query = `Last_name = "${escapedName}"`;
+```
 
 <a id="createdependencychecker"></a>
 
