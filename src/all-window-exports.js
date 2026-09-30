@@ -51,6 +51,7 @@
 		'toHalfWidthKana',
 		'toHalfWidth',
 		'assertEmailAddress',
+		'registerFullWidthHandler',
 		// vc-check.js
 		'validateZoomMeetingId',
 		'validateZoomPasscode',

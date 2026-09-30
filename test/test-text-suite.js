@@ -139,3 +139,285 @@ try {
 }
 
 console.log('ALL TEXT-SUITE TESTS INVOKED');
+
+// --- registerFullWidthHandler ---
+// kintone-custom-lib.js を読み込まずに kintone.events.on のみをスタブ化して検証する
+const registerFullWidthHandler =
+	global.registerFullWidthHandler || (window && window.registerFullWidthHandler);
+if (!registerFullWidthHandler) throw new Error('registerFullWidthHandler が取得できませんでした');
+
+/** 直近の登録内容を保持するスタブ */
+let lastRegistration = null;
+global.kintone = {
+	events: {
+		on: (events, handler) => {
+			lastRegistration = { events, handler };
+		},
+	},
+};
+
+/**
+ * ハンドラを登録して呼び出すヘルパー
+ * @param {string} fieldCode フィールドコード
+ * @param {object} options registerFullWidthHandler のオプション
+ * @param {*} value フィールド値
+ * @returns {object} 実行後のイベントオブジェクト
+ */
+const runHandler = (fieldCode, options, value) => {
+	registerFullWidthHandler(fieldCode, options);
+	const event = { record: { [fieldCode]: { value } } };
+	return lastRegistration.handler(event);
+};
+
+try {
+	const event = runHandler('name', {}, 'abc');
+	assert.strictEqual(event.record.name.value, 'ａｂｃ');
+	assert.strictEqual(event.record.name.error, null);
+	console.log('PASS: registerFullWidthHandler converts value');
+} catch (e) {
+	console.error('FAIL: registerFullWidthHandler converts value', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = {};
+	const event = runHandler('name', { throwOnError: true, errorMessages }, 'a\tb');
+	assert.strictEqual(event.record.name.value, 'a\tb', '変換失敗時は元の値を維持する');
+	assert.ok(event.record.name.error, 'フィールドエラーが設定される');
+	assert.strictEqual(errorMessages.name, event.record.name.error, 'エラーマップにも設定される');
+	console.log('PASS: registerFullWidthHandler throwOnError=true sets error');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler throwOnError=true sets error',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	// throwOnError=false（既定）では変換不能文字をそのまま残しエラーにしない
+	const event = runHandler('name', {}, 'a\tb');
+	assert.strictEqual(event.record.name.value, 'ａ\tｂ');
+	assert.strictEqual(event.record.name.error, null);
+	console.log('PASS: registerFullWidthHandler throwOnError=false keeps unconvertible chars');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler throwOnError=false keeps unconvertible chars',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = {};
+	registerFullWidthHandler('name', { throwOnError: true, errorMessages });
+	const handler = lastRegistration.handler;
+	['', null, undefined].forEach((empty) => {
+		const event = handler({ record: { name: { value: empty } } });
+		assert.strictEqual(event.record.name.value, empty, '空欄は変換しない');
+		assert.strictEqual(event.record.name.error, null);
+		assert.strictEqual(errorMessages.name, null);
+	});
+	console.log('PASS: registerFullWidthHandler skips empty values');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler skips empty values',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	// 対象フィールドがイベントに存在しない場合も例外を出さない
+	registerFullWidthHandler('name', {});
+	const event = lastRegistration.handler({ record: {} });
+	assert.ok(event, 'フィールド欠落時もイベントを返す');
+	console.log('PASS: registerFullWidthHandler tolerates missing field');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler tolerates missing field',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	// エラー後の次の変更で成功した場合、エラー状態が解除される
+	const errorMessages = {};
+	registerFullWidthHandler('name', { throwOnError: true, errorMessages });
+	const handler = lastRegistration.handler;
+	const field = { value: 'a\tb' };
+	handler({ record: { name: field } });
+	assert.ok(field.error, 'まずエラーになる');
+	field.value = 'abc';
+	const event = handler({ record: { name: field } });
+	assert.strictEqual(event.record.name.value, 'ａｂｃ');
+	assert.strictEqual(event.record.name.error, null);
+	assert.strictEqual(errorMessages.name, null);
+	console.log('PASS: registerFullWidthHandler clears previous error');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler clears previous error',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	// removeWhitespace 既定値(false)では空白を残す（半角スペースは全角スペースへ変換）
+	const event = runHandler('name', {}, 'a b');
+	assert.strictEqual(event.record.name.value, 'ａ\u3000ｂ');
+	console.log('PASS: registerFullWidthHandler removeWhitespace default keeps spaces');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler removeWhitespace default keeps spaces',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	// 半角空白・全角空白・タブ・改行をすべて削除する
+	const event = runHandler('name', { removeWhitespace: true }, 'a b\u3000c\td\ne');
+	assert.strictEqual(event.record.name.value, 'ａｂｃｄｅ');
+	console.log('PASS: registerFullWidthHandler removeWhitespace removes all whitespace');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler removeWhitespace removes all whitespace',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	// maxLength 未指定なら文字数制限なし
+	const event = runHandler('name', {}, 'abcdefghij');
+	assert.strictEqual(event.record.name.value, 'ａｂｃｄｅｆｇｈｉｊ');
+	console.log('PASS: registerFullWidthHandler without maxLength');
+} catch (e) {
+	console.error('FAIL: registerFullWidthHandler without maxLength', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const event = runHandler('addr', { maxLength: 3 }, 'abc');
+	assert.strictEqual(event.record.addr.value, 'ａｂｃ');
+	assert.strictEqual(event.record.addr.error, null);
+	console.log('PASS: registerFullWidthHandler maxLength within limit');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler maxLength within limit',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = {};
+	const event = runHandler(
+		'addr',
+		{ maxLength: 3, maxLengthErrorMessage: '住所は3文字以内で入力してください。', errorMessages },
+		'abcd'
+	);
+	assert.strictEqual(event.record.addr.value, 'abcd', '超過時は元の値を維持する');
+	assert.strictEqual(event.record.addr.error, '住所は3文字以内で入力してください。');
+	assert.strictEqual(errorMessages.addr, '住所は3文字以内で入力してください。');
+	console.log('PASS: registerFullWidthHandler maxLength exceeded');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler maxLength exceeded',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const event = runHandler('addr', { maxLength: 3 }, 'abcde');
+	assert.strictEqual(event.record.addr.error, '全角変換後、3文字以内で入力してください。');
+	console.log('PASS: registerFullWidthHandler default maxLength message');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler default maxLength message',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	// 空白除去後の文字数で判定する
+	const event = runHandler('addr', { maxLength: 3, removeWhitespace: true }, 'a b c');
+	assert.strictEqual(event.record.addr.value, 'ａｂｃ');
+	assert.strictEqual(event.record.addr.error, null);
+	console.log('PASS: registerFullWidthHandler maxLength counts after whitespace removal');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler maxLength counts after whitespace removal',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	let threw = false;
+	try {
+		registerFullWidthHandler('name', { maxLength: 0 });
+	} catch (err) {
+		threw = true;
+	}
+	assert.ok(threw, 'maxLength=0 は登録時にエラー');
+	threw = false;
+	try {
+		registerFullWidthHandler('name', { maxLength: '3' });
+	} catch (err) {
+		threw = true;
+	}
+	assert.ok(threw, 'maxLength が文字列なら登録時にエラー');
+	console.log('PASS: registerFullWidthHandler rejects invalid maxLength');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler rejects invalid maxLength',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	registerFullWidthHandler('name', {});
+	assert.deepStrictEqual(lastRegistration.events, [
+		'app.record.create.change.name',
+		'app.record.edit.change.name',
+	]);
+	registerFullWidthHandler('name', { devices: 'mobile' });
+	assert.deepStrictEqual(lastRegistration.events, [
+		'mobile.app.record.create.change.name',
+		'mobile.app.record.edit.change.name',
+	]);
+	registerFullWidthHandler('name', { devices: 'both' });
+	assert.deepStrictEqual(lastRegistration.events, [
+		'app.record.create.change.name',
+		'app.record.edit.change.name',
+		'mobile.app.record.create.change.name',
+		'mobile.app.record.edit.change.name',
+	]);
+	console.log('PASS: registerFullWidthHandler devices option');
+} catch (e) {
+	console.error('FAIL: registerFullWidthHandler devices option', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	// errorMessages はオブジェクト自体を差し替えず、該当キーのみ更新する
+	const errorMessages = { other: '別のエラー' };
+	runHandler('name', { throwOnError: true, errorMessages }, 'a\tb');
+	assert.strictEqual(errorMessages.other, '別のエラー', '他キーは保持される');
+	assert.ok(errorMessages.name);
+	console.log('PASS: registerFullWidthHandler updates errorMessages in place');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHandler updates errorMessages in place',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+console.log('ALL registerFullWidthHandler TESTS INVOKED');
