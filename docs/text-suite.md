@@ -130,9 +130,9 @@ kintone 標準の `kintone.events.on` を使い、指定フィールドの変更
 サブテーブル内の指定列について、変更された行のセルだけを全角または全角ひらがなに変換します。どちらも `registerFullWidthHandler` と同じオプション（`throwOnError`、`removeWhitespace`、`maxLength`、`maxLengthErrorMessage`、`devices`、`errorMessages`）を受け付けます。既定値、型検証、変換・空白除去・文字数判定の順序も通常フィールド版と同じです。
 
 - `tableFieldCode` はサブテーブルのフィールドコード、`fieldCode` は変換対象列のフィールドコードです。
-- 変更行は `event.changes.row.id` とレコード内の行IDで照合します。行IDがない、または一致する行がないイベントでは値を変更しません。
+- 変更行は、まず `event.changes.row.id` とレコード内の行IDで照合します。変更行にIDがない場合は、変更行オブジェクトまたは `row.value` オブジェクトの参照がレコード内の行と一意に一致するときに限り処理します。値の内容だけでは照合しません。一意に特定できないイベントでは値を変更しません。
 - 行追加・削除に対応するサブテーブル自体の変更イベントにも登録し、エラーマップから現在存在しない行の情報を除去します。
-- エラーマップは `errorMessages[tableFieldCode][rowId][fieldCode]` 形式です。`rowId` はkintoneの行IDです。対象セルのエラーは成功時・空値時にクリアし、変換失敗・文字数超過時に設定します。
+- エラーマップは `errorMessages[tableFieldCode][rowId][fieldCode]` 形式です。`rowId` はkintoneの行IDです。ID未設定行はセルの `error` を更新しますが、安定した行キーがないためエラーマップには登録しません。対象セルのエラーは成功時・空値時にクリアし、変換失敗・文字数超過時に設定します。
 
 ```js
 const tableFieldErrorMessages = {};

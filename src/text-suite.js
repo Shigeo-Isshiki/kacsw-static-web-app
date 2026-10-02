@@ -754,24 +754,39 @@ const _ts_registerTableFieldHandler = (tableFieldCode, fieldCode, options, conve
 		const rows = record && record[tableFieldCode] && record[tableFieldCode].value;
 		syncErrorMessages(record);
 		const changedRow = event && event.changes && event.changes.row;
-		if (!Array.isArray(rows) || !changedRow || typeof changedRow.id !== 'string' || !changedRow.id)
-			return event;
-		const row = rows.find((candidate) => candidate && candidate.id === changedRow.id);
+		if (!Array.isArray(rows) || !changedRow) return event;
+
+		let matchingRows;
+		if (typeof changedRow.id === 'string' && changedRow.id) {
+			matchingRows = rows.filter((candidate) => candidate && candidate.id === changedRow.id);
+		} else {
+			matchingRows = rows.filter(
+				(candidate) =>
+					candidate === changedRow ||
+					(candidate &&
+						changedRow.value &&
+						typeof changedRow.value === 'object' &&
+						candidate.value === changedRow.value)
+			);
+		}
+		if (matchingRows.length !== 1) return event;
+
+		const row = matchingRows[0];
 		const field = row && row.value && row.value[fieldCode];
 		if (!field) return event;
 
 		field.error = null;
-		if (errorMessages) {
+		if (errorMessages && typeof row.id === 'string' && row.id) {
 			if (!errorMessages[tableFieldCode] || typeof errorMessages[tableFieldCode] !== 'object') {
 				errorMessages[tableFieldCode] = {};
 			}
 			if (
-				!errorMessages[tableFieldCode][changedRow.id] ||
-				typeof errorMessages[tableFieldCode][changedRow.id] !== 'object'
+				!errorMessages[tableFieldCode][row.id] ||
+				typeof errorMessages[tableFieldCode][row.id] !== 'object'
 			) {
-				errorMessages[tableFieldCode][changedRow.id] = {};
+				errorMessages[tableFieldCode][row.id] = {};
 			}
-			errorMessages[tableFieldCode][changedRow.id][fieldCode] = null;
+			errorMessages[tableFieldCode][row.id][fieldCode] = null;
 		}
 
 		const value = field.value;
@@ -784,7 +799,9 @@ const _ts_registerTableFieldHandler = (tableFieldCode, fieldCode, options, conve
 		} catch (error) {
 			const message = error && error.message ? error.message : String(error);
 			field.error = message;
-			if (errorMessages) errorMessages[tableFieldCode][changedRow.id][fieldCode] = message;
+			if (errorMessages && typeof row.id === 'string' && row.id) {
+				errorMessages[tableFieldCode][row.id][fieldCode] = message;
+			}
 		}
 		return event;
 	});

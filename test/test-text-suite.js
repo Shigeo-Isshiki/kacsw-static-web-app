@@ -625,6 +625,55 @@ try {
 }
 
 try {
+	const row = { value: { kana: { value: 'ｶﾀｶﾅ' } } };
+	const rows = [row];
+	const { event, handler } = runTableHandler(
+		registerTableFullWidthHiraganaHandler,
+		'table',
+		'kana',
+		{},
+		rows,
+		row
+	);
+	handler(event);
+	assert.strictEqual(row.value.kana.value, 'かたかな');
+
+	const sharedRowValue = { kana: { value: 'ｶﾀｶﾅ' } };
+	const valueMatchRows = [{ value: sharedRowValue }];
+	const valueMatch = runTableHandler(
+		registerTableFullWidthHiraganaHandler,
+		'table',
+		'kana',
+		{},
+		valueMatchRows,
+		{ value: sharedRowValue }
+	);
+	valueMatch.handler(valueMatch.event);
+	assert.strictEqual(valueMatchRows[0].value.kana.value, 'かたかな');
+
+	const sharedValue = { kana: { value: 'ｶﾀｶﾅ' } };
+	const ambiguousRows = [{ value: sharedValue }, { value: sharedValue }];
+	const ambiguous = runTableHandler(
+		registerTableFullWidthHiraganaHandler,
+		'table',
+		'kana',
+		{},
+		ambiguousRows,
+		{ value: sharedValue }
+	);
+	ambiguous.handler(ambiguous.event);
+	assert.strictEqual(ambiguousRows[0].value.kana.value, 'ｶﾀｶﾅ');
+	assert.strictEqual(ambiguousRows[1].value.kana.value, 'ｶﾀｶﾅ');
+	console.log('PASS: table handler identifies id-less rows by unique object identity');
+} catch (e) {
+	console.error(
+		'FAIL: table handler identifies id-less rows by unique object identity',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
 	const errorMessages = {};
 	const rows = [{ id: 'row-1', value: { kana: { value: 'あA' } } }];
 	const { event, handler } = runTableHandler(
@@ -648,6 +697,29 @@ try {
 } catch (e) {
 	console.error(
 		'FAIL: table handlers set and clear cell errors by row id',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = {};
+	const row = { value: { kana: { value: 'あA' } } };
+	const { event, handler } = runTableHandler(
+		registerTableFullWidthHiraganaHandler,
+		'table',
+		'kana',
+		{ throwOnError: true, errorMessages },
+		[row],
+		row
+	);
+	handler(event);
+	assert.ok(row.value.kana.error);
+	assert.strictEqual(errorMessages.table, undefined, 'IDなし行は行IDエラーマップに登録しない');
+	console.log('PASS: id-less table row errors remain on the cell without invalid map keys');
+} catch (e) {
+	console.error(
+		'FAIL: id-less table row errors remain on the cell without invalid map keys',
 		e && e.message ? e.message : e
 	);
 	process.exitCode = 2;
