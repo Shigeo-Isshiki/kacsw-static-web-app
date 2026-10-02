@@ -30,6 +30,7 @@
 - `toHalfWidth(str, [throwOnError=true])` — 文字列中の全角英数字・記号等を半角に変換
 - `assertEmailAddress(emailAddress)` — 半角に正規化し、簡易 RFC5322 相当の形式チェックを行う（正常時は小文字化した文字列を返す、異常時は例外）
 - `registerFullWidthHandler(fieldCode, [options])` — kintone の追加・編集画面のフィールド変更イベントに全角変換ハンドラを登録する
+- `registerFullWidthHiraganaHandler(fieldCode, [options])` — kintone の追加・編集画面のフィールド変更イベントに全角ひらがな変換ハンドラを登録する
 
 各関数は引数に不正な型や変換不能な文字が含まれている場合、デフォルトで例外を投げます（`throwOnError=false` を使える関数では例外を抑止して非変換文字をそのまま残す挙動も可能）。
 
@@ -104,6 +105,23 @@ kintone 標準の `kintone.events.on` を使い、指定フィールドの変更
 
 住所欄のように「全角変換したうえで文字数を制限したい」ケースは、専用ハンドラを作らず `maxLength` オプションで対応できます。
 
+### `registerFullWidthHiraganaHandler(fieldCode, options = {})`
+
+`registerFullWidthHandler` と同じイベント登録方式・オプション契約で、対象フィールドを `toFullWidthHiragana` により正規化します。追加・編集画面に登録し、`devices` で PC・モバイルを選択できます。変換エラーや文字数超過時はフィールド値を維持してフィールドエラーを設定します。
+
+#### options
+
+| オプション              | 型                                    | 既定値                                                | 説明                                                                                             |
+| ----------------------- | ------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `throwOnError`          | boolean                               | `false`                                               | `toFullWidthHiragana(value, throwOnError)` に渡します                                            |
+| `removeWhitespace`      | boolean                               | `false`                                               | `true` の場合、ひらがな変換後に `/[\s\u3000]+/g` で空白文字をすべて削除します（trim ではありません） |
+| `maxLength`             | number \| null                        | `null`                                                | 変換・空白除去後の `.length` による上限。`null` は無制限。正の整数以外は登録時にエラー           |
+| `maxLengthErrorMessage` | string                                | `全角変換後、{maxLength}文字以内で入力してください。` | 文字数超過時のエラーメッセージ                                                                   |
+| `devices`               | `'desktop'` \| `'mobile'` \| `'both'` | `'desktop'`                                           | 登録対象のデバイス                                                                               |
+| `errorMessages`         | object                                | なし                                                  | 既存のエラーマップ。該当フィールドの値のみ更新します                                             |
+
+文字数制限は `maxLength` を指定した場合にのみ適用されます。変換成功時・空値時はフィールドエラーと `errorMessages[fieldCode]` がクリアされます。
+
 ---
 
 ## 例
@@ -134,6 +152,13 @@ registerFullWidthHandler(F.ADDRESS, {
 	maxLength: 20,
 	maxLengthErrorMessage: '住所は20文字以内で入力してください。',
 	removeWhitespace: true,
+	errorMessages: fullWidthHandlerErrorMessage,
+});
+
+// フリガナ: ひらがなへ変換し、空白を除去。PC・モバイル両方へ登録
+registerFullWidthHiraganaHandler(F.FURIGANA, {
+	removeWhitespace: true,
+	devices: 'both',
 	errorMessages: fullWidthHandlerErrorMessage,
 });
 ```

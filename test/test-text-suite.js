@@ -13,6 +13,8 @@ const toHalfWidthKana = global.toHalfWidthKana || (window && window.toHalfWidthK
 const toFullWidth = global.toFullWidth || (window && window.toFullWidth);
 const toHalfWidth = global.toHalfWidth || (window && window.toHalfWidth);
 const assertEmailAddress = global.assertEmailAddress || (window && window.assertEmailAddress);
+const registerFullWidthHiraganaHandler =
+	global.registerFullWidthHiraganaHandler || (window && window.registerFullWidthHiraganaHandler);
 
 if (
 	!isSingleByteAlnumOnly ||
@@ -21,7 +23,8 @@ if (
 	!toHalfWidthKana ||
 	!toFullWidth ||
 	!toHalfWidth ||
-	!assertEmailAddress
+	!assertEmailAddress ||
+	!registerFullWidthHiraganaHandler
 )
 	throw new Error('text-suite の関数が取得できませんでした');
 
@@ -421,3 +424,108 @@ try {
 }
 
 console.log('ALL registerFullWidthHandler TESTS INVOKED');
+
+// --- registerFullWidthHiraganaHandler ---
+const runHiraganaHandler = (fieldCode, options, value) => {
+	registerFullWidthHiraganaHandler(fieldCode, options);
+	const event = { record: { [fieldCode]: { value } } };
+	return lastRegistration.handler(event);
+};
+
+try {
+	const event = runHiraganaHandler('kana', {}, 'ｶﾀｶﾅ ひらがな\u3000');
+	assert.strictEqual(event.record.kana.value, 'かたかな\u3000ひらがな\u3000');
+	assert.strictEqual(event.record.kana.error, null);
+	console.log('PASS: registerFullWidthHiraganaHandler converts value by default');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHiraganaHandler converts value by default',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const event = runHiraganaHandler('kana', { removeWhitespace: true }, 'ｶﾅ ひらがな\u3000\tあ\n');
+	assert.strictEqual(event.record.kana.value, 'かなひらがなあ');
+	console.log('PASS: registerFullWidthHiraganaHandler removes whitespace');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHiraganaHandler removes whitespace',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = {};
+	registerFullWidthHiraganaHandler('kana', { throwOnError: true, errorMessages });
+	const field = { value: 'あA' };
+	const handler = lastRegistration.handler;
+	handler({ record: { kana: field } });
+	assert.strictEqual(field.value, 'あA', '変換失敗時は元の値を維持する');
+	assert.ok(field.error);
+	assert.strictEqual(errorMessages.kana, field.error);
+	field.value = 'あ';
+	handler({ record: { kana: field } });
+	assert.strictEqual(field.error, null);
+	assert.strictEqual(errorMessages.kana, null);
+	field.value = '';
+	field.error = 'old error';
+	errorMessages.kana = 'old error';
+	handler({ record: { kana: field } });
+	assert.strictEqual(field.error, null);
+	assert.strictEqual(errorMessages.kana, null);
+	console.log('PASS: registerFullWidthHiraganaHandler updates errors');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHiraganaHandler updates errors',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const withoutLimit = runHiraganaHandler('kana', {}, 'あいうえおかきくけこさ');
+	assert.strictEqual(withoutLimit.record.kana.error, null);
+	const exceeded = runHiraganaHandler(
+		'kana',
+		{ maxLength: 2, maxLengthErrorMessage: '2文字までです。' },
+		'あいう'
+	);
+	assert.strictEqual(exceeded.record.kana.value, 'あいう');
+	assert.strictEqual(exceeded.record.kana.error, '2文字までです。');
+	const afterWhitespaceRemoval = runHiraganaHandler(
+		'kana',
+		{ maxLength: 2, removeWhitespace: true },
+		'あ い'
+	);
+	assert.strictEqual(afterWhitespaceRemoval.record.kana.value, 'あい');
+	assert.strictEqual(afterWhitespaceRemoval.record.kana.error, null);
+	console.log('PASS: registerFullWidthHiraganaHandler maxLength options');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHiraganaHandler maxLength options',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	registerFullWidthHiraganaHandler('kana', { devices: 'both' });
+	assert.deepStrictEqual(lastRegistration.events, [
+		'app.record.create.change.kana',
+		'app.record.edit.change.kana',
+		'mobile.app.record.create.change.kana',
+		'mobile.app.record.edit.change.kana',
+	]);
+	console.log('PASS: registerFullWidthHiraganaHandler devices option');
+} catch (e) {
+	console.error(
+		'FAIL: registerFullWidthHiraganaHandler devices option',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+console.log('ALL registerFullWidthHiraganaHandler TESTS INVOKED');
