@@ -15,6 +15,11 @@ const toHalfWidth = global.toHalfWidth || (window && window.toHalfWidth);
 const assertEmailAddress = global.assertEmailAddress || (window && window.assertEmailAddress);
 const registerFullWidthHiraganaHandler =
 	global.registerFullWidthHiraganaHandler || (window && window.registerFullWidthHiraganaHandler);
+const registerTableFullWidthHandler =
+	global.registerTableFullWidthHandler || (window && window.registerTableFullWidthHandler);
+const registerTableFullWidthHiraganaHandler =
+	global.registerTableFullWidthHiraganaHandler ||
+	(window && window.registerTableFullWidthHiraganaHandler);
 
 if (
 	!isSingleByteAlnumOnly ||
@@ -24,7 +29,9 @@ if (
 	!toFullWidth ||
 	!toHalfWidth ||
 	!assertEmailAddress ||
-	!registerFullWidthHiraganaHandler
+	!registerFullWidthHiraganaHandler ||
+	!registerTableFullWidthHandler ||
+	!registerTableFullWidthHiraganaHandler
 )
 	throw new Error('text-suite の関数が取得できませんでした');
 
@@ -151,10 +158,12 @@ if (!registerFullWidthHandler) throw new Error('registerFullWidthHandler が取�
 
 /** 直近の登録内容を保持するスタブ */
 let lastRegistration = null;
+const registrations = [];
 global.kintone = {
 	events: {
 		on: (events, handler) => {
 			lastRegistration = { events, handler };
+			registrations.push(lastRegistration);
 		},
 	},
 };
@@ -529,3 +538,232 @@ try {
 }
 
 console.log('ALL registerFullWidthHiraganaHandler TESTS INVOKED');
+
+// --- table field handlers ---
+const runTableHandler = (registerHandler, tableFieldCode, fieldCode, options, rows, changedRow) => {
+	registrations.length = 0;
+	registerHandler(tableFieldCode, fieldCode, options);
+	const columnRegistration = registrations.find(({ events }) =>
+		events.includes(`app.record.edit.change.${fieldCode}`)
+	);
+	const event = {
+		type: `app.record.edit.change.${fieldCode}`,
+		record: { [tableFieldCode]: { value: rows } },
+		changes: { row: changedRow },
+	};
+	return { event, handler: columnRegistration && columnRegistration.handler };
+};
+
+const runTableSync = (tableFieldCode, fieldCode, options, rows) => {
+	registrations.length = 0;
+	registerTableFullWidthHandler(tableFieldCode, fieldCode, options);
+	const tableRegistration = registrations.find(({ events }) =>
+		events.includes(`app.record.edit.change.${tableFieldCode}`)
+	);
+	const event = { type: `app.record.edit.change.${tableFieldCode}`, record: { [tableFieldCode]: { value: rows } } };
+	return tableRegistration.handler(event);
+};
+
+try {
+	const rows = [
+		{
+			id: 'row-1',
+			value: { target: { value: 'abc' }, untouched: { value: 'keep' } },
+		},
+		{ id: 'row-2', value: { target: { value: 'xyz' } } },
+	];
+	const { event, handler } = runTableHandler(
+		registerTableFullWidthHandler,
+		'table',
+		'target',
+		{},
+		rows,
+		{ id: 'row-1' }
+	);
+	handler(event);
+	assert.strictEqual(rows[0].value.target.value, 'ａｂｃ');
+	assert.strictEqual(rows[0].value.untouched.value, 'keep');
+	assert.strictEqual(rows[1].value.target.value, 'xyz');
+	console.log('PASS: registerTableFullWidthHandler changes only the selected cell');
+} catch (e) {
+	console.error(
+		'FAIL: registerTableFullWidthHandler changes only the selected cell',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const rows = [{ id: 'new-row', value: { kana: { value: 'ｶﾀｶﾅ' } } }];
+	const { event, handler } = runTableHandler(
+		registerTableFullWidthHiraganaHandler,
+		'table',
+		'kana',
+		{},
+		rows,
+		{ id: 'new-row' }
+	);
+	handler(event);
+	assert.strictEqual(rows[0].value.kana.value, 'かたかな');
+	const noMatch = runTableHandler(
+		registerTableFullWidthHiraganaHandler,
+		'table',
+		'kana',
+		{},
+		rows,
+		{ id: 'missing-row' }
+	);
+	noMatch.handler(noMatch.event);
+	assert.strictEqual(rows[0].value.kana.value, 'かたかな');
+	console.log('PASS: registerTableFullWidthHiraganaHandler targets rows by id');
+} catch (e) {
+	console.error(
+		'FAIL: registerTableFullWidthHiraganaHandler targets rows by id',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = {};
+	const rows = [{ id: 'row-1', value: { kana: { value: 'あA' } } }];
+	const { event, handler } = runTableHandler(
+		registerTableFullWidthHiraganaHandler,
+		'table',
+		'kana',
+		{ throwOnError: true, errorMessages },
+		rows,
+		{ id: 'row-1' }
+	);
+	handler(event);
+	const cell = rows[0].value.kana;
+	assert.strictEqual(cell.value, 'あA');
+	assert.ok(cell.error);
+	assert.strictEqual(errorMessages.table['row-1'].kana, cell.error);
+	cell.value = '';
+	handler(event);
+	assert.strictEqual(cell.error, null);
+	assert.strictEqual(errorMessages.table['row-1'].kana, null);
+	console.log('PASS: table handlers set and clear cell errors by row id');
+} catch (e) {
+	console.error(
+		'FAIL: table handlers set and clear cell errors by row id',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const rows = [{ id: 'row-1', value: { target: { value: 'abc' } } }];
+	const { event, handler } = runTableHandler(
+		registerTableFullWidthHandler,
+		'table',
+		'target',
+		{ maxLength: 2, maxLengthErrorMessage: '2文字までです。' },
+		rows,
+		{ id: 'row-1' }
+	);
+	handler(event);
+	assert.strictEqual(rows[0].value.target.value, 'abc');
+	assert.strictEqual(rows[0].value.target.error, '2文字までです。');
+	const invalidRow = runTableHandler(
+		registerTableFullWidthHandler,
+		'table',
+		'target',
+		{},
+		rows,
+		{}
+	);
+	invalidRow.handler(invalidRow.event);
+	assert.strictEqual(rows[0].value.target.value, 'abc', '行IDがない場合は変更しない');
+	console.log('PASS: table handlers validate length and safely skip unidentified rows');
+} catch (e) {
+	console.error(
+		'FAIL: table handlers validate length and safely skip unidentified rows',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const defaultRows = [{ id: 'row-1', value: { target: { value: 'a b' } } }];
+	const defaultCase = runTableHandler(
+		registerTableFullWidthHandler,
+		'table',
+		'target',
+		{},
+		defaultRows,
+		{ id: 'row-1' }
+	);
+	defaultCase.handler(defaultCase.event);
+	assert.strictEqual(defaultRows[0].value.target.value, 'ａ\u3000ｂ');
+
+	const removeRows = [{ id: 'row-2', value: { target: { value: 'a b\u3000c' } } }];
+	const removeCase = runTableHandler(
+		registerTableFullWidthHandler,
+		'table',
+		'target',
+		{ removeWhitespace: true },
+		removeRows,
+		{ id: 'row-2' }
+	);
+	removeCase.handler(removeCase.event);
+	assert.strictEqual(removeRows[0].value.target.value, 'ａｂｃ');
+	console.log('PASS: table handlers preserve or remove whitespace by option');
+} catch (e) {
+	console.error(
+		'FAIL: table handlers preserve or remove whitespace by option',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = {
+		table: {
+			'row-1': { target: 'stale' },
+			'deleted-row': { target: 'deleted' },
+		},
+	};
+	runTableSync('table', 'target', { errorMessages }, [{ id: 'row-1', value: {} }]);
+	assert.deepStrictEqual(errorMessages.table, { 'row-1': { target: 'stale' } });
+	runTableSync('table', 'target', { errorMessages }, [
+		{ id: 'row-1', value: {} },
+		{ id: 'added-row', value: {} },
+	]);
+	assert.ok(errorMessages.table['row-1']);
+	assert.ok(!errorMessages.table['deleted-row']);
+	console.log('PASS: table handler synchronizes errors after row deletion and addition');
+} catch (e) {
+	console.error(
+		'FAIL: table handler synchronizes errors after row deletion and addition',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	registrations.length = 0;
+	registerTableFullWidthHiraganaHandler('table', 'kana', { devices: 'both' });
+	assert.deepStrictEqual(registrations[0].events, [
+		'app.record.create.change.table',
+		'app.record.edit.change.table',
+		'mobile.app.record.create.change.table',
+		'mobile.app.record.edit.change.table',
+	]);
+	assert.deepStrictEqual(registrations[1].events, [
+		'app.record.create.change.kana',
+		'app.record.edit.change.kana',
+		'mobile.app.record.create.change.kana',
+		'mobile.app.record.edit.change.kana',
+	]);
+	console.log('PASS: table handler registers table sync and device-specific cell events');
+} catch (e) {
+	console.error(
+		'FAIL: table handler registers table sync and device-specific cell events',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+console.log('ALL TABLE FIELD HANDLER TESTS INVOKED');

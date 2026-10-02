@@ -53,6 +53,8 @@
 		'assertEmailAddress',
 		'registerFullWidthHandler',
 		'registerFullWidthHiraganaHandler',
+		'registerTableFullWidthHandler',
+		'registerTableFullWidthHiraganaHandler',
 		// vc-check.js
 		'validateZoomMeetingId',
 		'validateZoomPasscode',

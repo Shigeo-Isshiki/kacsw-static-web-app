@@ -31,6 +31,8 @@
 - `assertEmailAddress(emailAddress)` — 半角に正規化し、簡易 RFC5322 相当の形式チェックを行う（正常時は小文字化した文字列を返す、異常時は例外）
 - `registerFullWidthHandler(fieldCode, [options])` — kintone の追加・編集画面のフィールド変更イベントに全角変換ハンドラを登録する
 - `registerFullWidthHiraganaHandler(fieldCode, [options])` — kintone の追加・編集画面のフィールド変更イベントに全角ひらがな変換ハンドラを登録する
+- `registerTableFullWidthHandler(tableFieldCode, fieldCode, [options])` — サブテーブル列の変更イベントに全角変換ハンドラを登録する
+- `registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, [options])` — サブテーブル列の変更イベントに全角ひらがな変換ハンドラを登録する
 
 各関数は引数に不正な型や変換不能な文字が含まれている場合、デフォルトで例外を投げます（`throwOnError=false` を使える関数では例外を抑止して非変換文字をそのまま残す挙動も可能）。
 
@@ -121,6 +123,32 @@ kintone 標準の `kintone.events.on` を使い、指定フィールドの変更
 | `errorMessages`         | object                                | なし                                                  | 既存のエラーマップ。該当フィールドの値のみ更新します                                             |
 
 文字数制限は `maxLength` を指定した場合にのみ適用されます。変換成功時・空値時はフィールドエラーと `errorMessages[fieldCode]` がクリアされます。
+
+### `registerTableFullWidthHandler(tableFieldCode, fieldCode, options = {})`
+### `registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, options = {})`
+
+サブテーブル内の指定列について、変更された行のセルだけを全角または全角ひらがなに変換します。どちらも `registerFullWidthHandler` と同じオプション（`throwOnError`、`removeWhitespace`、`maxLength`、`maxLengthErrorMessage`、`devices`、`errorMessages`）を受け付けます。既定値、型検証、変換・空白除去・文字数判定の順序も通常フィールド版と同じです。
+
+- `tableFieldCode` はサブテーブルのフィールドコード、`fieldCode` は変換対象列のフィールドコードです。
+- 変更行は `event.changes.row.id` とレコード内の行IDで照合します。行IDがない、または一致する行がないイベントでは値を変更しません。
+- 行追加・削除に対応するサブテーブル自体の変更イベントにも登録し、エラーマップから現在存在しない行の情報を除去します。
+- エラーマップは `errorMessages[tableFieldCode][rowId][fieldCode]` 形式です。`rowId` はkintoneの行IDです。対象セルのエラーは成功時・空値時にクリアし、変換失敗・文字数超過時に設定します。
+
+```js
+const tableFieldErrorMessages = {};
+
+registerTableFullWidthHandler('Training_content_list', 'Instructor_last_name', {
+	throwOnError: true,
+	devices: 'both',
+	errorMessages: tableFieldErrorMessages,
+});
+
+registerTableFullWidthHiraganaHandler('Member_list', 'Last_name_kana', {
+	throwOnError: true,
+	removeWhitespace: true,
+	errorMessages: tableFieldErrorMessages,
+});
+```
 
 ---
 

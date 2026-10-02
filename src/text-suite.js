@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_ts_)で始める
-/* exported isSingleByteAlnumOnly, toFullWidthKatakana, toFullWidth, toFullWidthHiragana, toHalfWidthKana, toHalfWidth, assertEmailAddress, registerFullWidthHandler, registerFullWidthHiraganaHandler */
+/* exported isSingleByteAlnumOnly, toFullWidthKatakana, toFullWidth, toFullWidthHiragana, toHalfWidthKana, toHalfWidth, assertEmailAddress, registerFullWidthHandler, registerFullWidthHiraganaHandler, registerTableFullWidthHandler, registerTableFullWidthHiraganaHandler */
 /* global kintone */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
@@ -666,6 +666,150 @@ const registerFullWidthHiraganaHandler = (fieldCode, options = {}) => {
 	});
 };
 
+/**
+ * サブテーブル内の指定フィールド変更イベントに変換ハンドラを登録する関数
+ * @param {string} tableFieldCode サブテーブルのフィールドコード
+ * @param {string} fieldCode 対象列のフィールドコード
+ * @param {_TS_FULL_WIDTH_HANDLER_OPTIONS} [options] オプション
+ * @param {(value: string, throwOnError: boolean) => string} converter 変換関数
+ * @returns {void}
+ * @throws {Error} 引数やオプションが不正な場合
+ */
+const _ts_registerTableFieldHandler = (tableFieldCode, fieldCode, options, converter) => {
+	if (!_ts_checkString(tableFieldCode) || !tableFieldCode)
+		throw new Error('tableFieldCodeは空でない文字列である必要があります');
+	if (!_ts_checkString(fieldCode) || !fieldCode)
+		throw new Error('fieldCodeは空でない文字列である必要があります');
+	if (options === null || typeof options !== 'object' || Array.isArray(options))
+		throw new Error('optionsはオブジェクトである必要があります');
+	const {
+		throwOnError = false,
+		removeWhitespace = false,
+		maxLength = null,
+		maxLengthErrorMessage,
+		devices = 'desktop',
+		errorMessages,
+	} = options;
+	if (!_ts_checkBoolean(throwOnError))
+		throw new Error('throwOnErrorはboolean型である必要があります');
+	if (!_ts_checkBoolean(removeWhitespace))
+		throw new Error('removeWhitespaceはboolean型である必要があります');
+	if (maxLength !== null && !(Number.isInteger(maxLength) && maxLength > 0))
+		throw new Error('maxLengthは正の整数またはnullである必要があります');
+	if (maxLengthErrorMessage !== undefined && !_ts_checkString(maxLengthErrorMessage))
+		throw new Error('maxLengthErrorMessageは文字列である必要があります');
+	if (!['desktop', 'mobile', 'both'].includes(devices))
+		throw new Error("devicesは'desktop'、'mobile'、'both'のいずれかである必要があります");
+	if (
+		errorMessages !== undefined &&
+		(errorMessages === null || typeof errorMessages !== 'object' || Array.isArray(errorMessages))
+	)
+		throw new Error('errorMessagesはオブジェクトである必要があります');
+	if (typeof kintone === 'undefined' || !kintone.events || typeof kintone.events.on !== 'function')
+		throw new Error('kintone.events.onが利用できません');
+
+	const lengthErrorMessage =
+		maxLengthErrorMessage ?? `全角変換後、${maxLength}文字以内で入力してください。`;
+	const eventNames = [];
+	const tableEventNames = [];
+	if (devices === 'desktop' || devices === 'both') {
+		eventNames.push(`app.record.create.change.${fieldCode}`, `app.record.edit.change.${fieldCode}`);
+		tableEventNames.push(
+			`app.record.create.change.${tableFieldCode}`,
+			`app.record.edit.change.${tableFieldCode}`
+		);
+	}
+	if (devices === 'mobile' || devices === 'both') {
+		eventNames.push(
+			`mobile.app.record.create.change.${fieldCode}`,
+			`mobile.app.record.edit.change.${fieldCode}`
+		);
+		tableEventNames.push(
+			`mobile.app.record.create.change.${tableFieldCode}`,
+			`mobile.app.record.edit.change.${tableFieldCode}`
+		);
+	}
+
+	const syncErrorMessages = (record) => {
+		if (!errorMessages) return;
+		const rows = record && record[tableFieldCode] && record[tableFieldCode].value;
+		const tableErrors = errorMessages[tableFieldCode];
+		if (!tableErrors || typeof tableErrors !== 'object' || Array.isArray(tableErrors)) return;
+		const rowIds = new Set(
+			Array.isArray(rows)
+				? rows.map((row) => row && row.id).filter((rowId) => typeof rowId === 'string' && rowId)
+				: []
+		);
+		Object.keys(tableErrors).forEach((rowId) => {
+			if (!rowIds.has(rowId)) delete tableErrors[rowId];
+		});
+	};
+
+	kintone.events.on(tableEventNames, (event) => {
+		syncErrorMessages(event && event.record);
+		return event;
+	});
+	kintone.events.on(eventNames, (event) => {
+		const record = event && event.record;
+		const rows = record && record[tableFieldCode] && record[tableFieldCode].value;
+		syncErrorMessages(record);
+		const changedRow = event && event.changes && event.changes.row;
+		if (!Array.isArray(rows) || !changedRow || typeof changedRow.id !== 'string' || !changedRow.id)
+			return event;
+		const row = rows.find((candidate) => candidate && candidate.id === changedRow.id);
+		const field = row && row.value && row.value[fieldCode];
+		if (!field) return event;
+
+		field.error = null;
+		if (errorMessages) {
+			if (!errorMessages[tableFieldCode] || typeof errorMessages[tableFieldCode] !== 'object') {
+				errorMessages[tableFieldCode] = {};
+			}
+			if (
+				!errorMessages[tableFieldCode][changedRow.id] ||
+				typeof errorMessages[tableFieldCode][changedRow.id] !== 'object'
+			) {
+				errorMessages[tableFieldCode][changedRow.id] = {};
+			}
+			errorMessages[tableFieldCode][changedRow.id][fieldCode] = null;
+		}
+
+		const value = field.value;
+		if (value === null || value === undefined || value === '') return event;
+		try {
+			let converted = converter(String(value), throwOnError);
+			if (removeWhitespace) converted = converted.replace(_TS_WHITESPACE_REGEX, '');
+			if (maxLength !== null && converted.length > maxLength) throw new Error(lengthErrorMessage);
+			field.value = converted;
+		} catch (error) {
+			const message = error && error.message ? error.message : String(error);
+			field.error = message;
+			if (errorMessages) errorMessages[tableFieldCode][changedRow.id][fieldCode] = message;
+		}
+		return event;
+	});
+};
+
+/**
+ * サブテーブル内の指定フィールドを全角変換するハンドラを登録する関数
+ * @param {string} tableFieldCode サブテーブルのフィールドコード
+ * @param {string} fieldCode 対象列のフィールドコード
+ * @param {_TS_FULL_WIDTH_HANDLER_OPTIONS} [options] オプション
+ * @returns {void}
+ */
+const registerTableFullWidthHandler = (tableFieldCode, fieldCode, options = {}) =>
+	_ts_registerTableFieldHandler(tableFieldCode, fieldCode, options, toFullWidth);
+
+/**
+ * サブテーブル内の指定フィールドを全角ひらがな変換するハンドラを登録する関数
+ * @param {string} tableFieldCode サブテーブルのフィールドコード
+ * @param {string} fieldCode 対象列のフィールドコード
+ * @param {_TS_FULL_WIDTH_HANDLER_OPTIONS} [options] オプション
+ * @returns {void}
+ */
+const registerTableFullWidthHiraganaHandler = (tableFieldCode, fieldCode, options = {}) =>
+	_ts_registerTableFieldHandler(tableFieldCode, fieldCode, options, toFullWidthHiragana);
+
 // 公開
 if (typeof window !== 'undefined') {
 	window.isSingleByteAlnumOnly = isSingleByteAlnumOnly;
@@ -677,6 +821,8 @@ if (typeof window !== 'undefined') {
 	window.assertEmailAddress = assertEmailAddress;
 	window.registerFullWidthHandler = registerFullWidthHandler;
 	window.registerFullWidthHiraganaHandler = registerFullWidthHiraganaHandler;
+	window.registerTableFullWidthHandler = registerTableFullWidthHandler;
+	window.registerTableFullWidthHiraganaHandler = registerTableFullWidthHiraganaHandler;
 }
 
 // 内部ユーティリティはファイル内に留めます（非公開化）
