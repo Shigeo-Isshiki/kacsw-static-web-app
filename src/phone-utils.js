@@ -1314,6 +1314,72 @@ const normalizePhoneNumber = (phoneNumber) => {
 	}
 };
 
+/**
+ * 電話番号フィールドの変更イベントに正規化ハンドラを登録する関数
+ * @param {string} fieldCode 対象フィールドコード
+ * @param {object} options 登録オプション
+ * @param {'callCapable'|'homeLine'|'faxCapable'|'mobile'} options.type 必須の電話番号種別
+ * @param {object} [options.errorMessages] エラーメッセージを保持する既存オブジェクト
+ * @param {'desktop'|'mobile'|'both'} [options.devices='both'] 登録対象のデバイス
+ * @returns {void}
+ * @throws {Error} 引数やオプションが不正な場合
+ */
+const registerPhoneNumberHandler = (fieldCode, options = {}) => {
+	if (typeof fieldCode !== 'string' || !fieldCode)
+		throw new Error('fieldCodeは空でない文字列である必要があります');
+	if (options === null || typeof options !== 'object' || Array.isArray(options))
+		throw new Error('optionsはオブジェクトである必要があります');
+
+	const { type, errorMessages, devices = 'both' } = options;
+	const errorMessageByType = {
+		callCapable: '通話可能な電話番号を入力してください。',
+		homeLine: '携帯電話以外の通話可能な電話番号を入力してください。',
+		faxCapable: 'FAX可能な電話番号を入力してください。',
+		mobile: '携帯電話番号を入力してください。',
+	};
+	if (!Object.prototype.hasOwnProperty.call(errorMessageByType, type))
+		throw new Error(
+			'typeはcallCapable、homeLine、faxCapable、mobileのいずれかである必要があります'
+		);
+	if (!['desktop', 'mobile', 'both'].includes(devices))
+		throw new Error("devicesは'desktop'、'mobile'、'both'のいずれかである必要があります");
+	if (
+		errorMessages !== undefined &&
+		(errorMessages === null || typeof errorMessages !== 'object' || Array.isArray(errorMessages))
+	)
+		throw new Error('errorMessagesはオブジェクトである必要があります');
+	if (typeof kintone === 'undefined' || !kintone.events || typeof kintone.events.on !== 'function')
+		throw new Error('kintone.events.onが利用できません');
+
+	const eventNames = [];
+	if (devices === 'desktop' || devices === 'both')
+		eventNames.push(`app.record.create.change.${fieldCode}`, `app.record.edit.change.${fieldCode}`);
+	if (devices === 'mobile' || devices === 'both')
+		eventNames.push(
+			`mobile.app.record.create.change.${fieldCode}`,
+			`mobile.app.record.edit.change.${fieldCode}`
+		);
+
+	kintone.events.on(eventNames, (event) => {
+		const field = event && event.record && event.record[fieldCode];
+		if (!field) return event;
+
+		field.error = null;
+		if (errorMessages) errorMessages[fieldCode] = null;
+		if (field.value === null || field.value === undefined || field.value === '') return event;
+
+		try {
+			const result = formatPhoneNumber(field.value);
+			if (result[type] !== true) throw new Error(errorMessageByType[type]);
+			field.value = result.formattedNumber;
+		} catch (_error) {
+			field.error = errorMessageByType[type];
+			if (errorMessages) errorMessages[fieldCode] = errorMessageByType[type];
+		}
+		return event;
+	});
+};
+
 // 公開: 電話番号ユーティリティをグローバルに露出（ファイル末尾に非破壊的に追加）
 if (typeof window !== 'undefined') {
 	try {
@@ -1331,5 +1397,9 @@ if (typeof window !== 'undefined') {
 	try {
 		window.normalizePhoneNumber =
 			typeof normalizePhoneNumber !== 'undefined' ? normalizePhoneNumber : undefined;
+	} catch {}
+	try {
+		window.registerPhoneNumberHandler =
+			typeof registerPhoneNumberHandler !== 'undefined' ? registerPhoneNumberHandler : undefined;
 	} catch {}
 }

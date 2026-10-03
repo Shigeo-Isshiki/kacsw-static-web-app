@@ -25,6 +25,7 @@
 - [`formatPhoneNumber(phoneNumber)`](#formatphonenumber)
 - [`getPhoneNumberType(phoneNumber)`](#getphonenumbertype)
 - [`normalizePhoneNumber(phoneNumber)`](#normalizephonenumber)
+- [`registerPhoneNumberHandler(fieldCode, options)`](#registerphonenumberhandler)
 
 （全て同期関数、入力に不正がある場合は `Error` をスローします。`phoneNumber` は文字列または数値を受け取ります。）
 
@@ -112,6 +113,36 @@
 用途:
 
 - フォーム保存前や比較処理用に「数字のみ」表現が必要な場合に利用します。
+
+<a id="registerphonenumberhandler"></a>
+
+### `registerPhoneNumberHandler(fieldCode, options)`
+
+- 概要: kintone の追加・編集画面で、指定フィールドの変更時に電話番号を検証して整形します。画面表示イベントでは実行しません。
+- `fieldCode` (string) — 対象フィールドコード。
+- `options.type` (必須) — `callCapable`、`homeLine`、`faxCapable`、`mobile` のいずれか。未指定や未知の値は登録時にエラーになります。
+- `options.errorMessages` (任意の object) — エラー文言を `errorMessages[fieldCode]` に設定し、空値または正常値では `null` にクリアします。省略可能です。
+- `options.devices` (任意) — `desktop`、`mobile`、`both` のいずれか。既定値は `both` です。対象デバイスの追加・編集変更イベントだけに登録します。
+- 戻り値: `void`。
+- エラー時: 入力値は変更せず、フィールドの `error` と指定されたエラーマップに種別ごとの文言を設定します。`formatPhoneNumber` が投げたエラーもフィールドエラーとして処理し、イベント外へは投げません。空値と正常値では古いエラーをクリアします。
+
+種別は `formatPhoneNumber` の戻り値にある同名フラグで判定します。`homeLine` は固定電話だけでなく、「通話可能かつ携帯電話ではない」番号（IP電話などを含む）です。
+
+| `type` | 判定条件 | エラーメッセージ |
+| --- | --- | --- |
+| `callCapable` | `callCapable === true` | 通話可能な電話番号を入力してください。 |
+| `homeLine` | `homeLine === true` | 携帯電話以外の通話可能な電話番号を入力してください。 |
+| `faxCapable` | `faxCapable === true` | FAX可能な電話番号を入力してください。 |
+| `mobile` | `mobile === true` | 携帯電話番号を入力してください。 |
+
+```js
+const errorMessages = {};
+registerPhoneNumberHandler('phone', {
+	type: 'homeLine',
+	errorMessages,
+	devices: 'both',
+});
+```
 
 ---
 

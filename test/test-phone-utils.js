@@ -9,8 +9,16 @@ const isValidPhoneNumber = global.isValidPhoneNumber || (window && window.isVali
 const formatPhoneNumber = global.formatPhoneNumber || (window && window.formatPhoneNumber);
 const getPhoneNumberType = global.getPhoneNumberType || (window && window.getPhoneNumberType);
 const normalizePhoneNumber = global.normalizePhoneNumber || (window && window.normalizePhoneNumber);
+const registerPhoneNumberHandler =
+	global.registerPhoneNumberHandler || (window && window.registerPhoneNumberHandler);
 
-if (!isValidPhoneNumber || !formatPhoneNumber || !getPhoneNumberType || !normalizePhoneNumber)
+if (
+	!isValidPhoneNumber ||
+	!formatPhoneNumber ||
+	!getPhoneNumberType ||
+	!normalizePhoneNumber ||
+	!registerPhoneNumberHandler
+)
 	throw new Error('phone-utils の関数が取得できませんでした');
 
 try {
@@ -199,3 +207,153 @@ try {
 }
 
 console.log('ALL PHONE-UTILS TESTS INVOKED');
+
+// --- registerPhoneNumberHandler ---
+const phoneHandlerRegistrations = [];
+global.kintone = {
+	events: {
+		on: (events, handler) => phoneHandlerRegistrations.push({ events, handler }),
+	},
+};
+
+const runPhoneHandler = (type, value, errorMessages = {}) => {
+	registerPhoneNumberHandler('phone', { type, errorMessages });
+	const registration = phoneHandlerRegistrations[phoneHandlerRegistrations.length - 1];
+	const event = { record: { phone: { value, error: '古いエラー' } } };
+	return { event: registration.handler(event), errorMessages };
+};
+
+try {
+	const { event } = runPhoneHandler('callCapable', '０３ ３１２３ ４５６７');
+	assert.strictEqual(event.record.phone.value, '03-3123-4567');
+	assert.strictEqual(event.record.phone.error, null);
+	console.log('PASS: registerPhoneNumberHandler formats call-capable number');
+} catch (e) {
+	console.error('FAIL: registerPhoneNumberHandler formats call-capable number', e.message);
+	process.exitCode = 2;
+}
+
+try {
+	const { event, errorMessages } = runPhoneHandler('homeLine', '05012345678');
+	assert.strictEqual(event.record.phone.value, '050-1234-5678', 'IP電話もhomeLineとして受け入れる');
+	assert.strictEqual(event.record.phone.error, null);
+	assert.strictEqual(errorMessages.phone, null);
+	console.log('PASS: registerPhoneNumberHandler accepts IP phone as homeLine');
+} catch (e) {
+	console.error('FAIL: registerPhoneNumberHandler homeLine accepts IP phone', e.message);
+	process.exitCode = 2;
+}
+
+try {
+	const { event, errorMessages } = runPhoneHandler('faxCapable', '08012345678');
+	assert.strictEqual(event.record.phone.value, '08012345678', '不適合時は入力値を維持する');
+	assert.strictEqual(event.record.phone.error, 'FAX可能な電話番号を入力してください。');
+	assert.strictEqual(errorMessages.phone, event.record.phone.error);
+	console.log('PASS: registerPhoneNumberHandler rejects non-fax number');
+} catch (e) {
+	console.error('FAIL: registerPhoneNumberHandler rejects non-fax number', e.message);
+	process.exitCode = 2;
+}
+
+try {
+	const { event } = runPhoneHandler('faxCapable', '03-3123-4567');
+	assert.strictEqual(event.record.phone.value, '03-3123-4567');
+	assert.strictEqual(event.record.phone.error, null);
+	console.log('PASS: registerPhoneNumberHandler formats fax-capable number');
+} catch (e) {
+	console.error('FAIL: registerPhoneNumberHandler formats fax-capable number', e.message);
+	process.exitCode = 2;
+}
+
+try {
+	const { event, errorMessages } = runPhoneHandler('mobile', 'invalid');
+	assert.strictEqual(event.record.phone.value, 'invalid');
+	assert.strictEqual(event.record.phone.error, '携帯電話番号を入力してください。');
+	assert.strictEqual(errorMessages.phone, event.record.phone.error);
+	console.log('PASS: registerPhoneNumberHandler handles formatter exceptions');
+} catch (e) {
+	console.error('FAIL: registerPhoneNumberHandler formatter exception handling', e.message);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = { phone: '前のエラー' };
+	registerPhoneNumberHandler('phone', { type: 'mobile', errorMessages });
+	const handler = phoneHandlerRegistrations[phoneHandlerRegistrations.length - 1].handler;
+	['', null, undefined].forEach((value) => {
+		const event = handler({ record: { phone: { value, error: '古いエラー' } } });
+		assert.strictEqual(event.record.phone.value, value);
+		assert.strictEqual(event.record.phone.error, null);
+		assert.strictEqual(errorMessages.phone, null);
+	});
+	const validEvent = handler({ record: { phone: { value: '08012345678', error: '古いエラー' } } });
+	assert.strictEqual(validEvent.record.phone.value, '080-1234-5678');
+	assert.strictEqual(validEvent.record.phone.error, null);
+	assert.strictEqual(errorMessages.phone, null);
+	console.log('PASS: registerPhoneNumberHandler clears stale errors');
+} catch (e) {
+	console.error('FAIL: registerPhoneNumberHandler clears stale errors', e.message);
+	process.exitCode = 2;
+}
+
+try {
+	assert.throws(() => registerPhoneNumberHandler('phone', {}), /type/);
+	assert.throws(() => registerPhoneNumberHandler('phone', { type: 'landline' }), /type/);
+	console.log('PASS: registerPhoneNumberHandler requires known type');
+} catch (e) {
+	console.error('FAIL: registerPhoneNumberHandler type validation', e.message);
+	process.exitCode = 2;
+}
+
+try {
+	const mismatches = [
+		['callCapable', '02012345678', '通話可能な電話番号を入力してください。'],
+		['homeLine', '08012345678', '携帯電話以外の通話可能な電話番号を入力してください。'],
+		['mobile', '03-3123-4567', '携帯電話番号を入力してください。'],
+	];
+	mismatches.forEach(([type, value, message]) => {
+		const { event, errorMessages } = runPhoneHandler(type, value);
+		assert.strictEqual(event.record.phone.value, value);
+		assert.strictEqual(event.record.phone.error, message);
+		assert.strictEqual(errorMessages.phone, message);
+	});
+	const registrationCount = phoneHandlerRegistrations.length;
+	registerPhoneNumberHandler('phone', { type: 'callCapable' });
+	const noErrorMapHandler = phoneHandlerRegistrations[registrationCount].handler;
+	const invalidEvent = noErrorMapHandler({ record: { phone: { value: 'invalid' } } });
+	assert.strictEqual(invalidEvent.record.phone.error, '通話可能な電話番号を入力してください。');
+	console.log('PASS: registerPhoneNumberHandler rejects each mismatched type safely');
+} catch (e) {
+	console.error(
+		'FAIL: registerPhoneNumberHandler mismatched types',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	registerPhoneNumberHandler('phone', { type: 'callCapable' });
+	assert.deepStrictEqual(phoneHandlerRegistrations[phoneHandlerRegistrations.length - 1].events, [
+		'app.record.create.change.phone',
+		'app.record.edit.change.phone',
+		'mobile.app.record.create.change.phone',
+		'mobile.app.record.edit.change.phone',
+	]);
+	registerPhoneNumberHandler('phone', { type: 'mobile', devices: 'desktop' });
+	assert.deepStrictEqual(phoneHandlerRegistrations[phoneHandlerRegistrations.length - 1].events, [
+		'app.record.create.change.phone',
+		'app.record.edit.change.phone',
+	]);
+	registerPhoneNumberHandler('phone', { type: 'mobile', devices: 'mobile' });
+	assert.deepStrictEqual(phoneHandlerRegistrations[phoneHandlerRegistrations.length - 1].events, [
+		'mobile.app.record.create.change.phone',
+		'mobile.app.record.edit.change.phone',
+	]);
+	console.log('PASS: registerPhoneNumberHandler registers supported change events only');
+} catch (e) {
+	console.error(
+		'FAIL: registerPhoneNumberHandler change-event registration',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}

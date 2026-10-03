@@ -39,6 +39,7 @@
 		'formatPhoneNumber',
 		'getPhoneNumberType',
 		'normalizePhoneNumber',
+		'registerPhoneNumberHandler',
 		// shipping-processing.js
 		'getNextBusinessDay',
 		'kintoneShippingInquiryButton',
