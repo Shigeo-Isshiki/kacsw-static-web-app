@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_ts_)で始める
-/* exported isSingleByteAlnumOnly, toFullWidthKatakana, toFullWidth, toFullWidthHiragana, toHalfWidthKana, toHalfWidth, assertEmailAddress, registerFullWidthHandler, registerFullWidthHiraganaHandler, registerTableFullWidthHandler, registerTableFullWidthHiraganaHandler */
+/* exported isSingleByteAlnumOnly, toFullWidthKatakana, toFullWidth, toFullWidthHiragana, toHalfWidthKana, toHalfWidth, assertEmailAddress, registerFullWidthHandler, registerFullWidthHiraganaHandler, registerTableFullWidthHandler, registerTableFullWidthHiraganaHandler, registerEmailAddressHandler, registerTableEmailAddressHandler */
 /* global kintone */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
@@ -525,33 +525,17 @@ const _TS_WHITESPACE_REGEX = /[\s\u3000]+/g;
  */
 
 /**
- * 指定フィールドの変更イベントに全角変換ハンドラを登録する関数
- * @param {string} fieldCode 対象フィールドコード
- * @param {_TS_FULL_WIDTH_HANDLER_OPTIONS} [options] オプション
- * @returns {void}
- * @throws {Error} 引数やオプションが不正な場合
+ * ハンドラ共通オプションを検証する関数
+ * @param {object} options オプション
+ * @param {'desktop'|'mobile'|'both'} defaultDevices devices の既定値
+ * @param {boolean} includeFullWidthOptions 全角変換用オプションを検証するか
+ * @returns {object} 検証済みオプション
+ * @throws {Error} オプションが不正な場合
  */
-const registerFullWidthHandler = (fieldCode, options = {}) => {
-	if (!_ts_checkString(fieldCode) || !fieldCode)
-		throw new Error('fieldCodeは空でない文字列である必要があります');
+const _ts_validateHandlerOptions = (options, defaultDevices, includeFullWidthOptions = false) => {
 	if (options === null || typeof options !== 'object' || Array.isArray(options))
 		throw new Error('optionsはオブジェクトである必要があります');
-	const {
-		throwOnError = false,
-		removeWhitespace = false,
-		maxLength = null,
-		maxLengthErrorMessage,
-		devices = 'desktop',
-		errorMessages,
-	} = options;
-	if (!_ts_checkBoolean(throwOnError))
-		throw new Error('throwOnErrorはboolean型である必要があります');
-	if (!_ts_checkBoolean(removeWhitespace))
-		throw new Error('removeWhitespaceはboolean型である必要があります');
-	if (maxLength !== null && !(Number.isInteger(maxLength) && maxLength > 0))
-		throw new Error('maxLengthは正の整数またはnullである必要があります');
-	if (maxLengthErrorMessage !== undefined && !_ts_checkString(maxLengthErrorMessage))
-		throw new Error('maxLengthErrorMessageは文字列である必要があります');
+	const { devices = defaultDevices, errorMessages } = options;
 	if (!['desktop', 'mobile', 'both'].includes(devices))
 		throw new Error("devicesは'desktop'、'mobile'、'both'のいずれかである必要があります");
 	if (
@@ -559,11 +543,69 @@ const registerFullWidthHandler = (fieldCode, options = {}) => {
 		(errorMessages === null || typeof errorMessages !== 'object' || Array.isArray(errorMessages))
 	)
 		throw new Error('errorMessagesはオブジェクトである必要があります');
+
+	const validatedOptions = { devices, errorMessages };
+	if (includeFullWidthOptions) {
+		const {
+			throwOnError = false,
+			removeWhitespace = false,
+			maxLength = null,
+			maxLengthErrorMessage,
+		} = options;
+		if (!_ts_checkBoolean(throwOnError))
+			throw new Error('throwOnErrorはboolean型である必要があります');
+		if (!_ts_checkBoolean(removeWhitespace))
+			throw new Error('removeWhitespaceはboolean型である必要があります');
+		if (maxLength !== null && !(Number.isInteger(maxLength) && maxLength > 0))
+			throw new Error('maxLengthは正の整数またはnullである必要があります');
+		if (maxLengthErrorMessage !== undefined && !_ts_checkString(maxLengthErrorMessage))
+			throw new Error('maxLengthErrorMessageは文字列である必要があります');
+		Object.assign(validatedOptions, {
+			throwOnError,
+			removeWhitespace,
+			maxLength,
+			maxLengthErrorMessage,
+		});
+	}
+	return validatedOptions;
+};
+
+/**
+ * kintone イベントAPIの利用可否を検証する関数
+ * @returns {void}
+ * @throws {Error} kintone.events.on が利用できない場合
+ */
+const _ts_assertKintoneEventsAvailable = () => {
 	if (typeof kintone === 'undefined' || !kintone.events || typeof kintone.events.on !== 'function')
 		throw new Error('kintone.events.onが利用できません');
+};
 
-	const lengthErrorMessage =
-		maxLengthErrorMessage ?? `全角変換後、${maxLength}文字以内で入力してください。`;
+/**
+ * 指定フィールドの変更イベントに値検証ハンドラを登録する関数
+ * @param {string} fieldCode 対象フィールドコード
+ * @param {object} options オプション
+ * @param {(value: *, options: object) => string} normalizer 値を検証・正規化する関数
+ * @param {'desktop'|'mobile'|'both'} defaultDevices devices の既定値
+ * @param {boolean} [includeFullWidthOptions=false] 全角変換用オプションを検証するか
+ * @returns {void}
+ * @throws {Error} 引数やオプションが不正な場合
+ */
+const _ts_registerFieldValueHandler = (
+	fieldCode,
+	options,
+	normalizer,
+	defaultDevices,
+	includeFullWidthOptions = false
+) => {
+	if (!_ts_checkString(fieldCode) || !fieldCode)
+		throw new Error('fieldCodeは空でない文字列である必要があります');
+	const { devices, errorMessages, ...handlerOptions } = _ts_validateHandlerOptions(
+		options,
+		defaultDevices,
+		includeFullWidthOptions
+	);
+	_ts_assertKintoneEventsAvailable();
+
 	const eventNames = [];
 	if (devices === 'desktop' || devices === 'both')
 		eventNames.push(`app.record.create.change.${fieldCode}`, `app.record.edit.change.${fieldCode}`);
@@ -582,10 +624,7 @@ const registerFullWidthHandler = (fieldCode, options = {}) => {
 		const value = field.value;
 		if (value === null || value === undefined || value === '') return event;
 		try {
-			let converted = toFullWidth(String(value), throwOnError);
-			if (removeWhitespace) converted = converted.replace(_TS_WHITESPACE_REGEX, '');
-			if (maxLength !== null && converted.length > maxLength) throw new Error(lengthErrorMessage);
-			field.value = converted;
+			field.value = normalizer(value, handlerOptions);
 		} catch (error) {
 			const message = error && error.message ? error.message : String(error);
 			field.error = message;
@@ -593,6 +632,31 @@ const registerFullWidthHandler = (fieldCode, options = {}) => {
 		}
 		return event;
 	});
+};
+
+/**
+ * 指定フィールドの変更イベントに全角変換ハンドラを登録する関数
+ * @param {string} fieldCode 対象フィールドコード
+ * @param {_TS_FULL_WIDTH_HANDLER_OPTIONS} [options] オプション
+ * @returns {void}
+ * @throws {Error} 引数やオプションが不正な場合
+ */
+const registerFullWidthHandler = (fieldCode, options = {}) => {
+	_ts_registerFieldValueHandler(
+		fieldCode,
+		options,
+		(value, { throwOnError, removeWhitespace, maxLength, maxLengthErrorMessage }) => {
+			let converted = toFullWidth(String(value), throwOnError);
+			if (removeWhitespace) converted = converted.replace(_TS_WHITESPACE_REGEX, '');
+			if (maxLength !== null && converted.length > maxLength)
+				throw new Error(
+					maxLengthErrorMessage ?? `全角変換後、${maxLength}文字以内で入力してください。`
+				);
+			return converted;
+		},
+		'desktop',
+		true
+	);
 };
 
 /**
@@ -603,67 +667,32 @@ const registerFullWidthHandler = (fieldCode, options = {}) => {
  * @throws {Error} 引数やオプションが不正な場合
  */
 const registerFullWidthHiraganaHandler = (fieldCode, options = {}) => {
-	if (!_ts_checkString(fieldCode) || !fieldCode)
-		throw new Error('fieldCodeは空でない文字列である必要があります');
-	if (options === null || typeof options !== 'object' || Array.isArray(options))
-		throw new Error('optionsはオブジェクトである必要があります');
-	const {
-		throwOnError = false,
-		removeWhitespace = false,
-		maxLength = null,
-		maxLengthErrorMessage,
-		devices = 'desktop',
-		errorMessages,
-	} = options;
-	if (!_ts_checkBoolean(throwOnError))
-		throw new Error('throwOnErrorはboolean型である必要があります');
-	if (!_ts_checkBoolean(removeWhitespace))
-		throw new Error('removeWhitespaceはboolean型である必要があります');
-	if (maxLength !== null && !(Number.isInteger(maxLength) && maxLength > 0))
-		throw new Error('maxLengthは正の整数またはnullである必要があります');
-	if (maxLengthErrorMessage !== undefined && !_ts_checkString(maxLengthErrorMessage))
-		throw new Error('maxLengthErrorMessageは文字列である必要があります');
-	if (!['desktop', 'mobile', 'both'].includes(devices))
-		throw new Error("devicesは'desktop'、'mobile'、'both'のいずれかである必要があります");
-	if (
-		errorMessages !== undefined &&
-		(errorMessages === null || typeof errorMessages !== 'object' || Array.isArray(errorMessages))
-	)
-		throw new Error('errorMessagesはオブジェクトである必要があります');
-	if (typeof kintone === 'undefined' || !kintone.events || typeof kintone.events.on !== 'function')
-		throw new Error('kintone.events.onが利用できません');
-
-	const lengthErrorMessage =
-		maxLengthErrorMessage ?? `全角変換後、${maxLength}文字以内で入力してください。`;
-	const eventNames = [];
-	if (devices === 'desktop' || devices === 'both')
-		eventNames.push(`app.record.create.change.${fieldCode}`, `app.record.edit.change.${fieldCode}`);
-	if (devices === 'mobile' || devices === 'both')
-		eventNames.push(
-			`mobile.app.record.create.change.${fieldCode}`,
-			`mobile.app.record.edit.change.${fieldCode}`
-		);
-
-	kintone.events.on(eventNames, (event) => {
-		const record = event && event.record;
-		const field = record && record[fieldCode];
-		if (!field) return event;
-		field.error = null;
-		if (errorMessages) errorMessages[fieldCode] = null;
-		const value = field.value;
-		if (value === null || value === undefined || value === '') return event;
-		try {
+	_ts_registerFieldValueHandler(
+		fieldCode,
+		options,
+		(value, { throwOnError, removeWhitespace, maxLength, maxLengthErrorMessage }) => {
 			let converted = toFullWidthHiragana(String(value), throwOnError);
 			if (removeWhitespace) converted = converted.replace(_TS_WHITESPACE_REGEX, '');
-			if (maxLength !== null && converted.length > maxLength) throw new Error(lengthErrorMessage);
-			field.value = converted;
-		} catch (error) {
-			const message = error && error.message ? error.message : String(error);
-			field.error = message;
-			if (errorMessages) errorMessages[fieldCode] = message;
-		}
-		return event;
-	});
+			if (maxLength !== null && converted.length > maxLength)
+				throw new Error(
+					maxLengthErrorMessage ?? `全角変換後、${maxLength}文字以内で入力してください。`
+				);
+			return converted;
+		},
+		'desktop',
+		true
+	);
+};
+
+/**
+ * 指定フィールドの変更イベントにメールアドレス検証ハンドラを登録する関数
+ * @param {string} fieldCode 対象フィールドコード
+ * @param {object} options オプション
+ * @returns {void}
+ * @throws {Error} 引数やオプションが不正な場合
+ */
+const registerEmailAddressHandler = (fieldCode, options = {}) => {
+	_ts_registerFieldValueHandler(fieldCode, options, assertEmailAddress, 'desktop');
 };
 
 /**
@@ -671,45 +700,31 @@ const registerFullWidthHiraganaHandler = (fieldCode, options = {}) => {
  * @param {string} tableFieldCode サブテーブルのフィールドコード
  * @param {string} fieldCode 対象列のフィールドコード
  * @param {_TS_FULL_WIDTH_HANDLER_OPTIONS} [options] オプション
- * @param {(value: string, throwOnError: boolean) => string} converter 変換関数
+ * @param {(value: *, options: object) => string} normalizer 値を検証・正規化する関数
+ * @param {'desktop'|'mobile'|'both'} [defaultDevices='desktop'] devices の既定値
+ * @param {boolean} [includeFullWidthOptions=false] 全角変換用オプションを検証するか
  * @returns {void}
  * @throws {Error} 引数やオプションが不正な場合
  */
-const _ts_registerTableFieldHandler = (tableFieldCode, fieldCode, options, converter) => {
+const _ts_registerTableFieldHandler = (
+	tableFieldCode,
+	fieldCode,
+	options,
+	normalizer,
+	defaultDevices = 'desktop',
+	includeFullWidthOptions = false
+) => {
 	if (!_ts_checkString(tableFieldCode) || !tableFieldCode)
 		throw new Error('tableFieldCodeは空でない文字列である必要があります');
 	if (!_ts_checkString(fieldCode) || !fieldCode)
 		throw new Error('fieldCodeは空でない文字列である必要があります');
-	if (options === null || typeof options !== 'object' || Array.isArray(options))
-		throw new Error('optionsはオブジェクトである必要があります');
-	const {
-		throwOnError = false,
-		removeWhitespace = false,
-		maxLength = null,
-		maxLengthErrorMessage,
-		devices = 'desktop',
-		errorMessages,
-	} = options;
-	if (!_ts_checkBoolean(throwOnError))
-		throw new Error('throwOnErrorはboolean型である必要があります');
-	if (!_ts_checkBoolean(removeWhitespace))
-		throw new Error('removeWhitespaceはboolean型である必要があります');
-	if (maxLength !== null && !(Number.isInteger(maxLength) && maxLength > 0))
-		throw new Error('maxLengthは正の整数またはnullである必要があります');
-	if (maxLengthErrorMessage !== undefined && !_ts_checkString(maxLengthErrorMessage))
-		throw new Error('maxLengthErrorMessageは文字列である必要があります');
-	if (!['desktop', 'mobile', 'both'].includes(devices))
-		throw new Error("devicesは'desktop'、'mobile'、'both'のいずれかである必要があります");
-	if (
-		errorMessages !== undefined &&
-		(errorMessages === null || typeof errorMessages !== 'object' || Array.isArray(errorMessages))
-	)
-		throw new Error('errorMessagesはオブジェクトである必要があります');
-	if (typeof kintone === 'undefined' || !kintone.events || typeof kintone.events.on !== 'function')
-		throw new Error('kintone.events.onが利用できません');
+	const { devices, errorMessages, ...handlerOptions } = _ts_validateHandlerOptions(
+		options,
+		defaultDevices,
+		includeFullWidthOptions
+	);
+	_ts_assertKintoneEventsAvailable();
 
-	const lengthErrorMessage =
-		maxLengthErrorMessage ?? `全角変換後、${maxLength}文字以内で入力してください。`;
 	const eventNames = [];
 	const tableEventNames = [];
 	if (devices === 'desktop' || devices === 'both') {
@@ -792,10 +807,7 @@ const _ts_registerTableFieldHandler = (tableFieldCode, fieldCode, options, conve
 		const value = field.value;
 		if (value === null || value === undefined || value === '') return event;
 		try {
-			let converted = converter(String(value), throwOnError);
-			if (removeWhitespace) converted = converted.replace(_TS_WHITESPACE_REGEX, '');
-			if (maxLength !== null && converted.length > maxLength) throw new Error(lengthErrorMessage);
-			field.value = converted;
+			field.value = normalizer(value, handlerOptions);
 		} catch (error) {
 			const message = error && error.message ? error.message : String(error);
 			field.error = message;
@@ -815,7 +827,22 @@ const _ts_registerTableFieldHandler = (tableFieldCode, fieldCode, options, conve
  * @returns {void}
  */
 const registerTableFullWidthHandler = (tableFieldCode, fieldCode, options = {}) =>
-	_ts_registerTableFieldHandler(tableFieldCode, fieldCode, options, toFullWidth);
+	_ts_registerTableFieldHandler(
+		tableFieldCode,
+		fieldCode,
+		options,
+		(value, { throwOnError, removeWhitespace, maxLength, maxLengthErrorMessage }) => {
+			let converted = toFullWidth(String(value), throwOnError);
+			if (removeWhitespace) converted = converted.replace(_TS_WHITESPACE_REGEX, '');
+			if (maxLength !== null && converted.length > maxLength)
+				throw new Error(
+					maxLengthErrorMessage ?? `全角変換後、${maxLength}文字以内で入力してください。`
+				);
+			return converted;
+		},
+		'desktop',
+		true
+	);
 
 /**
  * サブテーブル内の指定フィールドを全角ひらがな変換するハンドラを登録する関数
@@ -825,7 +852,33 @@ const registerTableFullWidthHandler = (tableFieldCode, fieldCode, options = {}) 
  * @returns {void}
  */
 const registerTableFullWidthHiraganaHandler = (tableFieldCode, fieldCode, options = {}) =>
-	_ts_registerTableFieldHandler(tableFieldCode, fieldCode, options, toFullWidthHiragana);
+	_ts_registerTableFieldHandler(
+		tableFieldCode,
+		fieldCode,
+		options,
+		(value, { throwOnError, removeWhitespace, maxLength, maxLengthErrorMessage }) => {
+			let converted = toFullWidthHiragana(String(value), throwOnError);
+			if (removeWhitespace) converted = converted.replace(_TS_WHITESPACE_REGEX, '');
+			if (maxLength !== null && converted.length > maxLength)
+				throw new Error(
+					maxLengthErrorMessage ?? `全角変換後、${maxLength}文字以内で入力してください。`
+				);
+			return converted;
+		},
+		'desktop',
+		true
+	);
+
+/**
+ * サブテーブル内の指定列変更イベントにメールアドレス検証ハンドラを登録する関数
+ * @param {string} tableCode サブテーブルのフィールドコード
+ * @param {string} columnCode 対象列のフィールドコード
+ * @param {object} options オプション
+ * @returns {void}
+ * @throws {Error} 引数やオプションが不正な場合
+ */
+const registerTableEmailAddressHandler = (tableCode, columnCode, options = {}) =>
+	_ts_registerTableFieldHandler(tableCode, columnCode, options, assertEmailAddress, 'desktop');
 
 // 公開
 if (typeof window !== 'undefined') {
@@ -840,6 +893,8 @@ if (typeof window !== 'undefined') {
 	window.registerFullWidthHiraganaHandler = registerFullWidthHiraganaHandler;
 	window.registerTableFullWidthHandler = registerTableFullWidthHandler;
 	window.registerTableFullWidthHiraganaHandler = registerTableFullWidthHiraganaHandler;
+	window.registerEmailAddressHandler = registerEmailAddressHandler;
+	window.registerTableEmailAddressHandler = registerTableEmailAddressHandler;
 }
 
 // 内部ユーティリティはファイル内に留めます（非公開化）

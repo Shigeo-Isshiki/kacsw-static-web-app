@@ -56,6 +56,8 @@
 		'registerFullWidthHiraganaHandler',
 		'registerTableFullWidthHandler',
 		'registerTableFullWidthHiraganaHandler',
+		'registerEmailAddressHandler',
+		'registerTableEmailAddressHandler',
 		// vc-check.js
 		'validateZoomMeetingId',
 		'validateZoomPasscode',

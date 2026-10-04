@@ -13,6 +13,10 @@ const toHalfWidthKana = global.toHalfWidthKana || (window && window.toHalfWidthK
 const toFullWidth = global.toFullWidth || (window && window.toFullWidth);
 const toHalfWidth = global.toHalfWidth || (window && window.toHalfWidth);
 const assertEmailAddress = global.assertEmailAddress || (window && window.assertEmailAddress);
+const registerEmailAddressHandler =
+	global.registerEmailAddressHandler || (window && window.registerEmailAddressHandler);
+const registerTableEmailAddressHandler =
+	global.registerTableEmailAddressHandler || (window && window.registerTableEmailAddressHandler);
 const registerFullWidthHiraganaHandler =
 	global.registerFullWidthHiraganaHandler || (window && window.registerFullWidthHiraganaHandler);
 const registerTableFullWidthHandler =
@@ -29,6 +33,8 @@ if (
 	!toFullWidth ||
 	!toHalfWidth ||
 	!assertEmailAddress ||
+	!registerEmailAddressHandler ||
+	!registerTableEmailAddressHandler ||
 	!registerFullWidthHiraganaHandler ||
 	!registerTableFullWidthHandler ||
 	!registerTableFullWidthHiraganaHandler
@@ -560,7 +566,10 @@ const runTableSync = (tableFieldCode, fieldCode, options, rows) => {
 	const tableRegistration = registrations.find(({ events }) =>
 		events.includes(`app.record.edit.change.${tableFieldCode}`)
 	);
-	const event = { type: `app.record.edit.change.${tableFieldCode}`, record: { [tableFieldCode]: { value: rows } } };
+	const event = {
+		type: `app.record.edit.change.${tableFieldCode}`,
+		record: { [tableFieldCode]: { value: rows } },
+	};
 	return tableRegistration.handler(event);
 };
 
@@ -839,3 +848,158 @@ try {
 }
 
 console.log('ALL TABLE FIELD HANDLER TESTS INVOKED');
+
+// --- email address field handlers ---
+try {
+	const errorMessages = { email: 'old error' };
+	registrations.length = 0;
+	registerEmailAddressHandler('email', { errorMessages });
+	const registration = registrations[0];
+	assert.deepStrictEqual(registration.events, [
+		'app.record.create.change.email',
+		'app.record.edit.change.email',
+	]);
+	const event = { record: { email: { value: 'ＴＥＳＴ@Example.COM' } } };
+	registration.handler(event);
+	assert.strictEqual(event.record.email.value, 'test@example.com');
+	assert.strictEqual(event.record.email.error, null);
+	assert.strictEqual(errorMessages.email, null);
+	console.log('PASS: registerEmailAddressHandler normalizes and defaults to desktop');
+} catch (e) {
+	console.error(
+		'FAIL: registerEmailAddressHandler normalizes and defaults to desktop',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = {};
+	registrations.length = 0;
+	registerEmailAddressHandler('email', { devices: 'mobile', errorMessages });
+	assert.deepStrictEqual(registrations[0].events, [
+		'mobile.app.record.create.change.email',
+		'mobile.app.record.edit.change.email',
+	]);
+	const handler = registrations[0].handler;
+	const invalidField = { value: 'not-an-email', error: 'old error' };
+	handler({ record: { email: invalidField } });
+	assert.strictEqual(invalidField.value, 'not-an-email');
+	assert.ok(invalidField.error);
+	assert.strictEqual(errorMessages.email, invalidField.error);
+	const emptyField = { value: '', error: 'old error' };
+	errorMessages.email = 'old error';
+	handler({ record: { email: emptyField } });
+	assert.strictEqual(emptyField.error, null);
+	assert.strictEqual(errorMessages.email, null);
+	console.log('PASS: email field handler preserves invalid values and clears errors');
+} catch (e) {
+	console.error(
+		'FAIL: email field handler preserves invalid values and clears errors',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	registrations.length = 0;
+	registerEmailAddressHandler('email', { devices: 'both' });
+	assert.deepStrictEqual(registrations[0].events, [
+		'app.record.create.change.email',
+		'app.record.edit.change.email',
+		'mobile.app.record.create.change.email',
+		'mobile.app.record.edit.change.email',
+	]);
+	console.log('PASS: email handler supports explicit both-device registration');
+} catch (e) {
+	console.error(
+		'FAIL: email handler supports explicit both-device registration',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = {};
+	const rows = [{ id: 'row-1', value: { email: { value: 'ＴＥＳＴ@Example.COM' } } }];
+	registrations.length = 0;
+	registerTableEmailAddressHandler('contacts', 'email', { errorMessages });
+	const cellHandler = registrations.find(({ events }) =>
+		events.includes('app.record.edit.change.email')
+	).handler;
+	cellHandler({
+		type: 'app.record.edit.change.email',
+		record: { contacts: { value: rows } },
+		changes: { row: { id: 'row-1' } },
+	});
+	assert.strictEqual(rows[0].value.email.value, 'test@example.com');
+	assert.strictEqual(rows[0].value.email.error, null);
+	assert.strictEqual(errorMessages.contacts['row-1'].email, null);
+	console.log('PASS: table email handler normalizes and clears row-id errors');
+} catch (e) {
+	console.error(
+		'FAIL: table email handler normalizes and clears row-id errors',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	const errorMessages = {};
+	const rows = [{ id: 'row-1', value: { email: { value: 'invalid' } } }];
+	registrations.length = 0;
+	registerTableEmailAddressHandler('contacts', 'email', { errorMessages });
+	const handler = registrations.find(({ events }) =>
+		events.includes('app.record.edit.change.email')
+	).handler;
+	const event = {
+		type: 'app.record.edit.change.email',
+		record: { contacts: { value: rows } },
+		changes: { row: { id: 'row-1' } },
+	};
+	handler(event);
+	const cell = rows[0].value.email;
+	assert.strictEqual(cell.value, 'invalid');
+	assert.ok(cell.error);
+	assert.strictEqual(errorMessages.contacts['row-1'].email, cell.error);
+	const unknownRowEvent = {
+		...event,
+		changes: { row: { id: 'missing-row' } },
+	};
+	handler(unknownRowEvent);
+	assert.strictEqual(cell.value, 'invalid');
+	assert.strictEqual(cell.error, errorMessages.contacts['row-1'].email);
+	console.log('PASS: table email handler preserves invalid values and skips unknown rows');
+} catch (e) {
+	console.error(
+		'FAIL: table email handler preserves invalid values and skips unknown rows',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
+
+try {
+	registrations.length = 0;
+	[undefined, 'desktop', 'mobile', 'both'].forEach((devices) => {
+		registrations.length = 0;
+		registerTableEmailAddressHandler('contacts', 'email', { devices });
+		const prefixes =
+			devices === 'both' ? ['app', 'mobile.app'] : devices === 'mobile' ? ['mobile.app'] : ['app'];
+		['contacts', 'email'].forEach((fieldCode, index) => {
+			assert.deepStrictEqual(
+				registrations[index].events,
+				prefixes.flatMap((prefix) => [
+					`${prefix}.record.create.change.${fieldCode}`,
+					`${prefix}.record.edit.change.${fieldCode}`,
+				])
+			);
+		});
+	});
+	console.log('PASS: table email handler defaults to desktop and supports device selection');
+} catch (e) {
+	console.error(
+		'FAIL: table email handler defaults to desktop and supports device selection',
+		e && e.message ? e.message : e
+	);
+	process.exitCode = 2;
+}
