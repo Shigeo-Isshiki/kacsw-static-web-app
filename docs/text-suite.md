@@ -81,33 +81,6 @@
 
 同じ変換について、通常フィールドの変更イベント、サブテーブル列の変更イベントの順に説明します。いずれも `devices` の既定値は `'desktop'` で、画面表示イベントには登録しません。
 
-### 共通仕様と移行時の注意
-
-#### 登録されるイベントとデバイス
-
-- `desktop`（既定）: `app.record.create.change.{fieldCode}` / `app.record.edit.change.{fieldCode}`
-- `mobile`: `mobile.app.record.create.change.{fieldCode}` / `mobile.app.record.edit.change.{fieldCode}`
-- `both`: 上記すべて。PC・モバイル両方に適用する場合は `devices: 'both'` を明示します。
-- テーブル版の `{fieldCode}` は対象列のコードです。行追加・削除時に削除済み行のエラーを除去するため、同じデバイスのテーブルコード変更イベントにも登録します。
-- 画面表示イベントや保存イベントには登録しません。表示時・保存時に必要な処理はアプリ側に残してください。
-
-#### 空値とエラー管理
-
-- 空値は `null` / `undefined` / 空文字です。古いエラーをクリアし、値は変更せずイベントを返します。空白文字だけの入力は空値扱いせず、各APIの正規化・検証処理に渡します。
-- 成功時は正規化した値を設定し、フィールドの `error` とエラーマップの対象キーを `null` にします。失敗時は入力値を維持し、両方にエラーメッセージを設定します。
-- `options.errorMessages` は省略可能な既存オブジェクトです。通常版は `errorMessages[fieldCode]`、テーブル版は `errorMessages[tableCode][rowId][columnCode]` を更新します。
-
-#### テーブル版の行管理
-
-- 変更行は `event.changes.row.id` とレコード内の行IDで照合します。IDがない場合は、変更行または `row.value` のオブジェクト参照が一意に一致するときだけ処理します。値の内容だけでは照合せず、一意に特定できない場合は対象セルを変更しません。
-- 行番号はエラーマップのキーに使いません。ID未設定行はセルの `error` のみ更新し、エラーマップには登録しません。
-- テーブル自体と対象列の変更イベントで、現在存在しない行のエラーをエラーマップから除去します。
-
-#### 移行時の注意
-
-- 従来の同じ変換・検証処理との二重登録を避けてください。
-- これらのAPIは空値を許容するため、必須入力の判定はkintoneの設定やアプリ側で行ってください。
-
 ### `registerFullWidthHandler(fieldCode, options = {})`
 
 kintone 標準の `kintone.events.on` を使い、指定フィールドの変更イベントに全角変換ハンドラを登録します。処理は `text-suite.js` 内で完結しており、`kintone-custom-lib.js` には依存しません。
@@ -128,6 +101,12 @@ kintone 標準の `kintone.events.on` を使い、指定フィールドの変更
 | `devices`               | `'desktop'` \| `'mobile'` \| `'both'` | `'desktop'`                                           | 登録対象のデバイス                                                                               |
 | `errorMessages`         | object                                | なし                                                  | 既存のエラーマップ。オブジェクト自体は差し替えず `errorMessages[fieldCode]` のみ更新します       |
 
+#### 登録されるイベント
+
+- `desktop`: `app.record.create.change.{fieldCode}` / `app.record.edit.change.{fieldCode}`
+- `mobile`: `mobile.app.record.create.change.{fieldCode}` / `mobile.app.record.edit.change.{fieldCode}`
+- `both`: 上記すべて
+
 #### ハンドラの挙動
 
 1. 対象フィールドがイベントレコードに無い場合は、何もせずイベントを返します。
@@ -145,7 +124,9 @@ kintone 標準の `kintone.events.on` を使い、指定フィールドの変更
 サブテーブル内の指定列について、変更された行のセルだけを全角に変換します。オプション、既定値、型検証、変換 → 空白除去 → 文字数判定の順序は `registerFullWidthHandler` と同じです。
 
 - `tableFieldCode` はサブテーブルのフィールドコード、`fieldCode` は変換対象列のフィールドコードです。
-- 行の特定、登録イベント、エラー管理は「共通仕様と移行時の注意」のテーブル版の仕様に従います。
+- 変更行は、まず `event.changes.row.id` とレコード内の行IDで照合します。変更行にIDがない場合は、変更行オブジェクトまたは `row.value` オブジェクトの参照がレコード内の行と一意に一致するときに限り処理します。値の内容だけでは照合しません。一意に特定できないイベントでは値を変更しません。
+- 行追加・削除に対応するサブテーブル自体の変更イベントにも登録し、エラーマップから現在存在しない行の情報を除去します。
+- エラーマップは `errorMessages[tableFieldCode][rowId][fieldCode]` 形式です。`rowId` はkintoneの行IDです。ID未設定行はセルの `error` を更新しますが、安定した行キーがないためエラーマップには登録しません。対象セルのエラーは成功時・空値時にクリアし、変換失敗・文字数超過時に設定します。
 
 ```js
 const tableFieldErrorMessages = {};
@@ -176,7 +157,7 @@ registerTableFullWidthHandler('Training_content_list', 'Instructor_last_name', {
 
 ### `registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, options = {})`
 
-サブテーブル内の指定列について、変更された行のセルだけを全角ひらがなに変換します。オプション、既定値、型検証、変換 → 空白除去 → 文字数判定の順序は `registerFullWidthHiraganaHandler` と同じです。行の特定、登録イベント、エラー管理は「共通仕様と移行時の注意」のテーブル版の仕様に従います。
+サブテーブル内の指定列について、変更された行のセルだけを全角ひらがなに変換します。オプション、既定値、型検証、変換 → 空白除去 → 文字数判定の順序は `registerFullWidthHiraganaHandler` と同じです。行の特定、登録イベント、行IDによるエラーマップ管理は `registerTableFullWidthHandler` と同じです。
 
 ```js
 const tableFieldErrorMessages = {};
@@ -197,15 +178,85 @@ registerTableFullWidthHiraganaHandler('Member_list', 'Last_name_kana', {
 - `options.errorMessages` は省略可能な既存エラーマップです。`errorMessages[fieldCode]` を更新します。
 - 空値・検証成功時はフィールドエラーとマップの値を `null` にします。失敗時は入力値を維持し、エラーをフィールドとマップの両方に設定します。
 
+#### 任意のドメイン制約（通常版・テーブル版共通）
+
+既存の呼び出しはそのまま利用できます。`domainConstraint` を省略すれば従来どおり基本形式検証・正規化だけを行います。
+
+| オプション                        | 型                                       | 説明                                                                                                                                                                                    |
+| --------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domainConstraint.allowedDomains` | string[]                                 | 空でない許可ドメイン配列。`@` を付けず指定します。大文字小文字を区別しない完全一致で、サブドメインは別のドメインとして扱います                                                          |
+| `domainConstraint.errorMessage`   | string                                   | 空でない制約違反メッセージ                                                                                                                                                              |
+| `domainConstraint.when`           | `(record, emailAddress, row) => boolean` | 任意の同期条件関数。現在のレコードと正規化後のメールアドレスを受け取ります。テーブル版は第3引数に対象行（`id`・`value`）を渡し、通常版は `undefined` を渡します。省略時は常に適用します |
+| `watchFields`                     | string[]                                 | 再検証を行う通常フィールドのコード配列。既定は `[]`。通常版は対象メール欄を、テーブル版は対象テーブルの全行を再検証します                                                               |
+| `watchColumns`                    | string[]                                 | テーブル版のみ。同じテーブル内の監視列コード配列。既定は `[]`。列変更時に変更行だけを再検証します                                                                                       |
+
+メール形式検証 → 正規化 → 適用条件判定 → ドメイン照合の順に実行します。制約違反時は正規化後の値も書き戻さず、元の入力を維持します。条件が `false` になった場合も基本形式検証は行い、それが成功すれば古いエラーを解除します。空値は従来どおり許容します。
+
+監視対象の変更ではイベント内の現在のレコードを使ってメール欄を再検証します。`devices` に従い追加・編集画面の変更イベントだけを登録し、表示・保存イベントは登録しません。条件関数の例外やboolean以外の戻り値もフィールドとエラーマップのエラーとして表示します。
+
+```js
+// 区分に応じて制約を適用する例
+registerEmailAddressHandler('Contact_email', {
+	devices: 'both',
+	errorMessages: emailAddressHandlerErrorMessage,
+	watchFields: ['Contact_type'],
+	domainConstraint: {
+		allowedDomains: ['example.com'],
+		when: (record, emailAddress) => record.Contact_type.value === '社内',
+		errorMessage: '社内連絡先には @example.com ドメインのメールアドレスを指定してください。',
+	},
+});
+
+// 常に制約を適用する例
+registerEmailAddressHandler('Notification_email', {
+	devices: 'both',
+	errorMessages: emailAddressHandlerErrorMessage,
+	domainConstraint: {
+		allowedDomains: ['example.com'],
+		errorMessage: '@example.com ドメインのメールアドレスを指定してください。',
+	},
+});
+```
+
+上記のフィールドコード・区分・ドメイン・メッセージは説明用の架空の例です。実際のアプリ設定に置き換えてください。このライブラリは特定アプリの条件やドメインを内部に固定しません。個別アプリの移行や保存時の最終検査はアプリ側で行ってください。
+
+公開時は変更をレビュー・マージして `main` に反映し、Azure Static Web Apps CI/CD のデプロイ成功を確認してください。配信先は `https://js.kacsw.or.jp/text-suite.js` です。アプリでURL読み込みを利用している場合は再読み込み後に新しいオプションの動作を確認し、ファイルアップロードを利用している場合は更新済みJSをアプリへ再アップロードしてアプリを更新してください。
+
 ### `registerTableEmailAddressHandler(tableCode, columnCode, options = {})`
 
-サブテーブルの指定列について、変更された行だけを `assertEmailAddress` で検証・正規化します。オプションは通常フィールド版と同じです。行の特定、登録イベント、エラー管理は「共通仕様と移行時の注意」のテーブル版の仕様に従います。
+サブテーブルの指定列について、変更された行だけを `assertEmailAddress` で検証・正規化します。`devices`、`errorMessages`、`domainConstraint` の仕様は通常版と同じで、`devices` の既定値は `'desktop'` です。形式検証・正規化・条件判定・ドメイン照合は通常版と共有しています。
 
-#### メールハンドラ固有の注意
+- `watchFields` はテーブル外の通常フィールドを指定します。その変更時は現在のレコードを使い、対象テーブルの全行を再検証します。
+- `watchColumns` は同じテーブル内の列を指定します。その変更時は行ID（IDが無い場合は一意なオブジェクト参照）で変更行を特定し、その行だけを再検証します。一意に特定できない場合はセルを変更しません。
+- 条件関数は `when(record, normalizedEmailAddress, row)` です。`row.value[columnCode].value` で対象行の条件列を参照できます。メール値の引数は正規化後ですが、レコード・行のメール欄は検証成功まで元の入力値を保持します。
+- エラーマップは `errorMessages[tableCode][rowId][columnCode]` 形式です。ID未設定行のエラーはセルだけに設定します。通常フィールドの監視による全行再検証でも行番号をキーにはしません。
+- 同じ監視コードの重複は除去します。`watchFields` と `watchColumns` の重複、テーブルコードの監視、対象メール列を `watchFields` に指定する設定は登録時にエラーになります。対象メール列を `watchColumns` に含めても二重登録しません。
+- ドメイン制約・監視を省略した既存呼び出しは、従来どおり対象メール列の変更時だけ検証し、テーブル変更時は削除済み行のエラー整理だけを行います。保存イベントは登録しません。
 
-- 基本形式の検証と正規化は `assertEmailAddress` に従います。前後の空白除去、全角文字の半角化、小文字化を行います。空白文字だけの入力は検証エラーになります。
-- 簡易的な形式検証であり、メールアドレスの実在性や受信可能性を保証するものではありません。
-- ドメイン許可リストなどの業務固有ルールは含みません。移行時は基本形式検証・正規化だけを共通APIに置き換え、業務固有ルールはアプリ側に残してください。
+```js
+registerTableEmailAddressHandler('Contacts', 'Email_address', {
+	devices: 'both',
+	errorMessages: emailAddressHandlerErrorMessage,
+	watchFields: ['Restrict_email_domain'],
+	watchColumns: ['Contact_type'],
+	domainConstraint: {
+		allowedDomains: ['example.com'],
+		when: (record, emailAddress, row) =>
+			record.Restrict_email_domain.value === '有効' || row.value.Contact_type.value === '社内',
+		errorMessage: '@example.com ドメインのメールアドレスを指定してください。',
+	},
+});
+```
+
+`assertEmailAddress` 自体は基本形式の検証・正規化のみを行い、ドメイン制約は通常版・テーブル版とも明示的に指定した場合だけ適用します。他テーブルの列監視や個別アプリの移行は対象外です。
+
+#### メールハンドラのイベントと移行時の注意
+
+- 通常版・テーブル版とも、対象フィールド（列）の `app.record.create.change.{fieldCode}` / `app.record.edit.change.{fieldCode}` に登録します。モバイル対象の場合は `mobile.` 接頭辞のイベントにも登録します。画面表示イベントには登録しません。
+- テーブル版は、行追加・削除時に削除済み行のエラーを除去するため、テーブルコードの追加・編集変更イベントにも登録します。行番号はエラーマップのキーに使いません。ID未設定行は、一意なオブジェクト参照で特定できる場合にセルだけ処理し、エラーマップには登録しません。
+- 空値は `null` / `undefined` / 空文字です。空白文字だけの入力は空値扱いせず、`assertEmailAddress` の検証結果に従います。
+- 移行時は、従来の基本形式検証・正規化ハンドラとの二重登録を避けてください。既定はPCのみなので、モバイルにも適用する場合は `devices: 'both'` を明示します。保存時の検証や業務固有ルールはこのAPIに含まれないため、必要な処理はアプリ側に残してください。
+- kintoneの変更イベントに対応するフィールドが対象です。「リンク（メールアドレス）」フィールドは変更イベント非対応のため、メール欄自体の変更ではこのハンドラは動きません。監視フィールドも変更イベント対応の種類を指定してください。入力時の検証には「文字列（1行）」を使用し、リンクフィールドを維持する場合の保存時検証はアプリ側で対応してください。
 
 ---
 

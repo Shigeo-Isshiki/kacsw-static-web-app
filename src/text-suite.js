@@ -584,9 +584,10 @@ const _ts_assertKintoneEventsAvailable = () => {
  * 指定フィールドの変更イベントに値検証ハンドラを登録する関数
  * @param {string} fieldCode 対象フィールドコード
  * @param {object} options オプション
- * @param {(value: *, options: object) => string} normalizer 値を検証・正規化する関数
+ * @param {(value: *, options: object, record: object) => string} normalizer 値を検証・正規化する関数
  * @param {'desktop'|'mobile'|'both'} defaultDevices devices の既定値
  * @param {boolean} [includeFullWidthOptions=false] 全角変換用オプションを検証するか
+ * @param {string[]} [watchFields=[]] 再検証を行う監視対象フィールド
  * @returns {void}
  * @throws {Error} 引数やオプションが不正な場合
  */
@@ -595,7 +596,8 @@ const _ts_registerFieldValueHandler = (
 	options,
 	normalizer,
 	defaultDevices,
-	includeFullWidthOptions = false
+	includeFullWidthOptions = false,
+	watchFields = []
 ) => {
 	if (!_ts_checkString(fieldCode) || !fieldCode)
 		throw new Error('fieldCodeは空でない文字列である必要があります');
@@ -607,13 +609,18 @@ const _ts_registerFieldValueHandler = (
 	_ts_assertKintoneEventsAvailable();
 
 	const eventNames = [];
-	if (devices === 'desktop' || devices === 'both')
-		eventNames.push(`app.record.create.change.${fieldCode}`, `app.record.edit.change.${fieldCode}`);
-	if (devices === 'mobile' || devices === 'both')
-		eventNames.push(
-			`mobile.app.record.create.change.${fieldCode}`,
-			`mobile.app.record.edit.change.${fieldCode}`
-		);
+	for (const watchedField of new Set([fieldCode, ...watchFields])) {
+		if (devices === 'desktop' || devices === 'both')
+			eventNames.push(
+				`app.record.create.change.${watchedField}`,
+				`app.record.edit.change.${watchedField}`
+			);
+		if (devices === 'mobile' || devices === 'both')
+			eventNames.push(
+				`mobile.app.record.create.change.${watchedField}`,
+				`mobile.app.record.edit.change.${watchedField}`
+			);
+	}
 
 	kintone.events.on(eventNames, (event) => {
 		const record = event && event.record;
@@ -624,7 +631,7 @@ const _ts_registerFieldValueHandler = (
 		const value = field.value;
 		if (value === null || value === undefined || value === '') return event;
 		try {
-			field.value = normalizer(value, handlerOptions);
+			field.value = normalizer(value, handlerOptions, record);
 		} catch (error) {
 			const message = error && error.message ? error.message : String(error);
 			field.error = message;
@@ -685,14 +692,96 @@ const registerFullWidthHiraganaHandler = (fieldCode, options = {}) => {
 };
 
 /**
+ * メールアドレスハンドラのオプション
+ * @typedef {object} _TS_EMAIL_ADDRESS_HANDLER_OPTIONS
+ * @property {'desktop'|'mobile'|'both'} [devices='desktop'] 登録対象のデバイス
+ * @property {object} [errorMessages] エラーメッセージを保持する既存オブジェクト
+ * @property {string[]} [watchFields=[]] 再検証を行う監視対象フィールド
+ * @property {string[]} [watchColumns=[]] テーブル版で再検証を行う同じテーブル内の列
+ * @property {object} [domainConstraint] 任意のドメイン制約
+ * @property {string[]} domainConstraint.allowedDomains 許可ドメイン（大文字小文字を区別しない完全一致）
+ * @property {string} domainConstraint.errorMessage ドメイン制約違反時のメッセージ
+ * @property {(record: object, emailAddress: string, row?: object) => boolean} [domainConstraint.when] 適用条件（テーブル版は対象行も渡す）
+ */
+
+/**
+ * メールハンドラのオプションを検証し正規化関数を作る
+ * @param {_TS_EMAIL_ADDRESS_HANDLER_OPTIONS} options オプション
+ * @param {boolean} [isTable=false] テーブル版か
+ * @returns {object} 監視対象と正規化関数
+ */
+const _ts_createEmailHandler = (options, isTable = false) => {
+	_ts_validateHandlerOptions(options, 'desktop');
+	const { domainConstraint, watchFields = [], watchColumns = [] } = options;
+	if (!Array.isArray(watchFields) || watchFields.some((code) => !_ts_checkString(code) || !code))
+		throw new Error('watchFieldsは空でないフィールドコードの配列である必要があります');
+	if (
+		isTable &&
+		(!Array.isArray(watchColumns) || watchColumns.some((code) => !_ts_checkString(code) || !code))
+	)
+		throw new Error('watchColumnsは空でない列コードの配列である必要があります');
+	if (isTable && watchFields.some((code) => watchColumns.includes(code)))
+		throw new Error('watchFieldsとwatchColumnsに同じコードは指定できません');
+
+	let allowedDomains;
+	let errorMessage;
+	let when;
+	if (domainConstraint !== undefined) {
+		if (
+			domainConstraint === null ||
+			typeof domainConstraint !== 'object' ||
+			Array.isArray(domainConstraint)
+		)
+			throw new Error('domainConstraintはオブジェクトである必要があります');
+		const domains = domainConstraint.allowedDomains;
+		if (
+			!Array.isArray(domains) ||
+			domains.length === 0 ||
+			domains.some(
+				(domain) =>
+					!_ts_checkString(domain) ||
+					!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i.test(domain)
+			)
+		)
+			throw new Error('allowedDomainsはドメイン名の空でない配列である必要があります');
+		allowedDomains = new Set(domains.map((domain) => domain.toLowerCase()));
+		errorMessage = domainConstraint.errorMessage;
+		if (!_ts_checkString(errorMessage) || !errorMessage)
+			throw new Error('domainConstraint.errorMessageは空でない文字列である必要があります');
+		when = domainConstraint.when;
+		if (when !== undefined && typeof when !== 'function')
+			throw new Error('domainConstraint.whenは関数である必要があります');
+	}
+
+	return {
+		watchFields,
+		watchColumns,
+		normalizer: (value, _handlerOptions, record, row) => {
+			const normalized = assertEmailAddress(value);
+			if (allowedDomains) {
+				const applies = when ? when(record, normalized, row) : true;
+				if (typeof applies !== 'boolean')
+					throw new Error('domainConstraint.whenはboolean値を返す必要があります');
+				const domain = normalized.slice(normalized.lastIndexOf('@') + 1);
+				if (applies && !allowedDomains.has(domain)) throw new Error(errorMessage);
+			}
+			return normalized;
+		},
+	};
+};
+
+/**
  * 指定フィールドの変更イベントにメールアドレス検証ハンドラを登録する関数
  * @param {string} fieldCode 対象フィールドコード
- * @param {object} options オプション
+ * @param {_TS_EMAIL_ADDRESS_HANDLER_OPTIONS} [options] オプション
  * @returns {void}
  * @throws {Error} 引数やオプションが不正な場合
  */
 const registerEmailAddressHandler = (fieldCode, options = {}) => {
-	_ts_registerFieldValueHandler(fieldCode, options, assertEmailAddress, 'desktop');
+	if (!_ts_checkString(fieldCode) || !fieldCode)
+		throw new Error('fieldCodeは空でない文字列である必要があります');
+	const { normalizer, watchFields } = _ts_createEmailHandler(options);
+	_ts_registerFieldValueHandler(fieldCode, options, normalizer, 'desktop', false, watchFields);
 };
 
 /**
@@ -700,9 +789,11 @@ const registerEmailAddressHandler = (fieldCode, options = {}) => {
  * @param {string} tableFieldCode サブテーブルのフィールドコード
  * @param {string} fieldCode 対象列のフィールドコード
  * @param {_TS_FULL_WIDTH_HANDLER_OPTIONS} [options] オプション
- * @param {(value: *, options: object) => string} normalizer 値を検証・正規化する関数
+ * @param {(value: *, options: object, record: object, row: object) => string} normalizer 値を検証・正規化する関数
  * @param {'desktop'|'mobile'|'both'} [defaultDevices='desktop'] devices の既定値
  * @param {boolean} [includeFullWidthOptions=false] 全角変換用オプションを検証するか
+ * @param {string[]} [watchFields=[]] 全行を再検証する通常フィールド
+ * @param {string[]} [watchColumns=[]] 対象行を再検証する同じテーブル内の列
  * @returns {void}
  * @throws {Error} 引数やオプションが不正な場合
  */
@@ -712,7 +803,9 @@ const _ts_registerTableFieldHandler = (
 	options,
 	normalizer,
 	defaultDevices = 'desktop',
-	includeFullWidthOptions = false
+	includeFullWidthOptions = false,
+	watchFields = [],
+	watchColumns = []
 ) => {
 	if (!_ts_checkString(tableFieldCode) || !tableFieldCode)
 		throw new Error('tableFieldCodeは空でない文字列である必要があります');
@@ -727,6 +820,7 @@ const _ts_registerTableFieldHandler = (
 
 	const eventNames = [];
 	const tableEventNames = [];
+	const watchEventNames = [];
 	if (devices === 'desktop' || devices === 'both') {
 		eventNames.push(`app.record.create.change.${fieldCode}`, `app.record.edit.change.${fieldCode}`);
 		tableEventNames.push(
@@ -744,6 +838,25 @@ const _ts_registerTableFieldHandler = (
 			`mobile.app.record.edit.change.${tableFieldCode}`
 		);
 	}
+	for (const code of new Set(watchColumns)) {
+		if (code === fieldCode) continue;
+		if (devices === 'desktop' || devices === 'both')
+			eventNames.push(`app.record.create.change.${code}`, `app.record.edit.change.${code}`);
+		if (devices === 'mobile' || devices === 'both')
+			eventNames.push(
+				`mobile.app.record.create.change.${code}`,
+				`mobile.app.record.edit.change.${code}`
+			);
+	}
+	for (const code of new Set(watchFields)) {
+		if (devices === 'desktop' || devices === 'both')
+			watchEventNames.push(`app.record.create.change.${code}`, `app.record.edit.change.${code}`);
+		if (devices === 'mobile' || devices === 'both')
+			watchEventNames.push(
+				`mobile.app.record.create.change.${code}`,
+				`mobile.app.record.edit.change.${code}`
+			);
+	}
 
 	const syncErrorMessages = (record) => {
 		if (!errorMessages) return;
@@ -758,6 +871,37 @@ const _ts_registerTableFieldHandler = (
 		Object.keys(tableErrors).forEach((rowId) => {
 			if (!rowIds.has(rowId)) delete tableErrors[rowId];
 		});
+	};
+
+	const validateRow = (record, row) => {
+		const field = row && row.value && row.value[fieldCode];
+		if (!field) return;
+
+		field.error = null;
+		if (errorMessages && typeof row.id === 'string' && row.id) {
+			if (!errorMessages[tableFieldCode] || typeof errorMessages[tableFieldCode] !== 'object') {
+				errorMessages[tableFieldCode] = {};
+			}
+			if (
+				!errorMessages[tableFieldCode][row.id] ||
+				typeof errorMessages[tableFieldCode][row.id] !== 'object'
+			) {
+				errorMessages[tableFieldCode][row.id] = {};
+			}
+			errorMessages[tableFieldCode][row.id][fieldCode] = null;
+		}
+
+		const value = field.value;
+		if (value === null || value === undefined || value === '') return;
+		try {
+			field.value = normalizer(value, handlerOptions, record, row);
+		} catch (error) {
+			const message = error && error.message ? error.message : String(error);
+			field.error = message;
+			if (errorMessages && typeof row.id === 'string' && row.id) {
+				errorMessages[tableFieldCode][row.id][fieldCode] = message;
+			}
+		}
 	};
 
 	kintone.events.on(tableEventNames, (event) => {
@@ -785,38 +929,19 @@ const _ts_registerTableFieldHandler = (
 			);
 		}
 		if (matchingRows.length !== 1) return event;
-
-		const row = matchingRows[0];
-		const field = row && row.value && row.value[fieldCode];
-		if (!field) return event;
-
-		field.error = null;
-		if (errorMessages && typeof row.id === 'string' && row.id) {
-			if (!errorMessages[tableFieldCode] || typeof errorMessages[tableFieldCode] !== 'object') {
-				errorMessages[tableFieldCode] = {};
-			}
-			if (
-				!errorMessages[tableFieldCode][row.id] ||
-				typeof errorMessages[tableFieldCode][row.id] !== 'object'
-			) {
-				errorMessages[tableFieldCode][row.id] = {};
-			}
-			errorMessages[tableFieldCode][row.id][fieldCode] = null;
-		}
-
-		const value = field.value;
-		if (value === null || value === undefined || value === '') return event;
-		try {
-			field.value = normalizer(value, handlerOptions);
-		} catch (error) {
-			const message = error && error.message ? error.message : String(error);
-			field.error = message;
-			if (errorMessages && typeof row.id === 'string' && row.id) {
-				errorMessages[tableFieldCode][row.id][fieldCode] = message;
-			}
-		}
+		validateRow(record, matchingRows[0]);
 		return event;
 	});
+	if (watchEventNames.length) {
+		kintone.events.on(watchEventNames, (event) => {
+			const record = event && event.record;
+			const rows = record && record[tableFieldCode] && record[tableFieldCode].value;
+			if (!Array.isArray(rows)) return event;
+			syncErrorMessages(record);
+			rows.forEach((row) => validateRow(record, row));
+			return event;
+		});
+	}
 };
 
 /**
@@ -873,12 +998,33 @@ const registerTableFullWidthHiraganaHandler = (tableFieldCode, fieldCode, option
  * サブテーブル内の指定列変更イベントにメールアドレス検証ハンドラを登録する関数
  * @param {string} tableCode サブテーブルのフィールドコード
  * @param {string} columnCode 対象列のフィールドコード
- * @param {object} options オプション
+ * @param {_TS_EMAIL_ADDRESS_HANDLER_OPTIONS} [options] オプション
  * @returns {void}
  * @throws {Error} 引数やオプションが不正な場合
  */
-const registerTableEmailAddressHandler = (tableCode, columnCode, options = {}) =>
-	_ts_registerTableFieldHandler(tableCode, columnCode, options, assertEmailAddress, 'desktop');
+const registerTableEmailAddressHandler = (tableCode, columnCode, options = {}) => {
+	if (!_ts_checkString(tableCode) || !tableCode)
+		throw new Error('tableFieldCodeは空でない文字列である必要があります');
+	if (!_ts_checkString(columnCode) || !columnCode)
+		throw new Error('fieldCodeは空でない文字列である必要があります');
+	const { normalizer, watchFields, watchColumns } = _ts_createEmailHandler(options, true);
+	if (
+		watchFields.includes(columnCode) ||
+		watchFields.includes(tableCode) ||
+		watchColumns.includes(tableCode)
+	)
+		throw new Error('監視対象にはテーブルコードや通常フィールド扱いの対象列を指定できません');
+	_ts_registerTableFieldHandler(
+		tableCode,
+		columnCode,
+		options,
+		normalizer,
+		'desktop',
+		false,
+		watchFields,
+		watchColumns
+	);
+};
 
 // 公開
 if (typeof window !== 'undefined') {
