@@ -332,6 +332,9 @@ const checkZipCodeExists = (zipCode, callback) => {
 		});
 };
 
+const _zc_formatValidatedZipCode = (normalized) =>
+	/^\d{7}$/.test(normalized) ? normalized.slice(0, 3) + '-' + normalized.slice(3) : normalized;
+
 /**
  * 郵便番号をハイフン付き（123-4567）にフォーマットする関数（APIで存在確認、callback型）
  * @param {string|number} zipCode 郵便番号またはデジタルアドレス（7桁の半角英数字）。
@@ -361,14 +364,7 @@ const formatZipCode = (zipCode, callback) => {
 				_zc_invokeCallback(callback, { error: '郵便番号が存在しません' });
 				return null;
 			}
-			// 数字7桁ならハイフン付き、それ以外はそのまま
-			if (/^\d{7}$/.test(normalized)) {
-				_zc_invokeCallback(callback, {
-					zipCode: normalized.slice(0, 3) + '-' + normalized.slice(3),
-				});
-			} else {
-				_zc_invokeCallback(callback, { zipCode: normalized });
-			}
+			_zc_invokeCallback(callback, { zipCode: _zc_formatValidatedZipCode(normalized) });
 		})
 		.catch(() => {
 			_zc_invokeCallback(callback, { error: 'API接続エラー' });
@@ -530,46 +526,38 @@ const getAddressByZipCode = (zipCode, callback) => {
 						zipCodeRight = (zipCodeRight || '') + addressObj.zip_code[i];
 					}
 				}
-				formatZipCode(addressObj.zip_code, (zipResult) => {
-					if (zipResult.error) {
-						_zc_invokeCallback(callback, { error: zipResult.error });
-						return;
-					}
-					_zc_invokeCallback(callback, {
-						originalZipCode: zipCode,
-						normalizedZipCode: normalized,
-						apiZipCode: addressObj.zip_code,
-						zipCode: zipResult.zipCode || null,
-						zipCode1: zipCodeArray[0] || null,
-						zipCode2: zipCodeArray[1] || null,
-						zipCode3: zipCodeArray[2] || null,
-						zipCode4: zipCodeArray[3] || null,
-						zipCode5: zipCodeArray[4] || null,
-						zipCode6: zipCodeArray[5] || null,
-						zipCode7: zipCodeArray[6] || null,
-						address: fullAddress ? fullAddress.replace(/[\u3000\u0020]/g, '') : null,
-						prefName: addressObj.pref_name
-							? addressObj.pref_name.replace(/[\u3000\u0020]/g, '')
-							: null,
-						cityName: addressObj.city_name
-							? addressObj.city_name.replace(/[\u3000\u0020]/g, '')
-							: null,
-						townName: addressObj.town_name
-							? addressObj.town_name.replace(/[\u3000\u0020]/g, '')
-							: null,
-						bizName: addressObj.biz_name
-							? addressObj.biz_name.replace(/[\u3000\u0020]/g, '')
-							: null,
-						blockName: addressObj.block_name
-							? addressObj.block_name.replace(/[\u3000\u0020]/g, '')
-							: null,
-						otherName: addressObj.other_name
-							? addressObj.other_name.replace(/[\u3000\u0020]/g, '')
-							: null,
-						businessName: addressObj.business_name
-							? addressObj.business_name.replace(/[\u3000\u0020]/g, '')
-							: null,
-					});
+				_zc_invokeCallback(callback, {
+					originalZipCode: zipCode,
+					normalizedZipCode: normalized,
+					apiZipCode: addressObj.zip_code,
+					zipCode: _zc_formatValidatedZipCode(addressObj.zip_code),
+					zipCode1: zipCodeArray[0] || null,
+					zipCode2: zipCodeArray[1] || null,
+					zipCode3: zipCodeArray[2] || null,
+					zipCode4: zipCodeArray[3] || null,
+					zipCode5: zipCodeArray[4] || null,
+					zipCode6: zipCodeArray[5] || null,
+					zipCode7: zipCodeArray[6] || null,
+					address: fullAddress ? fullAddress.replace(/[\u3000\u0020]/g, '') : null,
+					prefName: addressObj.pref_name
+						? addressObj.pref_name.replace(/[\u3000\u0020]/g, '')
+						: null,
+					cityName: addressObj.city_name
+						? addressObj.city_name.replace(/[\u3000\u0020]/g, '')
+						: null,
+					townName: addressObj.town_name
+						? addressObj.town_name.replace(/[\u3000\u0020]/g, '')
+						: null,
+					bizName: addressObj.biz_name ? addressObj.biz_name.replace(/[\u3000\u0020]/g, '') : null,
+					blockName: addressObj.block_name
+						? addressObj.block_name.replace(/[\u3000\u0020]/g, '')
+						: null,
+					otherName: addressObj.other_name
+						? addressObj.other_name.replace(/[\u3000\u0020]/g, '')
+						: null,
+					businessName: addressObj.business_name
+						? addressObj.business_name.replace(/[\u3000\u0020]/g, '')
+						: null,
 				});
 			} else {
 				_zc_invokeCallback(callback, {

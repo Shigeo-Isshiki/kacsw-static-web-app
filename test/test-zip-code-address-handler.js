@@ -5,6 +5,7 @@ const vm = require('vm');
 const {
 	registerZipCodeAddressHandler,
 	getAddressByZipCode,
+	formatZipCode,
 } = require('../src/zip-code-address-utils');
 
 const clone = (value) => {
@@ -190,6 +191,7 @@ function setup(extra = {}, mobile = false) {
 		assert.ok(!env.names.some((name) => name.includes('submit') || name.includes('detail')));
 		env.dispatch('create.change.Zip');
 		assert.strictEqual((await env.controller.whenIdle()).status, 'formatted');
+		assert.strictEqual(env.requests, 1);
 		assert.strictEqual(env.record.Zip.value, '123-4567');
 		assert.strictEqual(env.record.Address.value, '既存住所');
 		assert.strictEqual(env.record.Related.value, '既存関連');
@@ -200,6 +202,7 @@ function setup(extra = {}, mobile = false) {
 		env.dispatch('edit.show');
 		env.dispatch('edit.change.Zip');
 		assert.strictEqual((await env.controller.whenIdle()).status, 'applied');
+		assert.strictEqual(env.requests, 1);
 		assert.strictEqual(env.record.Address.value, '東京都千代田区千代田1-1');
 		assert.strictEqual(env.record.Other.value, '既存建物');
 		assert.strictEqual(env.record.Related.value, '既存関連');
@@ -222,6 +225,7 @@ function setup(extra = {}, mobile = false) {
 					outcome = await env.controller.whenIdle();
 				}
 				assert.strictEqual(outcome.status, 'applied');
+				assert.strictEqual(env.requests, 1);
 				assert.strictEqual(env.record.Zip.value, '230-0052');
 				assert.strictEqual(env.record.Address.value, '東京都千代田区千代田1-1');
 				assert.strictEqual(env.record.Other.value, '建物名');
@@ -334,10 +338,11 @@ function setup(extra = {}, mobile = false) {
 		let call = 0;
 		global.fetch = async () =>
 			++call === 1 ? response(address()) : { ok: false, status: 404, json: async () => null };
-		assert.strictEqual((await env.controller.apply()).status, 'error');
-		assert.strictEqual(env.record.Zip.value, '１２３－４５６７');
-		assert.strictEqual(env.record.Address.value, '既存住所');
-		console.log('PASS: downstream ZIP formatting failure is not a success-shaped result');
+		assert.strictEqual((await env.controller.apply()).status, 'applied');
+		assert.strictEqual(call, 1);
+		assert.strictEqual(env.record.Zip.value, '123-4567');
+		assert.strictEqual(env.record.Address.value, '東京都千代田区千代田1-1');
+		console.log('PASS: address formatting does not issue a redundant second request');
 
 		const browser = vm.createContext({ window: {}, console, setTimeout });
 		vm.runInContext(fs.readFileSync(path.join(__dirname, '../src/text-suite.js'), 'utf8'), browser);
@@ -645,9 +650,64 @@ function setup(extra = {}, mobile = false) {
 
 		// The legacy search callback remains available without registration.
 		delete global.kintone;
-		global.fetch = async () => response(address());
-		const result = await new Promise((resolve) => getAddressByZipCode('1234567', resolve));
-		assert.strictEqual(result.apiZipCode, '1234567');
+		for (const proxy of [false, true]) {
+			for (const [input, apiZip, formatted] of [
+				['１２３－４５６７', '1234567', '123-4567'],
+				['Ａ１Ｂ－２Ｃ３Ｄ', '1234567', '123-4567'],
+				['A1B2C3D', 'A1B2C3D', 'A1B2C3D'],
+			]) {
+				let requests = 0;
+				const row = address({ zip_code: apiZip });
+				if (proxy) {
+					global.kintone = {
+						proxy: (_url, _method, _headers, _body, success) => {
+							requests++;
+							success(JSON.stringify({ addresses: [row] }), 200);
+						},
+					};
+					global.fetch = () => {
+						throw new Error('fetch must not be used with proxy');
+					};
+				} else {
+					delete global.kintone;
+					global.fetch = async () => {
+						requests++;
+						return response(row);
+					};
+				}
+				let callbackCount = 0;
+				let synchronous = true;
+				const resultPromise = new Promise((resolve) =>
+					getAddressByZipCode(input, (result) => {
+						callbackCount++;
+						assert.strictEqual(synchronous, false);
+						resolve(result);
+					})
+				);
+				synchronous = false;
+				const result = await resultPromise;
+				assert.strictEqual(requests, 1);
+				assert.strictEqual(result.zipCode, formatted);
+				assert.strictEqual(result.apiZipCode, apiZip);
+				assert.strictEqual(result.zipCode1, apiZip[0]);
+				assert.strictEqual(result.zipCode7, apiZip[6]);
+				assert.strictEqual(result.address, '東京都千代田区千代田1-1');
+				await tick();
+				assert.strictEqual(callbackCount, 1);
+			}
+		}
+		delete global.kintone;
+		let formatRequests = 0;
+		global.fetch = async () => {
+			formatRequests++;
+			return { ok: false, status: 404, json: async () => null };
+		};
+		const formatResult = await new Promise((resolve) => formatZipCode('1234567', resolve));
+		assert.strictEqual(formatRequests, 1);
+		assert.ok(formatResult.error);
+		console.log(
+			'PASS: search uses one fetch/proxy request; public formatter still checks existence'
+		);
 		vm.runInContext(
 			fs.readFileSync(path.join(__dirname, '../src/zip-code-address-utils.js'), 'utf8'),
 			browser
