@@ -884,9 +884,13 @@ const registerZipCodeAddressHandler = (options) => {
 		if (element) element.disabled = value;
 	};
 	const context = (record, source) => ({ record, source, busy });
+	const isEmptyTextField = (field) =>
+		field?.value === undefined && ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT'].includes(field?.type);
+	const fieldValue = (field) => (isEmptyTextField(field) ? '' : field.value);
 	const requireFields = (record) => {
 		for (const code of [zipCodeField, ...targets]) {
-			if (!record?.[code] || typeof record[code].value !== 'string') {
+			const field = record?.[code];
+			if (!field || (typeof field.value !== 'string' && !isEmptyTextField(field))) {
 				const error = new Error(`文字列フィールド「${code}」が存在しないか値が不正です`);
 				error.fieldCode = code;
 				throw error;
@@ -992,7 +996,7 @@ const registerZipCodeAddressHandler = (options) => {
 					throw new Error('APIレスポンスが不正です（住所設定の必須項目）');
 				requireFields(record);
 				const replace = source === 'button' || result.normalizedZipCode !== result.apiZipCode;
-				const assignAddress = replace || record[mainAddressField].value === '';
+				const assignAddress = replace || fieldValue(record[mainAddressField]) === '';
 				const values = new Map();
 				if (assignAddress) {
 					if (replace) for (const code of targets) values.set(code, '');

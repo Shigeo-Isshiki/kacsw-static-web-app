@@ -7,7 +7,12 @@ const {
 	getAddressByZipCode,
 } = require('../src/zip-code-address-utils');
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
+const clone = (value) => {
+	if (Array.isArray(value)) return value.map(clone);
+	if (value && typeof value === 'object')
+		return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, clone(item)]));
+	return value;
+};
 const deferred = () => {
 	let resolve;
 	const promise = new Promise((done) => {
@@ -199,6 +204,73 @@ function setup(extra = {}, mobile = false) {
 		assert.strictEqual(env.record.Other.value, '既存建物');
 		assert.strictEqual(env.record.Related.value, '既存関連');
 		console.log('PASS: ordinary ZIP fills an empty main address only');
+
+		for (const type of ['SINGLE_LINE_TEXT', 'MULTI_LINE_TEXT']) {
+			for (const source of ['change', 'digital', 'button']) {
+				env = setup();
+				env.record.Zip.value = source === 'digital' ? 'A1B2C3D' : '2300052';
+				for (const code of ['Address', 'Other', 'Biz', 'Related'])
+					env.record[code] = { type, value: undefined };
+				env.setRow(address({ zip_code: '2300052', other_name: '建物名', biz_name: '事業所名' }));
+				env.dispatch('edit.show');
+				assert.strictEqual(env.record.Address.value, undefined);
+				assert.strictEqual(env.requests, 0);
+				let outcome;
+				if (source === 'button') outcome = await env.controller.apply();
+				else {
+					env.dispatch('edit.change.Zip');
+					outcome = await env.controller.whenIdle();
+				}
+				assert.strictEqual(outcome.status, 'applied');
+				assert.strictEqual(env.record.Zip.value, '230-0052');
+				assert.strictEqual(env.record.Address.value, '東京都千代田区千代田1-1');
+				assert.strictEqual(env.record.Other.value, '建物名');
+				assert.strictEqual(env.record.Biz.value, '事業所名');
+				assert.strictEqual(env.record.Related.value, source === 'change' ? undefined : '');
+				assert.strictEqual(env.zipErrors.Zip, null);
+				assert.strictEqual(env.addressErrors.Address, null);
+			}
+		}
+		console.log('PASS: undefined text fields allow normal, digital and button address assignment');
+
+		env = setup();
+		env.dispatch('edit.show');
+		const emptyFieldsGate = deferred();
+		global.fetch = () => emptyFieldsGate.promise;
+		env.dispatch('edit.change.Zip');
+		const emptyFieldsTask = env.controller.whenIdle();
+		await tick();
+		for (const code of ['Address', 'Other', 'Biz'])
+			env.record[code] = { type: 'SINGLE_LINE_TEXT', value: undefined };
+		emptyFieldsGate.resolve(response(address()));
+		assert.strictEqual((await emptyFieldsTask).status, 'applied');
+		assert.strictEqual(env.record.Address.value, '東京都千代田区千代田1-1');
+		assert.strictEqual(env.record.Other.value, undefined);
+		assert.strictEqual(env.record.Biz.value, undefined);
+		console.log('PASS: undefined fields in the latest record after search are accepted');
+
+		env = setup();
+		for (const code of ['Other', 'Biz', 'Related'])
+			env.record[code] = { type: 'SINGLE_LINE_TEXT', value: undefined };
+		env.dispatch('edit.show');
+		env.dispatch('edit.change.Zip');
+		assert.strictEqual((await env.controller.whenIdle()).status, 'formatted');
+		assert.strictEqual(env.record.Address.value, '既存住所');
+		for (const code of ['Other', 'Biz', 'Related'])
+			assert.strictEqual(env.record[code].value, undefined);
+		console.log('PASS: existing main address and undefined related fields remain unchanged');
+
+		env = setup();
+		for (const code of ['Address', 'Other', 'Biz', 'Related'])
+			env.record[code] = { type: 'SINGLE_LINE_TEXT', value: undefined };
+		env.setRow(address({ city_name: undefined }));
+		env.dispatch('edit.show');
+		assert.strictEqual((await env.controller.apply()).status, 'error');
+		for (const code of ['Address', 'Other', 'Biz', 'Related'])
+			assert.strictEqual(env.record[code].value, undefined);
+		assert.strictEqual(env.record.Zip.value, '１２３－４５６７');
+		assert.ok(env.zipErrors.Zip);
+		console.log('PASS: failed search does not normalize undefined record values');
 
 		env = setup();
 		env.record.Zip.value = 'Ａ１Ｂ－２Ｃ３Ｄ';
@@ -545,6 +617,31 @@ function setup(extra = {}, mobile = false) {
 		assert.strictEqual(env.record.Other.error, env.addressErrors.Other);
 		assert.strictEqual(env.zipErrors.Zip, undefined);
 		console.log('PASS: configuration and record field types are validated explicitly');
+
+		for (const code of ['Address', 'Other', 'Biz', 'Related']) {
+			for (const invalid of [
+				undefined,
+				{ type: 'SINGLE_LINE_TEXT', value: null },
+				{ type: 'SINGLE_LINE_TEXT', value: 123 },
+				{ type: 'SINGLE_LINE_TEXT', value: false },
+				{ type: 'SINGLE_LINE_TEXT', value: [] },
+				{ type: 'SINGLE_LINE_TEXT', value: {} },
+				{ type: 'NUMBER', value: undefined },
+				{ value: undefined },
+			]) {
+				env = setup();
+				if (invalid === undefined) delete env.record[code];
+				else env.record[code] = invalid;
+				env.dispatch('edit.show');
+				assert.strictEqual((await env.controller.apply()).status, 'error');
+				assert.ok(env.addressErrors[code]);
+				if (env.record[code]) assert.strictEqual(env.record[code].error, env.addressErrors[code]);
+				assert.strictEqual(env.record.Zip.value, '１２３－４５６７');
+				assert.strictEqual(env.requests, 0);
+				assert.strictEqual(env.spaces.Button.children[0].disabled, false);
+			}
+		}
+		console.log('PASS: missing fields and invalid non-empty/non-text values still fail');
 
 		// The legacy search callback remains available without registration.
 		delete global.kintone;
