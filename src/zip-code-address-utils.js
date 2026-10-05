@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
-/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, kintoneZipSetSpaceFieldButton, kintoneZipSpaceFieldText, normalizeZipCode, initZipCodeAddressUtilsRuntime, resetZipCodeAddressUtilsRuntime */
+/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, kintoneZipSetSpaceFieldButton, kintoneZipSpaceFieldText, registerZipCodeAddressHandler, normalizeZipCode, initZipCodeAddressUtilsRuntime, resetZipCodeAddressUtilsRuntime */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // 郵便番号APIベースURL
@@ -439,7 +439,7 @@ const getAddressByZipCode = (zipCode, callback) => {
 		})
 		.then((result) => {
 			if (!result) return;
-			if (!result.addresses || result.addresses.length === 0) {
+			if (!Array.isArray(result.addresses) || result.addresses.length === 0) {
 				_zc_invokeCallback(callback, {
 					error:
 						'該当する住所データが見つかりませんでした。郵便番号／デジタルアドレスを確認してください。',
@@ -452,10 +452,13 @@ const getAddressByZipCode = (zipCode, callback) => {
 					!addr ||
 					addr.zip_code == null ||
 					typeof addr.zip_code !== 'string' ||
+					!/^[0-9A-Z]{7}$/.test(addr.zip_code) ||
 					addr.pref_name == null ||
 					typeof addr.pref_name !== 'string' ||
+					!addr.pref_name.replace(/[\u3000\u0020]/g, '') ||
 					addr.city_name == null ||
 					typeof addr.city_name !== 'string' ||
+					!addr.city_name.replace(/[\u3000\u0020]/g, '') ||
 					addr.town_name == null ||
 					typeof addr.town_name !== 'string' ||
 					(addr.biz_name != null && typeof addr.biz_name !== 'string') ||
@@ -528,6 +531,10 @@ const getAddressByZipCode = (zipCode, callback) => {
 					}
 				}
 				formatZipCode(addressObj.zip_code, (zipResult) => {
+					if (zipResult.error) {
+						_zc_invokeCallback(callback, { error: zipResult.error });
+						return;
+					}
 					_zc_invokeCallback(callback, {
 						originalZipCode: zipCode,
 						normalizedZipCode: normalized,
@@ -768,6 +775,352 @@ const kintoneZipSpaceFieldText = (spaceField, id, display) => {
 };
 
 /**
+ * 郵便番号の入力変更・明示的な住所再設定・表示制御を登録します。
+ * 設定・戻り値の契約は docs/zip-code-address-utils.md を参照してください。
+ * @param {object} options
+ * @returns {{apply: function, refresh: function, whenIdle: function, dispose: function}}
+ */
+const registerZipCodeAddressHandler = (options) => {
+	if (!options || typeof options !== 'object' || Array.isArray(options))
+		throw new Error('optionsはオブジェクトである必要があります');
+	const {
+		zipCodeField,
+		mainAddressField,
+		addressFields,
+		clearFields = [],
+		devices = 'desktop',
+		watchFields = [],
+		zipErrorMessages,
+		addressErrorMessages,
+		button,
+		guidance,
+		canApply = () => true,
+		transformAddress = (value) => value,
+		afterApply,
+	} = options;
+	const isCode = (value) => typeof value === 'string' && value.trim() !== '';
+	const resultProperties = new Set([
+		'originalZipCode',
+		'normalizedZipCode',
+		'apiZipCode',
+		'zipCode',
+		'zipCode1',
+		'zipCode2',
+		'zipCode3',
+		'zipCode4',
+		'zipCode5',
+		'zipCode6',
+		'zipCode7',
+		'address',
+		'prefName',
+		'cityName',
+		'townName',
+		'blockName',
+		'otherName',
+		'bizName',
+		'businessName',
+	]);
+	if (!isCode(zipCodeField) || !isCode(mainAddressField))
+		throw new Error('郵便番号・メイン住所フィールドコードを指定してください');
+	if (
+		!addressFields ||
+		typeof addressFields !== 'object' ||
+		Array.isArray(addressFields) ||
+		!Object.keys(addressFields).length ||
+		!Object.entries(addressFields).every(
+			([property, code]) => resultProperties.has(property) && isCode(code)
+		)
+	)
+		throw new Error('addressFieldsは検索結果プロパティとフィールドコードの対応表です');
+	const mappedFields = Object.values(addressFields);
+	if (
+		!mappedFields.includes(mainAddressField) ||
+		new Set(mappedFields).size !== mappedFields.length ||
+		!Array.isArray(clearFields) ||
+		!clearFields.every(isCode) ||
+		!Array.isArray(watchFields) ||
+		!watchFields.every(isCode) ||
+		[...mappedFields, ...clearFields].includes(zipCodeField)
+	)
+		throw new Error('住所フィールドの対応・クリア対象・監視対象が不正です');
+	if (!['desktop', 'mobile', 'both'].includes(devices))
+		throw new Error('devicesはdesktop、mobile、bothのいずれかです');
+	for (const map of [zipErrorMessages, addressErrorMessages]) {
+		if (!map || typeof map !== 'object' || Array.isArray(map))
+			throw new Error('郵便番号用・住所用のerrorMessagesオブジェクトを指定してください');
+	}
+	for (const fn of [canApply, transformAddress, afterApply]) {
+		if (fn !== undefined && typeof fn !== 'function')
+			throw new Error('条件・変換・後続処理は関数で指定してください');
+	}
+	for (const ui of [button, guidance]) {
+		if (
+			ui !== undefined &&
+			(!ui ||
+				!isCode(ui.spaceField) ||
+				!isCode(ui.id) ||
+				(ui.visible !== undefined && typeof ui.visible !== 'function') ||
+				(ui.text !== undefined && typeof ui.text !== 'string'))
+		)
+			throw new Error('表示設定にはspaceField、idと適切なvisible/textを指定してください');
+	}
+	if (button && guidance && button.id === guidance.id)
+		throw new Error('ボタンと案内文には異なるidを指定してください');
+	if (typeof kintone === 'undefined' || typeof kintone.events?.on !== 'function')
+		throw new Error('kintone.events.onが利用できません');
+
+	const targets = [...new Set([...mappedFields, ...clearFields])];
+	let namespace;
+	let sequence = 0;
+	let screen = 0;
+	let disposed = false;
+	let busy = false;
+	let pending = Promise.resolve({ status: 'skipped' });
+	let buttonPending = pending;
+	const elements = new Map();
+	const setBusy = (value) => {
+		busy = value;
+		const element = elements.get(button?.id);
+		if (element) element.disabled = value;
+	};
+	const context = (record, source) => ({ record, source, busy });
+	const requireFields = (record) => {
+		for (const code of [zipCodeField, ...targets]) {
+			if (!record?.[code] || typeof record[code].value !== 'string') {
+				const error = new Error(`文字列フィールド「${code}」が存在しないか値が不正です`);
+				error.fieldCode = code;
+				throw error;
+			}
+		}
+	};
+	const setError = (record, code, message, map) => {
+		map[code] = message;
+		if (record?.[code]) record[code].error = message;
+	};
+	const removeElements = () => {
+		for (const element of elements.values()) element.remove();
+		elements.clear();
+	};
+	const render = (record) => {
+		if (disposed || !namespace) return;
+		for (const [ui, isButton] of [
+			[button, true],
+			[guidance, false],
+		]) {
+			if (!ui) continue;
+			const space = namespace.getSpaceElement(ui.spaceField);
+			const visible = ui.visible
+				? ui.visible(context(record, 'display'))
+				: Boolean(record?.[zipCodeField]?.value);
+			let element = elements.get(ui.id);
+			if (!visible || !space) {
+				if (element) element.remove();
+				elements.delete(ui.id);
+				continue;
+			}
+			if (!element || element.parentNode !== space) {
+				if (element) element.remove();
+				element = document.createElement(isButton ? 'button' : 'div');
+				element.id = ui.id;
+				if (isButton) {
+					element.type = 'button';
+					element.className = 'kintoneplugin-button-normal';
+					element.addEventListener('click', () => {
+						// DOMイベントはPromiseを待たないため、apply内部で例外を処理する。
+						void apply();
+					});
+				} else {
+					element.style.whiteSpace = 'pre-line';
+				}
+				element.textContent =
+					ui.text ??
+					(isButton
+						? '郵便番号から住所を取得'
+						: '郵便番号の代わりにデジタルアドレスでも検索可能です。\nデジタルアドレスの場合は郵便番号に変換されます。');
+				space.appendChild(element);
+				elements.set(ui.id, element);
+			}
+			if (isButton) element.disabled = busy;
+		}
+	};
+	const refresh = () => {
+		if (!disposed && namespace) render(namespace.get().record);
+	};
+	const start = (source, input) => {
+		const token = ++sequence;
+		const view = screen;
+		const api = namespace;
+		let expectedZip = input;
+		const isCurrent = () =>
+			!disposed &&
+			screen === view &&
+			sequence === token &&
+			api.get().record[zipCodeField]?.value === expectedZip;
+		const task = async () => {
+			let errorField = zipCodeField;
+			let errorMap = zipErrorMessages;
+			try {
+				if (!isCurrent()) return { status: 'stale' };
+				let record = api.get().record;
+				requireFields(record);
+				if (!input || !canApply(context(record, source))) return { status: 'skipped' };
+				if (source === 'button' && button?.visible && !button.visible(context(record, source)))
+					return { status: 'skipped' };
+				const result = await new Promise((resolve) => getAddressByZipCode(input, resolve));
+				if (!isCurrent()) return { status: 'stale' };
+				record = api.get().record;
+				if (!canApply(context(record, source))) return { status: 'skipped' };
+				if (source === 'button' && button?.visible && !button.visible(context(record, source)))
+					return { status: 'skipped' };
+				if (result.error) throw new Error(result.error);
+				if (
+					result.normalizedZipCode !== _zc_normalizeZipCodeInput(input) ||
+					typeof result.apiZipCode !== 'string' ||
+					!/^[0-9A-Z]{7}$/.test(result.apiZipCode) ||
+					typeof result.zipCode !== 'string' ||
+					_zc_normalizeZipCodeInput(result.zipCode) !== result.apiZipCode ||
+					!['address', 'prefName', 'cityName'].every(
+						(key) => typeof result[key] === 'string' && result[key].trim() !== ''
+					) ||
+					!Object.entries(addressFields).some(
+						([property, code]) =>
+							code === mainAddressField &&
+							typeof result[property] === 'string' &&
+							result[property].trim() !== ''
+					)
+				)
+					throw new Error('APIレスポンスが不正です（住所設定の必須項目）');
+				requireFields(record);
+				const replace = source === 'button' || result.normalizedZipCode !== result.apiZipCode;
+				const assignAddress = replace || record[mainAddressField].value === '';
+				const values = new Map();
+				if (assignAddress) {
+					if (replace) for (const code of targets) values.set(code, '');
+					for (const [property, code] of Object.entries(addressFields)) {
+						errorField = code;
+						errorMap = addressErrorMessages;
+						const value = result[property];
+						if (value === null || value === undefined) continue;
+						if (typeof value !== 'string')
+							throw new Error(`検索結果「${property}」は文字列である必要があります`);
+						const converted = transformAddress(value, { fieldCode: code, property, result });
+						if (typeof converted !== 'string')
+							throw new Error(`住所変換「${code}」は文字列を返す必要があります`);
+						values.set(code, converted);
+					}
+				}
+				// 検証・全角変換が全て成功してから一括反映する。
+				record[zipCodeField].value = result.zipCode;
+				setError(record, zipCodeField, null, zipErrorMessages);
+				for (const [code, value] of values) {
+					record[code].value = value;
+					setError(record, code, null, addressErrorMessages);
+				}
+				api.set({ record });
+				expectedZip = result.zipCode;
+				if (assignAddress && afterApply) {
+					errorField = mainAddressField;
+					errorMap = addressErrorMessages;
+					await afterApply({ record, result, source, isCurrent });
+				}
+				return { status: assignAddress ? 'applied' : 'formatted', result };
+			} catch (error) {
+				if (targets.includes(error?.fieldCode)) {
+					errorField = error.fieldCode;
+					errorMap = addressErrorMessages;
+				}
+				const message = error instanceof Error ? error.message : String(error);
+				console.error('registerZipCodeAddressHandler:', error);
+				if (isCurrent()) {
+					const record = api.get().record;
+					setError(record, errorField, message, errorMap);
+					api.set({ record });
+				}
+				return { status: 'error', error: message };
+			}
+		};
+		// changeイベント内のrecord.get/setとPromise返却はKintoneでは利用できない。
+		pending = Promise.resolve()
+			.then(task)
+			.then((outcome) => {
+				if (!disposed && screen === view) refresh();
+				return outcome;
+			})
+			.catch((error) => {
+				// レコード取得・エラー表示自体の失敗もDOMイベントへ漏らさない。
+				console.error('registerZipCodeAddressHandler:', error);
+				return { status: 'error', error: String(error) };
+			});
+		return pending;
+	};
+	const apply = () => {
+		if (busy) return buttonPending;
+		if (disposed || !namespace) return Promise.resolve({ status: 'skipped' });
+		setBusy(true);
+		try {
+			const record = namespace.get().record;
+			render(record);
+			const operation = start('button', record[zipCodeField]?.value);
+			pending = operation.then((outcome) => {
+				setBusy(false);
+				try {
+					refresh();
+				} catch (error) {
+					console.error('registerZipCodeAddressHandler:', error);
+					return { status: 'error', error: String(error) };
+				}
+				return outcome;
+			});
+			buttonPending = pending;
+		} catch (error) {
+			setBusy(false);
+			console.error('registerZipCodeAddressHandler:', error);
+			pending = Promise.resolve({ status: 'error', error: String(error) });
+		}
+		return pending;
+	};
+	const eventNames = [];
+	for (const prefix of devices === 'both'
+		? ['app', 'mobile.app']
+		: [devices === 'mobile' ? 'mobile.app' : 'app']) {
+		for (const mode of ['create', 'edit']) {
+			eventNames.push(`${prefix}.record.${mode}.show`);
+			for (const field of new Set([zipCodeField, ...watchFields]))
+				eventNames.push(`${prefix}.record.${mode}.change.${field}`);
+		}
+	}
+	const handler = (event) => {
+		if (disposed) return event;
+		namespace = event.type.startsWith('mobile.') ? kintone.mobile.app.record : kintone.app.record;
+		if (event.type.endsWith('.show')) {
+			screen++;
+			sequence++;
+			removeElements();
+		} else if (event.type.endsWith(`.change.${zipCodeField}`)) {
+			setError(event.record, zipCodeField, null, zipErrorMessages);
+			start('change', event.record[zipCodeField]?.value);
+		}
+		render(event.record);
+		return event;
+	};
+	kintone.events.on(eventNames, handler);
+	return {
+		apply,
+		refresh,
+		whenIdle: () =>
+			busy && pending !== buttonPending
+				? Promise.all([pending, buttonPending]).then(([outcome]) => outcome)
+				: pending,
+		dispose: () => {
+			disposed = true;
+			sequence++;
+			removeElements();
+			kintone.events.off(eventNames, handler);
+		},
+	};
+};
+
+/**
  * 郵便番号を正規化（空白・記号除去、全角→半角、APIで存在確認、callback型）
  * @param {string|number} zipCode 郵便番号またはデジタルアドレス（7桁の半角英数字）。
  * @param {function} callback - (result: { zipCode: string } | { error: string }) => void
@@ -814,6 +1167,7 @@ if (typeof window !== 'undefined') {
 	window.hasPrefectureName = hasPrefectureName;
 	window.kintoneZipSetSpaceFieldButton = kintoneZipSetSpaceFieldButton;
 	window.kintoneZipSpaceFieldText = kintoneZipSpaceFieldText;
+	window.registerZipCodeAddressHandler = registerZipCodeAddressHandler;
 	window.normalizeZipCode = normalizeZipCode;
 	window.initZipCodeAddressUtilsRuntime = initZipCodeAddressUtilsRuntime;
 	window.resetZipCodeAddressUtilsRuntime = resetZipCodeAddressUtilsRuntime;
@@ -831,6 +1185,7 @@ try {
 			hasPrefectureName,
 			kintoneZipSetSpaceFieldButton,
 			kintoneZipSpaceFieldText,
+			registerZipCodeAddressHandler,
 			normalizeZipCode,
 			initZipCodeAddressUtilsRuntime,
 			resetZipCodeAddressUtilsRuntime,

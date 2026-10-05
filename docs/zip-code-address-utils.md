@@ -16,6 +16,7 @@
   - [`getPrefectureByZipCode(zipCode, callback)`](#getPrefectureByZipCode)
   - [`hasPrefectureName(address)`](#hasPrefectureName)
   - [`normalizeZipCode(zipCode, callback)`](#normalizeZipCode)
+  - [`registerZipCodeAddressHandler(options)`](#registerZipCodeAddressHandler)
   - [`kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)`](#kintoneZipSetSpaceFieldButton)
   - [`kintoneZipSpaceFieldText(spaceField, id, display)`](#kintoneZipSpaceFieldText)
   - [`initZipCodeAddressUtilsRuntime(options)`](#initZipCodeAddressUtilsRuntime)
@@ -55,6 +56,7 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 - `getPrefectureByZipCode(zipCode, callback)` — 都道府県名を `callback(prefName|string|null)` で返す（見つからなければ `null`）。
 - `hasPrefectureName(address)` — 住所が47都道府県の正式名称で始まるかを厳密に判定する。
 - `normalizeZipCode(zipCode, callback)` — 正規化済みの7文字（半角英数字）を `callback(result)` で返す。成功: `{ zipCode: string }`、失敗: `{ error: string }`。
+- `registerZipCodeAddressHandler(options)` — kintone の郵便番号変更、住所の割り当て・置換、ボタン・案内表示をまとめて登録する。新規利用・移行ではこの API を推奨。
 - `kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)` — kintone のスペースフィールドにボタンを追加（または削除）します。
 - `kintoneZipSpaceFieldText(spaceField, id, display)` — 説明テキストをスペースフィールドに追加/削除します。
 - `initZipCodeAddressUtilsRuntime(options)` — PC/モバイル判定を明示設定して内部キャッシュに保存します。
@@ -76,7 +78,7 @@ initZipCodeAddressUtilsRuntime(globalThis.KACSW_RUNTIME);
 
 ## 各関数の引数・戻り値詳細
 
-**注意**: すべての API 呼び出しは非同期でコールバックを利用します。
+**注意**: 検索 API は非同期コールバック型です。新しい登録 API の `apply()` / `whenIdle()` は Promise 型です。
 
 <a id="checkZipCodeExists"></a>
 
@@ -238,6 +240,145 @@ hasPrefectureName(' 東京都千代田区千代田1-1'); // false
 - `result` の形:
   - 成功: `{ zipCode: '1234567' }`（正規化済み7文字）
   - 失敗: `{ error: '郵便番号が存在しません' }` や `{ error: 'API接続エラー' }`
+
+---
+
+<a id="registerZipCodeAddressHandler"></a>
+
+### `registerZipCodeAddressHandler(options)`
+
+アプリ初期化時に一度登録します。住所の地区判定など、業務固有処理は含めません。既存の `getAddressByZipCode` を検索 API として使用します。
+
+#### 設定オブジェクト
+
+| キー | 型・既定値 | 契約 |
+| --- | --- | --- |
+| `zipCodeField` | string、必須 | 郵便番号／デジタルアドレスのフィールドコード |
+| `mainAddressField` | string、必須 | 空欄補完の判定対象。`addressFields` の割り当て先に含める |
+| `addressFields` | object、必須 | `{ 検索結果のプロパティ名: Kintoneフィールドコード }`。同一フィールドへの重複割り当ては禁止 |
+| `clearFields` | string[]、`[]` | 置換時に空文字にする追加の関連フィールド。割り当て先も自動でクリア対象となる |
+| `zipErrorMessages` | object、必須 | 郵便番号・検索・必須結果検証エラーを保持する既存オブジェクト |
+| `addressErrorMessages` | object、必須 | 住所割り当て・全角変換・後続処理エラーを保持する既存オブジェクト |
+| `devices` | `'desktop' \| 'mobile' \| 'both'`、`'desktop'` | 登録する画面。PC/モバイルの record API は実際のイベントから選択する |
+| `watchFields` | string[]、`[]` | 郵便番号以外に表示更新を監視するフィールド。これらの変更では検索しない |
+| `canApply` | `({ record, source, busy }) => boolean`、常に true | 検索・反映の業務上の許可条件。開始時と結果到着時に最新レコードで評価 |
+| `button` | object、省略可 | `{ spaceField, id, text?, visible? }`。`text` は完全なボタンラベル（既定「郵便番号から住所を取得」） |
+| `guidance` | object、省略可 | `{ spaceField, id, text?, visible? }`。省略時は案内自体を作成しない |
+| `transformAddress` | `(value, { fieldCode, property, result }) => string`、そのまま返す | 任意の同期住所変換。全角変換・文字数検証等を実施できる。失敗は throw する |
+| `afterApply` | `({ record, result, source, isCurrent }) => void \| Promise<void>`、省略可 | 住所反映後だけ実行。地区判定等をアプリ側で実施する。完了まで `apply()` は待つ |
+
+対象は通常の文字列フィールドです（サブテーブル・配列型は非対応）。郵便番号フィールドを住所割り当て先やクリア対象に含めてはいけません。設定不正は登録時に例外、フィールドの欠落・値型不正は処理時にエラーとなります。`addressFields` のプロパティ名は `getAddressByZipCode` の公開結果から選びます。メイン住所の検索結果値は空でない文字列が必須です。
+
+`visible` のシグネチャは `({ record, source, busy }) => boolean`。描画時の `source` は `'display'`、ボタン操作の再検証時は `'button'` です。既定の表示条件は郵便番号が空でないことです。`canApply` の `source` は `'change'` または `'button'`。条件関数は同期・副作用なしとしてください。`busy` は処理中の表示情報であり、条件に `!busy` を使うとボタン操作自体が不許可になるため、二重押下対策には利用しないでください（ライブラリで disabled を制御します）。
+
+#### 反映ルール
+
+| 操作 | 郵便番号 | 住所 |
+| --- | --- | --- |
+| 作成・編集の画面表示 | 検索も整形もしない | ボタン・案内の表示だけ更新 |
+| 通常郵便番号の入力変更 | 検索成功後に整形 | メイン住所が空文字の場合だけ存在する結果を補完。既存住所・関連欄は保持 |
+| デジタルアドレスの入力変更 | API の郵便番号に置換 | 既存住所にかかわらず全割り当て先＋`clearFields` をクリアして存在する結果を反映 |
+| ボタン操作／`apply()` | 検索成功後に整形 | 利用者による明示的な置換。デジタルアドレスと同じクリア・反映 |
+| 空の郵便番号への変更 | 検索しない | 住所を保持し、古い検索を無効化 |
+| `watchFields` の変更 | 検索しない | 表示だけ更新 |
+
+デジタルアドレスの判定は **`normalizedZipCode !== apiZipCode`** のみです。英字の有無では判定しません。
+
+検索・変換をすべて検証してから一括でレコード値を設定します。必須 API 項目は `zip_code`（7文字の半角大文字英数字）、`pref_name` / `city_name`（空白除去後も空でない文字列）、`town_name`（文字列、API による空文字は許可）です。検索結果には正しい `normalizedZipCode`、`apiZipCode`、`zipCode`、空でない `address` / `prefName` / `cityName` が必要です。
+
+`other_name`、`biz_name`、`block_name`、`business_name` は欠落・null を許容します。存在する場合は文字列が必要です。任意結果がない場合、通常の補完では既存の関連欄を保持し、置換ではクリアしたままになります。必須項目不正や全角変換失敗では、郵便番号を含むレコード値を変更しません（エラー情報だけを設定します）。
+
+非同期結果は、開始時の**入力値そのもの**と現在の郵便番号が一致する場合だけ適用します。別の変更・検索、次の作成編集画面表示、`dispose()` でも古い処理を無効化するため、値が A → B → A と戻っても古い A の結果は適用されません。結果到着時に許可条件とメイン住所の空欄状態を再確認します。通常検索の待機中に住所が入力された場合は、郵便番号だけ整形します。通信自体はキャンセルしません。
+
+#### 戻り値と Promise
+
+```js
+{
+  apply(),     // 明示的な住所置換。Promise<Outcome>
+  whenIdle(),  // 最新検索と進行中のボタン操作の完了を待つ。Promise<Outcome>
+  refresh(),   // 現在レコードで表示だけ更新。void
+  dispose(),   // イベント解除、生成要素削除、進行中結果を無効化。void
+}
+```
+
+`Outcome` は次のいずれかです。
+
+- `{ status: 'applied', result }` — 住所を反映し後続処理も完了
+- `{ status: 'formatted', result }` — 郵便番号だけ整形、住所は保持
+- `{ status: 'skipped' }` — 空入力・条件不成立・未表示・解除済み
+- `{ status: 'stale' }` — 古い検索結果を破棄
+- `{ status: 'error', error: string }` — エラーを記録し処理完了
+
+ボタン処理中の `apply()` は進行中のボタン Promise を返し、二重検索を起こしません。失敗時も disabled を解除します。DOM のクリックイベントは Promise を待たないため、ライブラリ内部で検索・後続処理の例外を処理し、エラーマップとフィールドの `error`、`console.error` に記録します。呼び出し元は reject ではなく `status` を確認します。
+
+Kintone のフィールド変更イベントでは Promise を返せず、ハンドラ内で `record.get/set` もできません。この API はイベントを同期的に返し、イベント終了後に最新レコードを取得・設定します。保存イベントは登録せず、`event.error` は設定しません。各アプリで両エラーマップと `whenIdle()` を確認し、保存を待つ／止める方針を決めてください。保存完了後の非同期更新を避けるには、保存成功・画面離脱時に `dispose()` し、再表示時に必要なら再登録してください。
+
+成功した対象のエラーは `null` にします。変更していない住所欄や他のフィールドのエラーは消しません。エラーマップは既存の全角変換ハンドラと同様に `{ フィールドコード: エラー文字列 | null }` 形式です。複数の処理が同じエントリを所有する場合の競合管理はアプリ側で行ってください。
+
+`afterApply` 開始時点で住所はすでに反映済みです。後続処理の失敗はメイン住所に記録し、住所反映は巻き戻しません。渡す `record` はスナップショットで、変更しても自動保存しません。非同期の業務処理がレコードを更新する場合は、`isCurrent()` で確認し、最新レコードを取り直して必要な業務フィールドだけ更新してください。
+
+#### 登録例
+
+```js
+const zipErrors = {};
+const addressErrors = {};
+const addressHandler = registerZipCodeAddressHandler({
+	zipCodeField: '郵便番号',
+	mainAddressField: '住所',
+	addressFields: {
+		address: '住所',
+		otherName: '建物名',
+		bizName: '事業所名',
+	},
+	clearFields: ['住所補足'],
+	devices: 'both',
+	watchFields: ['処理状況'],
+	zipErrorMessages: zipErrors,
+	addressErrorMessages: addressErrors,
+	canApply: ({ record }) => record.処理状況.value !== '完了',
+	button: {
+		spaceField: '住所設定スペース',
+		id: 'address-set-button',
+		text: '郵便番号から住所を再設定',
+		visible: ({ record }) => Boolean(record.郵便番号.value) && record.処理状況.value !== '完了',
+	},
+	guidance: {
+		spaceField: '住所案内スペース',
+		id: 'address-guidance',
+		text: 'デジタルアドレスも入力できます。\n住所の再設定はボタンを押してください。',
+		visible: ({ record }) => record.処理状況.value !== '完了',
+	},
+	// text-suite.js を読み込んでいるアプリで、必要な場合だけ指定する。
+	transformAddress: (value) => toFullWidth(value, true),
+	afterApply: async ({ result, isCurrent }) => {
+		const district = await lookupDistrict(result.address); // アプリ固有の処理
+		if (!isCurrent()) return;
+		// アプリ自身のPC/モバイル判定ヘルパーを使い、最新レコードの地区欄だけ更新する。
+		updateDistrictField(district);
+	},
+});
+// アプリ独自のボタンからも完了を待てる。
+// const outcome = await addressHandler.apply();
+```
+
+#### 案内文と旧 API からの移行・削除手順
+
+旧 `kintoneZipSpaceFieldText` の既定 HTML は静的な `<div>` / `<br>` です。新 API は同じ2行の文言を `textContent` と `white-space: pre-line` で描画し、改行表示を維持します。`text` に HTML が含まれても実行せず文字列として表示します。任意 HTML 文字列の指定には対応しません。リッチな案内が必要なら、アプリ側で信頼済み DOM を別途構築してください。表示制御は生成した要素だけを削除・追加し、共有スペースの親要素を隠しません。旧クラス名 `kintoneplugin-button-normal` はボタンに維持します。
+
+このリポジトリには旧2関数を呼ぶ業務アプリのコードは含まれていません。既存のヘルパー実装・テストを確認して互換性を維持していますが、アプリ側による追加の `innerHTML` 加工、CSS、スペース親の非表示制御については移行時に実機で確認してください。
+
+1. 今回は旧2関数と `getAddressByZipCode` の名前・引数・公開先を残す。旧利用アプリは継続動作する。検索の不正必須項目・整形失敗については、値を返さず既存の `{ error }` 契約で明示する。
+2. アプリごとに住所対応表・クリア対象・エラーマップ・表示条件を新登録設定へ移す。地区判定等は `afterApply` に移す。新旧が同じ郵便番号／スペースを同時に処理しないよう、移行したアプリでは旧検索変更ハンドラと旧2関数の呼び出しをまとめて外す。
+3. 作成・編集、PC/モバイル、既存住所・空欄、デジタルアドレス、検索エラー・保存制御、案内・ボタンの見た目を利用アプリごとに検証する。
+4. 利用アプリ一覧を管理し、旧2関数の参照がゼロであることを確認するまでは削除しない。外部アプリの移行完了はこのリポジトリ内の検索だけでは証明できない。
+5. 全アプリ移行後の別リリースで旧2関数本体、window/CommonJS 公開、`all-window-exports.js` の登録、旧関数専用テスト・文書を削除する。`getAddressByZipCode` は残す。配布用ビルドと回帰テストを実行して削除版を公開する。
+
+検証コマンド:
+
+```bash
+node -r ./test/setup-tests.js test/test-zip-code-address-handler.js
+node -r ./test/setup-tests.js test/test-zip-code-address-utils.js
+```
 
 ---
 
