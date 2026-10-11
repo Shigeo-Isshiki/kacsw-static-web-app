@@ -1,10 +1,37 @@
 /** kViewer 専用の基本操作をまとめた JavaScript ライブラリです。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.0.1
+ * @version 1.1.0
  */
-/* exported createDependencyChecker, getFieldValueOr, setFieldShown, setFormBridgeButtonShown, setPrintCreatorButtonShown */
+/* exported createDependencyChecker, getFieldValueOr, setFieldShown, setFormBridgeButtonShown, setPrintCreatorButtonShown, installCopyPrintRestrictions, redirectToRecordDetail, setStaticContentShown */
 
 const _KV_displayValues = new WeakMap();
+const _KV_staticDisplayValues = new WeakMap();
+const _KV_copyPrintStates = new WeakMap();
+
+const _kvSetRestorableDisplay = (element, shown, savedValues) => {
+	if (!shown) {
+		if (!savedValues.has(element)) {
+			savedValues.set(element, {
+				value: element.style.getPropertyValue('display'),
+				priority: element.style.getPropertyPriority('display'),
+			});
+		}
+		if (
+			element.style.getPropertyValue('display') !== 'none' ||
+			element.style.getPropertyPriority('display') !== 'important'
+		) {
+			element.style.setProperty('display', 'none', 'important');
+		}
+	} else if (savedValues.has(element)) {
+		const original = savedValues.get(element);
+		if (original.value) {
+			element.style.setProperty('display', original.value, original.priority);
+		} else {
+			element.style.removeProperty('display');
+		}
+		savedValues.delete(element);
+	}
+};
 
 const _kvReportError = (name, message, details) => {
 	if (details === undefined) {
@@ -296,10 +323,235 @@ const setPrintCreatorButtonShown = (context, shown) =>
 		'setPrintCreatorButtonShown'
 	);
 
+/**
+ * @param {Object} context getMainContentElement を持つコンテキスト
+ * @param {string} staticCode 単一の静的コンテンツコード
+ * @param {boolean} shown 表示状態を復元する場合 true
+ * @returns {boolean} 全対象への適用成功時 true
+ */
+const setStaticContentShown = (context, staticCode, shown) => {
+	const name = 'setStaticContentShown';
+	if (
+		!context ||
+		typeof context !== 'object' ||
+		Array.isArray(context) ||
+		typeof staticCode !== 'string' ||
+		!staticCode.trim() ||
+		typeof shown !== 'boolean'
+	) {
+		_kvReportError(name, 'invalid arguments');
+		return false;
+	}
+	let elements;
+	try {
+		if (typeof context.getMainContentElement !== 'function') {
+			_kvReportError(name, 'context does not provide getMainContentElement');
+			return false;
+		}
+		const root = context.getMainContentElement();
+		if (!_kvIsElement(root)) {
+			_kvReportError(name, 'main content element was not found');
+			return false;
+		}
+		elements = [root, ...root.querySelectorAll('[data-static-code]')].filter(
+			(element) => element.getAttribute('data-static-code') === staticCode
+		);
+	} catch {
+		console.error(name + ': failed to acquire static content elements');
+		return false;
+	}
+	if (elements.length === 0) {
+		_kvReportError(name, 'no matching static content found in main content');
+		return false;
+	}
+	let success = true;
+	for (const element of elements) {
+		try {
+			_kvSetRestorableDisplay(element, shown, _KV_staticDisplayValues);
+		} catch {
+			console.error(name + ': failed to update static content display');
+			success = false;
+		}
+	}
+	return success;
+};
+
+/**
+ * @param {string} recordCode kViewer のレコードコード
+ * @returns {boolean} 既存リストビューから遷移指示を設定できた場合 true
+ */
+const redirectToRecordDetail = (recordCode) => {
+	if (typeof recordCode !== 'string' || !recordCode.trim()) {
+		_kvReportError('redirectToRecordDetail', 'recordCode must be a nonblank string');
+		return false;
+	}
+	try {
+		const location = window.location;
+		if (
+			!location ||
+			typeof location.origin !== 'string' ||
+			!location.origin ||
+			typeof location.pathname !== 'string'
+		) {
+			_kvReportError('redirectToRecordDetail', 'current location API is unavailable');
+			return false;
+		}
+		const path = location.pathname.replace(/\/+$/, '');
+		location.href = location.origin + path + '/detail/' + encodeURIComponent(recordCode);
+		return true;
+	} catch {
+		console.error('redirectToRecordDetail: failed to set detail navigation');
+		return false;
+	}
+};
+
+const _kvRollbackCopyPrint = (state) => {
+	for (let index = state.cleanups.length - 1; index >= 0; index -= 1) {
+		try {
+			state.cleanups[index]();
+			state.cleanups.splice(index, 1);
+		} catch {
+			console.error('installCopyPrintRestrictions: failed to clean up partial registration');
+		}
+	}
+	return state.cleanups.length === 0;
+};
+
+/**
+ * ページ全体の一部のコピー・印刷操作を抑止します。情報秘匿やOS操作の禁止ではありません。
+ * @returns {boolean} 登録成功または既に登録済みの場合 true
+ */
+const installCopyPrintRestrictions = () => {
+	const name = 'installCopyPrintRestrictions';
+	let page;
+	try {
+		page = window.document;
+		if (
+			!page ||
+			!page.head ||
+			!_kvIsElement(page.body) ||
+			typeof page.createElement !== 'function' ||
+			typeof page.addEventListener !== 'function' ||
+			typeof page.removeEventListener !== 'function' ||
+			typeof window.addEventListener !== 'function' ||
+			typeof window.removeEventListener !== 'function'
+		) {
+			_kvReportError(name, 'required DOM or event APIs are unavailable');
+			return false;
+		}
+	} catch {
+		console.error(name + ': failed to access page DOM');
+		return false;
+	}
+	let state = _KV_copyPrintStates.get(page);
+	if (state && state.installed) return true;
+	if (state && !_kvRollbackCopyPrint(state)) return false;
+	state = { installed: false, cleanups: [] };
+	_KV_copyPrintStates.set(page, state);
+
+	const savedDisplay = new WeakMap();
+	let printingBody = null;
+	const startPrint = () => {
+		try {
+			if (!printingBody) {
+				if (!_kvIsElement(page.body)) throw new Error('body unavailable');
+				printingBody = page.body;
+			}
+			_kvSetRestorableDisplay(printingBody, false, savedDisplay);
+		} catch {
+			console.error(name + ': failed to hide page for printing');
+		}
+	};
+	const endPrint = () => {
+		try {
+			if (printingBody) {
+				_kvSetRestorableDisplay(printingBody, true, savedDisplay);
+				printingBody = null;
+			}
+		} catch {
+			console.error(name + ': failed to restore page after printing');
+		}
+	};
+	const preventDefault = (event) => event.preventDefault();
+	const preventKeys = (event) => {
+		if (
+			((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 'p') ||
+			event.key === 'PrintScreen'
+		) {
+			event.preventDefault();
+			event.stopPropagation();
+		}
+	};
+	const listen = (target, type, handler) => {
+		state.cleanups.push(() => target.removeEventListener(type, handler, true));
+		target.addEventListener(type, handler, true);
+	};
+	state.cleanups.push(() => {
+		if (printingBody) {
+			_kvSetRestorableDisplay(printingBody, true, savedDisplay);
+			printingBody = null;
+		}
+	});
+	try {
+		listen(page, 'contextmenu', preventDefault);
+		listen(page, 'selectstart', preventDefault);
+		listen(page, 'keydown', preventKeys);
+		listen(window, 'beforeprint', startPrint);
+		listen(window, 'afterprint', endPrint);
+
+		if (typeof window.matchMedia === 'function') {
+			const media = window.matchMedia('print');
+			const change = (event) => {
+				try {
+					if (event.matches) startPrint();
+					else endPrint();
+				} catch {
+					console.error(name + ': failed to process print media notification');
+				}
+			};
+			if (
+				media &&
+				typeof media.addEventListener === 'function' &&
+				typeof media.removeEventListener === 'function'
+			) {
+				state.cleanups.push(() => media.removeEventListener('change', change));
+				media.addEventListener('change', change);
+			} else if (
+				media &&
+				typeof media.addListener === 'function' &&
+				typeof media.removeListener === 'function'
+			) {
+				state.cleanups.push(() => media.removeListener(change));
+				media.addListener(change);
+			} else {
+				_kvReportError(name, 'optional print media change API is unavailable');
+			}
+		} else {
+			_kvReportError(name, 'optional matchMedia API is unavailable');
+		}
+
+		const style = page.createElement('style');
+		style.textContent = '@media print { body { display: none !important; } }';
+		state.cleanups.push(() => {
+			if (style.parentNode) style.parentNode.removeChild(style);
+		});
+		page.head.appendChild(style);
+		state.installed = true;
+		return true;
+	} catch {
+		console.error(name + ': registration failed');
+		_kvRollbackCopyPrint(state);
+		return false;
+	}
+};
+
 if (typeof window !== 'undefined') {
 	window.createDependencyChecker = createDependencyChecker;
 	window.getFieldValueOr = getFieldValueOr;
 	window.setFieldShown = setFieldShown;
 	window.setFormBridgeButtonShown = setFormBridgeButtonShown;
 	window.setPrintCreatorButtonShown = setPrintCreatorButtonShown;
+	window.installCopyPrintRestrictions = installCopyPrintRestrictions;
+	window.redirectToRecordDetail = redirectToRecordDetail;
+	window.setStaticContentShown = setStaticContentShown;
 }

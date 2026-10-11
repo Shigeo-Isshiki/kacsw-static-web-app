@@ -115,7 +115,7 @@
 
 この作業環境から実画面操作は実施していません。ユーザー提供ログで確認できた範囲は上記に記載し、それ以外は未検証として扱います。
 
-## 既存リストビューの連携ボタン不具合（2026-10-12、取得修正の実画面確認済み・未配布）
+## 既存リストビューの連携ボタン不具合（2026-10-12、1.0.1配布済み）
 
 アプリ226の既存リストビューの詳細画面で、配布版1.0.0の両ボタン関数が取得範囲内で対象を見つけられず、非表示処理を実行できなかったことが報告されました。業務条件を変えず、ページ全体で対象を取得し `hidden` と `display: none !important` を使う従来方式へ戻したところ、利用者が復旧を確認しています。他4本の公開画面にはボタン共通化を未適用との報告です。これは新マイページビューの単一フィールド表示確認とは別件です。
 
@@ -176,4 +176,83 @@ KV_BUTTON_TEST {"eventNumber":2,"formBridge":{"shown":false,"success":true},"pri
 - `npm test` — 成功（候補版1.0.1の取得修正を含む全テスト）。
 - `npx prettier --check "src/**/*.{js,css,html}"` / `npx eslint "src/**/*.js"` — 成功（リポジトリ全体のソースチェック）。
 
-この調査段階の変更は、本番配布対象の `main` ではなく、調査用ブランチ `investigate/kviewer-button-scope` で管理します。候補版のバージョン表記は1.0.1です。`main` への反映・配布版更新は行っておらず、本番配布URLの更新済みを意味しません。
+1.0.1は調査用ブランチ `investigate/kviewer-button-scope` で開発後、`main`（`08593d1`）へ反映しました。2026-10-12にデプロイ・CI・配布作成の成功、および通常配布URLのバージョン1.0.1とソースの完全一致を確認しました。以下の第2段階候補版は、この配布済み1.0.1とは別です。
+
+## 第2段階：1.1.0候補版
+
+開発ブランチは `feature/kviewer-stage-two` です。追加対象は次の3関数のみです。各アプリのカスタマイズは変更していません。通常配布URLは更新せず、候補版の実画面確認後に別途配布判断を行います。既存5関数と1.0.1の連携ボタン取得修正は維持します。
+
+### `installCopyPrintRestrictions()`
+
+- 引数なし。必須登録が完了した場合と同じページで登録済みの場合は `true`。DOM・必須API欠落や登録失敗は警告またはエラーを報告して `false`。
+- ページ全体の `contextmenu`、`selectstart` の既定動作を抑止します。`keydown` の Ctrl/Cmd＋P（大文字Pも対象）と PrintScreen は既定動作と伝播を抑止します。それ以外のキーは変更しません。
+- `beforeprint` はbodyを `display: none !important` にし、`afterprint` は元のインラインdisplayと優先度を復元します。重複する印刷開始通知では元の保存状態を上書きしません。元のbodyを保持して復元するため、印刷中にbodyが差し替わっても別のbodyを復元対象にはしません。
+- 利用可能な `matchMedia('print')` の `change` 通知に対応し、新APIの `addEventListener/removeEventListener`、旧APIの `addListener/removeListener` の順に使用します。任意APIがない場合は警告して必須登録を継続します。利用できるAPIの呼び出しが例外を投げた場合は登録失敗としてロールバックします。
+- 印刷用CSS `@media print { body { display: none !important; } }` を登録します。重複呼び出しではリスナーとCSSを追加しません。
+- 途中失敗時は、この呼び出しが追加したリスナー・styleのみを解除します。解除自体が失敗した項目は保持し、次回呼び出しで後始末を再試行します。未解除項目が残る間は新しい登録を追加せず `false` を返します。登録完了フラグは全登録成功後に設定します。
+- 印刷コールバック内の失敗はコンソールへ報告します。復元失敗時は保存状態を保持し、後続の終了通知で再試行できます。初回の `true` は将来のイベントコールバックの成功を保証しません。
+- 元から存在する無関係なリスナーやCSSは変更しません。公開解除APIや設定オプションは追加していません。
+
+```js
+kviewer.events.on('records.show', () => {
+	installCopyPrintRestrictions();
+});
+kviewer.events.on('record.show', () => {
+	installCopyPrintRestrictions();
+});
+```
+
+**完全なコピー・保存・印刷・スクリーンショット防止機能ではありません。** PrintScreenキーイベントの抑止はOSの画面キャプチャを禁止しません。Ctrl/Cmd＋C自体を抑止する実装でもありません。アクセス権限やブラウザーへ渡された値の秘匿とは別であり、選択・コンテキストメニュー・印刷の操作性とアクセシビリティに影響します。ページ全体に必要なビューだけが明示的に呼び出してください。
+
+### `redirectToRecordDetail(recordCode)`
+
+- `recordCode` は `__kviewer_record_code__` の文字列。非文字列・空文字・空白のみは警告して `false`。正常なコードはtrimせず `encodeURIComponent` でエンコードします。
+- 現在の `window.location.origin` と `pathname` の末尾スラッシュを除いたパスから、`/detail/{encodedCode}` を生成して `location.href` へ設定します。クエリ・ハッシュを引き継ぎません。
+- 設定できれば `true`、location API欠落・生成例外・設定例外は報告して `false`。`true` は遷移指示の設定を意味し、遷移先の読み込み成功ではありません。
+- レコードコードを任意URLとして扱いません。新マイページビューのURL対応は未確認です。呼び出し元は既存リストビューの一覧パスを前提とし、詳細画面から一覧パスを推測して作り直す処理は追加していません。詳細画面等から呼び出す場合は対応パスの確認が先に必要です。
+
+```js
+kviewer.events.on('records.show', (context) => {
+	const records = context.records;
+	if (Array.isArray(records) && records.length === 1) {
+		redirectToRecordDetail(records[0].__kviewer_record_code__);
+	}
+});
+```
+
+1件かどうかの業務判断は呼び出し側です。ここでの1件は取得した配列が1件という意味であり、全検索結果が1件とは限りません。
+
+### `setStaticContentShown(context, staticCode, shown)`
+
+- `context` は `getMainContentElement()` を持つオブジェクト、`staticCode` は空白のみではない文字列、`shown` は真偽値。正常なコードはtrimせず完全一致で照合します。
+- メインコンテンツ自身と子孫の `data-static-code` 属性値を直接比較して、同じコードの全要素を操作します。コードをセレクターに埋め込まないため、引用符・バックスラッシュ等もそのまま扱えます。範囲外への検索・documentへのフォールバックはしません。
+- 非表示時は元のインラインdisplayと優先度を保存して `display: none !important` にし、再表示時は保存した状態へ復元します。反復非表示で保存内容を上書きしません。`hidden` は変更しません。
+- この関数が隠していない要素への `shown: true` はdisplayを変更しません。元からインラインやCSSで非表示だった要素を強制表示しません。
+- 全対象に適用できれば `true`。不正引数・対象なし・取得失敗は報告して `false`。一部の適用失敗は報告して `false` を返し、他対象への適用は継続します。成功した要素はロールバックせず、保存状態を保持して再試行・復元できます。
+
+```js
+kviewer.events.on('view.show', (context) => {
+	// shown はこのビュー側で期間などの業務条件から決めた真偽値。
+	setStaticContentShown(context, 'static-field-content_Charge', shown);
+});
+```
+
+既存の表示ヘルパーはdisplay文字列のみを保存しているため、その挙動は変更せず、優先度も保持する新しい内部ヘルパーを静的コンテンツと印刷用に共用しました。
+
+### 既存処理との差異と実画面検証
+
+重複処理の本体はこのリポジトリ内にはなく、依頼文に列挙された動作・現行URL式を基に共通化しました。73行の原本との行単位の同一性を検証したわけではありません。主な差異は登録失敗時の解除・再試行、印刷開始重複時の保存保護、表示優先度の復元、URLの末尾スラッシュ除去、入力検証・失敗報告です。
+
+新3関数の実画面確認は未実施です。順に207で操作抑止と印刷前後の表示、154等の既存一覧で1件時の詳細遷移、353ダッシュボードで期間等の条件が異なる画面状態の静的コンテンツ表示を確認してください。OSの制約やCSP、印刷UIの実挙動は自動テストでは保証しません。反復呼び出し・復元の耐久性は自動テストで確認し、レコード値の動的変更を実画面テストの前提にはしません。候補版アップロード時は通常版との二重読み込みを避け、通常配布への反映は別途依頼してください。
+
+### 第2段階の自動検証・取得先
+
+- `npm test` — 成功。新しい `test/test-kviewer-stage-two.js` と既存の全テストを実行しました。既存5関数のテスト、226のメニュー配置、別コンテナ分離、曖昧な対応の拒否も含みます。
+- 新3関数のテストでは、初回・反復登録、キーの既定動作と伝播、印刷通知重複、display・優先度の復元、matchMedia新旧APIと任意API欠落、リスナー・CSS・mediaの登録失敗と再試行、解除失敗時の再試行抑制、コールバック内の失敗報告を確認しました。
+- 静的コンテンツはルート・子孫・複数対象・範囲外・特殊文字・初期非表示・通常およびimportantの復元・一部適用失敗を確認しました。遷移は特殊文字・末尾スラッシュ・クエリとハッシュ除去・型検証・設定例外・外部URL形コードを同じオリジンのパスとして扱うことを確認しました。
+- `npx prettier --check "src/**/*.{js,css,html}" test/test-kviewer-stage-two.js` — 成功。
+- `npm run lint` — 成功（全ソースのESLint）。
+- `for file in src/*.js test/test-*.js; do node --check "$file" || exit 1; done` — 成功。
+- `git diff --check` — 成功。
+
+候補版は[開発ブランチのソース](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/blob/feature/kviewer-stage-two/src/kviewer-custom-lib.js)からRawを取得してください。2026-10-12に通常配布URLを取得し、引き続き1.0.1であることを確認しました。1.1.0を通常配布した状態ではありません。
