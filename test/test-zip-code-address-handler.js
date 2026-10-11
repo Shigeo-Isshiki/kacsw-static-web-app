@@ -719,12 +719,21 @@ function setup(extra = {}, mobile = false) {
 		for (const name of [
 			'registerZipCodeAddressHandler',
 			'getAddressByZipCode',
-			'initZipCodeAddressUtilsRuntime',
-			'resetZipCodeAddressUtilsRuntime',
+			'formatZipCode',
+			'normalizeZipCode',
+			'checkZipCodeExists',
+			'getCityByZipCode',
+			'getPrefectureByZipCode',
+			'hasPrefectureName',
 		])
 			assert.strictEqual(typeof browser.window[name], 'function');
 		const exports = require('../src/zip-code-address-utils');
-		for (const name of ['kintoneZipSetSpaceFieldButton', 'kintoneZipSpaceFieldText']) {
+		for (const name of [
+			'kintoneZipSetSpaceFieldButton',
+			'kintoneZipSpaceFieldText',
+			'initZipCodeAddressUtilsRuntime',
+			'resetZipCodeAddressUtilsRuntime',
+		]) {
 			assert.strictEqual(Object.prototype.hasOwnProperty.call(browser.window, name), false);
 			assert.strictEqual(Object.prototype.hasOwnProperty.call(exports, name), false);
 			assert.strictEqual(vm.runInContext(`typeof ${name}`, browser), 'undefined');

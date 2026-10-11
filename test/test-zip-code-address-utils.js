@@ -207,13 +207,6 @@ const makeFetchStub = (status, jsonBody) => {
 		});
 		console.log('PASS: formatZipCode invalid input');
 
-		assert.strictEqual(zc.initZipCodeAddressUtilsRuntime({ mode: 'mobile' }), true);
-		assert.strictEqual(zc.initZipCodeAddressUtilsRuntime({ isMobilePage: false }), true);
-		assert.strictEqual(zc.initZipCodeAddressUtilsRuntime({ mode: 'invalid' }), false);
-		assert.strictEqual(zc.initZipCodeAddressUtilsRuntime(), false);
-		assert.strictEqual(zc.resetZipCodeAddressUtilsRuntime(), undefined);
-		console.log('PASS: compatibility runtime APIs remain callable');
-
 		console.log('ALL ZIP-CODE-ADDRESS-UTILS TESTS INVOKED');
 	} finally {
 		// restore

@@ -6,23 +6,41 @@
 
 ## 目次
 
-- 概要
-- 公開 API サマリ
-- 各関数の引数・戻り値詳細（戻り値の形を必ず記載）
-  - [`checkZipCodeExists(zipCode, callback)`](#checkZipCodeExists)
-  - [`formatZipCode(zipCode, callback)`](#formatZipCode)
-  - [`getAddressByZipCode(zipCode, callback)`](#getAddressByZipCode)
-  - [`getCityByZipCode(zipCode, callback)`](#getCityByZipCode)
-  - [`getPrefectureByZipCode(zipCode, callback)`](#getPrefectureByZipCode)
-  - [`hasPrefectureName(address)`](#hasPrefectureName)
-  - [`normalizeZipCode(zipCode, callback)`](#normalizeZipCode)
-  - [`registerZipCodeAddressHandler(options)`](#registerZipCodeAddressHandler)
-  - [`initZipCodeAddressUtilsRuntime(options)`](#initZipCodeAddressUtilsRuntime)
-  - [`resetZipCodeAddressUtilsRuntime()`](#resetZipCodeAddressUtilsRuntime)
-- 実例
-- 注意事項 / エッジケース
+- [概要・通信方式](#overview)
+- [公開 API サマリ（用途別）](#public-api)
+- [各関数の引数・戻り値詳細](#api-details)
+- [実例](#examples)
+- [注意事項 / エッジケース](#notes)
+- [参照](#references)
+
+### kintone の住所設定・表示制御
+
+- [`registerZipCodeAddressHandler(options)`](#registerZipCodeAddressHandler)
+  - [設定オブジェクト](#handler-options)
+  - [反映ルール・結果検証・非同期制御](#handler-application)
+  - [戻り値・Promise・保存判断・後続処理](#handler-promises)
+  - [登録例](#handler-example)
+  - [案内文・旧 API の削除](#removed-apis)
+
+### 郵便番号の存在確認・整形・正規化
+
+- [`checkZipCodeExists(zipCode, callback)`](#checkZipCodeExists)
+- [`formatZipCode(zipCode, callback)`](#formatZipCode)
+- [`normalizeZipCode(zipCode, callback)`](#normalizeZipCode)
+
+### 住所・市区町村・都道府県の検索
+
+- [`getAddressByZipCode(zipCode, callback)`](#getAddressByZipCode)
+- [`getCityByZipCode(zipCode, callback)`](#getCityByZipCode)
+- [`getPrefectureByZipCode(zipCode, callback)`](#getPrefectureByZipCode)
+
+### 住所文字列の検証
+
+- [`hasPrefectureName(address)`](#hasPrefectureName)
 
 ---
+
+<a id="overview"></a>
 
 ## 概要
 
@@ -45,22 +63,35 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 
 ---
 
+<a id="public-api"></a>
+
 ## 公開 API サマリ
 
-- `checkZipCodeExists(zipCode, callback)` — 存在確認を行い `callback(exists:boolean)` を呼び出す。
-- `formatZipCode(zipCode, callback)` — 表示用の郵便番号（ハイフン付きなど）を `callback(result)` で返す。`result` は成功なら `{ zipCode: string }`、失敗なら `{ error: string }`。
-- `getAddressByZipCode(zipCode, callback)` — 住所情報オブジェクトを `callback(result)` で返す。成功時は詳細フィールドを含むオブジェクトを返す（下記参照）。失敗時は `{ error: string }`。
-- `getCityByZipCode(zipCode, callback)` — 市区町村名を `callback(cityName|string|null)` で返す（見つからなければ `null`）。
-- `getPrefectureByZipCode(zipCode, callback)` — 都道府県名を `callback(prefName|string|null)` で返す（見つからなければ `null`）。
-- `hasPrefectureName(address)` — 住所が47都道府県の正式名称で始まるかを厳密に判定する。
-- `normalizeZipCode(zipCode, callback)` — 正規化済みの7文字（半角英数字）を `callback(result)` で返す。成功: `{ zipCode: string }`、失敗: `{ error: string }`。
-- `registerZipCodeAddressHandler(options)` — kintone の郵便番号変更、住所の割り当て・置換、ボタン・案内表示をまとめて登録する。新規利用・移行ではこの API を推奨。
-- `initZipCodeAddressUtilsRuntime(options)` — 既存アプリの共通初期化との互換用。モード指定の有効性を返しますが、画面判定には使用しません。
-- `resetZipCodeAddressUtilsRuntime()` — 互換用の呼び出し口。現在は何もしません。
+### kintone の住所設定・表示制御
+
+- [`registerZipCodeAddressHandler(options)`](#registerZipCodeAddressHandler) — kintone の郵便番号変更、住所の割り当て・置換、ボタン・案内表示をまとめて登録する。
 
 `registerZipCodeAddressHandler` の登録対象は `devices` で指定します。実際に使用する PC/モバイルの record API は Kintone のイベント種別から選択するため、ランタイム初期化、`KACSW_RUNTIME`、URL による画面判定は不要です。
 
+### 郵便番号の存在確認・整形・正規化
+
+- [`checkZipCodeExists(zipCode, callback)`](#checkZipCodeExists) — 存在確認を行い `callback(exists:boolean)` を呼び出す。
+- [`formatZipCode(zipCode, callback)`](#formatZipCode) — 表示用の郵便番号（ハイフン付きなど）を `callback(result)` で返す。成功: `{ zipCode: string }`、失敗: `{ error: string }`。
+- [`normalizeZipCode(zipCode, callback)`](#normalizeZipCode) — 正規化済みの7文字（半角英数字）を `callback(result)` で返す。成功: `{ zipCode: string }`、失敗: `{ error: string }`。
+
+### 住所・市区町村・都道府県の検索
+
+- [`getAddressByZipCode(zipCode, callback)`](#getAddressByZipCode) — 住所情報オブジェクトを `callback(result)` で返す。成功時は詳細フィールドを含むオブジェクト、失敗時は `{ error: string }`。
+- [`getCityByZipCode(zipCode, callback)`](#getCityByZipCode) — 市区町村名を `callback(cityName|string|null)` で返す（見つからなければ `null`）。
+- [`getPrefectureByZipCode(zipCode, callback)`](#getPrefectureByZipCode) — 都道府県名を `callback(prefName|string|null)` で返す（見つからなければ `null`）。
+
+### 住所文字列の検証
+
+- [`hasPrefectureName(address)`](#hasPrefectureName) — 住所が47都道府県の正式名称で始まるかを厳密に判定する。
+
 ---
+
+<a id="api-details"></a>
 
 ## 各関数の引数・戻り値詳細
 
@@ -236,6 +267,8 @@ hasPrefectureName(' 東京都千代田区千代田1-1'); // false
 
 アプリ初期化時に一度登録します。住所の地区判定など、業務固有処理は含めません。既存の `getAddressByZipCode` を検索 API として使用します。
 
+<a id="handler-options"></a>
+
 #### 設定オブジェクト
 
 | キー | 型・既定値 | 契約 |
@@ -260,6 +293,8 @@ hasPrefectureName(' 東京都千代田区千代田1-1'); // false
 
 `visible` のシグネチャは `({ record, source, busy }) => boolean`。描画時の `source` は `'display'`、ボタン操作の再検証時は `'button'` です。既定の表示条件は郵便番号が空でないことです。`canApply` の `source` は `'change'` または `'button'`。条件関数は同期・副作用なしとしてください。`busy` は処理中の表示情報であり、条件に `!busy` を使うとボタン操作自体が不許可になるため、二重押下対策には利用しないでください（ライブラリで disabled を制御します）。
 
+<a id="handler-application"></a>
+
 #### 反映ルール
 
 | 操作 | 郵便番号 | 住所 |
@@ -278,6 +313,8 @@ hasPrefectureName(' 東京都千代田区千代田1-1'); // false
 `other_name`、`biz_name`、`block_name`、`business_name` は欠落・null を許容します。存在する場合は文字列が必要です。任意結果がない場合、通常の補完では既存の関連欄を保持し、置換ではクリアしたままになります。必須項目不正や全角変換失敗では、郵便番号を含むレコード値を変更しません（エラー情報だけを設定します）。
 
 非同期結果は、開始時の**入力値そのもの**と現在の郵便番号が一致する場合だけ適用します。別の変更・検索、次の作成編集画面表示、`dispose()` でも古い処理を無効化するため、値が A → B → A と戻っても古い A の結果は適用されません。結果到着時に許可条件とメイン住所の空欄状態を再確認します。通常検索の待機中に住所が入力された場合は、郵便番号だけ整形します。通信自体はキャンセルしません。
+
+<a id="handler-promises"></a>
 
 #### 戻り値と Promise
 
@@ -305,6 +342,8 @@ Kintone のフィールド変更イベントでは Promise を返せず、ハン
 成功した対象のエラーは `null` にします。変更していない住所欄や他のフィールドのエラーは消しません。エラーマップは既存の全角変換ハンドラと同様に `{ フィールドコード: エラー文字列 | null }` 形式です。複数の処理が同じエントリを所有する場合の競合管理はアプリ側で行ってください。
 
 `afterApply` 開始時点で住所はすでに反映済みです。後続処理の失敗はメイン住所に記録し、住所反映は巻き戻しません。渡す `record` はスナップショットで、変更しても自動保存しません。非同期の業務処理がレコードを更新する場合は、`isCurrent()` で確認し、最新レコードを取り直して必要な業務フィールドだけ更新してください。
+
+<a id="handler-example"></a>
 
 #### 登録例
 
@@ -350,11 +389,15 @@ const addressHandler = registerZipCodeAddressHandler({
 // const outcome = await addressHandler.apply();
 ```
 
+<a id="removed-apis"></a>
+
 #### 案内文と旧 API の削除
 
 案内文は `textContent` と `white-space: pre-line` で描画し、既定の2行の文言・改行表示を維持します。`text` に HTML が含まれても実行せず文字列として表示します。任意 HTML 文字列の指定には対応しません。リッチな案内が必要なら、アプリ側で信頼済み DOM を別途構築してください。表示制御は生成した要素だけを削除・追加し、共有スペースの親要素を隠しません。ボタンは `kintoneplugin-button-normal` クラスを維持します。外観を合わせるには [51-modern-default.css](https://js.kacsw.or.jp/51-modern-default.css) をアプリに適用してください。
 
 2026年10月11日、利用元アプリでの参照削除と `registerZipCodeAddressHandler` への統合完了の報告を受け、旧 `kintoneZipSetSpaceFieldButton` と `kintoneZipSpaceFieldText` を削除しました。本体、window/CommonJS 公開、一括公開リスト、旧関数専用のスペース・画面判定ヘルパーとテストを削除しています。旧名への呼び出しは利用できません。`getAddressByZipCode` は検索 API として引き続き利用できます。
+
+同日、利用元で未使用と確認された `initZipCodeAddressUtilsRuntime` と `resetZipCodeAddressUtilsRuntime` も削除しました。郵便番号ライブラリのランタイム初期化・リセットは不要です。登録対象は `devices`、PC/モバイルの record API はイベント種別で決まります。他のライブラリのランタイム初期化関数には変更ありません。
 
 古いカスタマイズを再利用する場合は、住所対応表・クリア対象・エラーマップ・ボタンと案内の表示条件を登録設定に移し、地区判定等は `afterApply` で実施してください。旧関数を呼ぶコードや旧検索変更ハンドラを残さず、上記の登録例を使用します。このリポジトリには業務アプリのコードは含まれないため、公開後の確認は各アプリの作成・編集、PC/モバイル画面で行ってください。
 
@@ -367,35 +410,7 @@ node -r ./test/setup-tests.js test/test-zip-code-address-utils.js
 
 ---
 
-<a id="initZipCodeAddressUtilsRuntime"></a>
-
-### `initZipCodeAddressUtilsRuntime(options)`
-
-- 引数:
-  - `options` (object)
-  - `options.isMobilePage` (boolean, optional)
-  - `options.mode` (`'mobile' | 'pc'`, optional)
-  - `options.version` (number, optional)
-
-- 動作:
-  - 共通初期化コードとの互換用に残しています。モード指定を検証するだけで、設定の保存や画面判定は行いません。`version` は互換用に受け付けますが使用しません。
-
-- 戻り値:
-  - `boolean`（有効な判定を適用できた場合 `true`）
-
----
-
-<a id="resetZipCodeAddressUtilsRuntime"></a>
-
-### `resetZipCodeAddressUtilsRuntime()`
-
-- 動作:
-  - 共通初期化コードとの互換用に残しています。現在はランタイムキャッシュがないため何もしません。
-
-- 戻り値:
-  - `void`
-
----
+<a id="examples"></a>
 
 ## 実例
 
@@ -439,14 +454,18 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 
 ---
 
+<a id="notes"></a>
+
 ## 注意事項 / エッジケース
 
 - 入力はまず全角→半角・記号除去・大文字化されます。正規化後は必ず `^[0-9A-Z]{7}$` の形式で API に問い合わせられます。
 - API レスポンスが複数件返ってきた場合はエラー（複数見つかりました）扱いになります。実装は単一ヒットを期待しています。
-- `registerZipCodeAddressHandler` は kintone のイベント・record API と DOM に依存します。テストではこれらのスタブを用意し、PC・モバイルのイベント種別で対応する record API を利用することを確認してください。互換用ランタイム初期化はこの判定に影響しません。
+- `registerZipCodeAddressHandler` は kintone のイベント・record API と DOM に依存します。テストではこれらのスタブを用意し、PC・モバイルのイベント種別で対応する record API を利用することを確認してください。ランタイム初期化は不要です。
 - ネットワークや API の異常 JSON に対しては安全に `error` オブジェクトを返すよう実装されています。
 
 ---
+
+<a id="references"></a>
 
 ## 参照
 

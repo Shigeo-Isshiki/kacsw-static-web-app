@@ -3,7 +3,7 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
-/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, registerZipCodeAddressHandler, normalizeZipCode, initZipCodeAddressUtilsRuntime, resetZipCodeAddressUtilsRuntime */
+/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, registerZipCodeAddressHandler, normalizeZipCode */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // 郵便番号APIベースURL
@@ -63,23 +63,6 @@ const _ZC_SYMBOLS_REGEX = /[\-－‐‑–—−ー― 　]/g;
 
 // 全角英数字を検出するための正規表現
 const _ZC_ZENKAKU_ALPHA_NUM_REG = /[Ａ-Ｚａ-ｚ０-９]/g;
-
-const _zc_normalizeRuntimeMode = (options) => {
-	if (!options || typeof options !== 'object') return null;
-	if (typeof options.mode === 'string') {
-		const mode = options.mode.toLowerCase();
-		if (mode === 'mobile' || mode === 'pc') return mode;
-	}
-	if (typeof options.isMobilePage === 'boolean') {
-		return options.isMobilePage ? 'mobile' : 'pc';
-	}
-	return null;
-};
-
-// 旧アプリの共通初期化との互換用。新ハンドラーのデバイス選択には影響しない。
-const initZipCodeAddressUtilsRuntime = (options = {}) => _zc_normalizeRuntimeMode(options) !== null;
-
-const resetZipCodeAddressUtilsRuntime = () => {};
 
 //　ライブラリ内の共通関数定義部
 /**
@@ -907,8 +890,6 @@ if (typeof window !== 'undefined') {
 	window.hasPrefectureName = hasPrefectureName;
 	window.registerZipCodeAddressHandler = registerZipCodeAddressHandler;
 	window.normalizeZipCode = normalizeZipCode;
-	window.initZipCodeAddressUtilsRuntime = initZipCodeAddressUtilsRuntime;
-	window.resetZipCodeAddressUtilsRuntime = resetZipCodeAddressUtilsRuntime;
 }
 
 // CommonJS export for Node/test environments
@@ -923,8 +904,6 @@ try {
 			hasPrefectureName,
 			registerZipCodeAddressHandler,
 			normalizeZipCode,
-			initZipCodeAddressUtilsRuntime,
-			resetZipCodeAddressUtilsRuntime,
 		};
 	}
 } catch (e) {}
