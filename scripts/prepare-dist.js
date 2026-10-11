@@ -9,6 +9,7 @@ const DIST = path.join(ROOT, 'dist');
 // files to copy from src -> dist (keep in sync with previous list)
 const FILES = [
 	'kintone-custom-lib.js',
+	'kviewer-custom-lib.js',
 	'zip-code-address-utils.js',
 	'phone-utils.js',
 	'date-utils.js',

@@ -22,6 +22,7 @@ kintone 向けおよび汎用の小さな JavaScript ユーティリティ集で
 - [CSV パーサー — docs/csv-parser.md](./docs/csv-parser.md) — `src/csv-parser.js`
 - [日付ユーティリティ — docs/date-utils.md](./docs/date-utils.md) — `src/date-utils.js`
 - [kintone カスタムライブラリ — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md) — `src/kintone-custom-lib.js`
+- [kViewer 専用共通ライブラリ — docs/kviewer-custom-lib.md](./docs/kviewer-custom-lib.md) — `src/kviewer-custom-lib.js`
 - [国民の祝日ユーティリティ — docs/national-holidays.md](./docs/national-holidays.md) — `src/national-holidays.js`
 - [電話番号ユーティリティ — docs/phone-utils.md](./docs/phone-utils.md) — `src/phone-utils.js`
 - [配送処理ユーティリティ — docs/shipping-processing.md](./docs/shipping-processing.md) — `src/shipping-processing.js`
