@@ -207,95 +207,12 @@ const makeFetchStub = (status, jsonBody) => {
 		});
 		console.log('PASS: formatZipCode invalid input');
 
-		// 11) kintone DOM helpers: basic invocation (we'll stub kintone.app.record.getSpaceElement)
-		// prepare a fake DOM element and kintone
-		global.document = global.document || {
-			createElement: () => ({
-				id: null,
-				textContent: null,
-				addEventListener: () => {},
-				appendChild: () => {},
-				remove: () => {},
-			}),
-			getElementById: () => null,
-		};
-		global.kintone = global.kintone || {
-			app: {
-				record: {
-					getSpaceElement: () => ({ parentNode: { style: {} }, appendChild: () => {} }),
-				},
-			},
-		};
-		// call kintoneZipSetSpaceFieldButton with null label to hide
-		zc.kintoneZipSetSpaceFieldButton('S', 'btn-id', undefined, '1234567');
-		zc.kintoneZipSpaceFieldText('S', 'txt-id', true);
-		console.log('PASS: kintone DOM helper basic calls');
-
-		// 12) モバイル画面パスでは mobile.app.record.getSpaceElement を利用する
-		const originalLocation = global.location;
-		const mobileSpaceElement = {
-			parentNode: { style: { display: 'none' } },
-			appendChild: () => {},
-		};
-		global.location = { pathname: '/k/m/123/' };
-		global.kintone = {
-			app: {
-				record: {
-					getSpaceElement: () => null,
-				},
-			},
-			mobile: {
-				app: {
-					record: {
-						getSpaceElement: (code) => {
-							if (code === 'S-mobile') return mobileSpaceElement;
-							return null;
-						},
-					},
-				},
-			},
-		};
-
-		zc.kintoneZipSetSpaceFieldButton('S-mobile', 'btn-mobile', undefined, '1234567');
-		zc.kintoneZipSpaceFieldText('S-mobile', 'txt-mobile', true);
-		assert.strictEqual(mobileSpaceElement.parentNode.style.display, '');
-		global.location = originalLocation;
-		console.log('PASS: kintone ZIP helpers support mobile getSpaceElement');
-
-		// 13) /k/m/ 以外でも mobile 側しか使えない場合に fallback できる
-		const originalLocationFallback = global.location;
-		const fallbackSpaceElement = {
-			parentNode: { style: { display: 'none' } },
-			appendChild: () => {},
-		};
-		global.location = { pathname: '/k/123/' };
-		global.kintone = {
-			app: {
-				record: {
-					// PC 側には getSpaceElement が無いケースを再現
-				},
-			},
-			mobile: {
-				app: {
-					record: {
-						getSpaceElement: (code) => {
-							if (code === 'S-mobile-fallback') return fallbackSpaceElement;
-							return null;
-						},
-					},
-				},
-			},
-		};
-		zc.kintoneZipSetSpaceFieldButton(
-			'S-mobile-fallback',
-			'btn-mobile-fallback',
-			undefined,
-			'1234567'
-		);
-		zc.kintoneZipSpaceFieldText('S-mobile-fallback', 'txt-mobile-fallback', true);
-		assert.strictEqual(fallbackSpaceElement.parentNode.style.display, '');
-		global.location = originalLocationFallback;
-		console.log('PASS: kintone ZIP helpers support mobile fallback without /k/m/ path');
+		assert.strictEqual(zc.initZipCodeAddressUtilsRuntime({ mode: 'mobile' }), true);
+		assert.strictEqual(zc.initZipCodeAddressUtilsRuntime({ isMobilePage: false }), true);
+		assert.strictEqual(zc.initZipCodeAddressUtilsRuntime({ mode: 'invalid' }), false);
+		assert.strictEqual(zc.initZipCodeAddressUtilsRuntime(), false);
+		assert.strictEqual(zc.resetZipCodeAddressUtilsRuntime(), undefined);
+		console.log('PASS: compatibility runtime APIs remain callable');
 
 		console.log('ALL ZIP-CODE-ADDRESS-UTILS TESTS INVOKED');
 	} finally {

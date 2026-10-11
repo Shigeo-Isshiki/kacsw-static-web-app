@@ -69,8 +69,6 @@
 		'getCityByZipCode',
 		'getPrefectureByZipCode',
 		'hasPrefectureName',
-		'kintoneZipSetSpaceFieldButton',
-		'kintoneZipSpaceFieldText',
 		'registerZipCodeAddressHandler',
 		'normalizeZipCode',
 		// national-holidays.js

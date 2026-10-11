@@ -719,10 +719,17 @@ function setup(extra = {}, mobile = false) {
 		for (const name of [
 			'registerZipCodeAddressHandler',
 			'getAddressByZipCode',
-			'kintoneZipSetSpaceFieldButton',
-			'kintoneZipSpaceFieldText',
+			'initZipCodeAddressUtilsRuntime',
+			'resetZipCodeAddressUtilsRuntime',
 		])
 			assert.strictEqual(typeof browser.window[name], 'function');
+		const exports = require('../src/zip-code-address-utils');
+		for (const name of ['kintoneZipSetSpaceFieldButton', 'kintoneZipSpaceFieldText']) {
+			assert.strictEqual(Object.prototype.hasOwnProperty.call(browser.window, name), false);
+			assert.strictEqual(Object.prototype.hasOwnProperty.call(exports, name), false);
+			assert.strictEqual(vm.runInContext(`typeof ${name}`, browser), 'undefined');
+		}
+		console.log('PASS: removed helpers are absent from browser and CommonJS exports');
 		assert.ok(logged.length > 0);
 		console.log('PASS: legacy search API is preserved and failures are logged');
 	} finally {

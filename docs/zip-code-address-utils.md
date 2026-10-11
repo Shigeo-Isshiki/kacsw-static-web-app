@@ -17,8 +17,6 @@
   - [`hasPrefectureName(address)`](#hasPrefectureName)
   - [`normalizeZipCode(zipCode, callback)`](#normalizeZipCode)
   - [`registerZipCodeAddressHandler(options)`](#registerZipCodeAddressHandler)
-  - [`kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)`](#kintoneZipSetSpaceFieldButton)
-  - [`kintoneZipSpaceFieldText(spaceField, id, display)`](#kintoneZipSpaceFieldText)
   - [`initZipCodeAddressUtilsRuntime(options)`](#initZipCodeAddressUtilsRuntime)
   - [`resetZipCodeAddressUtilsRuntime()`](#resetZipCodeAddressUtilsRuntime)
 - 実例
@@ -33,7 +31,7 @@
 - 入力（全角数字・英字、ハイフン、空白を含む）を正規化して API に問い合わせる
 - 郵便番号／デジタルアドレスの存在確認・表示用フォーマット作成
 - API 応答を整形して住所や都道府県・市区町村だけを取り出す
-- kintone のスペースフィールド向けに DOM 要素を追加するユーティリティ
+- kintone の住所自動補完・明示的な置換・ボタンと案内表示を登録するユーティリティ
 
 主な前処理:
 
@@ -57,22 +55,10 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 - `hasPrefectureName(address)` — 住所が47都道府県の正式名称で始まるかを厳密に判定する。
 - `normalizeZipCode(zipCode, callback)` — 正規化済みの7文字（半角英数字）を `callback(result)` で返す。成功: `{ zipCode: string }`、失敗: `{ error: string }`。
 - `registerZipCodeAddressHandler(options)` — kintone の郵便番号変更、住所の割り当て・置換、ボタン・案内表示をまとめて登録する。新規利用・移行ではこの API を推奨。
-- `kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)` — kintone のスペースフィールドにボタンを追加（または削除）します。
-- `kintoneZipSpaceFieldText(spaceField, id, display)` — 説明テキストをスペースフィールドに追加/削除します。
-- `initZipCodeAddressUtilsRuntime(options)` — PC/モバイル判定を明示設定して内部キャッシュに保存します。
-- `resetZipCodeAddressUtilsRuntime()` — 内部キャッシュをクリアします。
+- `initZipCodeAddressUtilsRuntime(options)` — 既存アプリの共通初期化との互換用。モード指定の有効性を返しますが、画面判定には使用しません。
+- `resetZipCodeAddressUtilsRuntime()` — 互換用の呼び出し口。現在は何もしません。
 
-ランタイム初期化（推奨）:
-
-```js
-globalThis.KACSW_RUNTIME = {
-	isMobilePage: true,
-	version: Date.now(),
-};
-initZipCodeAddressUtilsRuntime(globalThis.KACSW_RUNTIME);
-```
-
-判定優先順位は `initZipCodeAddressUtilsRuntime` の設定、`KACSW_RUNTIME`、未設定時の自動判定（`location.pathname`）です。
+`registerZipCodeAddressHandler` の登録対象は `devices` で指定します。実際に使用する PC/モバイルの record API は Kintone のイベント種別から選択するため、ランタイム初期化、`KACSW_RUNTIME`、URL による画面判定は不要です。
 
 ---
 
@@ -364,17 +350,13 @@ const addressHandler = registerZipCodeAddressHandler({
 // const outcome = await addressHandler.apply();
 ```
 
-#### 案内文と旧 API からの移行・削除手順
+#### 案内文と旧 API の削除
 
-旧 `kintoneZipSpaceFieldText` の既定 HTML は静的な `<div>` / `<br>` です。新 API は同じ2行の文言を `textContent` と `white-space: pre-line` で描画し、改行表示を維持します。`text` に HTML が含まれても実行せず文字列として表示します。任意 HTML 文字列の指定には対応しません。リッチな案内が必要なら、アプリ側で信頼済み DOM を別途構築してください。表示制御は生成した要素だけを削除・追加し、共有スペースの親要素を隠しません。旧クラス名 `kintoneplugin-button-normal` はボタンに維持します。
+案内文は `textContent` と `white-space: pre-line` で描画し、既定の2行の文言・改行表示を維持します。`text` に HTML が含まれても実行せず文字列として表示します。任意 HTML 文字列の指定には対応しません。リッチな案内が必要なら、アプリ側で信頼済み DOM を別途構築してください。表示制御は生成した要素だけを削除・追加し、共有スペースの親要素を隠しません。ボタンは `kintoneplugin-button-normal` クラスを維持します。外観を合わせるには [51-modern-default.css](https://js.kacsw.or.jp/51-modern-default.css) をアプリに適用してください。
 
-このリポジトリには旧2関数を呼ぶ業務アプリのコードは含まれていません。既存のヘルパー実装・テストを確認して互換性を維持していますが、アプリ側による追加の `innerHTML` 加工、CSS、スペース親の非表示制御については移行時に実機で確認してください。
+2026年10月11日、利用元アプリでの参照削除と `registerZipCodeAddressHandler` への統合完了の報告を受け、旧 `kintoneZipSetSpaceFieldButton` と `kintoneZipSpaceFieldText` を削除しました。本体、window/CommonJS 公開、一括公開リスト、旧関数専用のスペース・画面判定ヘルパーとテストを削除しています。旧名への呼び出しは利用できません。`getAddressByZipCode` は検索 API として引き続き利用できます。
 
-1. 今回は旧2関数と `getAddressByZipCode` の名前・引数・公開先を残す。旧利用アプリは継続動作する。検索の不正必須項目・通信失敗については、値を返さず既存の `{ error }` 契約で明示する。住所検索内の整形用再問い合わせは廃止し、検証済みの結果からローカルで整形する。
-2. アプリごとに住所対応表・クリア対象・エラーマップ・表示条件を新登録設定へ移す。地区判定等は `afterApply` に移す。新旧が同じ郵便番号／スペースを同時に処理しないよう、移行したアプリでは旧検索変更ハンドラと旧2関数の呼び出しをまとめて外す。
-3. 作成・編集、PC/モバイル、既存住所・空欄、デジタルアドレス、検索エラー・保存制御、案内・ボタンの見た目を利用アプリごとに検証する。
-4. 利用アプリ一覧を管理し、旧2関数の参照がゼロであることを確認するまでは削除しない。外部アプリの移行完了はこのリポジトリ内の検索だけでは証明できない。
-5. 全アプリ移行後の別リリースで旧2関数本体、window/CommonJS 公開、`all-window-exports.js` の登録、旧関数専用テスト・文書を削除する。`getAddressByZipCode` は残す。配布用ビルドと回帰テストを実行して削除版を公開する。
+古いカスタマイズを再利用する場合は、住所対応表・クリア対象・エラーマップ・ボタンと案内の表示条件を登録設定に移し、地区判定等は `afterApply` で実施してください。旧関数を呼ぶコードや旧検索変更ハンドラを残さず、上記の登録例を使用します。このリポジトリには業務アプリのコードは含まれないため、公開後の確認は各アプリの作成・編集、PC/モバイル画面で行ってください。
 
 検証コマンド:
 
@@ -382,46 +364,6 @@ const addressHandler = registerZipCodeAddressHandler({
 node -r ./test/setup-tests.js test/test-zip-code-address-handler.js
 node -r ./test/setup-tests.js test/test-zip-code-address-utils.js
 ```
-
----
-
-<a id="kintoneZipSetSpaceFieldButton"></a>
-
-### `kintoneZipSetSpaceFieldButton(spaceField, id, label, zipCode, callback)`
-
-- 引数:
-  - `spaceField` (string) — kintone のスペースフィールドコード
-  - `id` (string) — 生成するボタンの `id`
-  - `label` (string | undefined | null) — ボタンラベル。`undefined` はデフォルト文言、`null`/`''` は非表示（削除）
-  - `zipCode` (string|number) — ボタン押下時に使う郵便番号/デジタルアドレス
-  - `callback` (function|undefined|null) — 取得結果を受け取るコールバック（省略可）
-
-- 動作:
-  - 指定した `spaceField` のスペース要素にボタンを追加します。`label` が `null` または空文字の場合はボタンを削除/非表示にします。
-  - スペース要素の取得と表示/非表示は内部で PC/モバイルを自動判定します（`initZipCodeAddressUtilsRuntime` または `KACSW_RUNTIME` が設定されていればその判定を優先し、未設定時は `location.pathname` ベースで推定。優先先が使えない場合はフォールバック）。
-  - ボタン押下時に `getAddressByZipCode` を呼び出し、`callback` に結果を返します。
-  - 生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。kintone のデザインと調和したボタン外観にするには、アプリに **「51-modern-default」スタイルシート**を適用してください（`https://js.kacsw.or.jp/51-modern-default.css` から利用できます）。
-
-- 戻り値:
-  - `void`（DOM に対する副作用を行います）
-
----
-
-<a id="kintoneZipSpaceFieldText"></a>
-
-### `kintoneZipSpaceFieldText(spaceField, id, display)`
-
-- 引数:
-  - `spaceField` (string)
-  - `id` (string)
-  - `display` (boolean) — `true` で表示、`false` で非表示（削除）
-
-- 動作:
-  - スペースフィールドに説明テキスト用の要素を追加または削除します。
-  - 表示切り替えは内部で PC/モバイルを自動判定します（ランタイム設定優先、未設定時は自動判定）。
-
-- 戻り値:
-  - `void`（DOM に対する副作用を行います）
 
 ---
 
@@ -436,7 +378,7 @@ node -r ./test/setup-tests.js test/test-zip-code-address-utils.js
   - `options.version` (number, optional)
 
 - 動作:
-  - PC/モバイル判定を内部キャッシュへ保存します。
+  - 共通初期化コードとの互換用に残しています。モード指定を検証するだけで、設定の保存や画面判定は行いません。`version` は互換用に受け付けますが使用しません。
 
 - 戻り値:
   - `boolean`（有効な判定を適用できた場合 `true`）
@@ -448,7 +390,7 @@ node -r ./test/setup-tests.js test/test-zip-code-address-utils.js
 ### `resetZipCodeAddressUtilsRuntime()`
 
 - 動作:
-  - 内部キャッシュされたランタイム設定をクリアします。
+  - 共通初期化コードとの互換用に残しています。現在はランタイムキャッシュがないため何もしません。
 
 - 戻り値:
   - `void`
@@ -491,16 +433,7 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 		event.error = '住所の先頭に都道府県名を入力してください。';
 	}
 
-	// スペースフィールドにボタンを追加
-	window.kintoneZipSetSpaceFieldButton(
-		'スペースフィールドコード',
-		'zip-btn',
-		undefined,
-		'1234567',
-		function (result) {
-			console.log(result);
-		}
-	);
+	// 住所設定・ボタン・案内表示は registerZipCodeAddressHandler の登録例を参照してください。
 </script>
 ```
 
@@ -510,7 +443,7 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 
 - 入力はまず全角→半角・記号除去・大文字化されます。正規化後は必ず `^[0-9A-Z]{7}$` の形式で API に問い合わせられます。
 - API レスポンスが複数件返ってきた場合はエラー（複数見つかりました）扱いになります。実装は単一ヒットを期待しています。
-- kintone DOM ヘルパは kintone のランタイム環境に依存します。テスト時には DOM と kintone の record namespace のスタブが必要です（PC / モバイル両方）。モバイル分岐の検証は `initZipCodeAddressUtilsRuntime({ isMobilePage: true })` と、未初期化の自動判定（`location.pathname`）の両方で確認してください。
+- `registerZipCodeAddressHandler` は kintone のイベント・record API と DOM に依存します。テストではこれらのスタブを用意し、PC・モバイルのイベント種別で対応する record API を利用することを確認してください。互換用ランタイム初期化はこの判定に影響しません。
 - ネットワークや API の異常 JSON に対しては安全に `error` オブジェクトを返すよう実装されています。
 
 ---

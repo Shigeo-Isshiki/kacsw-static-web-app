@@ -3,12 +3,11 @@
  * @version 1.0.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
-/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, kintoneZipSetSpaceFieldButton, kintoneZipSpaceFieldText, registerZipCodeAddressHandler, normalizeZipCode, initZipCodeAddressUtilsRuntime, resetZipCodeAddressUtilsRuntime */
+/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, registerZipCodeAddressHandler, normalizeZipCode, initZipCodeAddressUtilsRuntime, resetZipCodeAddressUtilsRuntime */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // 郵便番号APIベースURL
 const _ZC_ZIPCODE_API_BASE_URL = 'https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/digital';
-const _ZC_RUNTIME_GLOBAL_KEY = 'KACSW_RUNTIME';
 const _ZC_PREFECTURE_NAMES = [
 	'北海道',
 	'青森県',
@@ -59,9 +58,6 @@ const _ZC_PREFECTURE_NAMES = [
 	'沖縄県',
 ];
 
-let _zc_runtimeMode = null;
-let _zc_runtimeVersion = null;
-
 // 郵便番号で使用される可能性のある記号を検出するための正規表現
 const _ZC_SYMBOLS_REGEX = /[\-－‐‑–—−ー― 　]/g;
 
@@ -80,46 +76,10 @@ const _zc_normalizeRuntimeMode = (options) => {
 	return null;
 };
 
-const _zc_applyRuntimeOptions = (options) => {
-	const mode = _zc_normalizeRuntimeMode(options);
-	if (mode) {
-		_zc_runtimeMode = mode;
-	}
-	if (
-		options &&
-		typeof options === 'object' &&
-		typeof options.version === 'number' &&
-		Number.isFinite(options.version)
-	) {
-		_zc_runtimeVersion = options.version;
-	}
-	return mode !== null;
-};
+// 旧アプリの共通初期化との互換用。新ハンドラーのデバイス選択には影響しない。
+const initZipCodeAddressUtilsRuntime = (options = {}) => _zc_normalizeRuntimeMode(options) !== null;
 
-const _zc_syncRuntimeFromGlobal = () => {
-	try {
-		if (typeof window === 'undefined' || !window) return;
-		const runtime = window[_ZC_RUNTIME_GLOBAL_KEY];
-		if (!runtime || typeof runtime !== 'object') return;
-		const hasVersion = typeof runtime.version === 'number' && Number.isFinite(runtime.version);
-		if (hasVersion && _zc_runtimeVersion === runtime.version) return;
-		const applied = _zc_applyRuntimeOptions(runtime);
-		if (!applied && hasVersion) {
-			_zc_runtimeVersion = runtime.version;
-		}
-	} catch {
-		return;
-	}
-};
-
-const initZipCodeAddressUtilsRuntime = (options = {}) => {
-	return _zc_applyRuntimeOptions(options);
-};
-
-const resetZipCodeAddressUtilsRuntime = () => {
-	_zc_runtimeMode = null;
-	_zc_runtimeVersion = null;
-};
+const resetZipCodeAddressUtilsRuntime = () => {};
 
 //　ライブラリ内の共通関数定義部
 /**
@@ -185,98 +145,6 @@ const _zc_requestJson = (url) => {
 			reject(error);
 		}
 	});
-};
-
-const _zc_getAppNamespace = () => {
-	try {
-		if (typeof kintone === 'undefined' || !kintone) return null;
-		_zc_syncRuntimeFromGlobal();
-		const pcApp = kintone.app || null;
-		const mobileApp = kintone.mobile && kintone.mobile.app ? kintone.mobile.app : null;
-
-		if (_zc_runtimeMode === 'mobile' && mobileApp) return mobileApp;
-		if (_zc_runtimeMode === 'pc' && pcApp) return pcApp;
-
-		const isMobilePath =
-			typeof location !== 'undefined' && typeof location.pathname === 'string'
-				? /\/k\/m\//.test(location.pathname)
-				: false;
-
-		if (isMobilePath && mobileApp) return mobileApp;
-		if (pcApp) return pcApp;
-		if (mobileApp) return mobileApp;
-		return null;
-	} catch {
-		return null;
-	}
-};
-
-const _zc_getRecordNamespace = () => {
-	try {
-		if (typeof kintone === 'undefined' || !kintone) return null;
-		const pcRecord = kintone.app && kintone.app.record ? kintone.app.record : null;
-		const mobileRecord =
-			kintone.mobile && kintone.mobile.app && kintone.mobile.app.record
-				? kintone.mobile.app.record
-				: null;
-		const preferredApp = _zc_getAppNamespace();
-		const preferredRecord = preferredApp && preferredApp.record ? preferredApp.record : null;
-		const fallbackRecord = preferredRecord === pcRecord ? mobileRecord : pcRecord;
-		if (preferredRecord && typeof preferredRecord.getSpaceElement === 'function') {
-			return preferredRecord;
-		}
-		if (fallbackRecord && typeof fallbackRecord.getSpaceElement === 'function') {
-			return fallbackRecord;
-		}
-		if (preferredRecord) return preferredRecord;
-		if (fallbackRecord) return fallbackRecord;
-		return null;
-	} catch {
-		return null;
-	}
-};
-
-const _zc_getSpaceElement = (spaceField) => {
-	if (typeof spaceField !== 'string' || !spaceField.trim()) {
-		return null;
-	}
-	const recordNamespace = _zc_getRecordNamespace();
-	if (!recordNamespace || typeof recordNamespace.getSpaceElement !== 'function') {
-		return null;
-	}
-	return recordNamespace.getSpaceElement(spaceField);
-};
-
-const _zc_setSpaceFieldDisplayFallback = (spaceField, display) => {
-	const spaceElement = _zc_getSpaceElement(spaceField);
-	if (!spaceElement || !spaceElement.parentNode) {
-		return false;
-	}
-	spaceElement.parentNode.style.display = display ? '' : 'none';
-	return true;
-};
-
-/**
- * kintone のスペースフィールド（スペースエレメント）を表示/非表示に切り替えます。
- *
- * @param {string} spaceField スペースフィールドのフィールドコード
- * @param {boolean} display true=表示, false=非表示
- * @returns {boolean} 成功したら true、引数不正や要素が見つからなければ false
- */
-const _zc_setSpaceFieldDisplay = (spaceField, display) => {
-	if (typeof spaceField !== 'string' || !spaceField.trim() || typeof display !== 'boolean') {
-		console.warn('_zc_setSpaceFieldDisplay: invalid arguments', {
-			spaceField,
-			display,
-		});
-		return false;
-	}
-	const isDisplayed = _zc_setSpaceFieldDisplayFallback(spaceField, display);
-	if (!isDisplayed) {
-		console.warn('_zc_setSpaceFieldDisplay: space element not found', spaceField);
-		return false;
-	}
-	return true;
 };
 
 /**
@@ -640,126 +508,6 @@ const getPrefectureByZipCode = (zipCode, callback) => {
 		.catch(() => {
 			_zc_invokeCallback(callback, null);
 		});
-};
-
-/**
- * kintoneのスペースフィールドに「郵便番号から住所を取得」ボタンを追加・削除する関数
- *
- * @function
- * @param {string} spaceField - スペースフィールドのフィールドコード
- * @param {string} id - ボタン要素のID名（任意のもの）
- * @param {string|undefined|null} label - ボタンラベル用のタイトル名。
- *   - 文字列: 「郵便番号から{label}住所を取得」ラベルで表示
- *   - undefined: 「郵便番号から住所を取得」ラベルで表示（デフォルト文言）
- *   - null/空文字: ボタン非表示（削除）
- * @param {string|number} zipCode - 郵便番号またはデジタルアドレス（7桁の半角英数字）。全角や記号・空白は自動で除去・変換されます。
- * @param {function} [callback] - 住所取得結果を受け取るコールバック関数（省略可）。
- *   - 引数: result（住所情報オブジェクト or エラーオブジェクト）
- *   - 住所情報オブジェクト例: {
- *       originalZipCode, normalizedZipCode, apiZipCode, zipCode, zipCode1...zipCode7,
- *       address, prefName, cityName, townName, blockName, otherName, bizName
- *     }
- *   - エラー時: { error: エラーメッセージ }
- * @returns {void}
- * @description labelの値により表示制御：
- *   - 文字列なら「郵便番号から{label}住所を取得」ラベルで表示
- *   - undefinedなら「郵便番号から住所を取得」ラベルで表示
- *   - null/空文字ならボタン非表示（削除）
- *   ボタン押下時、callbackコールバックで住所取得結果を返します。
- *   生成されるボタンには常にクラス名 `kintoneplugin-button-normal` が付与されます。
- *   kintone のデザインと調和したボタン外観にするには、アプリに「51-modern-default」スタイルシートを
- *   適用してください（https://js.kacsw.or.jp/51-modern-default.css から利用できます）。
- */
-const kintoneZipSetSpaceFieldButton = (spaceField, id, label, zipCode, callback) => {
-	if (
-		typeof spaceField !== 'string' ||
-		!spaceField.trim() ||
-		typeof id !== 'string' ||
-		!id.trim() ||
-		(label !== null && typeof label !== 'string' && typeof label !== 'undefined') ||
-		(callback !== undefined && typeof callback !== 'function' && callback !== null)
-	) {
-		return;
-	}
-	// 既存ボタン削除
-	const buttonElementById = document.getElementById(id);
-	if (buttonElementById) {
-		buttonElementById.remove();
-	}
-	let textContent = '';
-	if (label !== undefined && label !== null && label !== '') {
-		textContent = '郵便番号から' + label + '住所を取得';
-	} else if (label === undefined) {
-		// labelがundefinedの場合はデフォルト文言
-		textContent = '郵便番号から住所を取得';
-	}
-	if (textContent === '' || !zipCode) {
-		// 非表示
-		_zc_setSpaceFieldDisplay(spaceField, false);
-		return;
-	}
-	const button = document.createElement('button');
-	// フォーム内で誤って submit を引き起こさないように type を明示する
-	button.type = 'button';
-	button.className = 'kintoneplugin-button-normal';
-	button.id = id;
-	button.textContent = textContent;
-	button.addEventListener('click', () => {
-		getAddressByZipCode(zipCode, (result) => {
-			// 呼び出し元で処理できるようにコールバックで返す
-			if (typeof callback === 'function') {
-				callback(result);
-			}
-		});
-	});
-	const spaceElement = _zc_getSpaceElement(spaceField);
-	if (spaceElement) {
-		spaceElement.appendChild(button);
-		_zc_setSpaceFieldDisplay(spaceField, true);
-	}
-	return;
-};
-
-/**
- * kintoneのスペースフィールドに郵便番号の処理に関する説明を表示・非表示する関数
- * @function
- * @param {string} spaceField - スペースフィールドのフィールドコード
- * @param {string} id - 出力する要素のID名（任意のもの）
- * @param {boolean} display - 表示する場合はtrue、非表示はfalse
- * @returns {void}
- * @description innerHTMLがあれば表示、なければ削除して非表示にします。
- */
-const kintoneZipSpaceFieldText = (spaceField, id, display) => {
-	if (
-		typeof spaceField !== 'string' ||
-		!spaceField.trim() ||
-		typeof id !== 'string' ||
-		!id.trim() ||
-		typeof display !== 'boolean'
-	) {
-		return;
-	}
-	// 既存要素削除
-	const spaceFieldElementById = document.getElementById(id);
-	if (spaceFieldElementById) {
-		spaceFieldElementById.remove();
-	}
-	const spaceElement = _zc_getSpaceElement(spaceField);
-	if (display) {
-		// 表示
-		const createSpaceFieldElement = document.createElement('div');
-		createSpaceFieldElement.id = id;
-		createSpaceFieldElement.innerHTML =
-			'<div>郵便番号の代わりにデジタルアドレスでも検索可能です。<br>デジタルアドレスの場合は郵便番号に変換されます。</div>';
-		if (spaceElement) {
-			spaceElement.appendChild(createSpaceFieldElement);
-			_zc_setSpaceFieldDisplay(spaceField, true);
-		}
-	} else {
-		// 非表示
-		_zc_setSpaceFieldDisplay(spaceField, false);
-	}
-	return;
 };
 
 /**
@@ -1157,8 +905,6 @@ if (typeof window !== 'undefined') {
 	window.getCityByZipCode = getCityByZipCode;
 	window.getPrefectureByZipCode = getPrefectureByZipCode;
 	window.hasPrefectureName = hasPrefectureName;
-	window.kintoneZipSetSpaceFieldButton = kintoneZipSetSpaceFieldButton;
-	window.kintoneZipSpaceFieldText = kintoneZipSpaceFieldText;
 	window.registerZipCodeAddressHandler = registerZipCodeAddressHandler;
 	window.normalizeZipCode = normalizeZipCode;
 	window.initZipCodeAddressUtilsRuntime = initZipCodeAddressUtilsRuntime;
@@ -1175,8 +921,6 @@ try {
 			getCityByZipCode,
 			getPrefectureByZipCode,
 			hasPrefectureName,
-			kintoneZipSetSpaceFieldButton,
-			kintoneZipSpaceFieldText,
 			registerZipCodeAddressHandler,
 			normalizeZipCode,
 			initZipCodeAddressUtilsRuntime,
