@@ -2,7 +2,7 @@
 (() => {
 	'use strict';
 
-	if (!window.kviewer || typeof window.kviewer.events?.on !== 'function') {
+	if (typeof kviewer === 'undefined' || !kviewer || typeof kviewer.events?.on !== 'function') {
 		console.error('kViewer button diagnostic: event registration API is unavailable.');
 		return;
 	}
@@ -141,7 +141,7 @@
 		}
 	};
 
-	window.kviewer.events.on('record.show', (context) => {
+	kviewer.events.on('record.show', (context) => {
 		const number = ++eventNumber;
 		snapshot(context, number, 'event');
 		if (typeof window.requestAnimationFrame !== 'function') {

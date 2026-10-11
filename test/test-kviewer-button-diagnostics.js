@@ -1,6 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const { JSDOM } = require('jsdom');
 
 const dom = new JSDOM(
@@ -80,4 +81,52 @@ try {
 	);
 } finally {
 	dom.window.close();
+}
+
+const lexicalDom = new JSDOM('<div class="kv-detail"></div>', {
+	runScripts: 'outside-only',
+});
+try {
+	const output = [];
+	let handler;
+	const frames = [];
+	const source = fs.readFileSync(
+		path.join(__dirname, '../scripts/kviewer-button-diagnostics.js'),
+		'utf8'
+	);
+	lexicalDom.window.console.error = (message) => output.push(message);
+	lexicalDom.window.console.log = (message) => output.push(message);
+	lexicalDom.window.requestAnimationFrame = (callback) => frames.push(callback);
+	lexicalDom.window.eval(source);
+	assert.deepStrictEqual(output, [
+		'kViewer button diagnostic: event registration API is unavailable.',
+	]);
+	output.length = 0;
+
+	lexicalDom.window.registerDiagnosticForTest = (name, callback) => {
+		assert.strictEqual(name, 'record.show');
+		handler = callback;
+	};
+	vm.runInContext(
+		'const kviewer = { events: { on: window.registerDiagnosticForTest } };',
+		lexicalDom.getInternalVMContext()
+	);
+	delete lexicalDom.window.registerDiagnosticForTest;
+	assert.strictEqual(typeof lexicalDom.window.kviewer, 'undefined');
+	assert.strictEqual(
+		vm.runInContext('typeof kviewer', lexicalDom.getInternalVMContext()),
+		'object'
+	);
+	vm.runInContext(source, lexicalDom.getInternalVMContext());
+	assert.strictEqual(typeof handler, 'function');
+	assert.strictEqual(output.length, 0);
+	handler({ getDetailViewElement: () => lexicalDom.window.document.querySelector('.kv-detail') });
+	frames.shift()();
+	frames.shift()();
+	assert.strictEqual(output.length, 2);
+	assert.ok(output.every((line) => line.startsWith('KV_BUTTON_DIAGNOSTIC ')));
+	assert.strictEqual(typeof lexicalDom.window.kviewer, 'undefined');
+	console.log('PASS: kViewer lexical global without window property and unavailable API guard');
+} finally {
+	lexicalDom.window.close();
 }
