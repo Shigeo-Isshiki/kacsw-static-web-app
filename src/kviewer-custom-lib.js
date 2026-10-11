@@ -1,6 +1,6 @@
 /** kViewer 専用の基本操作をまとめた JavaScript ライブラリです。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.0.0
+ * @version 1.0.1
  */
 /* exported createDependencyChecker, getFieldValueOr, setFieldShown, setFormBridgeButtonShown, setPrintCreatorButtonShown */
 
@@ -82,6 +82,64 @@ const _kvGetDetailElement = (context, name) => {
 	return detailElement;
 };
 
+const _kvGetIntegrationButtons = (detailElement, className, name) => {
+	const container = detailElement.closest('.kv-container');
+	const insideButtons = Array.from(detailElement.querySelectorAll(className));
+	if (detailElement.matches(className)) insideButtons.unshift(detailElement);
+	const buttons = insideButtons.filter((button) => {
+		if (button.closest('.kv-container') !== container) return false;
+		const nestedDetail = button.closest('.kv-detail');
+		return !nestedDetail || nestedDetail === detailElement || !detailElement.contains(nestedDetail);
+	});
+	if (buttons.length > 0) return buttons;
+
+	if (!container) {
+		_kvReportError(name, 'no matching buttons found in the acquired detail element', {
+			className,
+			searchScope: 'detail-element',
+			matchedCount: 0,
+		});
+		return null;
+	}
+
+	const ownedElements = (selector) =>
+		Array.from(container.querySelectorAll(selector)).filter(
+			(element) => element.closest('.kv-container') === container
+		);
+	const details = ownedElements('.kv-detail');
+	const menus = ownedElements('.kv-record-menu');
+	if (details.length !== 1 || details[0] !== detailElement || menus.length !== 1) {
+		_kvReportError(
+			name,
+			'cannot uniquely associate a record menu with the acquired detail element',
+			{
+				className,
+				searchScope: 'nearest-kv-container',
+				detailCount: details.length,
+				menuCount: menus.length,
+			}
+		);
+		return null;
+	}
+
+	const menu = menus[0];
+	const menuButtons = Array.from(menu.querySelectorAll(className)).filter(
+		(button) =>
+			button.closest('.kv-container') === container &&
+			button.closest('.kv-record-menu') === menu &&
+			!button.closest('.kv-detail')
+	);
+	if (menuButtons.length === 0) {
+		_kvReportError(name, 'no matching buttons found in the associated record menu', {
+			className,
+			searchScope: 'associated-kv-record-menu',
+			matchedCount: 0,
+		});
+		return null;
+	}
+	return menuButtons;
+};
+
 const _kvSetIntegrationButtonsShown = (context, shown, className, name) => {
 	if (typeof shown !== 'boolean') {
 		_kvReportError(name, 'shown must be a boolean', { shown });
@@ -93,23 +151,14 @@ const _kvSetIntegrationButtonsShown = (context, shown, className, name) => {
 
 	let buttons;
 	try {
-		buttons = Array.from(detailElement.querySelectorAll(className));
-		if (detailElement.matches && detailElement.matches(className)) buttons.unshift(detailElement);
+		buttons = _kvGetIntegrationButtons(detailElement, className, name);
 	} catch {
-		console.error(name + ': failed to find buttons in detail element', {
+		console.error(name + ': failed to find buttons in the detail or associated record menu', {
 			className,
-			searchScope: 'detail-element',
 		});
 		return false;
 	}
-	if (buttons.length === 0) {
-		_kvReportError(name, 'no matching buttons found in the acquired detail element', {
-			className,
-			searchScope: 'detail-element',
-			matchedCount: 0,
-		});
-		return false;
-	}
+	if (!buttons) return false;
 
 	let success = true;
 	buttons.forEach((button) => {
