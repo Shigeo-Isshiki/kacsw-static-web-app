@@ -54,7 +54,7 @@ const _kvApplyElementShown = (element, shown, name) => {
 
 const _kvGetDetailElement = (context, name) => {
 	if (!context || typeof context !== 'object' || Array.isArray(context)) {
-		_kvReportError(name, 'invalid context', { context });
+		_kvReportError(name, 'invalid context');
 		return null;
 	}
 
@@ -70,8 +70,8 @@ const _kvGetDetailElement = (context, name) => {
 	let detailElement;
 	try {
 		detailElement = getter.call(context);
-	} catch (error) {
-		console.error(name + ': failed to get detail element', { error });
+	} catch {
+		console.error(name + ': failed to get detail element');
 		return null;
 	}
 
@@ -95,12 +95,19 @@ const _kvSetIntegrationButtonsShown = (context, shown, className, name) => {
 	try {
 		buttons = Array.from(detailElement.querySelectorAll(className));
 		if (detailElement.matches && detailElement.matches(className)) buttons.unshift(detailElement);
-	} catch (error) {
-		console.error(name + ': failed to find buttons in detail element', { error, className });
+	} catch {
+		console.error(name + ': failed to find buttons in detail element', {
+			className,
+			searchScope: 'detail-element',
+		});
 		return false;
 	}
 	if (buttons.length === 0) {
-		_kvReportError(name, 'button is not configured in this detail view', { className });
+		_kvReportError(name, 'no matching buttons found in the acquired detail element', {
+			className,
+			searchScope: 'detail-element',
+			matchedCount: 0,
+		});
 		return false;
 	}
 
@@ -221,7 +228,7 @@ const setFieldShown = (context, fieldCode, shown) => {
  * 詳細ビュー内のFormBridge連携ボタンを表示・非表示にします。
  * @param {Object} context view.detail.show または record.show のコンテキスト
  * @param {boolean} shown 表示する場合は true
- * @returns {boolean} 操作成功時 true、ボタン未設定などの場合 false
+ * @returns {boolean} 操作成功時 true、検索範囲内に対象がない場合などは false
  */
 const setFormBridgeButtonShown = (context, shown) =>
 	_kvSetIntegrationButtonsShown(context, shown, '.kv-detail-fb-button', 'setFormBridgeButtonShown');
@@ -230,7 +237,7 @@ const setFormBridgeButtonShown = (context, shown) =>
  * 詳細ビュー内のPrintCreator連携ボタンを表示・非表示にします。
  * @param {Object} context view.detail.show または record.show のコンテキスト
  * @param {boolean} shown 表示する場合は true
- * @returns {boolean} 操作成功時 true、ボタン未設定などの場合 false
+ * @returns {boolean} 操作成功時 true、検索範囲内に対象がない場合などは false
  */
 const setPrintCreatorButtonShown = (context, shown) =>
 	_kvSetIntegrationButtonsShown(

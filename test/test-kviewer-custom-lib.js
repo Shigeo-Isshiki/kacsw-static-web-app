@@ -130,6 +130,38 @@ try {
 		false
 	);
 
+	// A hypothetical sibling placement verifies failure reporting, not production compatibility.
+	const outsideScope = dom.window.document.createElement('section');
+	outsideScope.innerHTML =
+		'<div class="kv-detail"></div><button class="kv-detail-fb-button"></button>' +
+		'<button class="kv-detail-pc-button"></button>';
+	dom.window.document.body.appendChild(outsideScope);
+	const warningBefore = console.warn;
+	const scopeWarnings = [];
+	try {
+		console.warn = (message, details) => scopeWarnings.push({ message, details });
+		const outsideContext = {
+			getDetailViewElement: () => outsideScope.querySelector('.kv-detail'),
+		};
+		assert.strictEqual(setFormBridgeButtonShown(outsideContext, false), false);
+		assert.strictEqual(setPrintCreatorButtonShown(outsideContext, false), false);
+		assert.strictEqual(scopeWarnings.length, 2);
+		for (const warning of scopeWarnings) {
+			assert.ok(warning.message.includes('no matching buttons found'));
+			assert.ok(!warning.message.includes('not configured'));
+			assert.strictEqual(warning.details.searchScope, 'detail-element');
+			assert.strictEqual(warning.details.matchedCount, 0);
+		}
+		assert.ok(
+			Array.from(outsideScope.querySelectorAll('button')).every(
+				(button) => button.style.display === '' && !button.hidden
+			)
+		);
+	} finally {
+		console.warn = warningBefore;
+		outsideScope.remove();
+	}
+
 	const originalWarn = console.warn;
 	const originalDebug = console.debug;
 	const originalNotifyError = global.notifyError;
@@ -157,7 +189,9 @@ try {
 		assert.throws(() => check({ strict: true }), /missing\.js \(dependencyMissingForKViewerTest\)/);
 		assert.strictEqual(notified, 2);
 		assert.strictEqual(
-			createDependencyChecker([{ name: 'dependencyPresentForKViewerTest', source: 'present.js' }])(),
+			createDependencyChecker([
+				{ name: 'dependencyPresentForKViewerTest', source: 'present.js' },
+			])(),
 			true
 		);
 	} finally {
@@ -169,7 +203,9 @@ try {
 		delete global.dependencyMissingForKViewerTest;
 	}
 
-	console.log('PASS: kviewer-custom-lib values, validation, display restoration, and view isolation');
+	console.log(
+		'PASS: kviewer-custom-lib values, validation, display restoration, and view isolation'
+	);
 } catch (error) {
 	console.error('FAIL: kviewer-custom-lib', error && error.stack ? error.stack : error);
 	process.exitCode = 1;
