@@ -1,215 +1,105 @@
-# kViewer 専用共通ライブラリ
+# kviewer-custom-lib 使い方リファレンス
 
-`src/kviewer-custom-lib.js` は kViewer 用の独立したブラウザー向けライブラリです。kintone 用ライブラリや `all-window-exports.js` は必要ありません。kViewer のカスタマイズ設定で、本ファイルを呼び出し側コードより先に読み込んでください。読み込むだけではイベント登録・DOM 操作を行いません。
+このドキュメントは [src/kviewer-custom-lib.js](../src/kviewer-custom-lib.js) が公開する関数ごとに、使い方と契約（引数・戻り値・副作用・エラー処理）をまとめたリファレンスです。作成時期ではなく、機能別に整理しています。
 
-## kintone 用ライブラリとの仕様対応
+通常配布版は **1.1.0** です。配布URLは https://js.kacsw.or.jp/kviewer-custom-lib.js です。
 
-| 項目 | kintone 用 `kintone-custom-lib.js` | kViewer 用 `kviewer-custom-lib.js` |
-| --- | --- | --- |
-| `getFieldValueOr` | `record[fieldCode].value` を取得し、フィールド欠落・`value: undefined`・不正引数では default 値。`null` や空文字は保持 | 同じレコード形式・fallback の扱い。`0`、`false`、空配列もそのまま保持し、レコードを変更しない |
-| `createDependencyChecker` | `{name, source}` 配列を受け、missing を警告・通知し、通常 `false` / strict 時 `Error` | 同形式・戻り値・strict を踏襲。`notifyError` がなくても警告を出す |
-| エラー報告 | コンソール出力と、利用可能な場合の `notifyError` | 引数・コンテキスト・DOM 要素の失敗をコンソールに明示。依存不足では利用可能な `notifyError` も使用 |
-| 公開 | `window` へ直接公開 | `window` へ直接公開。kintone ライブラリに依存しない |
-| イベント登録 | `kintoneEventOn` あり | 初版ではなし。呼び出し側が `kviewer.events.on` を使う |
+## 公開 API サマリ
 
-`getFieldValueOr` の引数名は依頼案に合わせ `fallback` としました。位置引数と挙動は既存関数の `defaultValue` と同じです。
+### レコード・依存チェック補助
 
-## API
+- [getFieldValueOr(record, fieldCode, fallback)](#getfieldvalueor)
+- [createDependencyChecker(requirements)](#createdependencychecker)
+- [redirectToRecordDetail(recordCode)](#redirecttorecorddetail)
 
-すべての操作関数は同期関数です。操作結果として `true`（成功）または `false`（引数不正、対象外コンテキスト、要素欠落・未設定など）を返し、失敗は `console.warn` / `console.error` にも報告します。
+### 表示制御
 
-### `getFieldValueOr(record, fieldCode, fallback)`
+- [setFieldShown(context, fieldCode, shown)](#setfieldshown)
+- [setStaticContentShown(context, staticCode, shown)](#setstaticcontentshown)
+- [setFormBridgeButtonShown(context, shown)](#setformbridgebuttonshown)
+- [setPrintCreatorButtonShown(context, shown)](#setprintcreatorbuttonshown)
 
-- `record`: kintone 形式のフィールドレコード（イベントコンテキスト全体ではありません）。今回確認された新マイページビューの本番公開画面では、`context.record` はラッパーであり、フィールドレコードは `context.record.kintoneRecord` にあります。渡す前にフィールドが `{ value: ... }` 形式であることを確認してください。共通関数はラッパーの自動展開を行いません。
-- `fieldCode`: 空でない文字列。
-- `fallback`: フィールドが欠落している、フィールド形状が不正、または `value` が `undefined` の場合の戻り値。省略時は `undefined`。
-- 正常時は `record[fieldCode].value` をそのまま返します。`null`、空文字、数値 `0`、`false`、空配列はいずれも有効値です。
-- 不正なレコードまたはフィールドコードは警告して `fallback` を返します。値を取得するだけでレコードは変更しません。
+### ページ全体の操作抑止
 
-### `setFieldShown(context, fieldCode, shown)`
+- [installCopyPrintRestrictions()](#installcopyprintrestrictions)
 
-- `context`: `record.show` イベントのコンテキスト。公開関数 `context.getFieldElement(fieldCode)` を使い、返された単一 DOM 要素全体を操作します。
-- `fieldCode`: 空でない文字列。`shown`: 真偽値のみ。
-- 表示状態を変更できた場合 `true`。不正入力、未対応コンテキスト、getter 例外、要素欠落では警告して `false`。
-- 初回の非表示時にインライン `display` 値を要素単位で保存し、再表示時に復元します。したがって元の `grid` や `inline-flex` などを保ちます。連続した同じ指定では余分な `display` 変更をしません。
-- 一覧列、サブテーブル内の列・行、固定コンテンツは対象外です。
+### 補足
 
-### `setFormBridgeButtonShown(context, shown)` / `setPrintCreatorButtonShown(context, shown)`
+- [読み込み・共通仕様](#usage)
+- [kintone用ライブラリとの仕様対応](#compatibility)
+- [公式仕様と実画面確認結果](#verification)
+- [自動検証・実画面の追加確認](#testing)
+- [連携ボタンの一時診断コード](#diagnostics)
+- [更新履歴・配布記録](#history)
 
-- `context`: `view.detail.show` / `record.show` のコンテキスト。`getDetailViewElement()`（優先）または `getDetailElement()` で対象詳細ビューを取得します。
-- `shown`: 真偽値のみ。詳細要素内の `.kv-detail-fb-button` または `.kv-detail-pc-button` を優先して取得します。入れ子の別コンテナ・別詳細に属するボタンは除外します。
-- 詳細内で対象が見つからない場合だけ、最寄りの `.kv-container` を確認します。そのコンテナに直接属する `.kv-detail` が取得要素1件のみで、`.kv-record-menu` も1件のみなら、そのメニューに属する対象ボタンをすべて操作します。入れ子コンテナの詳細・メニュー・ボタンは対象に含めません。コンテナ内の詳細またはメニューが複数の場合、対応が一意ではないため警告して `false` を返します。先に対象を確定してから表示状態を変更します。
-- 他ビューを含めた `document` 全体検索は行いません。再表示は各要素の元のインライン `display` を復元します。
-- 詳細内にも、一意に対応したメニュー内にも対象が見つからなければ、検索範囲内で未検出と警告して `false`。未検出だけを根拠にサービス設定上の「ボタン未設定」とは判断できません。詳細範囲の取得不可・例外・不正入力も `false` です。
+<a id="usage"></a>
 
-これらの表示操作はユーザー導線の制御であり、アクセス権限や値の秘匿、FormBridgeへの直接アクセス、編集・PDF出力権限を制御するものではありません。画面非表示値を FormBridge に引き継ぐ設定はサービス側で別途行ってください。表示関数は値の引き継ぎを行いません。
+## 読み込み・共通仕様
 
-### `createDependencyChecker(requirements)`
+- kViewerのカスタマイズ設定で、本ライブラリを呼び出し側コードより先に読み込んでください。候補版ファイルと通常配布版の二重読み込みは避けてください。
+- kViewer専用の独立したブラウザー向けライブラリです。kintone用ライブラリや一括exportファイルは不要です。各公開関数をライブラリ自身が `window` に割り当てます。
+- 読み込むだけではイベント登録・表示変更・操作抑止・遷移を行いません。ネットワーク通信・レコード更新・REST API呼び出しも行いません。
+- 表示操作・登録・遷移指示は同期処理です。成功時 `true`、失敗時 `false` とコンソール報告を基本とします。値取得と依存チェックは各関数の戻り値・例外契約を参照してください。
+- 業務条件、制御対象の選択、複数フィールド・複数静的コードへの逐次適用、イベント登録は各ビュー用コードの責務です。一括表示API・業務ルール・期間判定は持ちません。
+- kViewerは非同期イベントハンドラーのPromise完了を待たずに次のハンドラーを実行します。kintone同等の完了待ちを仮定しないでください。本ライブラリはイベント登録ラッパーやPromise制御を追加しません。
 
-- `requirements`: `[{ name: 'setFieldShown', source: 'kviewer-custom-lib.js' }]` 形式。
-- 戻り値の `checkDependencies(options)` は全関数が存在すれば `true`、不足時は missing 関数を `source (name)` 形式で警告して `false` を返します。
-- `options.strict === true` の場合、不足を報告したあと同じ詳細メッセージの `Error` を投げます。呼び出し側は戻り値または例外で続行／停止を選べます。
-- グローバル `notifyError` があれば通知します。未定義または通知例外でも警告・戻り値／strict 例外の扱いは継続します。
+**表示・導線の制御はアクセス権限の制御ではありません。** ブラウザーに渡された値の秘匿、FormBridgeへの直接アクセス禁止、編集・PDF出力権限を保証しません。非表示値のFormBridge引き継ぎはサービス側の別設定であり、表示関数は引き継ぎ処理を行いません。
 
-## 呼び出し側の利用例
+## 個別関数の使い方
 
-各ビューの業務条件、対象フィールドの選択、複数フィールドの逐次適用は呼び出し側が担当します。共通ライブラリは一括制御や業務ルールを持ちません。
+### レコード・依存チェック補助
 
-以下は今回の新マイページビューの本番公開画面で観測された `context.record.kintoneRecord` を使う例です。フィールドコードは実際のコードに置き換えてください。
+<a id="getfieldvalueor"></a>
 
-```js
-(() => {
-	const checkDependencies = createDependencyChecker([
-		{ name: 'getFieldValueOr', source: 'kviewer-custom-lib.js' },
-		{ name: 'setFieldShown', source: 'kviewer-custom-lib.js' },
-	]);
+#### getFieldValueOr(record, fieldCode, fallback)
 
-	if (!checkDependencies()) return;
-
-	kviewer.events.on('record.show', (context) => {
-		const record = context.record && context.record.kintoneRecord;
-		if (!record || typeof record !== 'object' || Array.isArray(record)) {
-			console.error('record.show: kintoneRecord が取得できません。');
-			return;
-		}
-		const status = getFieldValueOr(record, '受付状況', '');
-		const targets = ['確認事項', '対応メモ'];
-		targets.forEach((fieldCode) => {
-			setFieldShown(context, fieldCode, status === '対応中');
-		});
-	});
-})();
-```
-
-業務条件が各ビューで異なる場合はそのビュー側で条件を決めてください。kViewer は非同期イベントハンドラーの Promise 完了を待たずに次のハンドラーを実行するため、kintone のイベント処理と同等の完了待ちを仮定できません。本ライブラリはイベント登録・Promise制御を行いません。
-
-## 公式情報と新マイページビューの確認事項
-
-2026-10-11 時点で確認した[公式 JavaScript カスタマイズ仕様](https://kviewer.kintoneapp.com/help/customize/v2)には、`view.detail.show` の `getDetailViewElement()` と `record.show` の `getFieldElement(fieldCode)`、`getDetailElement()` が記載されています。また、複数ハンドラーは登録順に呼ばれる一方、非同期ハンドラーの Promise は待たない旨が明記されています。公開クラスとして `.kv-detail`、`.kv-detail-field`、`.kv-detail-fb-button`、`.kv-detail-pc-button` も掲載されています。
-
-[新マイページビューの案内](https://faq.kintoneapp.com/--6ab59d39b2fc2da633e60065)は新デザインへの移行、ユーザー管理対応、FormBridge連携設定の別途確認などを案内していますが、上記 JavaScript 仕様のイベント対応表にはマイページビューが利用可能ビューとして記載されていません。このため、新マイページビューで同じイベント・コンテキスト関数・DOMクラスが使えることは公式記載だけからは確定できません。以下のユーザー提供結果で確認された本番公開画面の挙動と、公式仕様の記載は区別して扱います。
-
-### ユーザー提供の本番公開画面での確認結果（2026-10-11）
-
-今回のマイページビューの本番公開画面のコンソールログと目視報告では、次の内容が確認できました。当初はプレビューでの結果として記録していましたが、ユーザーから本番環境へ適用した状態での結果だったと訂正があったため、確認環境の記載を修正しました。これは当該本番公開画面での観測であり、すべてのビューや環境での対応を保証するものではありません。プレビューでの動作は別途確認していません。
-
-- `record.show` が発火し、ハンドラーにコンテキストが渡されました。
-- `context.getFieldElement` と `context.getDetailViewElement` が存在します。後者は公式表の `record.show` に記載された `getDetailElement` と名前が異なりますが、本ライブラリはどちらも受け付けます。
-- `context.record.kintoneRecord` は配列ではないオブジェクトで、17個のキーがあります。`First_name` はオブジェクトとして存在し、自身の `value` プロパティを持つことが確認されました。値そのものは確認ログに出力していません。
-- `getFieldElement('対象フィールド')` の結果は `null` でした。「対象フィールド」は例示用の文字列なので、実在する詳細フィールドのフィールドコードに置き換えて再確認してください。
-- `context.getDetailViewElement()` は `.kv-detail` のDOM要素を返しました。
-- `context.getFieldElement('First_name')` は `data-field-code="First_name"`、`data-field-type="SINGLE_LINE_TEXT"` を持つ `.kv-detail-field` のDOM要素を返しました。値の要素だけではなく、ラベル側と値側を含むフィールド全体の要素です。表示形式はクラスによる flex、インラインスタイルは `grid-area` の指定でした。
-- `First_name` に対する `setFieldShown(context, 'First_name', false)` と、続く `setFieldShown(context, 'First_name', true)` がどちらも `true` を返しました。ユーザー提供ログで「非表示: 成功」「再表示: 成功」を確認しました。また、ユーザーの目視確認でラベルと値が両方消え、再表示後に元の位置・レイアウトへ戻ったことが報告されました。
-- ボタン取得・表示制御、繰り返し呼び出し、複数ビュー間の分離は引き続き実画面では未検証です。
-- 同じログに `connect-src` によるCSPの通信ブロックが出ています。通信先・発生元が提示されていないため原因や関連は未特定です。確認用のレコード・DOM取得コードおよび本ライブラリ自身はネットワーク通信を行いません。
-
-## 実画面での確認手順（未検証部分）
-
-追加検証は、まず本番に影響しない検証用ビューまたはプレビューにテスト用カスタマイズとして本ライブラリを先に読み込み、イベントの発火とコンテキスト関数をコンソールで確認します。本番公開画面に残っているタイマー付き表示確認コードや診断ログは、確認終了後に外してください。
-
-1. `kviewer.events.on('record.show', context => console.log(context, context.getFieldElement && context.getFieldElement('対象フィールド')))` を一時登録し、詳細表示で発火・戻り値を確認します。
-2. イベントが提供されない場合は `view.detail.show` と `context.getDetailViewElement()` を個別に確認します。イベント対応表にないため、発火・関数の存在を前提にしません。
-3. `setFieldShown(context, '対象フィールド', false)` → `true` の順に呼び、フィールド全体と元のレイアウトを確認します。連続呼び出しでも同じ状態を確認します。
-4. 対象詳細ビューにFormBridge/PrintCreatorボタンを複数設定し、各関数で非表示・再表示を確認します。別の詳細ビューを同時に描画し、そちらのボタンが変化しないことも確認します。
-5. ボタン未設定時は `false` と警告になることを確認します。非表示値の FormBridge 引き継ぎは別途サービス設定で検証します。
-
-この作業環境から実画面操作は実施していません。ユーザー提供ログで確認できた範囲は上記に記載し、それ以外は未検証として扱います。
-
-## 既存リストビューの連携ボタン不具合（2026-10-12、1.0.1配布済み）
-
-アプリ226の既存リストビューの詳細画面で、配布版1.0.0の両ボタン関数が取得範囲内で対象を見つけられず、非表示処理を実行できなかったことが報告されました。業務条件を変えず、ページ全体で対象を取得し `hidden` と `display: none !important` を使う従来方式へ戻したところ、利用者が復旧を確認しています。他4本の公開画面にはボタン共通化を未適用との報告です。これは新マイページビューの単一フィールド表示確認とは別件です。
-
-利用者による実DOM診断で、今回の取得失敗原因は詳細要素内だけを検索していたことと確認されました。両ボタンは取得された `.kv-detail` および `.kv-main-content` の外側の `.kv-record-menu` 内にあり、最寄りの共通祖先は `.kv-container` でした。当該コンテナの詳細要素・FormBridgeボタン・PrintCreatorボタンは各1件です。イベント時点と2描画フレーム後で配置・件数は変わりません。これは226の既存リストビューの観測であり、新マイページビューなど全環境への一般化はしません。
-
-表示状態は従来方式適用後のものです。従来方式は検索範囲と表示方式の両方が異なるため、`hidden`・`!important` の必要性を今回のログや復旧結果だけで確定しません。
-
-### 一時診断コード
-
-[scripts/kviewer-button-diagnostics.js](../scripts/kviewer-button-diagnostics.js) はブラウザー用の一時診断ファイルです。ライブラリや配布対象には含めません。検証用ビューで再現できる場合はそちらを優先し、必要な場合だけ226のカスタマイズに一時追加して、詳細画面を読み直してください。226の復旧済みボタン制御は変更しません。
-
-- `record.show` の時点と、その後の2回の描画フレームコールバック後に、`KV_BUTTON_DIAGNOSTIC` で始まるJSONを出力します。後者は有限回の比較診断であり、描画完了の保証や表示制御の回避策ではありません。
-- イベントAPIは既存カスタマイズと同じグローバル識別子 `kviewer` で参照します。`window.kviewer` にプロパティがなくても、`kviewer` が利用可能なら登録できます。この環境差とAPI未定義時の警告を回帰テストで確認しています。
-- 各取得APIの有無・取得結果、詳細要素内／ページ全体のボタン件数、包含関係、共通祖先・祖先列を記録します。`node` は診断中だけの連番で、DOMの実際のIDではありません。
-- 要素はタグ名、限定した公開 `kv-*` クラス、兄弟要素内の位置で表します。レコード、テキスト、リンク、URL、属性値、任意のクラス名、HTML、例外メッセージは出力しません。
-- `hidden` の有無、インライン `display` と優先度、計算済み表示状態も読み取ります。表示を変更せず、ネットワーク通信・無期限監視は行いません。
-- 復旧方式が既に非表示にしている場合、CSS状態はその方式の適用後の状態です。このログだけでは通常の `display: none` の有効性は検証できません。
-- 結果は該当する `eventNumber` の2件を共有してください。確認後は診断ファイルを設定から外し、ページを再読み込みして登録ハンドラーを除去してください。過去のコンテキスト全体やDOM要素を出力する診断コードは併用しません。
-
-### 現在の変更・検証・配布状況
-
-ローカルの1.0.1候補版では、詳細内の検索を維持し、未検出の場合のみ最寄りコンテナの一意に対応するメニューを検索する取得修正を実装しました。未検出時の `false` は維持し、未設定とは断定しません。ページ全体検索、固定タイマー、監視は追加していません。ボタンの表示方式・保存復元方式、値取得・フィールド表示は今回変更していません。
-
-診断コードの自動テストは、包含関係・共通祖先・件数・表示非変更・機密情報非出力を確認します。ライブラリの回帰テストには、226で観測された「コンテナ内の詳細・メインコンテンツの外にメニューとボタンがある」配置を再現しました。詳細内の既存配置、同種ボタン複数、入れ子・隣接の別コンテナとの分離、複数詳細・複数メニュー時の拒否、非表示→再表示→再非表示も対象としています。回帰テストは観測された構造を再現したもので、サービスの実HTML・CSS全体の再現ではありません。
-
-### 候補版1.0.1の226実画面確認結果
-
-利用者から、候補版1.0.1と検証用カスタマイズによる次のログが提供され、目視でもボタン制御が有効と報告されました。
-
-```text
-KV_BUTTON_TEST {"eventNumber":1,"formBridge":{"shown":false,"success":true},"printCreator":{"shown":true,"success":true}}
-KV_BUTTON_TEST {"eventNumber":2,"formBridge":{"shown":false,"success":true},"printCreator":{"shown":false,"success":true}}
-```
-
-- FormBridge編集ボタンの非表示、PrintCreator印刷ボタンの表示・非表示を、226の当該実画面で確認済みです。対応する関数の戻り値はすべて `true` でした。
-- 確認した状態では取得範囲修正で表示制御が機能し、`hidden` や `display: none !important` を追加する必要は認められませんでした。全ビュー・全CSS環境への保証ではありません。
-- FormBridgeの `shown: true` は今回のログに含まれないため、編集ボタンの表示条件は未確認です。226の既存フィールド動作も今回の報告だけでは個別確認済みとは扱いません。
-- クリック操作による確認やレイアウトについての詳細な報告はなく、今回の報告以上の個別確認は記録しません。
-
-226では表示されたレコードの値で条件を判定し、同一画面で値を動的に変更する運用ではありません。したがって、**同一画面での「非表示→再表示→再非表示」は今回の適用判断の必須実画面テストにはしません。** 実画面では条件の異なるレコードで指定どおりの表示・非表示を確認し、共通関数の反復呼び出し・非表示後の再表示・元の通常インライン表示状態の復元は自動テストで担保します。編集ボタンの表示条件の未確認は、同一画面の再表示テスト未完了とは区別します。
-
-元の `hidden`・インライン優先度の保存復元は今回追加していません。これらを操作する方式が必要と判明した場合は別途実装・検証します。表示制御はアクセス権限を制御しません。
-
-### 通常配布へ進める際の残確認事項
-
-取得修正自体は226の実画面で有効と確認済みであり、追加の強制非表示処理や同一画面の反復テストを条件とせず、1.0.1として通常配布へ進める候補とします。ただし、未確認項目を確認済みとすることなく、編集ボタンの表示条件に合うレコードでの確認と226の既存フィールド動作のスモーク確認を残事項として共有します。既存フィールド処理は未変更で、自動テストは成功しています。
-
-`main` への反映は別途承認後に行い、デプロイ結果と通常配布URLのバージョン・内容を確認してから配布更新完了とします。他4本への適用はその確認後に再開し、各対象画面で条件の異なるレコードを確認します。診断・検証用コードは確認終了後に撤去してください。
-
-この調査段階の自動検証は次のとおりです。
-
-- `node -r ./test/setup-tests.js test/test-kviewer-custom-lib.js` — 成功（226配置の回帰テスト、複数詳細・メニューの拒否、入れ子コンテナ・別詳細の分離、メニュー取得例外、既存の値取得・フィールド表示テストを含む）。
-- `node -r ./test/setup-tests.js test/test-kviewer-button-diagnostics.js` — 成功。
-- `npx prettier --check src/kviewer-custom-lib.js scripts/kviewer-button-diagnostics.js test/test-kviewer-custom-lib.js test/test-kviewer-button-diagnostics.js` — 成功。
-- `npx eslint src/kviewer-custom-lib.js` — 成功。
-- `node --check src/kviewer-custom-lib.js` / `node --check scripts/kviewer-button-diagnostics.js` / `git diff --check` — 成功。
-- VS Codeのテスト実行ツールではテストが検出されなかったため、既存のNode実行方式を使用しました。
-- `npm test` — 成功（候補版1.0.1の取得修正を含む全テスト）。
-- `npx prettier --check "src/**/*.{js,css,html}"` / `npx eslint "src/**/*.js"` — 成功（リポジトリ全体のソースチェック）。
-
-1.0.1は調査用ブランチ `investigate/kviewer-button-scope` で開発後、`main`（`08593d1`）へ反映しました。2026-10-12にデプロイ・CI・配布作成の成功、および通常配布URLのバージョン1.0.1とソースの完全一致を確認しました。以下の第2段階候補版は、この配布済み1.0.1とは別です。
-
-## 第2段階：1.1.0
-
-開発ブランチは `feature/kviewer-stage-two` です。追加対象は次の3関数のみです。このリポジトリで各アプリのカスタマイズは変更していません。候補版の代表3画面の確認報告を受け、2026-10-12に通常配布への反映依頼がありました。既存5関数と1.0.1の連携ボタン取得修正は維持します。
-
-### `installCopyPrintRestrictions()`
-
-- 引数なし。必須登録が完了した場合と同じページで登録済みの場合は `true`。DOM・必須API欠落や登録失敗は警告またはエラーを報告して `false`。
-- ページ全体の `contextmenu`、`selectstart` の既定動作を抑止します。`keydown` の Ctrl/Cmd＋P（大文字Pも対象）と PrintScreen は既定動作と伝播を抑止します。それ以外のキーは変更しません。
-- `beforeprint` はbodyを `display: none !important` にし、`afterprint` は元のインラインdisplayと優先度を復元します。重複する印刷開始通知では元の保存状態を上書きしません。元のbodyを保持して復元するため、印刷中にbodyが差し替わっても別のbodyを復元対象にはしません。
-- 利用可能な `matchMedia('print')` の `change` 通知に対応し、新APIの `addEventListener/removeEventListener`、旧APIの `addListener/removeListener` の順に使用します。任意APIがない場合は警告して必須登録を継続します。利用できるAPIの呼び出しが例外を投げた場合は登録失敗としてロールバックします。
-- 印刷用CSS `@media print { body { display: none !important; } }` を登録します。重複呼び出しではリスナーとCSSを追加しません。
-- 途中失敗時は、この呼び出しが追加したリスナー・styleのみを解除します。解除自体が失敗した項目は保持し、次回呼び出しで後始末を再試行します。未解除項目が残る間は新しい登録を追加せず `false` を返します。登録完了フラグは全登録成功後に設定します。
-- 印刷コールバック内の失敗はコンソールへ報告します。復元失敗時は保存状態を保持し、後続の終了通知で再試行できます。初回の `true` は将来のイベントコールバックの成功を保証しません。
-- 元から存在する無関係なリスナーやCSSは変更しません。公開解除APIや設定オプションは追加していません。
+- 動作概要：kintone形式のレコードから指定フィールドの `value` を取得します。レコードは変更しません。
+- `record` (object)：フィールド情報を持つレコード。イベントコンテキスト全体ではありません。確認された新マイページビューでは `context.record` はラッパーで、フィールドレコードは `context.record.kintoneRecord` です。関数側でラッパーを自動展開しません。
+- `fieldCode` (string)：空白のみではないフィールドコード。正常なコードをtrimして検索することはありません。
+- `fallback` (any, optional)：取得できない場合の戻り値。省略時は `undefined`。
+- 戻り値：自身の `value` プロパティがある場合、その値を返します。`null`、空文字、`0`、`false`、空配列はそのまま保持します。
+- 未入力・欠落時：フィールド欠落、フィールドがオブジェクトでない、`value` がない、または `undefined` の場合はfallbackを返します。正常な欠落・未入力では警告しません。
+- エラー時：不正なrecord・fieldCodeは警告してfallbackを返します。取得例外はエラーを報告してfallbackを返します。
 
 ```js
-kviewer.events.on('records.show', () => {
-	installCopyPrintRestrictions();
-});
-kviewer.events.on('record.show', () => {
-	installCopyPrintRestrictions();
-});
+const record = { First_name: { value: '例' }, empty: { value: '' } };
+getFieldValueOr(record, 'First_name', '未設定'); // '例'
+getFieldValueOr(record, 'empty', '未設定'); // ''
+getFieldValueOr(record, 'missing', '未設定'); // '未設定'
 ```
 
-**完全なコピー・保存・印刷・スクリーンショット防止機能ではありません。** PrintScreenキーイベントの抑止はOSの画面キャプチャを禁止しません。Ctrl/Cmd＋C自体を抑止する実装でもありません。アクセス権限やブラウザーへ渡された値の秘匿とは別であり、選択・コンテキストメニュー・印刷の操作性とアクセシビリティに影響します。ページ全体に必要なビューだけが明示的に呼び出してください。
+<a id="createdependencychecker"></a>
 
-### `redirectToRecordDetail(recordCode)`
+#### createDependencyChecker(requirements)
 
-- `recordCode` は `__kviewer_record_code__` の文字列。非文字列・空文字・空白のみは警告して `false`。正常なコードはtrimせず `encodeURIComponent` でエンコードします。
-- 現在の `window.location.origin` と `pathname` の末尾スラッシュを除いたパスから、`/detail/{encodedCode}` を生成して `location.href` へ設定します。クエリ・ハッシュを引き継ぎません。
-- 設定できれば `true`、location API欠落・生成例外・設定例外は報告して `false`。`true` は遷移指示の設定を意味し、遷移先の読み込み成功ではありません。
-- レコードコードを任意URLとして扱いません。新マイページビューのURL対応は未確認です。呼び出し元は既存リストビューの一覧パスを前提とし、詳細画面から一覧パスを推測して作り直す処理は追加していません。詳細画面等から呼び出す場合は対応パスの確認が先に必要です。
+- 動作概要：必要な外部関数が `globalThis` にあるかを確認する関数を生成します。
+- `requirements` (Array&lt;Object&gt;)：`{ name, source }` の配列。`name` は必須関数名、`source` は不足時に表示する出典ファイル名です。単純なグローバル関数名を指定してください。
+- 戻り値：`checkDependencies(options)` 関数。全関数が存在すれば `true`、不足時は `false`。
+- `options.strict`：不足時に例外を投げる設定。既存実装同様、truthyな指定で `Error` を投げます。通常は `true` / `false` を指定してください。
+- 不足時：不足関数だけを `source (name)` 形式で `console.warn` に列挙します。グローバルの `notifyError` があれば通知も試みます。未定義でも警告し、通知例外は `console.debug` に報告して戻り値・strict例外の処理を継続します。
+- 入力検証の制限：配列以外は空配列として扱い、null要素・文字列nameを持たない定義は無視します。設定自体の厳格検証APIではありません。
+
+```js
+const checkDependencies = createDependencyChecker([
+	{ name: 'setFieldShown', source: 'kviewer-custom-lib.js' },
+	{ name: 'setStaticContentShown', source: 'kviewer-custom-lib.js' },
+]);
+if (checkDependencies()) {
+	// 呼び出し側の処理を続行
+}
+// 不足を致命的エラーとして扱う場合：
+checkDependencies({ strict: true });
+```
+
+<a id="redirecttorecorddetail"></a>
+
+#### redirectToRecordDetail(recordCode)
+
+- 動作概要：既存リストビューの一覧パスからレコード詳細へのURLを生成し、`window.location.href` に設定します。
+- `recordCode` (string)：kViewerの `__kviewer_record_code__`。空文字・空白のみ・非文字列は警告して `false`。正常なコードはtrimせず `encodeURIComponent` でエンコードします。
+- URL：現在の `origin` と `pathname` の末尾スラッシュを除いたパスに、`/detail/{encodedCode}` を付加します。元の検索クエリ・ハッシュは引き継ぎません。コードを任意URLとして扱わず、外部オリジンへの遷移機能は持ちません。
+- 戻り値：遷移指示を設定できれば `true`。location API欠落・URL生成例外・設定例外は報告して `false`。
+- 制限：`true` は遷移先の読み込み成功を保証しません。呼び出し元は既存リストビューの一覧パスを前提とします。詳細画面から一覧パスを推測して作り直す処理はありません。新マイページビューのURL対応は未確認です。
 
 ```js
 kviewer.events.on('records.show', (context) => {
@@ -220,15 +110,71 @@ kviewer.events.on('records.show', (context) => {
 });
 ```
 
-1件かどうかの業務判断は呼び出し側です。ここでの1件は取得した配列が1件という意味であり、全検索結果が1件とは限りません。
+1件かどうかの判断は呼び出し側です。ここでの1件は取得配列が1件という意味で、全検索結果が1件とは限りません。
 
-### `setStaticContentShown(context, staticCode, shown)`
+### 表示制御
 
-- `context` は `getMainContentElement()` を持つオブジェクト、`staticCode` は空白のみではない文字列、`shown` は真偽値。正常なコードはtrimせず完全一致で照合します。
-- メインコンテンツ自身と子孫の `data-static-code` 属性値を直接比較して、同じコードの全要素を操作します。コードをセレクターに埋め込まないため、引用符・バックスラッシュ等もそのまま扱えます。範囲外への検索・documentへのフォールバックはしません。
-- 非表示時は元のインラインdisplayと優先度を保存して `display: none !important` にし、再表示時は保存した状態へ復元します。反復非表示で保存内容を上書きしません。`hidden` は変更しません。
-- この関数が隠していない要素への `shown: true` はdisplayを変更しません。元からインラインやCSSで非表示だった要素を強制表示しません。
-- 全対象に適用できれば `true`。不正引数・対象なし・取得失敗は報告して `false`。一部の適用失敗は報告して `false` を返し、他対象への適用は継続します。成功した要素はロールバックせず、保存状態を保持して再試行・復元できます。
+<a id="setfieldshown"></a>
+
+#### setFieldShown(context, fieldCode, shown)
+
+- 動作概要：`context.getFieldElement(fieldCode)` が返す単一の詳細フィールド要素全体を表示・非表示にします。
+- `context` (object)：`getFieldElement` を持つイベントコンテキスト。使用例は `record.show`。
+- `fieldCode` (string)：空白のみではないフィールドコード。正常なコードをtrimして検索しません。
+- `shown` (boolean)：`false` で非表示、`true` でこの関数による非表示前の状態を復元します。
+- 戻り値：操作成功時 `true`。不正入力・API欠落・要素欠落・取得や適用例外は報告して `false`。
+- 表示状態：初回非表示時のインライン `display` 文字列を保存し、再表示時に復元します。繰り返し非表示で保存内容を上書きせず、同じ指定では不要なdisplay変更をしません。この関数が隠していない要素への `true` は状態を変更しません。
+- 対象：返された要素内のフィールド値・項目名・枠線や装飾は一緒に非表示になります。別要素のラベル・罫線、外側コンテナの罫線・背景は自動では連動しません。ただし、独立したラベル・罫線でも `getFieldElement(code)` が目的の要素全体を返す場合は、そのコードを個別に指定できます。実装はフィールド種別を制限しません。
+- 対象外：一覧列、サブテーブル内の列・行、公開APIで取得できない固定コンテンツの専用制御。静的コードへの自動フォールバックはありません。見た目やコードの接頭辞ではなく取得方式で使い分け、メインコンテンツ内の `data-static-code` を対象とする場合は [setStaticContentShown](#setstaticcontentshown) を使用してください。
+- 制限：既存仕様を維持し、元のdisplay優先度や `hidden` を保存・操作する関数ではありません。
+
+アプリ196の新マイページビューでは、見出し・罫線の計10件を `getFieldElement` で取得でき、見出しは `data-field-type="LABEL"`、罫線は `data-field-type="HR"` として出力されることが報告されています。カスタマイズ側で次のように本関数を使用し、氏名変更の罫線は表示・非表示の両方、他9件は確認した各条件で戻り値trueと正常な表示状態を確認しました。確認範囲の詳細は [実画面確認結果](#verification) を参照してください。他ビューへの対応を保証するものではありません。
+
+```js
+setFieldShown(context, 'static_field_line_Name_change_group', canNameChangeGroup);
+```
+
+以下は新マイページビューで確認されたレコード形状を使う例です。業務条件と複数フィールドの逐次適用はビュー側に残します。コードは実際のフィールドコードに置き換えてください。
+
+```js
+(() => {
+	const checkDependencies = createDependencyChecker([
+		{ name: 'getFieldValueOr', source: 'kviewer-custom-lib.js' },
+		{ name: 'setFieldShown', source: 'kviewer-custom-lib.js' },
+	]);
+	if (!checkDependencies()) return;
+
+	kviewer.events.on('record.show', (context) => {
+		const record = context.record && context.record.kintoneRecord;
+		if (!record || typeof record !== 'object' || Array.isArray(record)) {
+			console.error('record.show: kintoneRecord が取得できません。');
+			return;
+		}
+		const shown = getFieldValueOr(record, '受付状況', '') === '対応中';
+		['確認事項', '対応メモ'].forEach((fieldCode) => {
+			setFieldShown(context, fieldCode, shown);
+		});
+	});
+})();
+```
+
+<a id="setstaticcontentshown"></a>
+
+#### setStaticContentShown(context, staticCode, shown)
+
+- 動作概要：メインコンテンツ内の単一静的コードに一致する全要素を表示・非表示にします。
+- `context` (object)：`getMainContentElement()` を持つイベントコンテキスト。使用例は `view.show`。
+- `staticCode` (string)：空白のみではない静的コンテンツコード。正常なコードはtrimせず完全一致で検索します。
+- `shown` (boolean)：`false` で非表示、`true` で元の状態を復元します。
+- 対象取得：取得したメインコンテンツ自身と子孫の `data-static-code` 属性値を直接比較します。同じコードが複数あればすべて対象にします。コードをセレクターへ埋め込まないため、引用符・バックスラッシュ等も扱えます。
+- 対象範囲：メインコンテンツ外は検索しません。API欠落時に `document` 全体へフォールバックしません。
+- 表示状態：初回非表示時のインラインdisplayと優先度を保存し、`display: none !important` にします。再表示は保存した状態を復元します。繰り返し非表示で保存内容を上書きせず、`hidden` は変更しません。
+- 初期非表示：この関数が隠していない要素への `true` はdisplayを変更しません。元からインライン・CSSで非表示だった要素を強制表示しません。
+- 戻り値：全対象への適用成功で `true`。不正入力・API欠落・対象なし・取得失敗は報告して `false`。一部適用失敗は報告して `false` とし、他対象の処理は継続します。成功した対象はロールバックせず、保存状態を保持して再試行・復元できます。
+
+**静的ラベル・罫線は、コードを設定しただけで対象になるとは限りません。** 実DOMで `data-static-code` が指定コードに一致し、メインコンテンツ内にあることが必要です。公式記載はダッシュボードの静的ラベル・画像です。独立した罫線や他ビューの静的要素への属性付与は、実画面で確認してください。コードの接頭辞では対象を判定しません。
+
+アプリ196の新マイページビューでは、診断した罫線・見出しのコードが `data-static-code` ではなく `data-field-code` として出力されていました。対象10件は `getFieldElement` で取得できたため、カスタマイズ側で [setFieldShown](#setfieldshown) を使用する対応が行われました。共通ライブラリ本体・配布URLは変更せず、本関数に別属性検索や自動フォールバックは追加していません。`no matching static content found in main content` は対象取得の失敗を意味し、表示用CSSの適用失敗ではありません。この観測を他のラベル・罫線や全ビューへ一般化しないでください。
 
 ```js
 kviewer.events.on('view.show', (context) => {
@@ -237,30 +183,204 @@ kviewer.events.on('view.show', (context) => {
 });
 ```
 
-既存の表示ヘルパーはdisplay文字列のみを保存しているため、その挙動は変更せず、優先度も保持する新しい内部ヘルパーを静的コンテンツと印刷用に共用しました。
+例えば実DOMの `data-static-code` が `example_static_label` であれば、次の呼び出しで制御できます。これはアプリ196の確認済みコードではなく、取得条件を示す仮の例です。
 
-### 既存処理との差異と実画面検証
+```js
+setStaticContentShown(context, 'example_static_label', false);
+setStaticContentShown(context, 'example_static_label', true);
+```
 
-重複処理の本体はこのリポジトリ内にはなく、依頼文に列挙された動作・現行URL式を基に共通化しました。73行の原本との行単位の同一性を検証したわけではありません。主な差異は登録失敗時の解除・再試行、印刷開始重複時の保存保護、表示優先度の復元、URLの末尾スラッシュ除去、入力検証・失敗報告です。
+この例のラベル・罫線について実DOM確認済みという意味ではありません。期間判定・複数コードの逐次適用は呼び出し側で行います。
 
-2026-10-12に、依頼元から候補版1.1.0の代表3画面について次の実画面確認結果が報告されました。これは利用者による確認であり、この作業環境から実画面操作を行ったものではありません。
+<a id="setformbridgebuttonshown"></a>
 
-| 対象 | 実画面で確認された範囲 | 未確認・証拠の制限 |
+#### setFormBridgeButtonShown(context, shown)
+
+- 動作概要：対象詳細に属する `.kv-detail-fb-button`（FormBridge編集ボタン）をすべて表示・非表示にします。
+- `context` (object)：`getDetailViewElement()`（優先）または `getDetailElement()` を持つコンテキスト。使用例は `view.detail.show` / `record.show`。
+- `shown` (boolean)：`false` で非表示、`true` で元の表示状態を復元します。
+- 対象取得：詳細要素内を優先し、入れ子の別コンテナ・別詳細のボタンを除外します。詳細内で未検出の場合だけ最寄りの `.kv-container` を確認し、そのコンテナに属する `.kv-detail` が取得対象1件のみで `.kv-record-menu` も1件のみなら、メニュー内の対象ボタンを取得します。入れ子コンテナの詳細・メニュー・ボタンは数・対象に含めません。
+- 戻り値：全対象の操作成功時 `true`。不正入力・取得失敗・対応が一意でない・検索範囲内で未検出・適用失敗は報告して `false`。一部適用失敗の場合も他対象の操作は継続します。
+- 失敗診断：検索範囲・件数や対応の曖昧さを報告します。未検出だけを根拠にサービス設定の「ボタン未設定」とは断定しません。
+- 表示状態：非表示前のインラインdisplay文字列を各要素に保存・復元します。反復非表示では保存内容を上書きしません。この関数が隠していない対象への `true` は変更しません。`hidden`・display優先度の保存復元や強制非表示は追加していません。
+- 制限：無条件のページ全体検索、固定タイマー、監視は行いません。対応が一意でない場合は操作前に拒否します。
+
+```js
+kviewer.events.on('record.show', (context) => {
+	// shouldShowFbButton は各ビュー側の業務条件で判定。
+	setFormBridgeButtonShown(context, shouldShowFbButton);
+});
+```
+
+<a id="setprintcreatorbuttonshown"></a>
+
+#### setPrintCreatorButtonShown(context, shown)
+
+- 動作概要：対象詳細に属する `.kv-detail-pc-button`（PrintCreator PDF出力ボタン）をすべて表示・非表示にします。
+- `context`、`shown`、対象範囲、表示復元、戻り値、失敗時の報告は [setFormBridgeButtonShown](#setformbridgebuttonshown) と同じです。内部の取得・表示処理を共用します。
+- FormBridgeボタンは操作しません。PDF出力権限や直接アクセスを制御する機能ではありません。
+
+```js
+kviewer.events.on('record.show', (context) => {
+	// shouldShowPcButton は各ビュー側の業務条件で判定。
+	setPrintCreatorButtonShown(context, shouldShowPcButton);
+});
+```
+
+### ページ全体の操作抑止
+
+<a id="installcopyprintrestrictions"></a>
+
+#### installCopyPrintRestrictions()
+
+- 動作概要：明示的な呼び出しにより、ページ全体の一部のコピー・印刷関連操作を抑止します。引数なし。
+- 戻り値：必要な登録の成功、または同じページで登録済みの場合は `true`。必須DOM/API欠落・登録失敗は報告して `false`。実装は登録済み判定の前にも必須DOM/APIを検証します。
+- 対象イベント：`contextmenu` と `selectstart` の既定動作を抑止します。`keydown` のCtrl/Cmd＋P（大文字Pも対象）とPrintScreenは既定動作・伝播を抑止し、他キーは変更しません。
+- 印刷開始・終了：`beforeprint` はbodyを `display: none !important` にし、`afterprint` は元のインラインdisplayと優先度を復元します。重複する開始通知で保存内容を上書きしません。印刷中にbodyが差し替わっても、復元は変更した元のbodyを対象とします。
+- 互換API：`matchMedia('print')` の新API `addEventListener/removeEventListener`、旧API `addListener/removeListener` の順に使用します。任意APIがない場合は警告して必須登録を継続します。利用可能なAPIの呼び出し例外は登録失敗として後始末します。
+- 印刷用CSS：次のstyleを登録します。反復呼び出しでリスナー・CSSを重複追加しません。
+
+```css
+@media print {
+	body {
+		display: none !important;
+	}
+}
+```
+
+- 登録途中の失敗：この呼び出しが追加したリスナー・styleのみを解除します。解除失敗項目は保持し、次回呼び出しで後始末を再試行します。未解除項目が残る間は新規登録せず `false` を返します。登録完了フラグは全登録成功後に設定します。元からある無関係なリスナー・CSSは変更しません。
+- コールバックの失敗：印刷時の非表示・復元・media通知処理の失敗もコンソールへ報告します。復元失敗では保存状態を保持し、後続の終了通知で再試行できます。初回の `true` は将来のコールバック成功を保証しません。
+- 公開解除API・細かな設定オプションはありません。使うイベントとビューは呼び出し側で決めます。
+
+```js
+kviewer.events.on('records.show', () => {
+	installCopyPrintRestrictions();
+});
+kviewer.events.on('record.show', () => {
+	installCopyPrintRestrictions();
+});
+```
+
+**完全なコピー・保存・印刷・スクリーンショット防止機能ではありません。** PrintScreenキーイベントの抑止はOSの画面キャプチャを禁止しません。Ctrl/Cmd＋C自体を抑止する実装でもありません。アクセス権限や値の秘匿とは別で、選択・コンテキストメニュー・印刷の操作性とアクセシビリティに影響します。
+
+<a id="compatibility"></a>
+
+## kintone用ライブラリとの仕様対応
+
+既存の [kintone-custom-lib.js](../src/kintone-custom-lib.js) 本体を確認して実装しました。
+
+| 項目 | kintone用 | kViewer用 |
 | --- | --- | --- |
-| 207（操作抑止） | 一覧・詳細で `success: true`、操作も問題なしとの報告 | 個々のキー・OS操作・印刷通知別の詳細結果は報告されていないため、すべて個別確認済みとは扱わない |
-| 154（詳細遷移） | 詳細遷移の動作確認完了との報告 | ログは取得されていない。関数戻り値のログ確認とは区別する |
-| 353ダッシュボード（静的コンテンツ） | `shown: false / success: true`、非表示動作を確認 | 期間内の表示は実画面未確認。表示・復元は自動テスト結果のみ |
+| 値取得 | `getFieldValueOr(record, fieldCode, defaultValue)` | 位置引数・値の扱いを踏襲。引数名は `fallback` |
+| 依存チェック | `{ name, source }` 配列、通常の真偽値、strict時の例外 | 同形式。通知が使えなくても不足を警告 |
+| エラー報告 | コンソール、利用可能な通知 | 操作失敗はコンソール。依存不足は利用可能な `notifyError` も使用 |
+| 公開方式 | `window` へ直接公開 | 同方式。kintone用ライブラリには依存しない |
+| イベント登録 | `kintoneEventOn` | 対応ラッパーなし。ビュー側が `kviewer.events.on` を使う |
 
-上記範囲で通常配布への反映依頼を受けました。期間内表示など未確認事項は配布後も未確認として維持します。OSの制約やCSP、印刷UIの実挙動は自動テストでは保証しません。反復呼び出し・復元の耐久性は自動テストで確認し、レコード値の動的変更を実画面テストの前提にはしません。通常配布URLへ戻す際は候補版との二重読み込みを避け、一時検証コードや旧処理の重複登録を除去してください。
+既存のフィールド・ボタン表示ヘルパーはdisplay文字列のみを保存します。その仕様は変更せず、静的コンテンツと印刷処理には優先度も保存する別の内部ヘルパーを共用しました。
 
-### 第2段階の自動検証・取得先
+第2段階の重複処理原本（73行）はリポジトリ内になく、依頼文の動作仕様・URL式を基に実装しました。原本との行単位の同一性を確認したものではありません。登録失敗時の解除・再試行、印刷開始重複時の保存保護、表示優先度の復元、URLの末尾スラッシュ除去、入力検証・失敗報告を追加しています。
 
-- `npm test` — 成功。新しい `test/test-kviewer-stage-two.js` と既存の全テストを実行しました。既存5関数のテスト、226のメニュー配置、別コンテナ分離、曖昧な対応の拒否も含みます。
-- 新3関数のテストでは、初回・反復登録、キーの既定動作と伝播、印刷通知重複、display・優先度の復元、matchMedia新旧APIと任意API欠落、リスナー・CSS・mediaの登録失敗と再試行、解除失敗時の再試行抑制、コールバック内の失敗報告を確認しました。
-- 静的コンテンツはルート・子孫・複数対象・範囲外・特殊文字・初期非表示・通常およびimportantの復元・一部適用失敗を確認しました。遷移は特殊文字・末尾スラッシュ・クエリとハッシュ除去・型検証・設定例外・外部URL形コードを同じオリジンのパスとして扱うことを確認しました。
-- `npx prettier --check "src/**/*.{js,css,html}" test/test-kviewer-stage-two.js` — 成功。
-- `npm run lint` — 成功（全ソースのESLint）。
-- `for file in src/*.js test/test-*.js; do node --check "$file" || exit 1; done` — 成功。
-- `git diff --check` — 成功。
+<a id="verification"></a>
 
-開発時の候補版は[開発ブランチのソース](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/blob/feature/kviewer-stage-two/src/kviewer-custom-lib.js)に保存されています。通常配布先は https://js.kacsw.or.jp/kviewer-custom-lib.js です。通常配布への反映は `main` へのプッシュ後のCI・デプロイ成功と、配布URLのバージョン1.1.0およびソース一致を確認して完了とします。
+## 公式仕様と実画面確認結果
+
+### 公式資料
+
+- [公式JavaScriptカスタマイズ仕様](https://kviewer.kintoneapp.com/help/customize/v2)（2026-10-11確認）：`view.detail.show` の `getDetailViewElement()`、`record.show` の `getFieldElement(fieldCode)` と `getDetailElement()`、公開DOMクラス、ダッシュボード静的ラベル・画像の `data-static-code` が記載されています。非同期ハンドラーのPromiseを待たないことも明記されています。
+- [新マイページビューの案内](https://faq.kintoneapp.com/--6ab59d39b2fc2da633e60065)：新デザインへの移行とFormBridge連携設定等の案内です。上記JavaScript仕様のイベント対応表にマイページビューは明記されていないため、公式記載と以下の観測結果は区別します。
+
+### 利用者報告による確認範囲
+
+この作業環境から実画面操作を行ったものではありません。当初プレビューとして記録した新マイページの結果は、本番適用後だったとの訂正を受け、本番公開画面の確認として記録しています。プレビューや全ビューでの対応を保証しません。
+
+| 画面・機能 | 確認済み | 未確認・証拠の制限 |
+| --- | --- | --- |
+| 新マイページ（2026-10-11） | `record.show` 発火、`getFieldElement` と `getDetailViewElement` の存在。後者は `.kv-detail` を返す。`context.record.kintoneRecord` はオブジェクト（17キー）、`First_name` は自身の `value` を持つ | プレビュー、同画面の連携ボタン、複数ビュー間の分離は未確認 |
+| 新マイページの `First_name` | `.kv-detail-field` 全体を取得。属性は `data-field-code="First_name"`、`data-field-type="SINGLE_LINE_TEXT"`。flexクラスとgrid-area指定。非表示・再表示とも `true`、目視でラベルと値が消え、元の配置へ復元 | 反復呼び出しは自動テストと区別。例示用の「対象フィールド」での取得はnullだった |
+| 196新マイページのラベル・罫線（2026-10-12） | `record.show` で対象10件を `getFieldElement` により取得。DOMに接続されmain内にあり、`data-field-code` は指定コードと完全一致。見出しは `LABEL`、罫線は `HR`（内部に `hr` 1件）、内部に別の `data-field-code` 要素や取得要素の `data-static-code` はなし。`setFieldShown` で下表の各条件の戻り値trueと正常な表示状態を確認 | 氏名変更の罫線以外の9件は下表と逆の表示条件が未確認。他ビュー・他環境、一時ログ削除後の最終版反映後の実画面は未確認 |
+| 226既存リストビュー（1.0.1） | 詳細・mainの外側の `.kv-record-menu` に両ボタン。共通祖先は `.kv-container`、詳細・各種ボタンは各1件。イベント時点と2描画フレーム後で変化なし。修正後の編集非表示、印刷表示・非表示と戻り値trueを目視・ログ確認 | 編集ボタンの表示条件、既存フィールドの個別スモーク確認、クリック・レイアウトの詳細報告はなし |
+| 207（1.1.0） | 一覧・詳細で `success: true`、操作も問題なしとの報告 | 個々のキー・OS操作・印刷通知別の詳細結果は未報告 |
+| 154（1.1.0） | 詳細遷移の動作確認完了との報告 | ログ未取得。戻り値ログの確認とは区別 |
+| 353ダッシュボード（1.1.0） | `shown: false / success: true`、非表示を確認 | 期間内表示は実画面未確認。表示・復元は自動テスト結果のみ |
+
+#### アプリ196の詳細確認範囲
+
+代表罫線 `static_field_line_Name_change_group` は、イベント時点と2描画フレーム後の両方でmainを取得できDOMに接続されていましたが、main内の `data-static-code` 要素数と、main内・ページ全体の指定コード一致数は0件でした。一方、`getFieldElement` は罫線全体を包む要素を返しました。対象取得失敗の原因は属性の違いとして整理しています。2フレームの観測だけであらゆる描画遅延を否定するものではありません。
+
+自宅情報変更の見出しは、kViewer設定のコードに意図しない半角スペースがあり、利用者が `static_field_title_ Home_information_change_group` から `static_field_title_Home_information_change_group` へ修正しました。ライブラリによるtrimや入力補正で対応したものではありません。
+
+| 対象 | 確認したshown | 戻り値・目視結果 |
+| --- | --- | --- |
+| 氏名変更の罫線 | false / true | 両方true、非表示・表示とも正常 |
+| 氏名変更の見出し | true | true、正常 |
+| 自宅情報変更の見出し・罫線 | true | 各true、正常 |
+| 勤務先情報変更の見出し・罫線 | true | 各true、正常 |
+| 支部選択希望変更の見出し・罫線 | false | 各true、正常 |
+| 都道府県士会異動の見出し・罫線 | false | 各true、正常 |
+
+カスタマイズ側では計10件を `setFieldShown` に統一し、未使用の `setStaticContentShown` の依存指定を削除しました。業務条件・イベント登録・レコード取得・通常フィールド制御は変更せず、追加CSS・固定タイマー・DOM監視・ページ全体検索による表示制御も追加していません。対応はカスタマイズ側で完結し、共通ライブラリの変更依頼はありません。
+
+一時診断・検証ログとラッパーの削除後、カスタマイズ側でPrettier整形、ワークスペース設定のESLint、`node --check`、一時コード・旧関数呼び出しの残存確認が正常終了したとの報告があります。本リポジトリで再実行した結果ではなく、ログ削除後の最終版をkViewerへ反映した後の実画面確認とも区別します。
+
+226の実画面ログ：
+
+```text
+KV_BUTTON_TEST {"eventNumber":1,"formBridge":{"shown":false,"success":true},"printCreator":{"shown":true,"success":true}}
+KV_BUTTON_TEST {"eventNumber":2,"formBridge":{"shown":false,"success":true},"printCreator":{"shown":false,"success":true}}
+```
+
+226の確認した状態では取得修正だけで有効になり、`hidden`・`!important` の追加は不要でした。全CSS環境への保証ではありません。新マイページ確認時には `connect-src` のCSP通信ブロックも報告されましたが、宛先・発生元が不明で原因は未特定です。本ライブラリは通信しません。
+
+<a id="testing"></a>
+
+## 自動検証・実画面の追加確認
+
+### 自動検証記録
+
+次のコマンドは1.1.0開発時に成功しました。文書の再編だけを理由にテストを再実行した記録ではありません。
+
+- `npm test`：新規・既存の全テスト。値取得、フィールド・ボタン表示、226のメニュー配置、別コンテナ分離、曖昧な対応の拒否を含む。
+- `npm run lint`：全ソースのESLint。
+- `npx prettier --check "src/**/*.{js,css,html}" test/test-kviewer-stage-two.js`：成功。
+- `for file in src/*.js test/test-*.js; do node --check "$file" || exit 1; done`：成功。
+- `git diff --check`：成功。
+
+個別テストは [test-kviewer-custom-lib.js](../test/test-kviewer-custom-lib.js)、[test-kviewer-button-diagnostics.js](../test/test-kviewer-button-diagnostics.js)、[test-kviewer-stage-two.js](../test/test-kviewer-stage-two.js) です。`node -r ./test/setup-tests.js test/対象ファイル.js` で個別実行できます。1.0.1開発時のライブラリ・診断テストも成功しています。VS Codeのテストツールでは検出されなかったため、既存のNode実行方式を使用しました。
+
+第2段階テストには、反復登録、キーと伝播、印刷通知重複、display・優先度復元、matchMedia新旧APIと任意API欠落、登録・解除失敗後の再試行、コールバック失敗報告、URLエンコードと例外、静的要素のルート・子孫・複数対象・範囲外・特殊文字・初期非表示・一部適用失敗を含みます。サービス側の実HTML・CSS全体、OS制約、CSP、印刷UIを保証するテストではありません。
+
+### 実画面確認の進め方
+
+- まず本番に影響しない検証用ビューを優先し、各取得APIの存在と対象のDOM範囲を確認します。静的ラベル・罫線は `data-static-code` の一致とmain内配置を確認してください。
+- 業務条件が異なるレコードや画面状態で、表示・非表示・遷移が指定どおりかを確認します。取得配列の件数を全検索結果の件数と混同しないでください。
+- 値の動的変更を前提としない運用では、同一画面の「非表示→再表示→再非表示」は必須実画面テストにはしません。反復・復元の耐久性は自動テストで担保します。表示条件の未確認と同一画面の復元テストは区別します。
+- 連携ボタンの検証で旧方式が既に非表示にしていると、新方式の効果を判定できません。重複操作を避け、各対象画面でサービスCSS下の挙動を確認します。`hidden` や優先度操作が別途必要と判明した場合は、保存復元契約を含め再検討します。
+- 一時診断・タイマー付き検証コードを終了後に撤去し、設定反映・再読み込みします。レコード・氏名・URL・HTMLを不要にログ出力しないでください。
+
+<a id="diagnostics"></a>
+
+## 連携ボタンの一時診断コード
+
+[scripts/kviewer-button-diagnostics.js](../scripts/kviewer-button-diagnostics.js) はブラウザー用の一時診断ファイルです。ライブラリや通常配布対象には含めません。検証用ビューで再現できる場合はそちらを優先し、必要な場合だけ該当ビューへ一時追加します。
+
+- `kviewer` 識別子でイベントAPIを参照します。`window.kviewer` がなくても識別子が使える環境と、API未定義の警告をテスト済みです。
+- `record.show` 時点と2描画フレームコールバック後に、`KV_BUTTON_DIAGNOSTIC` で始まるJSONを出力します。これは有限回の診断であり、描画完了保証・表示制御の回避策ではありません。
+- APIの有無・返却範囲、詳細内とページ全体の件数、包含関係、共通祖先・祖先列、hiddenの有無・displayと優先度・計算済み表示状態を読み取ります。`node` は診断中だけの連番です。
+- 表示変更・ネットワーク通信・無期限監視は行いません。タグ名、限定公開クラス、兄弟位置で構造を表し、レコード、テキスト、リンク、URL、属性値、任意クラス、HTML、例外メッセージは出力しません。
+- 旧方式適用後の表示状態だけでは、通常の `display: none` の有効性を判定できません。
+- 同じ `eventNumber` の2件を共有してください。取得後はファイルを設定から外し、ページ再読み込みでハンドラーを除去します。コンテキスト全体やDOMそのものを出力する過去の診断コードは併用しません。
+
+<a id="history"></a>
+
+## 更新履歴・配布記録
+
+| バージョン | 変更内容 | 配布記録 |
+| --- | --- | --- |
+| 1.0.0 | 独立した初版、値取得・依存チェック・単一フィールド・両連携ボタンの5関数 | `4773c6f` |
+| 1.0.1 | 226の実DOMに基づくメニュー内ボタン取得、一意性検証・別コンテナ除外、未設定と断定しない警告。開発ブランチ `investigate/kviewer-button-scope` | `08593d1`。2026-10-12にCI・デプロイ・配布作成成功と、URLの1.0.1およびソース一致を確認 |
+| 1.1.0 | 操作抑止・詳細遷移・静的コンテンツ表示を追加。開発ブランチ `feature/kviewer-stage-two`、候補版 `bd47b91` | `bf869cc`。代表3画面の確認報告を記録後、2026-10-12にCI・デプロイ・配布作成成功と、URLの1.1.0およびソース完全一致を確認 |
+
+1.0.0の226では、両ボタンが詳細要素外にあるため未検出となり、非表示処理が実行されませんでした。業務条件を変えず、ページ全体で取得し `hidden` と `display: none !important` を使う旧方式へ戻して復旧したとの報告を受け、実DOM診断と1.0.1の取得修正を行いました。当時、他4本は公開画面へボタン共通化を未適用でした。1.0.1確認結果と通常配布更新を経て、各画面の確認を行いながら適用を再開する扱いです。
+
+1.1.0配布内容のSHA-256は `601ab10a884a755dbfbbec9faa529269e16d5ed40e14fd334f4b796f2ede010b` でした。通常配布の更新はデプロイ結果に加えてURLの内容一致で確認しています。新機能を含む今後の更新も、候補版の確認結果と未確認事項を区別して判断します。
