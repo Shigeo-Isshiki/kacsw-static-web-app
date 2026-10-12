@@ -1,48 +1,14 @@
 # zip-code-address-utils 使い方リファレンス
 
+## 概要・バージョン
+
+現行ソースのバージョン：**1.0.0**。配布URLへの反映・内容一致は今回未確認です。
+
 このドキュメントは `src/zip-code-address-utils.js` が公開する郵便番号／デジタルアドレス関連ユーティリティ関数の使い方と引数・戻り値の契約を整理したリファレンスです。テストや Node 環境でも `require('../src/zip-code-address-utils.js')` で利用できます（CommonJS エクスポートあり）。
 
 ---
 
-## 目次
-
-- [概要・通信方式](#overview)
-- [公開 API サマリ（用途別）](#public-api)
-- [各関数の引数・戻り値詳細](#api-details)
-- [実例](#examples)
-- [注意事項 / エッジケース](#notes)
-- [参照](#references)
-
-### kintone の住所設定・表示制御
-
-- [`registerZipCodeAddressHandler(options)`](#registerZipCodeAddressHandler)
-  - [設定オブジェクト](#handler-options)
-  - [反映ルール・結果検証・非同期制御](#handler-application)
-  - [戻り値・Promise・保存判断・後続処理](#handler-promises)
-  - [登録例](#handler-example)
-  - [案内文・旧 API の削除](#removed-apis)
-
-### 郵便番号の存在確認・整形・正規化
-
-- [`checkZipCodeExists(zipCode, callback)`](#checkZipCodeExists)
-- [`formatZipCode(zipCode, callback)`](#formatZipCode)
-- [`normalizeZipCode(zipCode, callback)`](#normalizeZipCode)
-
-### 住所・市区町村・都道府県の検索
-
-- [`getAddressByZipCode(zipCode, callback)`](#getAddressByZipCode)
-- [`getCityByZipCode(zipCode, callback)`](#getCityByZipCode)
-- [`getPrefectureByZipCode(zipCode, callback)`](#getPrefectureByZipCode)
-
-### 住所文字列の検証
-
-- [`hasPrefectureName(address)`](#hasPrefectureName)
-
----
-
 <a id="overview"></a>
-
-## 概要
 
 `src/zip-code-address-utils.js` は以下の用途を想定したヘルパー群です。
 
@@ -63,9 +29,17 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 
 ---
 
-<a id="public-api"></a>
+## 読み込み・依存関係
 
-## 公開 API サマリ
+- ソース：[src/zip-code-address-utils.js](../src/zip-code-address-utils.js)
+- 配布URL：https://js.kacsw.or.jp/zip-code-address-utils.js
+- 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
+
+ブラウザでは各関数を `window` に公開し、NodeではCommonJSエクスポートも提供します。検索には郵便番号APIへの通信が必要です。kintoneでは `kintone.proxy`、その他のブラウザでは `fetch` を使用します。住所設定ハンドラーにはkintoneのイベント・record APIとDOMが必要です。
+
+## 公開関数の目次
+
+<a id="public-api"></a>
 
 ### kintone の住所設定・表示制御
 
@@ -91,9 +65,9 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 
 ---
 
-<a id="api-details"></a>
+## 関数リファレンス
 
-## 各関数の引数・戻り値詳細
+<a id="api-details"></a>
 
 **注意**: 検索 API は非同期コールバック型です。新しい登録 API の `apply()` / `whenIdle()` は Promise 型です。
 
@@ -271,21 +245,21 @@ hasPrefectureName(' 東京都千代田区千代田1-1'); // false
 
 #### 設定オブジェクト
 
-| キー | 型・既定値 | 契約 |
-| --- | --- | --- |
-| `zipCodeField` | string、必須 | 郵便番号／デジタルアドレスのフィールドコード |
-| `mainAddressField` | string、必須 | 空欄補完の判定対象。`addressFields` の割り当て先に含める |
-| `addressFields` | object、必須 | `{ 検索結果のプロパティ名: Kintoneフィールドコード }`。同一フィールドへの重複割り当ては禁止 |
-| `clearFields` | string[]、`[]` | 置換時に空文字にする追加の関連フィールド。割り当て先も自動でクリア対象となる |
-| `zipErrorMessages` | object、必須 | 郵便番号・検索・必須結果検証エラーを保持する既存オブジェクト |
-| `addressErrorMessages` | object、必須 | 住所割り当て・全角変換・後続処理エラーを保持する既存オブジェクト |
-| `devices` | `'desktop' \| 'mobile' \| 'both'`、`'desktop'` | 登録する画面。PC/モバイルの record API は実際のイベントから選択する |
-| `watchFields` | string[]、`[]` | 郵便番号以外に表示更新を監視するフィールド。これらの変更では検索しない |
-| `canApply` | `({ record, source, busy }) => boolean`、常に true | 検索・反映の業務上の許可条件。開始時と結果到着時に最新レコードで評価 |
-| `button` | object、省略可 | `{ spaceField, id, text?, visible? }`。`text` は完全なボタンラベル（既定「郵便番号から住所を取得」） |
-| `guidance` | object、省略可 | `{ spaceField, id, text?, visible? }`。省略時は案内自体を作成しない |
-| `transformAddress` | `(value, { fieldCode, property, result }) => string`、そのまま返す | 任意の同期住所変換。全角変換・文字数検証等を実施できる。失敗は throw する |
-| `afterApply` | `({ record, result, source, isCurrent }) => void \| Promise<void>`、省略可 | 住所反映後だけ実行。地区判定等をアプリ側で実施する。完了まで `apply()` は待つ |
+| キー                   | 型・既定値                                                                 | 契約                                                                                                 |
+| ---------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `zipCodeField`         | string、必須                                                               | 郵便番号／デジタルアドレスのフィールドコード                                                         |
+| `mainAddressField`     | string、必須                                                               | 空欄補完の判定対象。`addressFields` の割り当て先に含める                                             |
+| `addressFields`        | object、必須                                                               | `{ 検索結果のプロパティ名: Kintoneフィールドコード }`。同一フィールドへの重複割り当ては禁止          |
+| `clearFields`          | string[]、`[]`                                                             | 置換時に空文字にする追加の関連フィールド。割り当て先も自動でクリア対象となる                         |
+| `zipErrorMessages`     | object、必須                                                               | 郵便番号・検索・必須結果検証エラーを保持する既存オブジェクト                                         |
+| `addressErrorMessages` | object、必須                                                               | 住所割り当て・全角変換・後続処理エラーを保持する既存オブジェクト                                     |
+| `devices`              | `'desktop' \| 'mobile' \| 'both'`、`'desktop'`                             | 登録する画面。PC/モバイルの record API は実際のイベントから選択する                                  |
+| `watchFields`          | string[]、`[]`                                                             | 郵便番号以外に表示更新を監視するフィールド。これらの変更では検索しない                               |
+| `canApply`             | `({ record, source, busy }) => boolean`、常に true                         | 検索・反映の業務上の許可条件。開始時と結果到着時に最新レコードで評価                                 |
+| `button`               | object、省略可                                                             | `{ spaceField, id, text?, visible? }`。`text` は完全なボタンラベル（既定「郵便番号から住所を取得」） |
+| `guidance`             | object、省略可                                                             | `{ spaceField, id, text?, visible? }`。省略時は案内自体を作成しない                                  |
+| `transformAddress`     | `(value, { fieldCode, property, result }) => string`、そのまま返す         | 任意の同期住所変換。全角変換・文字数検証等を実施できる。失敗は throw する                            |
+| `afterApply`           | `({ record, result, source, isCurrent }) => void \| Promise<void>`、省略可 | 住所反映後だけ実行。地区判定等をアプリ側で実施する。完了まで `apply()` は待つ                        |
 
 対象は通常の文字列フィールドです（サブテーブル・配列型は非対応）。郵便番号フィールドを住所割り当て先やクリア対象に含めてはいけません。設定不正は登録時に例外、フィールドの欠落・値型不正は処理時にエラーとなります。`addressFields` のプロパティ名は `getAddressByZipCode` の公開結果から選びます。メイン住所の検索結果値は空でない文字列が必須です。
 
@@ -297,14 +271,14 @@ hasPrefectureName(' 東京都千代田区千代田1-1'); // false
 
 #### 反映ルール
 
-| 操作 | 郵便番号 | 住所 |
-| --- | --- | --- |
-| 作成・編集の画面表示 | 検索も整形もしない | ボタン・案内の表示だけ更新 |
-| 通常郵便番号の入力変更 | 検索成功後に整形 | メイン住所が空文字の場合だけ存在する結果を補完。既存住所・関連欄は保持 |
+| 操作                       | 郵便番号             | 住所                                                                           |
+| -------------------------- | -------------------- | ------------------------------------------------------------------------------ |
+| 作成・編集の画面表示       | 検索も整形もしない   | ボタン・案内の表示だけ更新                                                     |
+| 通常郵便番号の入力変更     | 検索成功後に整形     | メイン住所が空文字の場合だけ存在する結果を補完。既存住所・関連欄は保持         |
 | デジタルアドレスの入力変更 | API の郵便番号に置換 | 既存住所にかかわらず全割り当て先＋`clearFields` をクリアして存在する結果を反映 |
-| ボタン操作／`apply()` | 検索成功後に整形 | 利用者による明示的な置換。デジタルアドレスと同じクリア・反映 |
-| 空の郵便番号への変更 | 検索しない | 住所を保持し、古い検索を無効化 |
-| `watchFields` の変更 | 検索しない | 表示だけ更新 |
+| ボタン操作／`apply()`      | 検索成功後に整形     | 利用者による明示的な置換。デジタルアドレスと同じクリア・反映                   |
+| 空の郵便番号への変更       | 検索しない           | 住所を保持し、古い検索を無効化                                                 |
+| `watchFields` の変更       | 検索しない           | 表示だけ更新                                                                   |
 
 デジタルアドレスの判定は **`normalizedZipCode !== apiZipCode`** のみです。英字の有無では判定しません。
 
@@ -412,9 +386,9 @@ node -r ./test/setup-tests.js test/test-zip-code-address-utils.js
 
 <a id="examples"></a>
 
-## 実例
+### 実例
 
-### Node / テスト環境
+#### Node / テスト環境
 
 ```js
 const zc = require('../src/zip-code-address-utils.js');
@@ -434,7 +408,7 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 }
 ```
 
-### ブラウザ / kintone 環境
+#### ブラウザ / kintone 環境
 
 ```html
 <script src="src/zip-code-address-utils.js"></script>
@@ -454,9 +428,11 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 
 ---
 
+## 制約・注意事項
+
 <a id="notes"></a>
 
-## 注意事項 / エッジケース
+### 注意事項 / エッジケース
 
 - 入力はまず全角→半角・記号除去・大文字化されます。正規化後は必ず `^[0-9A-Z]{7}$` の形式で API に問い合わせられます。
 - API レスポンスが複数件返ってきた場合はエラー（複数見つかりました）扱いになります。実装は単一ヒットを期待しています。
@@ -467,6 +443,20 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 
 <a id="references"></a>
 
-## 参照
+### 参照
 
 - 実装ソース: `src/zip-code-address-utils.js`
+
+文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
+
+## 更新履歴・配布記録
+
+| バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                        |
+| ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------- |
+| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | 配布URLへの反映・内容一致は今回未確認 |
+| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `651dead`。初版作成日・配布日は未確認 |
+| 未設定     | 2026-10-05 | 住所検索時の不要なZIP API再リクエストを回避                 | `7b1da89`。配布確認は未確認           |
+| 未設定     | 2026-10-11 | 移行済みの旧kintone郵便番号ボタン・案内APIを削除            | `1d2a27b`。配布確認は未確認           |
+| 未設定     | 2026-10-11 | 未使用のZIP実行時APIを削除し、API仕様書を整理               | `502864f`。配布確認は未確認           |
+
+過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。配布URLの内容・CI・デプロイは今回未確認です。過去のバージョンは推測で割り当てていません。

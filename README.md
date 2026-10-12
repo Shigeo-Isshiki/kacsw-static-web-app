@@ -17,6 +17,10 @@ kintone 向けおよび汎用の小さな JavaScript ユーティリティ集で
 
 ## ドキュメント
 
+- [文書作成標準・ライブラリ一覧](./docs/README.md)
+- [保守・開発手順](./docs/maintenance/library-maintenance.md)
+- [kViewerの調査・検証記録](./docs/verification/kviewer-custom-lib.md)
+
 - [銀行振込ユーティリティ — docs/bank-transfer.md](./docs/bank-transfer.md) — `src/bank-transfer.js`
 - [CSV ビルダー — docs/csv-builder.md](./docs/csv-builder.md) — `src/csv-builder.js`
 - [CSV パーサー — docs/csv-parser.md](./docs/csv-parser.md) — `src/csv-parser.js`

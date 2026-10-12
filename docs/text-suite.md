@@ -1,12 +1,14 @@
 # text-suite 使い方リファレンス
 
+## 概要・バージョン
+
+現行ソースのバージョン：**1.0.0**。配布URLへの反映・内容一致は今回未確認です。
+
 `src/text-suite.js` は文字列変換・正規化に関するユーティリティ群を提供します。主に日本語の全角⇄半角変換、かなの相互変換（ひらがな⇄カタカナ、全角⇄半角カナ）、メールアドレスの簡易検証など、kintone カスタマイズやフォーム入力の正規化に便利な関数を収録しています。
 
 ---
 
-## 概要
-
-提供される主要関数は同期的で、ブラウザと Node 双方で利用可能です。ブラウザではファイル末尾で `window` に安全に公開されます（既存グローバルを上書きしない実装）。
+提供される主要関数は同期的です。ブラウザでは各関数を `window` に公開します。Nodeでのテスト環境は次章を参照してください。
 
 主な機能:
 
@@ -20,68 +22,107 @@
 
 ---
 
-## 公開 API サマリ
+## 読み込み・依存関係
+
+- ソース：[src/text-suite.js](../src/text-suite.js)
+- 配布URL：https://js.kacsw.or.jp/text-suite.js
+- 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
+
+ブラウザでは各関数を `window` に公開します。イベントハンドラー登録には `kintone.events.on` が必要です。登録処理は本ライブラリ内で完結し、kintone-custom-libには依存しません。Nodeのテストでは `window` と、登録APIを検証する場合はkintone APIを用意してください。
+
+## 公開関数の目次
 
 ### 変換・検証関数
 
-- `isSingleByteAlnumOnly(str)` — 半角英数字・記号・スペースのみで構成されているか判定
-- `toFullWidthKatakana(str, [throwOnError=true])` — 可能な限り全角カタカナに変換
-- `toFullWidthHiragana(str, [throwOnError=true])` — 可能な限り全角ひらがなに変換
-- `toHalfWidthKana(str, [throwOnError=true])` — 可能な限り半角カタカナに変換
-- `toFullWidth(str, [throwOnError=true])` — 文字列中の半角英数字・記号等を全角に変換
-- `toHalfWidth(str, [throwOnError=true])` — 文字列中の全角英数字・記号等を半角に変換
-- `assertEmailAddress(emailAddress)` — 半角に正規化し、簡易 RFC5322 相当の形式チェックを行う（正常時は小文字化した文字列を返す、異常時は例外）
-  各関数は引数に不正な型や変換不能な文字が含まれている場合、デフォルトで例外を投げます（`throwOnError=false` を使える関数では例外を抑止して非変換文字をそのまま残す挙動も可能）。
+- [`isSingleByteAlnumOnly(str)`](#api-issinglebytealnumonly) — 半角英数字・記号・スペースのみで構成されているか判定
+- [`toFullWidthKatakana(str, [throwOnError=true])`](#api-tofullwidthkatakana) — 可能な限り全角カタカナに変換
+- [`toFullWidthHiragana(str, [throwOnError=true])`](#api-tofullwidthhiragana) — 可能な限り全角ひらがなに変換
+- [`toHalfWidthKana(str, [throwOnError=true])`](#api-tohalfwidthkana) — 可能な限り半角カタカナに変換
+- [`toFullWidth(str, [throwOnError=true])`](#api-tofullwidth) — 文字列中の半角英数字・記号等を全角に変換
+- [`toHalfWidth(str, [throwOnError=true])`](#api-tohalfwidth) — 文字列中の全角英数字・記号等を半角に変換
+- [`assertEmailAddress(emailAddress)`](#api-assertemailaddress) — 半角に正規化し、簡易 RFC5322 相当の形式チェックを行う（正常時は小文字化した文字列を返す、異常時は例外）
+  入力・例外の扱いは各関数と共通契約を参照してください。`isSingleByteAlnumOnly` は判定値を返し、文字変換関数には変換不能文字に対する例外を制御する `throwOnError` があります。
 
 ### イベントハンドラ登録関数
 
-- `registerFullWidthHandler(fieldCode, [options])` — kintone の追加・編集画面のフィールド変更イベントに全角変換ハンドラを登録する
-- `registerTableFullWidthHandler(tableFieldCode, fieldCode, [options])` — サブテーブル列の変更イベントに全角変換ハンドラを登録する
-- `registerFullWidthHiraganaHandler(fieldCode, [options])` — kintone の追加・編集画面のフィールド変更イベントに全角ひらがな変換ハンドラを登録する
-- `registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, [options])` — サブテーブル列の変更イベントに全角ひらがな変換ハンドラを登録する
-- `registerEmailAddressHandler(fieldCode, [options])` — 通常フィールドのメールアドレス変更イベントに検証・正規化ハンドラを登録する
-- `registerTableEmailAddressHandler(tableCode, columnCode, [options])` — サブテーブル列のメールアドレス変更イベントに検証・正規化ハンドラを登録する
+- [`registerFullWidthHandler(fieldCode, [options])`](#api-registerfullwidthhandler) — kintone の追加・編集画面のフィールド変更イベントに全角変換ハンドラを登録する
+- [`registerTableFullWidthHandler(tableFieldCode, fieldCode, [options])`](#api-registertablefullwidthhandler) — サブテーブル列の変更イベントに全角変換ハンドラを登録する
+- [`registerFullWidthHiraganaHandler(fieldCode, [options])`](#api-registerfullwidthhiraganahandler) — kintone の追加・編集画面のフィールド変更イベントに全角ひらがな変換ハンドラを登録する
+- [`registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, [options])`](#api-registertablefullwidthhiraganahandler) — サブテーブル列の変更イベントに全角ひらがな変換ハンドラを登録する
+- [`registerEmailAddressHandler(fieldCode, [options])`](#api-registeremailaddresshandler) — 通常フィールドのメールアドレス変更イベントに検証・正規化ハンドラを登録する
+- [`registerTableEmailAddressHandler(tableCode, columnCode, [options])`](#api-registertableemailaddresshandler) — サブテーブル列のメールアドレス変更イベントに検証・正規化ハンドラを登録する
 
 ---
 
-## 変換・検証関数の詳細
+## 関数リファレンス
 
-### `isSingleByteAlnumOnly(str)`
+### 変換・検証関数の詳細
+
+#### 文字変換5関数の共通契約
+
+`toFullWidthKatakana`、`toFullWidthHiragana`、`toHalfWidthKana`、`toFullWidth`、`toHalfWidth` に共通します。
+
+- `str` (string)：変換対象。省略時は空文字列ですが、空文字列は `Error` になります。
+- `throwOnError` (boolean)：既定true。falseの場合は変換不能文字を残します。
+- 戻り値：変換後の文字列。元の入力値は変更しません。
+- エラー：不正な引数型・空文字列はfalse指定でも例外になります。変換不能文字に対する例外の有無を `throwOnError` で指定します。
+- 利用例は各関数の説明と、この章末尾の「例」を参照してください。
+
+<a id="api-issinglebytealnumonly"></a>
+
+#### `isSingleByteAlnumOnly(str)`
 
 - 引数: `str` (string)
 - 戻り値: `boolean` — 半角 ASCII のみなら `true`
+- 未入力・不正型: 省略・空文字列はtrue、文字列以外はfalseです。
 - ユースケース: 入力が半角英数字のみであることを保証したい場合の簡易チェック
 
-### `toFullWidthKatakana(str, throwOnError = true)`
+<a id="api-tofullwidthkatakana"></a>
+
+#### `toFullWidthKatakana(str, throwOnError = true)`
 
 - 概要: ひらがな・半角カナ・一部合成濁点を全角カタカナへ変換します
 - 例外: 全角カタカナ以外の文字が残る場合は `Error` を投げます（`throwOnError` で制御）
 
-### `toFullWidthHiragana(str, throwOnError = true)`
+<a id="api-tofullwidthhiragana"></a>
+
+#### `toFullWidthHiragana(str, throwOnError = true)`
 
 - 概要: 半角カナ→全角カナ→ひらがな の順で変換し、最終的にひらがな以外が残ると例外を投げます
 - 補足: 長音符（`ー` / U+30FC）は許容されます（長音を含むフリガナ等を扱う用途に配慮）
 
-### `toHalfWidthKana(str, throwOnError = true)`
+<a id="api-tohalfwidthkana"></a>
+
+#### `toHalfWidthKana(str, throwOnError = true)`
 
 - 概要: ひらがな→全角カタカナ→半角カナ の順で変換します。濁点/半濁点の合成処理やスペースの正規化を行います。
 
-### `toFullWidth` / `toHalfWidth`
+<a id="api-tofullwidth"></a>
+
+<a id="api-tohalfwidth"></a>
+
+#### `toFullWidth` / `toHalfWidth`
 
 - 概要: 英数字・記号・スペースの全角／半角変換を行います。チルダやバックスラッシュ・円記号等、一部の記号は例外的に対応します（例: `\\` -> `￥`、`~` -> `～`）。
 
-### `assertEmailAddress(emailAddress)`
+<a id="api-assertemailaddress"></a>
+
+#### `assertEmailAddress(emailAddress)`
 
 - 概要: 入力を半角に正規化し、簡易的に RFC5322 相当の形式で検証します。正常時は小文字化して返します。
-- 例外: 不正な形式の場合は `Error` を投げます。
+- 引数: `emailAddress` (string)。前後空白を除去して検証します。
+- 戻り値: 正規化したメールアドレス（string）。
+- 例外: 空文字列・省略・文字列以外・不正な形式の場合は `Error` を投げます。
 
 ---
 
-## イベントハンドラ登録関数の詳細
+### イベントハンドラ登録関数の詳細
 
 同じ変換について、通常フィールドの変更イベント、サブテーブル列の変更イベントの順に説明します。いずれも `devices` の既定値は `'desktop'` で、画面表示イベントには登録しません。
 
-### `registerFullWidthHandler(fieldCode, options = {})`
+<a id="api-registerfullwidthhandler"></a>
+
+#### `registerFullWidthHandler(fieldCode, options = {})`
 
 kintone 標準の `kintone.events.on` を使い、指定フィールドの変更イベントに全角変換ハンドラを登録します。処理は `text-suite.js` 内で完結しており、`kintone-custom-lib.js` には依存しません。
 
@@ -90,7 +131,7 @@ kintone 標準の `kintone.events.on` を使い、指定フィールドの変更
 - 戻り値: `void`
 - 例外: 引数・オプションが不正な場合、または `kintone.events.on` が利用できない場合は登録時に `Error` を投げます
 
-#### options
+##### options
 
 | オプション              | 型                                    | 既定値                                                | 説明                                                                                             |
 | ----------------------- | ------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -101,13 +142,13 @@ kintone 標準の `kintone.events.on` を使い、指定フィールドの変更
 | `devices`               | `'desktop'` \| `'mobile'` \| `'both'` | `'desktop'`                                           | 登録対象のデバイス                                                                               |
 | `errorMessages`         | object                                | なし                                                  | 既存のエラーマップ。オブジェクト自体は差し替えず `errorMessages[fieldCode]` のみ更新します       |
 
-#### 登録されるイベント
+##### 登録されるイベント
 
 - `desktop`: `app.record.create.change.{fieldCode}` / `app.record.edit.change.{fieldCode}`
 - `mobile`: `mobile.app.record.create.change.{fieldCode}` / `mobile.app.record.edit.change.{fieldCode}`
 - `both`: 上記すべて
 
-#### ハンドラの挙動
+##### ハンドラの挙動
 
 1. 対象フィールドがイベントレコードに無い場合は、何もせずイベントを返します。
 2. 処理開始時に `record[fieldCode].error` と（指定時）`errorMessages[fieldCode]` をクリアします。
@@ -119,7 +160,9 @@ kintone 標準の `kintone.events.on` を使い、指定フィールドの変更
 
 住所欄のように「全角変換したうえで文字数を制限したい」ケースは、専用ハンドラを作らず `maxLength` オプションで対応できます。
 
-### `registerTableFullWidthHandler(tableFieldCode, fieldCode, options = {})`
+<a id="api-registertablefullwidthhandler"></a>
+
+#### `registerTableFullWidthHandler(tableFieldCode, fieldCode, options = {})`
 
 サブテーブル内の指定列について、変更された行のセルだけを全角に変換します。オプション、既定値、型検証、変換 → 空白除去 → 文字数判定の順序は `registerFullWidthHandler` と同じです。
 
@@ -138,11 +181,13 @@ registerTableFullWidthHandler('Training_content_list', 'Instructor_last_name', {
 });
 ```
 
-### `registerFullWidthHiraganaHandler(fieldCode, options = {})`
+<a id="api-registerfullwidthhiraganahandler"></a>
+
+#### `registerFullWidthHiraganaHandler(fieldCode, options = {})`
 
 `registerFullWidthHandler` と同じイベント登録方式・オプション契約で、対象フィールドを `toFullWidthHiragana` により正規化します。追加・編集画面に登録し、`devices` で PC・モバイルを選択できます。変換エラーや文字数超過時はフィールド値を維持してフィールドエラーを設定します。
 
-#### options
+##### options
 
 | オプション              | 型                                    | 既定値                                                | 説明                                                                                                 |
 | ----------------------- | ------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -155,7 +200,9 @@ registerTableFullWidthHandler('Training_content_list', 'Instructor_last_name', {
 
 文字数制限は `maxLength` を指定した場合にのみ適用されます。変換成功時・空値時はフィールドエラーと `errorMessages[fieldCode]` がクリアされます。
 
-### `registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, options = {})`
+<a id="api-registertablefullwidthhiraganahandler"></a>
+
+#### `registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, options = {})`
 
 サブテーブル内の指定列について、変更された行のセルだけを全角ひらがなに変換します。オプション、既定値、型検証、変換 → 空白除去 → 文字数判定の順序は `registerFullWidthHiraganaHandler` と同じです。行の特定、登録イベント、行IDによるエラーマップ管理は `registerTableFullWidthHandler` と同じです。
 
@@ -169,7 +216,9 @@ registerTableFullWidthHiraganaHandler('Member_list', 'Last_name_kana', {
 });
 ```
 
-### `registerEmailAddressHandler(fieldCode, options = {})`
+<a id="api-registeremailaddresshandler"></a>
+
+#### `registerEmailAddressHandler(fieldCode, options = {})`
 
 指定した通常フィールドの追加・編集画面における値変更イベントへ、`assertEmailAddress` による形式検証・半角小文字への正規化を登録します。画面表示イベントには登録しません。
 
@@ -178,7 +227,7 @@ registerTableFullWidthHiraganaHandler('Member_list', 'Last_name_kana', {
 - `options.errorMessages` は省略可能な既存エラーマップです。`errorMessages[fieldCode]` を更新します。
 - 空値・検証成功時はフィールドエラーとマップの値を `null` にします。失敗時は入力値を維持し、エラーをフィールドとマップの両方に設定します。
 
-#### 任意のドメイン制約（通常版・テーブル版共通）
+##### 任意のドメイン制約（通常版・テーブル版共通）
 
 既存の呼び出しはそのまま利用できます。`domainConstraint` を省略すれば従来どおり基本形式検証・正規化だけを行います。
 
@@ -222,7 +271,9 @@ registerEmailAddressHandler('Notification_email', {
 
 公開時は変更をレビュー・マージして `main` に反映し、Azure Static Web Apps CI/CD のデプロイ成功を確認してください。配信先は `https://js.kacsw.or.jp/text-suite.js` です。アプリでURL読み込みを利用している場合は再読み込み後に新しいオプションの動作を確認し、ファイルアップロードを利用している場合は更新済みJSをアプリへ再アップロードしてアプリを更新してください。
 
-### `registerTableEmailAddressHandler(tableCode, columnCode, options = {})`
+<a id="api-registertableemailaddresshandler"></a>
+
+#### `registerTableEmailAddressHandler(tableCode, columnCode, options = {})`
 
 サブテーブルの指定列について、変更された行だけを `assertEmailAddress` で検証・正規化します。`devices`、`errorMessages`、`domainConstraint` の仕様は通常版と同じで、`devices` の既定値は `'desktop'` です。形式検証・正規化・条件判定・ドメイン照合は通常版と共有しています。
 
@@ -250,7 +301,7 @@ registerTableEmailAddressHandler('Contacts', 'Email_address', {
 
 `assertEmailAddress` 自体は基本形式の検証・正規化のみを行い、ドメイン制約は通常版・テーブル版とも明示的に指定した場合だけ適用します。他テーブルの列監視や個別アプリの移行は対象外です。
 
-#### メールハンドラのイベントと移行時の注意
+##### メールハンドラのイベントと移行時の注意
 
 - 通常版・テーブル版とも、対象フィールド（列）の `app.record.create.change.{fieldCode}` / `app.record.edit.change.{fieldCode}` に登録します。モバイル対象の場合は `mobile.` 接頭辞のイベントにも登録します。画面表示イベントには登録しません。
 - テーブル版は、行追加・削除時に削除済み行のエラーを除去するため、テーブルコードの追加・編集変更イベントにも登録します。行番号はエラーマップのキーに使いません。ID未設定行は、一意なオブジェクト参照で特定できる場合にセルだけ処理し、エラーマップには登録しません。
@@ -260,7 +311,7 @@ registerTableEmailAddressHandler('Contacts', 'Email_address', {
 
 ---
 
-## 例
+### 例
 
 ```js
 // ブラウザで読み込んだ場合は window に公開されます
@@ -301,26 +352,22 @@ registerFullWidthHiraganaHandler(F.FURIGANA, {
 
 ---
 
-## 登録ハンドラの内部構成
+## 制約・注意事項
 
-通常フィールド版は `_ts_registerFieldValueHandler`、テーブル版は `_ts_registerTableFieldHandler` に登録処理を集約しています。どちらも `_ts_validateHandlerOptions` によるオプション検証と、kintoneイベントAPIの利用可否チェックを使用します。これらは非公開の内部関数です。
+### 検証・文字変換の制約
 
-- 共通登録処理は、対象フィールドの取得、空値判定、エラーのクリア、正規化関数の呼び出し、失敗時の入力値維持とエラー設定を担当します。テーブル版には行の特定と行IDエラーマップの同期が加わります。
-- 全角・ひらがなの各公開APIから渡す正規化関数が、変換 → 空白除去 → 文字数判定を担当します。通常版とテーブル版で同じ順序・既定値・エラーメッセージです。
-- メールの各公開APIは `assertEmailAddress` を正規化関数として渡します。共通登録処理自体に全角変換固有の処理は含めません。
-- 今後別の変換APIを追加する場合も、変換固有の処理は正規化関数側に定義し、イベント登録・エラー管理は共通登録処理を利用する構成です。
+`assertEmailAddress` は簡易検証です。厳密なRFC準拠を保証しません。長音符と波ダッシュ・ハイフン類は異なる変換規則を使います。
 
-## テストと運用ヒント
+文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
 
-- 重要な境界値: 半角⇄全角の混在、長音符（`ー`）や波ダッシュ等の記号、合成濁点／半濁点（゛/゜ の結合処理）を含む入力を検証してください。
-- `throwOnError=false` のケースでどのように非変換文字が残るかを確認するテストを用意すると堅牢です。
-- `assertEmailAddress` は簡易検証であり、厳密な RFC 準拠が必要な用途には専用ライブラリの利用を検討してください。
-- `registerFullWidthHandler` のテストでは `kintone.events.on` をスタブ化し、登録されたイベント名と、スタブ経由で取得したハンドラへ渡す擬似イベントオブジェクトの変化を検証します。
+## 更新履歴・配布記録
 
-### 長音符・波ダッシュに関する注意
+| バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                        |
+| ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------- |
+| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | 配布URLへの反映・内容一致は今回未確認 |
+| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `0299cda`。初版作成日・配布日は未確認 |
+| 未設定     | 2026-10-03 | IDのない新規テーブル行の処理を修正                          | `ee2b5c0`。配布確認は未確認           |
+| 未設定     | 2026-10-04 | メールハンドラーを追加し、テキストハンドラー登録を統一      | `5cddccf`。配布確認は未確認           |
+| 未設定     | 2026-10-04 | 任意のメールドメイン制約と依存検証を追加                    | `47aa625`。配布確認は未確認           |
 
-ライブラリは全角長音符 `ー`（U+30FC）と半角長音符 `ｰ`（U+FF70）を変換テーブルに登録していますが、波ダッシュ（U+301C / U+FF5E など）や他のハイフン類はハイフン正規化の対象として `_TS_HYPHEN_REGEX` でまとめて扱われます。必要であれば追加のコードポイントを変換テーブルに加えることで一元的な正規化が可能です。
-
----
-
-必要ならば関数ごとの戻り値の詳細（例: どのエラー文字列が返るか、throwOnError=false 時の正確な挙動）や内部変換テーブル（`_TS_CONVERT_CHARACTER_LIST`）の解説を追記します。どのレベルの詳細が欲しいですか？
+過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。配布URLの内容・CI・デプロイは今回未確認です。過去のバージョンは推測で割り当てていません。

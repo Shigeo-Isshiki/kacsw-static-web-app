@@ -1,22 +1,38 @@
-# csv-parser API ドキュメント
+# csv-parser 使い方リファレンス
 
-このドキュメントは [src/csv-parser.js](src/csv-parser.js) が公開する関数の使い方と、引数（schema/options）および返り値の仕様を整理したリファレンスです。
+## 概要・バージョン
+
+現行ソースのバージョン：**1.0.0**。配布URLへの反映・内容一致は今回未確認です。
+
+このドキュメントは [src/csv-parser.js](../src/csv-parser.js) が公開する関数の使い方と、引数（schema/options）および返り値の仕様を整理したリファレンスです。
 
 目的: kintone カスタマイズ側から CSV インポート処理を呼び出す際に、ファイル選択・文字コード変換・CSV パース・レコード化までの挙動を一貫して確認できるようにします。
 
 ---
 
-## 公開 API サマリ
+## 読み込み・依存関係
 
-- `parseCSV(schema, options) -> Promise<Result>`
-  - CSV ファイル選択ダイアログを内部で開き、読み込み・デコード・パース・schema マッピングまでを実行します。
+- ソース：[src/csv-parser.js](../src/csv-parser.js)
+- 配布URL：https://js.kacsw.or.jp/csv-parser.js
+- 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
+
+ブラウザでは `window.parseCSV` と `window.CSV.parseCSV` に公開します。NodeではCommonJSエクスポートがありますが、ファイル選択にはDOM・File APIが必要です。`encoding.js` は任意で、使用する場合は先に読み込んでください。未使用時は `TextDecoder` を使います。
 
 ブラウザでは `parseCSV(...)` として直接利用できます（`window.parseCSV` に公開）。
 併せて `window.CSV.parseCSV(...)` からも呼び出せます。Node/テスト環境では CommonJS エクスポート（`module.exports`）にも対応しています。
 
 ---
 
-## 1) parseCSV の詳細
+## 公開関数の目次
+
+- [`parseCSV(schema, options) -> Promise<Result>`](#api-parsecsv)
+  - CSV ファイル選択ダイアログを内部で開き、読み込み・デコード・パース・schema マッピングまでを実行します。
+
+## 関数リファレンス
+
+<a id="api-parsecsv"></a>
+
+### parseCSV(schema, options)
 
 **シグネチャ**:
 
@@ -43,9 +59,9 @@ parseCSV(schema, (options = {}));
 
 ---
 
-## 2) options の詳細
+### 2) options の詳細
 
-### CSV 構文オプション
+#### CSV 構文オプション
 
 - `delimiter` (string)
   - 区切り文字。デフォルト `,`。
@@ -74,7 +90,7 @@ parseCSV(schema, (options = {}));
 - `strictColumnCount` (boolean)
   - ヘッダ列数と各行列数の不一致をエラー化するか。デフォルト `false`。
 
-### 文字コードオプション
+#### 文字コードオプション
 
 - `encoding` (string)
   - `AUTO` | `UTF8` | `SJIS` | `UTF16LE` など。デフォルト `AUTO`。
@@ -88,7 +104,7 @@ parseCSV(schema, (options = {}));
 - `allowBom` (boolean)
   - BOM 判定を使うか。デフォルト `true`。
 
-### ファイル選択オプション
+#### ファイル選択オプション
 
 - `accept` (string)
   - ファイル選択ダイアログに渡す `accept` 属性値。デフォルト `.csv,text/csv`。
@@ -96,7 +112,7 @@ parseCSV(schema, (options = {}));
   - 例: `'*'`（制限なし）
   - ブラウザの UI フィルタのみで、強制制限ではありません。
 
-### エラー/出力オプション
+#### エラー/出力オプション
 
 - `onRowError` (string)
   - `collect` | `skip` | `throw`。デフォルト `collect`。
@@ -106,7 +122,7 @@ parseCSV(schema, (options = {}));
 
 ---
 
-## 3) schema 要素（詳細）
+### 3) schema 要素（詳細）
 
 各要素はオブジェクトで、以下をサポートします。
 
@@ -149,14 +165,14 @@ parseCSV(schema, (options = {}));
 
 ---
 
-## 4) 返り値仕様
+### 4) 返り値仕様
 
-### records
+#### records
 
 - schema に基づいて作成された配列。
 - `onRowError` が `collect` または `skip` の場合、エラー行は records へ追加されません。
 
-### errors
+#### errors
 
 代表的なフィールド:
 
@@ -190,18 +206,18 @@ parseCSV(schema, (options = {}));
 - `VALIDATION_ERROR`: 入力値が条件を満たしていない
 - `PARSE_ERROR`: 予期しない理由で CSV 解析に失敗した
 
-### 構造不一致時
+#### 構造不一致時
 
 - `hasHeader: true` の場合は、ヘッダーと schema の列対応が合わないときに `CSV_STRUCTURE_MISMATCH` を 1 件返して処理を止めます。
 - `hasHeader: false` の場合は、schema の想定列数に対して実データの列数が足りないときに `CSV_STRUCTURE_MISMATCH` を 1 件返して処理を止めます。
 - これにより、個別列の `COLUMN_NOT_FOUND` が大量に並ぶ状態を避けられます。
 
-### キャンセル時
+#### キャンセル時
 
 - ファイル選択ダイアログをキャンセルした場合は `errors` には追加せず、`meta.cancelled = true` を返します。
 - そのため、利用側では `result.meta.cancelled` を見てキャンセルとエラーを分けて扱えます。
 
-### meta
+#### meta
 
 - `totalRows` (number): データ行数（ヘッダ除く）
 - `parsedRows` (number): records 化できた行数
@@ -217,11 +233,11 @@ parseCSV(schema, (options = {}));
 
 ---
 
-## 5) 内部処理フロー（短く）
+### 5) 内部処理フロー（短く）
 
 ファイル選択 -> バイト読み込み -> 文字コード判定/デコード -> CSV 構文解析 -> ヘッダ/データ分離 -> schema 変換・検証 -> 結果返却
 
-### 日付変換の補足
+#### 日付変換の補足
 
 - `type: 'date'` は最終的に `YYYY-MM-DD`（kintone 日付形式）へ正規化されます。
 - `type: 'datetime'` は最終的に `YYYY-MM-DDTHH:MM:SSZ`（ミリ秒なし）へ正規化されます。
@@ -229,15 +245,7 @@ parseCSV(schema, (options = {}));
 
 ---
 
-## 6) 運用上の注意
-
-- `parseCSV` は内部でファイル選択ダイアログを開くため、ユーザー操作起点（クリックイベントなど）から呼び出してください。
-- 文字コードが重要な運用では、`encoding` を明示指定してテストしたうえで `AUTO` を併用する運用を推奨します。
-- `encodingLibrary: auto` の場合、`encoding.js` が利用可能なら優先し、利用不可時は `TextDecoder` にフォールバックします。
-
----
-
-## 7) kintone で Shift_JIS CSV を読むサンプル
+### 7) kintone で Shift_JIS CSV を読むサンプル
 
 前提:
 
@@ -296,3 +304,28 @@ console.log('meta', result.meta);
 - `type: 'datetime'` は最終的に `YYYY-MM-DDTHH:MM:SSZ` へ正規化されます。
 - ユーザーがファイル選択をキャンセルした場合は `result.meta.cancelled` で判定します。
 - 反映先アプリへの追加/更新/Upsert 判定は、`result.records` を使って kintone 側ロジックで実行してください。
+
+## 制約・注意事項
+
+### 6) 運用上の注意
+
+- `parseCSV` は内部でファイル選択ダイアログを開くため、ユーザー操作起点（クリックイベントなど）から呼び出してください。
+- 文字コードが重要な運用では、`encoding` を明示指定してテストしたうえで `AUTO` を併用する運用を推奨します。
+- `encodingLibrary: auto` の場合、`encoding.js` が利用可能なら優先し、利用不可時は `TextDecoder` にフォールバックします。
+
+---
+
+文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
+
+## 更新履歴・配布記録
+
+| バージョン | 記録日     | 主な変更                                                                  | 記録・配布確認                        |
+| ---------- | ---------- | ------------------------------------------------------------------------- | ------------------------------------- |
+| 1.0.0      | 2026-10-12 | 現行ソースを基準版として記録し、先頭JSDocにバージョンを明記。機能変更なし | 配布URLへの反映・内容一致は今回未確認 |
+| 未設定     | 2026-06-13 | Shift_JIS入力に対応したCSVパーサーを追加                                  | `141db34`。配布確認は未確認           |
+| 未設定     | 2026-06-13 | ファイル種類を絞るacceptオプションを追加                                  | `5a47d3f`。配布確認は未確認           |
+| 未設定     | 2026-06-16 | ファイル選択時の `FILE_NOT_SELECTED` 誤判定を抑制                         | `e23603a`。配布確認は未確認           |
+| 未設定     | 2026-08-04 | ファイル選択キャンセルの競合を修正                                        | `b07237c`。配布確認は未確認           |
+| 未設定     | 2026-08-05 | ファイル選択キャンセル処理を強化                                          | `dd5dece`。配布確認は未確認           |
+
+過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。配布URLの内容・CI・デプロイは今回未確認です。過去のバージョンは推測で割り当てていません。

@@ -1,4 +1,8 @@
-# csv-builder API ドキュメント
+# csv-builder 使い方リファレンス
+
+## 概要・バージョン
+
+現行ソースのバージョン：**1.0.0**。配布URLへの反映・内容一致は今回未確認です。
 
 このドキュメントは `src/csv-builder.js` が公開する関数の使い方と、公開関数に与える引数（意味と指定方法）を整理したリファレンスです。
 
@@ -6,7 +10,19 @@
 
 ---
 
-## 公開 API サマリ
+## 読み込み・依存関係
+
+- ソース：[src/csv-builder.js](../src/csv-builder.js)
+- 配布URL：https://js.kacsw.or.jp/csv-builder.js
+- 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
+
+ブラウザでは `window.CSV.buildRow` / `window.CSV.buildCSV` に公開します。Nodeでは `require("../src/csv-builder.js")` のCommonJSエクスポートを利用できます。元号定義は内蔵しており、date-utilsの追加読み込みは不要です。
+
+ブラウザでは `window.CSV.buildRow` / `window.CSV.buildCSV` として利用できます。Node で試す場合はテストと同じく `global.window = global` を行い `require('./src/csv-builder.js')` してください。
+
+---
+
+## 公開関数の目次
 
 - [buildRow(schema, data, options) -> string](#api-buildrow)
   - 単一レコード `data` から CSV の 1 行（改行無し）を返します。
@@ -14,13 +30,11 @@
 - [buildCSV(schema, dataArray, options) -> string](#api-buildcsv)
   - レコード配列 `dataArray` から CSV 全体（必要ならヘッダを含む）を返します。改行は `\n` です。
 
-ブラウザでは `window.CSV.buildRow` / `window.CSV.buildCSV` として利用できます。Node で試す場合はテストと同じく `global.window = global` を行い `require('./src/csv-builder.js')` してください。
-
----
+## 関数リファレンス
 
 <a id="api-buildrow"></a>
 
-## 1) buildRow の詳細
+### buildRow(schema, data, options)
 
 **シグネチャ**:
 
@@ -58,7 +72,7 @@ console.log(buildRow(schema, { id: 1, name: '山田' })); // "1,山田"
 
 <a id="api-buildcsv"></a>
 
-## 2) buildCSV の詳細
+### buildCSV(schema, dataArray, options)
 
 **シグネチャ**:
 
@@ -92,7 +106,7 @@ console.log(buildCSV(schema, rows, { header: true }));
 
 ---
 
-## スキーマ要素（詳細）
+### スキーマ要素（詳細）
 
 各要素はオブジェクトで、以下のプロパティをサポートします。
 
@@ -129,7 +143,7 @@ console.log(buildCSV(schema, rows, { header: true }));
 - `mapFinal` (boolean)
   - `true` を指定すると、map の戻り値をそのまま最終出力とし、その後の `formatter` / `type` / `format` の処理をスキップします。
 
-### 固定列（`key` を省略して固定値やデフォルトを出力する）
+#### 固定列（`key` を省略して固定値やデフォルトを出力する）
 
 配列形式のスキーマでは、各要素で `key` を省略することができます。`key` がない（または `null`）場合、内部でデータから値を取得せず `default` / `mapDefault` / `map` などにフォールバックします。固定の文字列や計算結果を1列に常に出力したいときに便利です。
 
@@ -155,7 +169,7 @@ CSV.buildCSV(schema, [{ id: 'A1', amount: 100 }], { header: true });
 
 ---
 
-### 列順（スキーマの順序）
+#### 列順（スキーマの順序）
 
 配列形式の `schema` を使うと、配列内の要素の並び順がそのまま CSV の列順になります。内部実装ではスキーマを正規化した配列（内部変数 `norm`）を先頭から順に処理して各セルを組み立てるためです。
 
@@ -176,7 +190,7 @@ const schema = [
 // 出力列順 = ID, 氏名, 金額
 ```
 
-## 内部の処理フロー（短く）
+### 内部の処理フロー（短く）
 
 raw 値取得 -> map 適用 -> (mapFinal?) -> formatter -> type/format -> escape -> 出力
 
@@ -184,7 +198,7 @@ raw 値取得 -> map 適用 -> (mapFinal?) -> formatter -> type/format -> escape
 
 ---
 
-## 出力とエスケープのルール（補足）
+### 出力とエスケープのルール（補足）
 
 - `null` / `undefined` -> 空文字列
 - 数値 (`typeof === 'number'` && `Number.isFinite`) -> クオートされずそのまま出力（例: `123`）
@@ -192,9 +206,9 @@ raw 値取得 -> map 適用 -> (mapFinal?) -> formatter -> type/format -> escape
 
 ---
 
-## 具体例
+### 具体例
 
-### 1) ヘッダ付き CSV（ブラウザ）
+#### 1) ヘッダ付き CSV（ブラウザ）
 
 ```html
 <script src="src/csv-builder.js"></script>
@@ -209,7 +223,7 @@ raw 値取得 -> map 適用 -> (mapFinal?) -> formatter -> type/format -> escape
 </script>
 ```
 
-### 2) Node で formatter を使う例（小数2桁、通貨）
+#### 2) Node で formatter を使う例（小数2桁、通貨）
 
 ```js
 global.window = global;
@@ -220,7 +234,7 @@ const schema = [
 console.log(window.CSV.buildCSV(schema, [{ amount: 123.456 }], { header: true }));
 ```
 
-### 3) Map と mapDefault の例
+#### 3) Map と mapDefault の例
 
 ```js
 const m = new Map([['りんご', 'A01']]);
@@ -228,7 +242,7 @@ const schema = [{ key: 'product', map: m, mapDefault: 'UNKNOWN' }];
 console.log(buildRow(schema, { product: 'ばなな' })); // -> 'UNKNOWN'
 ```
 
-### 日本語日付フォーマットの例
+#### 日本語日付フォーマットの例
 
 `src/csv-builder.js` では日本語表記のフォーマットをサポートしています。2つの形式の例を示します:
 
@@ -255,7 +269,7 @@ console.log(buildCSV(schemaJP, [rec], { header: true }));
 // -> "padded,unpadded\n2025年11月09日,2025年11月9日"
 ```
 
-### 和暦フォーマット（kintone 向け）の例
+#### 和暦フォーマット（kintone 向け）の例
 
 `src/csv-builder.js` は `date-utils.js` の `convertToEra` 相当ロジックを内包しており、`type: 'date'` の `format` に和暦系を指定できます。
 
@@ -291,7 +305,7 @@ console.log(buildRow(schemaEra, rec));
 // -> "令和7年,令和7年11月9日"
 ```
 
-### number型のゼロ埋めフォーマットの例
+#### number型のゼロ埋めフォーマットの例
 
 `type: 'number'` と `format: { width: N }` を組み合わせることで、整数部をN桁にゼロ埋めできます。
 
@@ -312,7 +326,7 @@ console.log(buildCSV(schemaPadding, [rec], { header: true }));
 
 ---
 
-## 契約（Contract）
+### 契約（Contract）
 
 - 入力: `schema`（配列/オブジェクト）、`data`（オブジェクト）または `dataArray`（配列）
 - 出力: CSV 文字列（改行は `\n`、区切りは `options.delimiter`）
@@ -320,7 +334,9 @@ console.log(buildCSV(schemaPadding, [rec], { header: true }));
 
 ---
 
-## 注意点とエッジケース
+## 制約・注意事項
+
+### 注意点とエッジケース
 
 - ドットパスで存在しないプロパティを辿ると `undefined` になるため `default` を設定することを推奨します。
 - `map` に plain object を使うときは `mapMode:'string'` を指定してください（デフォルトは型厳密な Map を期待します）。
@@ -329,6 +345,16 @@ console.log(buildCSV(schemaPadding, [rec], { header: true }));
 - 和暦出力は `ERA_*` 形式で指定できます。`date-utils.js` と同じ元号定義（令和/平成/昭和/大正/明治）を使用します。
 - 区切り文字を JIS 寄りにしたい場合は `ERA_INITIAL_JIS_YM` / `ERA_INITIAL_JIS_YMD` を使ってください。
 
----
+文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
 
-必要ならこのドキュメントにさらにユースケース（CRLF 対応、複雑なマッピング、パフォーマンス注意事項など）を追加します。
+## 更新履歴・配布記録
+
+| バージョン | 記録日     | 主な変更                                                                        | 記録・配布確認                        |
+| ---------- | ---------- | ------------------------------------------------------------------------------- | ------------------------------------- |
+| 1.0.0      | 2026-10-12 | 現行ソースを基準版として記録し、先頭JSDocにバージョンを明記。機能変更なし       | 配布URLへの反映・内容一致は今回未確認 |
+| 未設定     | 2025-11-09 | 現ファイルのGit履歴で確認できる最古の登録。ソース・仕様書・サンプルテストを追加 | `3c0b8b5`。初版作成日・配布日は未確認 |
+| 未設定     | 2026-04-26 | 和暦の日付書式と元号更新の説明を追加                                            | `fa68c15`。配布確認は未確認           |
+| 未設定     | 2026-04-26 | 元号漢字の先頭文字を使う日付書式を追加                                          | `d869116`。配布確認は未確認           |
+| 未設定     | 2026-07-16 | 年月書式とAPIサマリのアンカーリンクを追加                                       | `95057d4`。配布確認は未確認           |
+
+過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。配布URLの内容・CI・デプロイは今回未確認です。過去のバージョンは推測で割り当てていません。

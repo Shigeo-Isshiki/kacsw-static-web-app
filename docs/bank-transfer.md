@@ -1,5 +1,9 @@
 # bank-transfer 使い方リファレンス
 
+## 概要・バージョン
+
+現行ソースのバージョン：**1.0.0**。配布URLへの反映・内容一致は今回未確認です。
+
 このドキュメントは `src/bank-transfer.js` が公開する関数と、全銀フォーマット出力に必要な引数の詳細（契約）をまとめた使い方リファレンスです。
 
 > **重要**: このファイルには、kintoneでの単体動作のため、[src/national-holidays.js](../src/national-holidays.js) の祝日判定ロジックが組み込まれています（プレフィックス: `_bt_nh_`）。
@@ -9,33 +13,6 @@
 > - [src/shipping-processing.js](../src/shipping-processing.js) (プレフィックス: `_sp_nh_`)
 
 ---
-
-## 目次
-
-- 概要
-- 公開 API サマリ
-- 公開関数の引数詳細
-  - [`getBank(bankCodeOrName, callback)`](#getBank)
-  - [`getBranch(bankCode, branchCodeOrName, callback)`](#getBranch)
-  - [`convertYucho(kigou, bangou, callback)`](#convertYucho)
-  - [`parseZenginFile(options)`](#parseZenginFile)
-  - [`generateZenginData(headerData, records, callback)`](#generateZenginData)
-  - [`generateZenginDataAsync(headerData, records)`](#generateZenginDataAsync)
-  - [`generateHeader(headerData, callback)`](#generateHeader)
-  - [`generateDataRecords(records, fromBankNo, options?, callback)`](#generateDataRecords)
-  - [`normalizeEdiInfo(input, options)`](#normalizeEdiInfo)
-  - [`normalizePayeeName(name)`](#normalizePayeeName)
-  - [`normalizeAccountNumber(input)`](#normalizeAccountNumber)
-  - [`nextBankBusinessDay(baseDate, cutoffHour)`](#nextBankBusinessDay)
-  - [`nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)`](#nextPayrollTransferDate)
-  - [`isBankBusinessDay(targetDate)`](#isBankBusinessDay)
-- エラー形式
-- 実例
-- 注意事項 / エッジケース
-
----
-
-## 概要
 
 `src/bank-transfer.js` は kintone やブラウザ上で動作する銀行振込関連のユーティリティ群です。公開 API は `window.BANK` に付与されています（ロード後に `window.BANK = ...`）。
 
@@ -53,25 +30,13 @@
 
 ---
 
-## 公開 API サマリ
+## 読み込み・依存関係
 
-- `getBank(bankCodeOrName, options?, callback)`
-- `getBranch(bankCode, branchCodeOrName, options?, callback)`
-- `convertYucho(kigou, bangou, callback)`
-- `parseZenginFile(options)`
-- `encodeSjis(input)`
-- `generateHeader(headerData, callback)`
-- `generateDataRecords(records, fromBankNo, options?, callback)`
-- `generateTrailer(summaryData, callback)`
-- `generateEndRecord(callback)`
-- `generateZenginData(headerData, records, callback)`
-- `generateZenginDataAsync(headerData, records)`
-  - `normalizeEdiInfo(input, options)`
-  - `normalizePayeeName(name, options)`
-- `normalizeAccountNumber(input)`
-- `nextBankBusinessDay(baseDate, cutoffHour)`
-- `nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)`
-- `isBankBusinessDay(targetDate)`
+- ソース：[src/bank-transfer.js](../src/bank-transfer.js)
+- 配布URL：https://js.kacsw.or.jp/bank-transfer.js
+- 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
+
+ブラウザでは `window.BANK` に公開します。銀行・支店検索はkintoneでは `kintone.proxy`、その他のブラウザでは `fetch` を使用します。Shift_JIS変換を使う場合は、先に `encoding.js` を読み込み `window.Encoding` を公開してください。祝日ロジックは内蔵しており、祝日ライブラリの追加読み込みは不要です。
 
 （非同期 API のコールバックは単一引数 `callback(result)` に統一し、常に次のタスクで実行します。callback を指定しない呼び出しは `TypeError` になります）
 `parseZenginFile` は Promise を返します。
@@ -89,19 +54,40 @@ FormBridge向け中継APIは Bank Teraren API 互換のパス・応答形式を�
 
 `kintone.proxy` 経由の通信には10秒のタイムアウトを設けています。応答がない場合は、通常の通信エラーではなくタイムアウトとして扱います。内部デバッグログは `window.BANK._bt_debugLogs` に保存される場合がありますが、保持件数は最大200件です。
 
-## 将来の確認事項
+## 公開関数の目次
 
-- Promiseベースの非同期API（`getBankAsync` など）は、kintoneのイベント種別と既存callback APIへの影響を確認してから追加します。
-- `window.BANK` を標準名前空間とし、グローバル関数を段階的に廃止する移行は、アプリ側の利用箇所を確認してから実施します。
-- `parseZenginFile` の Shift_JIS 実データ読み込みは、実ファイルを用いた確認で問題なく動作することを確認済みです。
+### 銀行・支店検索と口座変換
 
-## 更新履歴
+- [`getBank(bankCodeOrName, options?, callback)`](#getBank)
+- [`getBranch(bankCode, branchCodeOrName, options?, callback)`](#getBranch)
+- [`convertYucho(kigou, bangou, callback)`](#convertYucho)
 
-- 2026-09-22: `generateZenginData`/`generateZenginDataAsync` で `headerData.typeCode` が `'11'`/`'12'`（給与振込・賞与振込）でも常に総合振込様式（EDI情報＋`7Y`）になってしまうバグを修正しました（`transferType` の二重解決が原因）。修正後、実際の金融機関システムへのアップロードで給与振込データとして正常に処理できることを確認済みです。
+### 全銀ファイルの読み込み・生成
 
----
+- [`parseZenginFile(options)`](#parseZenginFile)
+- [`encodeSjis(input)`](#api-encodesjis)
+- [`generateHeader(headerData, callback)`](#api-generateheader)
+- [`generateDataRecords(records, fromBankNo, options?, callback)`](#api-generatedatarecords)
+- [`generateTrailer(summaryData, callback)`](#api-generatetrailer)
+- [`generateEndRecord(callback)`](#api-generateendrecord)
+- [`generateZenginData(headerData, records, callback)`](#generateZenginData)
+- [`generateZenginDataAsync(headerData, records)`](#generateZenginDataAsync)
 
-## 公開関数の引数詳細
+### 入力の正規化
+
+- [`normalizeEdiInfo(input, options)`](#normalizeEdiInfo)
+- [`normalizePayeeName(name, options)`](#normalizePayeeName)
+- [`normalizeAccountNumber(input)`](#normalizeAccountNumber)
+
+### 銀行営業日
+
+- [`nextBankBusinessDay(baseDate, cutoffHour)`](#nextBankBusinessDay)
+- [`nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)`](#nextPayrollTransferDate)
+- [`isBankBusinessDay(targetDate)`](#isBankBusinessDay)
+
+## 関数リファレンス
+
+<a id="api-encodesjis"></a>
 
 ### `encodeSjis(input)`
 
@@ -629,6 +615,14 @@ console.log(result.content);
 
 <a id="generateHelpers"></a>
 
+<a id="api-generateheader"></a>
+
+<a id="api-generatedatarecords"></a>
+
+<a id="api-generatetrailer"></a>
+
+<a id="api-generateendrecord"></a>
+
 #### `generateHeader` / `generateDataRecords` / `generateTrailer` / `generateEndRecord`
 
 これらは `generateZenginData` の下位関数で、個別に利用することも可能です。ここでは各関数を簡潔に説明します。
@@ -804,7 +798,7 @@ console.log(result.content);
 
 ---
 
-## エラー形式 (ErrorResult)
+### エラー形式 (ErrorResult)
 
 共通の構造化エラー形式:
 
@@ -816,63 +810,52 @@ console.log(result.content);
 
 ---
 
-## 実例: generateZenginData の利用
+### 実例: generateZenginData の利用
 
-````js
+```js
 // Node / テスト環境の例
 global.window = global;
 require('./src/bank-transfer.js');
 
 const headerData = {
-  typeCode: '11',
-  requesterCode: '12345',
-  requesterName: 'テストカイシャ',
-  tradeDate: '20251109',
-  fromBankNo: '0001',
-  fromBranchNo: '001',
-  depositType: '普通',
-  accountNumber: '1234567'
+	typeCode: '11',
+	requesterCode: '12345',
+	requesterName: 'テストカイシャ',
+	tradeDate: '20251109',
+	fromBankNo: '0001',
+	fromBranchNo: '001',
+	depositType: '普通',
+	accountNumber: '1234567',
 };
 
 const records = [
-  { toBankNo:'0005', toBranchNo:'123', toAccountType:'普通', toAccountNumber:'1234567', amount:1000, customerName:'山田 太郎' }
+	{
+		toBankNo: '0005',
+		toBranchNo: '123',
+		toAccountType: '普通',
+		toAccountNumber: '1234567',
+		amount: 1000,
+		customerName: '山田 太郎',
+	},
 ];
 
 window.BANK.generateZenginData(headerData, records, (res) => {
-  if (res && res.success) {
-    // res.content を Shift_JIS に変換してファイル保存する
-    console.log('Zengin content length:', res.content.length);
-  } else {
-    console.error('生成エラー', res);
-  }
+	if (res && res.success) {
+		// res.content を Shift_JIS に変換してファイル保存する
+		console.log('Zengin content length:', res.content.length);
+	} else {
+		console.error('生成エラー', res);
+	}
 });
-
-### 生成結果の実例（実行サンプル）
-
-以下はリポジトリ内のサンプル実行結果の抜粋です（`scripts/generate-sample-zengin.js` を実行して得られた結果）。
-
-- content の全長: 484
-- 行数: 4（ヘッダ + データ行群 + トレーラ + エンド）
-
-先頭 4 行（CRLF 区切り、各行は 120 バイト固定長）:
-
-```text
-1: 11100000012345ﾃｽﾄ会社                                 11090001ﾐｽﾞﾎｷﾞﾝｺｳ      001ﾄｳｷﾖｳ          11234567
-2: 20005ﾐﾂﾋﾞｼﾕ-ｴﾌｼﾞｴｲｷﾞ123ﾖｺﾊﾏﾅｶﾔﾏ           11234567ﾔﾏﾀﾞ ﾀﾛｳ                      00000010001                    7Y
-3: 8000001000000001000
-4: 9
-````
-
-注:
-
-- 上記はサンプル入力に対する一例です。`header.parts` と `parts.data` に分割して個別に検査できます。
-- 実際の出力は入力データ（口座種別や口座番号、依頼人名）や内部の銀行データ取得の成否により変わります。
-
 ```
+
+過去の生成サンプル出力・実機検証の記録は [検証記録](verification/bank-transfer.md) を参照してください。出力は入力データと銀行検索結果によって変わります。
 
 ---
 
-## 注意事項 / エッジケース
+## 制約・注意事項
+
+### 注意事項 / エッジケース
 
 - 受取人名や依頼人名は SJIS 相当のバイト長で切り詰められます。切り詰めは視覚的に不自然になり得るため、事前に長さを検査してください。
 - amount は整数（小数は扱えません）。必要に応じて小数を整数（円）に変換してください。
@@ -880,5 +863,21 @@ window.BANK.generateZenginData(headerData, records, (res) => {
 
 ---
 
-必要なら、この文書を英語版に翻訳したり、`generateZenginData` の各下位関数に対するJSON スキーマを追加できます。ご希望があれば続けて対応します。
-```
+### 実画面検証の記録
+
+給与振込の修正後に金融機関へのアップロードで正常処理を確認した記録があります（`9eb1c81`）。配布URLの内容一致とは別の確認です。
+
+文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
+
+## 更新履歴・配布記録
+
+| バージョン | 記録日     | 主な変更                                                                                                                | 記録・配布確認                                                                                                                      |
+| ---------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0      | 2026-10-12 | 現行ソースを基準版として記録し、先頭JSDocにバージョンを明記。機能変更なし                                               | 配布URLへの反映・内容一致は今回未確認                                                                                               |
+| 未設定     | 2025-11-03 | 現ファイルのGit履歴で確認できる最古の登録。callback方式の単一ファイルライブラリを復元                                   | `a87a4c4`。初版作成日・配布日は未確認                                                                                               |
+| 未設定     | 2026-09-22 | 給与振込・賞与振込（typeCode 11/12）に対応                                                                              | `893d2f3`。配布確認は未確認                                                                                                         |
+| 未設定     | 2026-09-22 | `generateZenginData` / `generateZenginDataAsync` の振込種別二重解決を修正。給与・賞与でも総合振込様式になる不具合を解消 | 修正 `15cd80a`、実機検証記録 `9eb1c81`。金融機関システムへのアップロードで給与振込として正常処理を確認済み。配布URLとの一致は未確認 |
+| 未設定     | 2026-09-22 | 銀行営業日判定 `isBankBusinessDay` を追加                                                                               | `e72fd3b`。配布確認は未確認                                                                                                         |
+| 未設定     | 2026-09-26 | 依存チェックに関する説明を更新                                                                                          | `f75e4a7`（本仕様書の変更）。配布内容の変更確認とは区別                                                                             |
+
+過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。配布URLの内容・CI・デプロイは今回未確認です。過去のバージョンは推測で割り当てていません。

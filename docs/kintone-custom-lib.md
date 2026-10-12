@@ -1,10 +1,22 @@
 # kintone-custom-lib 使い方リファレンス
 
+## 概要・バージョン
+
+現行ソースのバージョン：**1.0.0**。配布URLへの反映・内容一致は今回未確認です。
+
 このドキュメントは `src/kintone-custom-lib.js` が公開する関数ごとに使い方と契約（引数・戻り値・副作用）をまとめたリファレンスです。
 
 各見出しは公開関数（`window` に公開される想定）に対応しています。テストや CI で Node 上から利用する場合は `global.window = global` を設定してから `require('../src/kintone-custom-lib.js')` してください。
 
-## 公開 API サマリ
+## 読み込み・依存関係
+
+- ソース：[src/kintone-custom-lib.js](../src/kintone-custom-lib.js)
+- 配布URL：https://js.kacsw.or.jp/kintone-custom-lib.js
+- 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
+
+ブラウザでは各関数を `window` に公開します。kintoneの画面操作・イベント登録には対応するkintone APIとDOMが必要です。テストでNodeから読み込む場合は `global.window = global` を設定し、必要なkintone APIとDOMを用意してください。
+
+## 公開関数の目次
 
 ### ランタイム初期化
 
@@ -42,7 +54,9 @@
 - [updateSubtableOperationControl(controller, partialOptions)](#updatesubtableoperationcontrol)
 - [teardownSubtableOperationControl(controller)](#teardownsubtableoperationcontrol)
 
-## ランタイム初期化（推奨）
+## 関数リファレンス
+
+### ランタイム初期化（推奨）
 
 PC/モバイル判定を呼び出し側で一度だけ確定したい場合は、次の初期化 API を利用します。
 
@@ -63,7 +77,7 @@ globalThis.KACSW_RUNTIME = {
 
 <a id="initkintonecustomlibruntime"></a>
 
-### initKintoneCustomLibRuntime(options)
+#### initKintoneCustomLibRuntime(options)
 
 - 動作概要: PC/モバイル判定を明示設定し、内部キャッシュへ保存します。
 
@@ -82,7 +96,7 @@ initKintoneCustomLibRuntime({ isMobilePage: true, version: Date.now() });
 
 <a id="resetkintonecustomlibruntime"></a>
 
-### resetKintoneCustomLibRuntime()
+#### resetKintoneCustomLibRuntime()
 
 - 動作概要: 内部キャッシュされたランタイム設定をクリアします。
 - 戻り値: なし
@@ -92,8 +106,6 @@ initKintoneCustomLibRuntime({ isMobilePage: true, version: Date.now() });
 ```js
 resetKintoneCustomLibRuntime();
 ```
-
-## 個別関数の使い方
 
 > 注意: ここに書かれた使用例はライブラリの公開 API に合わせたもので、実行環境（ブラウザ / kintone / Node+jsdom）によって前提が異なります。kintone の DOM 要素を参照する関数は、テスト時に `kintone.app` のモックや `document`（jsdom）の用意が必要です。
 
@@ -239,8 +251,6 @@ getFieldValueOr(rec, 'name', '不明'); // -> '山田'
 getFieldValueOr(rec, 'missing', '不明'); // -> '不明'
 ```
 
-テストヒント: 無効な `record` を渡したときに `defaultValue` が返ることをアサートします。
-
 <a id="kintoneeventon"></a>
 
 ### kintoneEventOn(events, handler)
@@ -257,8 +267,6 @@ kintoneEventOn('app.record.create', function (event) {
 	return event;
 });
 ```
-
-テストヒント: `global.kintone = { events: { on: (ev, h) => h({}) } }` のようにスタブして、ハンドラが呼ばれることを確認します。
 
 <a id="setrecordvalues"></a>
 
@@ -302,8 +310,6 @@ if (action === 'OK') {
 	console.log('ユーザーが閉じました');
 }
 ```
-
-テストヒント: jsdom と `kintone.createDialog`（PC）または `kintone.mobile.createBottomSheet`（モバイル）のモックを用意し、生成されたコンテナ内に `.kc-notify-error__message` が存在すること、不正な `script` 要素や `on*` 属性が削除されていることを確認します。
 
 違い（用途の目安）:
 
@@ -528,8 +534,6 @@ if (result && result.action === 'OK') {
 - `styleOptions.marginRight` (string) — 右余白（例: `8px`, `0.5rem`）
 - `styleOptions.horizontalMargin` (string) — 左右余白（後方互換用。`marginLeft`/`marginRight` 未指定側に適用）
 
-テストヒント: `kintone.app.getHeaderMenuSpaceElement(id)` をモックして、返された要素に button が追加されることを検証します。
-
 <a id="setrecordheadermenuspacebutton"></a>
 
 ### setRecordHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)
@@ -580,8 +584,6 @@ setRecordHeaderMenuSpaceButton(
 setRecordHeaderMenuSpaceButton('my-rec-btn', null);
 ```
 
-テストヒント: jsdom でテストする場合は `global.kintone.app.record.getHeaderMenuSpaceElement = id => document.getElementById('your-container')` のようにモックを用意し、返される要素に対して button が追加されることを確認します。
-
 <a id="setrecordheadermenuspacetext"></a>
 
 ### setRecordHeaderMenuSpaceText(id, innerHTML)
@@ -603,8 +605,6 @@ setRecordHeaderMenuSpaceText('rec-text', '<strong>ヘッダ情報</strong>');
 // 削除
 setRecordHeaderMenuSpaceText('rec-text', null);
 ```
-
-テストヒント: jsdom で `document` を用意し、`global.kintone.app.record.getHeaderMenuSpaceElement = id => document.getElementById('rec-header-space')` のようにモックしてから呼び出し、返された要素に該当 ID の要素が appendChild されることを確認します。
 
 <a id="setspacefieldbutton"></a>
 
@@ -657,8 +657,6 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 - `id` (string) — 挿入する要素の ID
 - `innerHTML` (string | null) — 挿入する HTML（サニタイズ済を想定）。`null` または空文字で削除
 
-テストヒント: `initKintoneCustomLibRuntime({ isMobilePage: true })` を使うケースと、未初期化で `location.pathname = '/k/m/...'` を使うケースの両方を検証します。
-
 <a id="setspacefielddisplay"></a>
 
 ### setSpaceFieldDisplay(spaceField, display)
@@ -669,38 +667,18 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 - `spaceField` (string) — スペースフィールドのコード
 - `display` (boolean) — true で表示、false で非表示にする指定
 
-## テスト用モック例（jsdom + Node）
+## 制約・注意事項
 
-簡易的なパターン:
+文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
 
-```js
-const { JSDOM } = require('jsdom');
-const dom = new JSDOM(`<!doctype html><html><body><div id="space-A"></div></body></html>`);
-global.window = dom.window;
-global.document = dom.window.document;
+## 更新履歴・配布記録
 
-// 必要な kintone API をモック
-global.kintone = {
-	app: {
-		record: {
-			getSpaceElement: (code) => document.getElementById(code),
-		},
-		getHeaderMenuSpaceElement: (id) => document.getElementById('header-' + id),
-	},
-	events: {
-		on: (ev, h) => {
-			/* stub */
-		},
-	},
-	createDialog: (config) => ({
-		element: config.body,
-		show: () => document.body.appendChild(config.body),
-	}),
-};
+| バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                        |
+| ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------- |
+| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | 配布URLへの反映・内容一致は今回未確認 |
+| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `93fc72e`。初版作成日・配布日は未確認 |
+| 未設定     | 2026-09-24 | ダイアログボタンをkintoneのスタイルに合わせる               | `e34aa9d`。配布確認は未確認           |
+| 未設定     | 2026-09-26 | 依存チェックを追加し、仕様書を更新                          | `f75e4a7`。配布確認は未確認           |
+| 未設定     | 2026-09-27 | kintoneクエリ値のエスケープヘルパーを追加                   | `67d7c6a`。配布確認は未確認           |
 
-require('../src/kintone-custom-lib.js');
-```
-
-このパターンを使うと `setSpaceFieldText` や `notifyError` 等の DOM 操作を Node 上で検証できます。
-
-必要があれば各関数のより詳細なシグネチャ（例: 例外の種類、内部ロギングの仕様、非同期の挙動など）を追記します。ご希望があればどの関数の説明をさらに掘り下げるか教えてください。
+過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。配布URLの内容・CI・デプロイは今回未確認です。過去のバージョンは推測で割り当てていません。

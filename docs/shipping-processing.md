@@ -1,5 +1,9 @@
 # shipping-processing 使い方リファレンス
 
+## 概要・バージョン
+
+現行ソースのバージョン：**1.0.0**。配布URLへの反映・内容一致は今回未確認です。
+
 このドキュメントは `src/shipping-processing.js` が公開する配送関連ユーティリティ関数の使い方（引数・戻り値・副作用）をまとめたリファレンスです。
 
 > **重要**: このファイルには、kintoneでの単体動作のため、[src/national-holidays.js](../src/national-holidays.js) の祝日判定ロジックが組み込まれています（プレフィックス: `_sp_nh_`）。
@@ -9,8 +13,6 @@
 > - [src/bank-transfer.js](../src/bank-transfer.js) (プレフィックス: `_bt_nh_`)
 
 ---
-
-## 概要
 
 `src/shipping-processing.js` は配送に関する共通処理を提供するユーティリティです。主に次を提供します。
 
@@ -24,13 +26,15 @@
 
 ---
 
-## 公開 API サマリ
+## 読み込み・依存関係
 
-- `getNextBusinessDay(baseDate, cutoffHour)`
-- `kintoneShippingInquiryButton(spaceField, id, label, trackingNumber, carrier)`
-- `validateTrackingNumber(trackingNumber, minLength, maxLength)`
-- `initShippingProcessingRuntime(options)`
-- `resetShippingProcessingRuntime()`
+- ソース：[src/shipping-processing.js](../src/shipping-processing.js)
+- 配布URL：https://js.kacsw.or.jp/shipping-processing.js
+- 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
+
+ブラウザでは各関数を `window` に公開します。問い合わせボタンにはkintoneのrecord APIとDOMが必要です。祝日判定は内蔵しており、追加ライブラリや外部祝日APIは不要です。Nodeのテストでは `window`・DOM・kintone APIを用意してください。
+
+### ランタイム設定
 
 ランタイム初期化（推奨）:
 
@@ -44,11 +48,19 @@ initShippingProcessingRuntime(globalThis.KACSW_RUNTIME);
 
 判定優先順位は `initShippingProcessingRuntime` の設定、`KACSW_RUNTIME`、未設定時の自動判定（`location.pathname`）です。
 
-（注）`getNextBusinessDay` は同期関数（**v2.0からコールバック方式から変更**）、`kintoneShippingInquiryButton` は DOM に副作用を与えます。`validateTrackingNumber` は同期関数で、入力不正時に `Error` を投げます。
+（注）`getNextBusinessDay` は同期関数、`kintoneShippingInquiryButton` は DOM に副作用を与えます。`validateTrackingNumber` は同期関数で、入力不正時に `Error` を投げます。
 
----
+## 公開関数の目次
 
-## 各関数の詳細
+- [`getNextBusinessDay(baseDate, cutoffHour)`](#api-getnextbusinessday)
+- [`kintoneShippingInquiryButton(spaceField, id, label, trackingNumber, carrier)`](#api-kintoneshippinginquirybutton)
+- [`validateTrackingNumber(trackingNumber, minLength, maxLength)`](#api-validatetrackingnumber)
+- [`initShippingProcessingRuntime(options)`](#api-initshippingprocessingruntime)
+- [`resetShippingProcessingRuntime()`](#api-resetshippingprocessingruntime)
+
+## 関数リファレンス
+
+<a id="api-validatetrackingnumber"></a>
 
 ### `validateTrackingNumber(trackingNumber, minLength = 10, maxLength = 14)`
 
@@ -77,13 +89,9 @@ validateTrackingNumber('１２３－４５６－７８９０'); // -> '123456789
 validateTrackingNumber('123-45 67890', 10, 14); // -> '1234567890'
 ```
 
-テストヒント:
-
-- 全角数字とハイフン混在の正常系
-- アルファベットや記号の混入でエラーになること
-- `minLength` / `maxLength` の境界値テスト
-
 ---
+
+<a id="api-getnextbusinessday"></a>
 
 ### `getNextBusinessDay(baseDate = new Date(), cutoffHour = 16)`
 
@@ -109,11 +117,9 @@ const d2 = getNextBusinessDay('2025-11-12', 16);
 console.log(d2); // -> '2025-11-12'
 ```
 
-テストヒント:
-
-- 土日、年末年始（12/29〜1/4）、祝日が連続するケースで正しく翌営業日に進むかを確認する
-
 ---
+
+<a id="api-kintoneshippinginquirybutton"></a>
 
 ### `kintoneShippingInquiryButton(spaceField, id, label, trackingNumber, carrier)`
 
@@ -141,12 +147,9 @@ console.log(d2); // -> '2025-11-12'
   - `sagawa` = 佐川急便
 - 問い合わせ URL のテンプレートは内部定数 `_SP_SHIPPING_INQUIRY_URL_MAP` を利用して生成する
 
-テストヒント:
-
-- `document.createElement` / kintone の record namespace をスタブして、生成される要素の `id`、`textContent`、およびクリック時に `window.open` が正しい URL を受け取ることを確認する
-- `label === null` の場合に親要素が `display: none` になる挙動を確認する
-
 ---
+
+<a id="api-initshippingprocessingruntime"></a>
 
 ### `initShippingProcessingRuntime(options)`
 
@@ -164,6 +167,8 @@ console.log(d2); // -> '2025-11-12'
 
 ---
 
+<a id="api-resetshippingprocessingruntime"></a>
+
 ### `resetShippingProcessingRuntime()`
 
 - 動作:
@@ -174,13 +179,7 @@ console.log(d2); // -> '2025-11-12'
 
 ---
 
-## 既知の内部定数
-
-- `_SP_SHIPPING_INQUIRY_URL_MAP` — 運送会社ごとの問い合わせ URL テンプレート（`yamato` = ヤマト運輸, `japanpost` = 日本郵便, `sagawa` = 佐川急便）
-
----
-
-## 例
+### 例
 
 ```js
 // 伝票番号の検証
@@ -202,12 +201,29 @@ kintoneShippingInquiryButton('space1', 'trackBtn', undefined, '1234567890', 'jap
 
 ---
 
-## テスト／検証のヒント
+## 制約・注意事項
 
-- `validateTrackingNumber` の境界、全角/半角、ハイフン・空白の扱いを網羅する
-- `getNextBusinessDay` は内部に組み込まれた祝日判定ロジックを使用するため、外部APIへの依存はありません。土日・祝日・年末年始が連続するケースで正しく翌営業日に進むかを検証する。
-- `kintoneShippingInquiryButton` は DOM と kintone API をスタブして副作用（ボタン追加、親の display 値、`window.open` 呼び出し）を検証する
+### 既知の内部定数
+
+- `_SP_SHIPPING_INQUIRY_URL_MAP` — 運送会社ごとの問い合わせ URL テンプレート（`yamato` = ヤマト運輸, `japanpost` = 日本郵便, `sagawa` = 佐川急便）
 
 ---
 
-必要であれば、このドキュメントに `_SP_SHIPPING_INQUIRY_URL_MAP` の実際のテンプレート一覧や祝日 API のレート制限・失敗時の挙動詳細を追記できます。どの部分を詳述しますか？
+### バージョンの扱い
+
+以前の仕様書にあった「v2.0」は、現在の先頭JSDocのバージョンと対応を確認できないため、現行版の識別には使いません。現行の `getNextBusinessDay` は同期関数です。
+
+文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
+
+## 更新履歴・配布記録
+
+| バージョン | 記録日     | 主な変更                                                        | 記録・配布確認                                          |
+| ---------- | ---------- | --------------------------------------------------------------- | ------------------------------------------------------- |
+| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし     | 配布URLへの反映・内容一致は今回未確認                   |
+| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                    | `94d6590`。初版作成日・配布日は未確認                   |
+| 未設定     | 2026-06-03 | モバイルの `getSpaceElement` 処理を修正し、仕様書・テストを更新 | `285a5fc`。配布確認は未確認                             |
+| 未設定     | 2026-06-03 | モバイルのスペース要素取得フォールバックを統一                  | `5e120d5`。配布確認は未確認                             |
+| 未設定     | 2026-06-18 | モバイルモード初期化を実行時キャッシュに対応                    | `01b9b5c`。配布確認は未確認                             |
+| 未設定     | 2026-09-26 | 依存チェックに関する説明を更新                                  | `f75e4a7`（本仕様書の変更）。配布内容の変更確認とは区別 |
+
+過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。配布URLの内容・CI・デプロイは今回未確認です。過去のバージョンは推測で割り当てていません。

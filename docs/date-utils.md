@@ -1,5 +1,9 @@
 # date-utils 使い方リファレンス
 
+## 概要・バージョン
+
+現行ソースのバージョン：**1.0.0**。配布URLへの反映・内容一致は今回未確認です。
+
 このドキュメントは `src/date-utils.js` が公開する日付ユーティリティ関数群の使い方と引数・戻り値の契約を整理したリファレンスです。ブラウザや kintone 上で直接 `window` 経由で利用できることを前提としています。
 
 > **重要**: 元号定義は `date-utils` だけでなく `csv-builder` にも組み込まれています。
@@ -11,24 +15,6 @@
 > - `docs/csv-builder.md`（和暦フォーマット仕様）
 
 ---
-
-## 目次
-
-- 概要
-- 公開 API サマリ
-- 各関数の引数詳細
-  - [`convertToSeireki(date)`](#convertToSeireki)
-  - [`convertToEra(date)`](#convertToEra)
-  - [`convertToYear(date)`](#convertToYear)
-  - [`convertToYearMonth(date)`](#convertToYearMonth)
-  - [`convertToAge(birthDate, asOfDate, useLegalAge)`](#convertToAge)
-- エラー形式
-- 実例
-- 注意事項 / エッジケース
-
----
-
-## 概要
 
 `src/date-utils.js` は和暦（元号）表記・漢数字・全角数字など現場でよくある多様な日付表現を受け取り、安定した西暦文字列や和暦表記、年だけの抽出を行うユーティリティ群です。主要な変換は次のとおりです。
 
@@ -49,17 +35,25 @@
 
 ---
 
-## 公開 API サマリ
+## 読み込み・依存関係
 
-- `convertToSeireki(date) -> string` — 成功時は `'YYYY-MM-DD'` 形式の文字列を返す。
-- `convertToEra(date) -> object` — `{ kanji, initial, initialOnly, numberOnly }` を返す。
-- `convertToYear(date) -> number` — 西暦の年（数値）を返す。
-- `convertToYearMonth(date) -> object` — `{ year: number, month: number }` を返す（month が欠ける場合は 1 を既定値とする）。
-- `convertToAge(birthDate, asOfDate?, useLegalAge?) -> number` — 生年月日と基準日から年齢を返す（`true`: 法律ベース / `false`: 満年齢、既定値は `false`）。
+- ソース：[src/date-utils.js](../src/date-utils.js)
+- 配布URL：https://js.kacsw.or.jp/date-utils.js
+- 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
+
+ブラウザでは `window.DATE` 名前空間に公開します。Nodeでは `require("../src/date-utils.js")` のCommonJSエクスポートを利用できます。元号定義は内蔵しています。
+
+## 公開関数の目次
+
+- [`convertToSeireki(date) -> string`](#convertToSeireki) — 成功時は `'YYYY-MM-DD'` 形式の文字列を返す。
+- [`convertToEra(date) -> object`](#convertToEra) — `{ kanji, initial, initialOnly, numberOnly }` を返す。
+- [`convertToYear(date) -> number`](#convertToYear) — 西暦の年（数値）を返す。
+- [`convertToYearMonth(date) -> object`](#convertToYearMonth) — `{ year: number, month: number }` を返す（month が欠ける場合は 1 を既定値とする）。
+- [`convertToAge(birthDate, asOfDate?, useLegalAge?) -> number`](#convertToAge) — 生年月日と基準日から年齢を返す（`true`: 法律ベース / `false`: 満年齢、既定値は `false`）。
 
 ---
 
-## 各関数の引数詳細
+## 関数リファレンス
 
 <a id="convertToSeireki"></a>
 
@@ -235,15 +229,15 @@ convertToAge('1990-05-10', '2026-05-09', true); // -> 36
 
 ---
 
-## エラー形式
+### エラー形式
 
 - 本モジュールは不正な入力や解析不能なケースで `Error` を投げます。エラーメッセージは日本語説明を含みます（例: '不正な入力形式です', '日付不正: Date型または文字列で指定してください' など）。
 
 ---
 
-## 実例
+### 実例
 
-### ブラウザ環境での利用
+#### ブラウザ環境での利用
 
 ```html
 <script src="src/date-utils.js"></script>
@@ -261,7 +255,7 @@ convertToAge('1990-05-10', '2026-05-09', true); // -> 36
 </script>
 ```
 
-### Node / テスト環境での利用
+#### Node / テスト環境での利用
 
 ```js
 // CommonJS 形式でエクスポートしています
@@ -272,7 +266,9 @@ console.log(DATE.convertToEra('1989-01-08')); // { kanji: '平成1年', initial:
 
 ---
 
-## 注意事項 / エッジケース
+## 制約・注意事項
+
+### 注意事項 / エッジケース
 
 - 漢数字や全角数字の変換は概ね 1〜3999 程度までの範囲を想定した実装です。極端に大きな漢数字表現は想定外です。
 - 元号は `令和` 以降の定義を内部テーブルで持っています。明治以前の扱いはサポート外で `Error` を投げます。
@@ -283,61 +279,22 @@ console.log(DATE.convertToEra('1989-01-08')); // { kanji: '平成1年', initial:
 
 ---
 
-## 参照
+### 参照
 
 - 実装ソース: `src/date-utils.js`
 
-必要があれば、さらに具体的なユースケース（例えば kintone レコードのフィールドからの変換例や、別ライブラリとの組合せ例）をこのドキュメントに追加します。
-
 ---
 
-## 改元があった場合の対応方法
+文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
 
-このモジュールは内部で `_DU_ERAS` 配列を参照して元号変換を行っています。改元（新しい元号の開始）が発生した場合は、以下の手順でソースとドキュメントを更新してください。
+## 更新履歴・配布記録
 
-- 1. `src/date-utils.js` の `_DU_ERAS` 配列に新しい元号オブジェクトを先頭（配列の先頭が最新の元号）へ追加します。オブジェクトのフォーマットは次の通りです。
+| バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                        |
+| ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------- |
+| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | 配布URLへの反映・内容一致は今回未確認 |
+| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `226cf91`。初版作成日・配布日は未確認 |
+| 未設定     | 2026-03-06 | `H13/5` などの和暦年月フォールバック解析を修正              | `5d64233`。配布確認は未確認           |
+| 未設定     | 2026-05-09 | 年齢算出オプションを追加し、仕様書を更新                    | `9b5888c`。配布確認は未確認           |
+| 未設定     | 2026-05-09 | `convertToAge` の `asOfDate` にnullを渡す場合の不具合を修正 | `ef59764`。配布確認は未確認           |
 
-```js
-// 例: 新元号 '新元号'（イニシャル 'X'）、開始日が 2025-11-26 の場合
-{
-	name: '新元号',            // 元号の漢字表記（例: '令和'）
-	initial: 'X',             // イニシャル（半角英字1文字。既存のイニシャルと重複しないこと）
-	number: 6,                // 実装上は参照用の番号フィールド（順序管理用）
-	start: new Date('2025-11-26')
-}
-```
-
-注意点:
-
-- `start` にはその元号の開始日（西暦）を `new Date('YYYY-MM-DD')` 形式で指定してください。モジュールはこの `start` を使って該当元号を判定します。
-- 新しい元号オブジェクトは配列の先頭（最新順）に置いてください。実装は配列を上から順に比較して最初にマッチした元号を採用します。
-- `initial` は半角英字1文字で他の元号の `initial` と重複しないようにしてください。内部実装では大文字小文字を区別せず比較します。
-
-- 2. 関連ファイルをまとめて更新
-
-- `src/date-utils.js` の `_DU_ERAS` を更新したら、`src/csv-builder.js` の `_CB_ERAS` も同じ内容に更新してください。
-- 仕様変更を反映するため、`docs/date-utils.md` と `docs/csv-builder.md` の両方を更新してください。
-- 必要に応じて、リリースノートや `README.md` に新元号対応を明記してください。
-
-- 3. テストとローカル確認
-
-変更後は必ず既存のテストを実行し、簡単な動作確認を行ってください。例:
-
-```bash
-# プロジェクトのテストスクリプトが設定されていれば
-npm test
-
-# 簡単な Node 実行での動作確認例（CommonJS エクスポートを利用）
-node -e "const d=require('./src/date-utils.js');console.log(d.convertToSeireki('X1-11-26'));"
-
-# csv-builder 側の和暦フォーマット確認（例）
-node -e "global.window=global;require('./src/csv-builder.js');console.log(window.CSV.buildRow([{key:'d',type:'date',format:'ERA_INITIAL_JIS_YMD'}],{d:'X1-11-26'}));"
-```
-
-上記の例では、`X1-11-26`（新元号の元年 11/26）を適切に西暦に変換できるかを検証します。
-
-- 4. バージョンとリリース
-
-必要に応じて `package.json` のバージョンを更新し、CHANGELOG やリリースノートを作成してください。チームで運用している場合は、ドキュメント周り（この `docs`）とリポジトリの README を更新しておくと追跡が容易です。
-
----
+過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。配布URLの内容・CI・デプロイは今回未確認です。過去のバージョンは推測で割り当てていません。
