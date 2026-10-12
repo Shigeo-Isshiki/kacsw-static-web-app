@@ -50,6 +50,8 @@
 
 ### サブテーブル操作ボタン制御
 
+> **廃止予定:** kintone がサブテーブルの行追加・行削除ボタンを制御する公式 API を提供したため、この節の3関数は将来的に廃止する方針です。新規実装では公式 API を使用してください。既存実装は直ちに削除・変更されるものではありません。廃止時期・対象バージョンは未定で、決定後に案内します。
+
 - [setupSubtableOperationControl(options)](#setupsubtableoperationcontrol)
 - [updateSubtableOperationControl(controller, partialOptions)](#updatesubtableoperationcontrol)
 - [teardownSubtableOperationControl(controller)](#teardownsubtableoperationcontrol)
@@ -109,7 +111,7 @@ resetKintoneCustomLibRuntime();
 
 > 注意: ここに書かれた使用例はライブラリの公開 API に合わせたもので、実行環境（ブラウザ / kintone / Node+jsdom）によって前提が異なります。kintone の DOM 要素を参照する関数は、テスト時に `kintone.app` のモックや `document`（jsdom）の用意が必要です。
 
-以下では、個別の公開関数について順に説明します。まずはサブテーブル操作ボタン制御 API から整理し、その後に一般的なレコード操作・通知・ダイアログ系の関数へ続けて解説します。
+以下では、個別の公開関数について順に説明します。サブテーブル操作ボタン制御 API は廃止予定のため、移行上の注意とあわせて記載します。その後に一般的なレコード操作・通知・ダイアログ系の関数を解説します。
 
 <a id="escapekintonequeryvalue"></a>
 
@@ -156,6 +158,13 @@ checkDependencies({ strict: true });
 ```
 
 ### サブテーブル操作ボタン制御 API
+
+> **廃止予定:** 新規実装では下記の公式 API を使用してください。この節の関数は既存実装との互換性のため現時点では利用できますが、将来的に廃止する方針です。廃止時期・対象バージョンは未定です。
+>
+> - 行追加ボタン: [テーブルフィールドの行の追加ボタンの表示／非表示を切り替える](https://cybozu.dev/ja/kintone/docs/js-api/record/show-or-hide-add-table-row-buttons/)
+> - 行削除ボタン: [テーブルフィールドの行の削除ボタンの表示／非表示を切り替える](https://cybozu.dev/ja/kintone/docs/js-api/record/show-or-hide-delete-table-row-buttons/)
+>
+> たとえば PC 画面では `kintone.app.record.showAddTableRowButtons(tableCode, false)` と `kintone.app.record.showDeleteTableRowButtons(tableCode, false)` で、それぞれのボタンを非表示にできます。モバイル画面では公式 API のモバイル向けオブジェクトを使用してください。表示条件やイベントなどの詳細は公式仕様を確認してください。
 
 <a id="setupsubtableoperationcontrol"></a>
 
