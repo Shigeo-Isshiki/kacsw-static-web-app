@@ -9,6 +9,7 @@
 - 静的チェックは `npm run lint`、`npx prettier --check "src/**/*.{js,css,html}"`、`node --check src/対象ファイル.js` を使用します。
 - 文書検証は [文書作成標準](../README.md#文書変更時の検証) に従います。
 - 実行したコマンドと結果、実画面確認と未確認事項は検証記録に残します。配布の確認はCI成功だけでなく配布URLの内容一致と区別して記録します。
+- リリース時は [通常配布確認の標準手順](../README.md#リリース通常配布確認の標準手順) に従い、配布対象コミットの通常URLとの照合結果を [通常配布確認記録](../verification/library-distribution.md) に追記します。
 
 ## date-utils：改元があった場合の対応方法
 
