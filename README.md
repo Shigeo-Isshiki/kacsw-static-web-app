@@ -2,91 +2,112 @@
 
 ![Prepare dist workflow](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/workflows/prepare-dist.yml/badge.svg)
 
-kintone 向けおよび汎用の小さな JavaScript ユーティリティ集です。各モジュールの使い方は `docs/` に記載しています。
+kintone・kViewer向け、および汎用のJavaScript共通ライブラリ集です。必要なライブラリをファイル単位で選び、各リファレンスに従って利用できます。
 
 ## 目次
 
-- [ドキュメント](#docs)
-- [クイックスタート](#quickstart)
-- [補足](#notes)
-- [貢献](#contributing)
+- [概要](#overview)
+- [利用方法](#usage)
+- [ライブラリ一覧](#docs)
+- [開発・ローカル確認](#quickstart)
+- [文書・保守・配布管理](#notes)
+- [貢献・問い合わせ](#contributing)
 - [ライセンス](#license)
-- [連絡先（Issues）](#contact)
+
+<a id="overview"></a>
+
+## 概要
+
+- kintone・kViewerのカスタマイズと、文字列・日付・CSVなどの共通処理を提供します。
+- 公開関数、読み込み順、外部APIへの依存、対応環境はライブラリごとに異なります。利用前に対象のリファレンスを確認してください。
+- バージョンは各ライブラリの先頭JSDocとリファレンスで管理します。リポジトリ全体の単一バージョンとして扱いません。
+
+<a id="usage"></a>
+
+## 利用方法
+
+通常配布URLは `https://js.kacsw.or.jp/<ライブラリ名>.js` です。利用するライブラリを、呼び出し側のカスタマイズコードより先に読み込んでください。
+
+- **kintone・kViewer**：サービスのJavaScriptカスタマイズ設定に、対象ライブラリの配布URLを登録します。設定方法や利用できるイベントは各サービスの仕様を確認してください。
+- **通常のWebページ**：対象ライブラリを `script` タグで読み込みます。例えば、文字列ユーティリティは次のように利用できます。
+
+```html
+<script src="https://js.kacsw.or.jp/text-suite.js"></script>
+<script>
+	console.log(toHalfWidth('ＡＢＣ１２３')); // ABC123
+</script>
+```
+
+すべてのライブラリを読み込む必要はありません。必要な依存関係と公開方式は、下記の各リファレンスを参照してください。通常配布URLは更新されるため、利用先での更新確認・動作確認も行ってください。
 
 <a id="docs"></a>
 
-## ドキュメント
+## ライブラリ一覧
 
-- [文書作成標準・ライブラリ一覧](./docs/README.md)
-- [保守・開発手順](./docs/maintenance/library-maintenance.md)
-- [kViewerの調査・検証記録](./docs/verification/kviewer-custom-lib.md)
+各リンク先に、配布URL・依存関係・公開関数・バージョン・制約を記載しています。
 
-- [銀行振込ユーティリティ — docs/bank-transfer.md](./docs/bank-transfer.md) — `src/bank-transfer.js`
-- [CSV ビルダー — docs/csv-builder.md](./docs/csv-builder.md) — `src/csv-builder.js`
-- [CSV パーサー — docs/csv-parser.md](./docs/csv-parser.md) — `src/csv-parser.js`
-- [日付ユーティリティ — docs/date-utils.md](./docs/date-utils.md) — `src/date-utils.js`
-- [kintone カスタムライブラリ — docs/kintone-custom-lib.md](./docs/kintone-custom-lib.md) — `src/kintone-custom-lib.js`
-- [kViewer 専用共通ライブラリ — docs/kviewer-custom-lib.md](./docs/kviewer-custom-lib.md) — `src/kviewer-custom-lib.js`
-- [国民の祝日ユーティリティ — docs/national-holidays.md](./docs/national-holidays.md) — `src/national-holidays.js`
-- [電話番号ユーティリティ — docs/phone-utils.md](./docs/phone-utils.md) — `src/phone-utils.js`
-- [配送処理ユーティリティ — docs/shipping-processing.md](./docs/shipping-processing.md) — `src/shipping-processing.js`
-- [システムユーティリティ — docs/system-utils.md](./docs/system-utils.md) — `src/system-utils.js`
-- [文字列ユーティリティ — docs/text-suite.md](./docs/text-suite.md) — `src/text-suite.js`
-- [ビデオ会議ユーティリティ — docs/vc-check.md](./docs/vc-check.md) — `src/vc-check.js`
-- [郵便番号／住所ユーティリティ — docs/zip-code-address-utils.md](./docs/zip-code-address-utils.md) — `src/zip-code-address-utils.js`
+| ライブラリ             | 主な用途                         | リファレンス                                       |
+| ---------------------- | -------------------------------- | -------------------------------------------------- |
+| bank-transfer          | 全銀データの生成・銀行営業日判定 | [銀行振込](./docs/bank-transfer.md)                |
+| csv-builder            | スキーマに基づくCSV生成          | [CSVビルダー](./docs/csv-builder.md)               |
+| csv-parser             | CSVの解析                        | [CSVパーサー](./docs/csv-parser.md)                |
+| date-utils             | 日付・和暦の変換                 | [日付](./docs/date-utils.md)                       |
+| kintone-custom-lib     | kintoneのカスタマイズ共通処理    | [kintone](./docs/kintone-custom-lib.md)            |
+| kviewer-custom-lib     | kViewerの表示制御などの共通処理  | [kViewer](./docs/kviewer-custom-lib.md)            |
+| national-holidays      | 日本の祝日判定                   | [国民の祝日](./docs/national-holidays.md)          |
+| phone-utils            | 電話番号の検証・整形             | [電話番号](./docs/phone-utils.md)                  |
+| shipping-processing    | 配送処理の補助                   | [配送処理](./docs/shipping-processing.md)          |
+| system-utils           | パスワード生成・マスクなど       | [システム](./docs/system-utils.md)                 |
+| text-suite             | 文字列変換・正規化               | [文字列](./docs/text-suite.md)                     |
+| vc-check               | ビデオ会議情報の検証             | [ビデオ会議](./docs/vc-check.md)                   |
+| zip-code-address-utils | 郵便番号・住所の処理             | [郵便番号・住所](./docs/zip-code-address-utils.md) |
 
 <a id="quickstart"></a>
 
-## クイックスタート
+## 開発・ローカル確認
+
+リポジトリを取得した後、そのルートで実行します。Node.js・npmが必要です。CIはNode.js 20を使用しており、ローカルでも開発依存関係の要求を満たすバージョンを使用してください。
 
 ```bash
-npm install
-npm run test    # テスト実行（scripts/run-tests.js を使用）
-npm start       # ./src を配信（http://localhost:8000）
+npm ci         # ロックファイルに従って開発依存関係を導入
+npm run lint   # 静的解析
+npm test       # 既存テスト
+npm start      # ローカル配信（http://localhost:8000）
 ```
 
 ローカル起動後は、まず以下のURLを開くと全体像を把握しやすくなります。
 
-- `http://localhost:8000/` : 入口ページ（`src/index.html`）
-- `http://localhost:8000/test.html` : 個別スクリプト確認ページ
-- `http://localhost:8000/test-all-scripts.html` : 一括読み込み確認ページ
+- http://localhost:8000/ ：[入口ページ](./src/index.html)
+- http://localhost:8000/test.html ：[個別スクリプト確認ページ](./src/test.html)
+- http://localhost:8000/test-all-scripts.html ：[一括読み込み確認ページ](./src/test-all-scripts.html)
 
 ### URL と JavaScript ファイルの対応
 
-`npm start` は `src/` をそのまま配信するため、`src` 配下の JavaScript は URL で直接確認できます。
+`npm start` は [src/](./src/) を配信します。例えば [text-suite.js](./src/text-suite.js) は http://localhost:8000/text-suite.js で確認できます。ローカルでの確認は、通常配布URLへの反映確認とは別です。
 
-- 例: `src/text-suite.js` -> `http://localhost:8000/text-suite.js`
-- 例: `src/phone-utils.js` -> `http://localhost:8000/phone-utils.js`
-- 例: `src/kintone-custom-lib.js` -> `http://localhost:8000/kintone-custom-lib.js`
-
-どのファイルを使うべきか迷う場合は、先に `docs/` の各説明を参照してください。
+詳細なテスト・データ更新方法は [保守・開発手順](./docs/maintenance/library-maintenance.md) を参照してください。
 
 <a id="notes"></a>
 
-## 補足
+## 文書・保守・配布管理
 
-- テストは `test/` 配下にあります。
-- 配布用ファイル作成は `npm run prepare:dist` と `npm run zip` を使用します。
-- `npm run prepare:dist` は `src/index.html` を `dist/index.html` としてコピーします。
-- 電話番号ユーティリティで参照している総務省公開情報は、2026年9月1日時点の内容に基づいています。
+- [文書作成標準](./docs/README.md)：APIリファレンスの構成、バージョン、履歴の記載ルール
+- [保守・開発手順](./docs/maintenance/library-maintenance.md)：テスト環境、データ更新など
+- [リリース・通常配布確認の標準手順](./docs/README.md#リリース通常配布確認の標準手順)：配布対象コミットの固定、ワークフロー確認、通常URLとの照合
+- [通常配布確認記録](./docs/verification/library-distribution.md)：確認日、対象コミット、配布ハッシュ、確認結果
+- [kViewerの調査・検証記録](./docs/verification/kviewer-custom-lib.md)・[銀行振込の検証記録](./docs/verification/bank-transfer.md)：個別の検証結果と未確認事項
 
----
+配布パッケージの作成コマンドは `npm run prepare:dist` と `npm run zip` です。パッケージ作成、デプロイ成功、通常配布URLの内容一致、利用先の実画面動作は別々に確認します。ソースの変更と配布は、貢献ガイドと上記の標準手順に従ってください。
 
 <a id="contributing"></a>
 
-## 貢献
+## 貢献・問い合わせ
 
 - 貢献方法については [CONTRIBUTING.md](./CONTRIBUTING.md) をご覧ください。
 
-<a id="license"></a>
-
-## ライセンス
-
-このプロジェクトは MIT ライセンスで公開されています。詳細は [LICENSE](./LICENSE) を参照してください。
-
 <a id="contact"></a>
 
-## 連絡先（Issues）
+### 問い合わせ・不具合報告
 
 Issue を作成する際に記載していただきたい最小限の項目:
 
@@ -97,6 +118,10 @@ Issue を作成する際に記載していただきたい最小限の項目:
 - 実行環境（Node バージョン、OS など）
 - 最小再現コードまたは該当ファイルの参照
 
-(上記を埋めていただければ対応が早くなります。)
+報告先は [GitHub Issues](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/issues) です。個人情報・認証情報・アクセストークンを含むログは掲載しないでください。
 
-※ Issues は GitHub のリポジトリ Issues ページで作成してください: https://github.com/Shigeo-Isshiki/kacsw-static-web-app/issues
+<a id="license"></a>
+
+## ライセンス
+
+このプロジェクトは MIT ライセンスで公開されています。詳細は [LICENSE](./LICENSE) を参照してください。
