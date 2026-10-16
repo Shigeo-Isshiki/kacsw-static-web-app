@@ -52,11 +52,13 @@ initShippingProcessingRuntime(globalThis.KACSW_RUNTIME);
 
 ## 公開関数の目次
 
-- [`getNextBusinessDay(baseDate, cutoffHour)`](#api-getnextbusinessday)
-- [`kintoneShippingInquiryButton(spaceField, id, label, trackingNumber, carrier)`](#api-kintoneshippinginquirybutton)
-- [`validateTrackingNumber(trackingNumber, minLength, maxLength)`](#api-validatetrackingnumber)
-- [`initShippingProcessingRuntime(options)`](#api-initshippingprocessingruntime)
-- [`resetShippingProcessingRuntime()`](#api-resetshippingprocessingruntime)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `getNextBusinessDay(baseDate, cutoffHour)` | 土日・祝日・年末年始を除外して次の発送営業日を返す。 | [参照](#api-getnextbusinessday) |
+| `kintoneShippingInquiryButton(spaceField, id, label, trackingNumber, carrier)` | kintoneのスペースに配送会社の追跡問い合わせボタンを設置する。 | [参照](#api-kintoneshippinginquirybutton) |
+| `validateTrackingNumber(trackingNumber, minLength, maxLength)` | 伝票番号を正規化し、文字種と桁数を検証する。 | [参照](#api-validatetrackingnumber) |
+| `initShippingProcessingRuntime(options)` | PC・モバイルの実行環境を明示して初期化する。 | [参照](#api-initshippingprocessingruntime) |
+| `resetShippingProcessingRuntime()` | 保持している実行環境設定をリセットする。 | [参照](#api-resetshippingprocessingruntime) |
 
 ## 関数リファレンス
 

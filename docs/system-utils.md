@@ -25,9 +25,11 @@ const pw2 = sys.generatePassword({ length: 16, useSymbols: false });
 
 ## 公開関数の目次
 
-- [`generatePassword(options)`](#generatepassword)
-- [`maskPassword(pw, visible)`](#maskpassword)
-- [`toKanaReading(str, options)`](#tokanareading)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `generatePassword(options)` | 指定した文字種・長さのルールでパスワードを生成する。 | [参照](#generatepassword) |
+| `maskPassword(pw, visible)` | パスワードの一部を隠して表示する。 | [参照](#maskpassword) |
+| `toKanaReading(str, options)` | 文字列からカナ読みを取得する。 | [参照](#tokanareading) |
 
 ## 関数リファレンス
 

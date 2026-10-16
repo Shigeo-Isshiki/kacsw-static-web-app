@@ -43,25 +43,33 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 
 ### kintone の住所設定・表示制御
 
-- [`registerZipCodeAddressHandler(options)`](#registerZipCodeAddressHandler) — kintone の郵便番号変更、住所の割り当て・置換、ボタン・案内表示をまとめて登録する。
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `registerZipCodeAddressHandler(options)` | 郵便番号変更時の住所割り当て・置換とボタン・案内表示を登録する。 | [参照](#registerZipCodeAddressHandler) |
 
 `registerZipCodeAddressHandler` の登録対象は `devices` で指定します。実際に使用する PC/モバイルの record API は Kintone のイベント種別から選択するため、ランタイム初期化、`KACSW_RUNTIME`、URL による画面判定は不要です。
 
 ### 郵便番号の存在確認・整形・正規化
 
-- [`checkZipCodeExists(zipCode, callback)`](#checkZipCodeExists) — 存在確認を行い `callback(exists:boolean)` を呼び出す。
-- [`formatZipCode(zipCode, callback)`](#formatZipCode) — 表示用の郵便番号（ハイフン付きなど）を `callback(result)` で返す。成功: `{ zipCode: string }`、失敗: `{ error: string }`。
-- [`normalizeZipCode(zipCode, callback)`](#normalizeZipCode) — 正規化済みの7文字（半角英数字）を `callback(result)` で返す。成功: `{ zipCode: string }`、失敗: `{ error: string }`。
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `checkZipCodeExists(zipCode, callback)` | 郵便番号の存在を確認して結果をコールバックに返す。 | [参照](#checkZipCodeExists) |
+| `formatZipCode(zipCode, callback)` | 郵便番号を表示用に整形して結果をコールバックに返す。 | [参照](#formatZipCode) |
+| `normalizeZipCode(zipCode, callback)` | 郵便番号を7文字の半角英数字に正規化して結果を返す。 | [参照](#normalizeZipCode) |
 
 ### 住所・市区町村・都道府県の検索
 
-- [`getAddressByZipCode(zipCode, callback)`](#getAddressByZipCode) — 住所情報オブジェクトを `callback(result)` で返す。成功時は詳細フィールドを含むオブジェクト、失敗時は `{ error: string }`。
-- [`getCityByZipCode(zipCode, callback)`](#getCityByZipCode) — 市区町村名を `callback(cityName|string|null)` で返す（見つからなければ `null`）。
-- [`getPrefectureByZipCode(zipCode, callback)`](#getPrefectureByZipCode) — 都道府県名を `callback(prefName|string|null)` で返す（見つからなければ `null`）。
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `getAddressByZipCode(zipCode, callback)` | 郵便番号から詳細な住所情報を検索する。 | [参照](#getAddressByZipCode) |
+| `getCityByZipCode(zipCode, callback)` | 郵便番号から市区町村名を検索する。 | [参照](#getCityByZipCode) |
+| `getPrefectureByZipCode(zipCode, callback)` | 郵便番号から都道府県名を検索する。 | [参照](#getPrefectureByZipCode) |
 
 ### 住所文字列の検証
 
-- [`hasPrefectureName(address)`](#hasPrefectureName) — 住所が47都道府県の正式名称で始まるかを厳密に判定する。
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `hasPrefectureName(address)` | 住所が都道府県の正式名称で始まるかを判定する。 | [参照](#hasPrefectureName) |
 
 ---
 

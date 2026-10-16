@@ -20,41 +20,51 @@
 
 ### ランタイム初期化
 
-- [initKintoneCustomLibRuntime(options)](#initkintonecustomlibruntime)
-- [resetKintoneCustomLibRuntime()](#resetkintonecustomlibruntime)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `initKintoneCustomLibRuntime(options)` | PC・モバイルの実行環境を明示して初期化する。 | [参照](#initkintonecustomlibruntime) |
+| `resetKintoneCustomLibRuntime()` | 保持している実行環境設定をリセットする。 | [参照](#resetkintonecustomlibruntime) |
 
 ### 通知・ダイアログ
 
-- [notifyError(message, title = 'エラー', allowHtml = false)](#notifyerror)
-- [notifyInfo(message, title = '情報', allowHtml = false)](#notifyinfo)
-- [notifyWarning(message, title = '注意', allowHtml = false)](#notifywarning)
-- [showYesNoDialog(message, title = '確認', options)](#showyesnodialog)
-- [showInputDialog(options)](#showinputdialog)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `notifyError(message, title = 'エラー', allowHtml = false)` | エラー通知を表示する。 | [参照](#notifyerror) |
+| `notifyInfo(message, title = '情報', allowHtml = false)` | 情報通知を表示する。 | [参照](#notifyinfo) |
+| `notifyWarning(message, title = '注意', allowHtml = false)` | 警告通知を表示する。 | [参照](#notifywarning) |
+| `showYesNoDialog(message, title = '確認', options)` | はい・いいえの確認ダイアログを表示する。 | [参照](#showyesnodialog) |
+| `showInputDialog(options)` | 入力ダイアログを表示する。 | [参照](#showinputdialog) |
 
 ### レコード・イベント補助
 
-- [escapeKintoneQueryValue(value)](#escapekintonequeryvalue)
-- [createDependencyChecker(requirements)](#createdependencychecker)
-- [getFieldValueOr(record, fieldCode, defaultValue)](#getfieldvalueor)
-- [kintoneEventOn(events, handler)](#kintoneeventon)
-- [setRecordValues(record, values)](#setrecordvalues)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `escapeKintoneQueryValue(value)` | kintoneクエリに埋め込む値をエスケープする。 | [参照](#escapekintonequeryvalue) |
+| `createDependencyChecker(requirements)` | 必要な外部関数の有無を確認する関数を生成する。 | [参照](#createdependencychecker) |
+| `getFieldValueOr(record, fieldCode, defaultValue)` | レコードからフィールド値を取得し、取得できない場合は既定値を返す。 | [参照](#getfieldvalueor) |
+| `kintoneEventOn(events, handler)` | kintoneイベントにハンドラーを登録する。 | [参照](#kintoneeventon) |
+| `setRecordValues(record, values)` | レコード内の複数フィールドの値を設定する。 | [参照](#setrecordvalues) |
 
 ### ヘッダー・スペース要素操作
 
-- [setHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)](#setheadermenuspacebutton)
-- [setRecordHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)](#setrecordheadermenuspacebutton)
-- [setRecordHeaderMenuSpaceText(id, innerHTML)](#setrecordheadermenuspacetext)
-- [setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)](#setspacefieldbutton)
-- [setSpaceFieldText(spaceField, id, innerHTML)](#setspacefieldtext)
-- [setSpaceFieldDisplay(spaceField, display)](#setspacefielddisplay)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `setHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)` | ヘッダーメニュースペースにボタンを設置する。 | [参照](#setheadermenuspacebutton) |
+| `setRecordHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)` | レコードヘッダースペースにボタンを設置する。 | [参照](#setrecordheadermenuspacebutton) |
+| `setRecordHeaderMenuSpaceText(id, innerHTML)` | レコードヘッダースペースにテキスト・HTMLを設定する。 | [参照](#setrecordheadermenuspacetext) |
+| `setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)` | スペースフィールドにボタンを設置する。 | [参照](#setspacefieldbutton) |
+| `setSpaceFieldText(spaceField, id, innerHTML)` | スペースフィールドにテキスト・HTMLを設定する。 | [参照](#setspacefieldtext) |
+| `setSpaceFieldDisplay(spaceField, display)` | スペースフィールドの表示・非表示を切り替える。 | [参照](#setspacefielddisplay) |
 
 ### サブテーブル操作ボタン制御
 
 > **廃止予定:** kintone がサブテーブルの行追加・行削除ボタンを制御する公式 API を提供したため、この節の3関数は将来的に廃止する方針です。新規実装では公式 API を使用してください。既存実装は直ちに削除・変更されるものではありません。廃止時期・対象バージョンは未定で、決定後に案内します。
 
-- [setupSubtableOperationControl(options)](#setupsubtableoperationcontrol)
-- [updateSubtableOperationControl(controller, partialOptions)](#updatesubtableoperationcontrol)
-- [teardownSubtableOperationControl(controller)](#teardownsubtableoperationcontrol)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `setupSubtableOperationControl(options)` | サブテーブルの行操作ボタン制御を設定する。 | [参照](#setupsubtableoperationcontrol) |
+| `updateSubtableOperationControl(controller, partialOptions)` | 設定済みのサブテーブル行操作ボタン制御を更新する。 | [参照](#updatesubtableoperationcontrol) |
+| `teardownSubtableOperationControl(controller)` | サブテーブル行操作ボタン制御を解除する。 | [参照](#teardownsubtableoperationcontrol) |
 
 ## 関数リファレンス
 

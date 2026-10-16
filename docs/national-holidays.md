@@ -35,9 +35,11 @@
 
 ## 公開関数の目次
 
-- [`isNationalHoliday(date) -> boolean`](#isNationalHoliday) — 指定日が祝日なら `true`
-- [`getNationalHolidayNameByLaw(date) -> string | null`](#getNationalHolidayNameByLaw) — 祝日名または `null`
-- [`getNationalHolidaysInYear(year) -> Array<{ date: string, name: string }>`](#getNationalHolidaysInYear) — 年内の祝日配列
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `isNationalHoliday(date)` | 指定日が祝日かどうかを判定する。 | [参照](#isNationalHoliday) |
+| `getNationalHolidayNameByLaw(date)` | 指定日の祝日名を返す。祝日でない場合は `null`。 | [参照](#getNationalHolidayNameByLaw) |
+| `getNationalHolidaysInYear(year)` | 指定年の祝日を日付と名称の配列で返す。 | [参照](#getNationalHolidaysInYear) |
 
 ---
 
