@@ -46,3 +46,15 @@
 3. 対象コミットのソースと取得ファイルをバイト単位で比較し、JSDocのバージョンとSHA-256を確認する。
 4. 不一致・取得失敗があれば確認済みと記載せず、対象と結果を記録する。
 5. 一致した対象のリファレンスと本記録に、確認日・対象コミット・ワークフロー結果を追記する。
+
+## 追加確認：kintone-custom-lib 2.0.0
+
+- 確認日：2026-10-17 04:49（日本時間、UTC+09:00）。
+- 対象ソース：マージコミット [`ee59b6d5e81ed18b40a4e7cf8941abe42b23d808`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/ee59b6d5e81ed18b40a4e7cf8941abe42b23d808) の `src/kintone-custom-lib.js`。
+- 配布URL：[https://js.kacsw.or.jp/kintone-custom-lib.js](https://js.kacsw.or.jp/kintone-custom-lib.js)。`Cache-Control: no-cache` を付けてGETし、HTTP 200、バイト単位の完全一致、JSDocバージョン `2.0.0` の一致を確認しました。
+- SHA-256：`a3ddba7c066eafc5e4161e15ba98578f4b8e20f476e5cac2c781a7c0d1af4e43`（ソース・配布ファイル共通）。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/38957467251)：成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/38957467044)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/38957466986)：配布パッケージ作成成功。
+- この確認は通常配布URLの内容一致に関するものです。利用先でのブラウザーキャッシュ更新や実画面動作の確認ではありません。
