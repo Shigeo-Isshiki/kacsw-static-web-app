@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.0.0** です。
+現行ソースは **2.0.0** です。確認済み通常配布版は **1.0.0** です。
 
 このドキュメントは `src/kintone-custom-lib.js` が公開する関数ごとに使い方と契約（引数・戻り値・副作用）をまとめたリファレンスです。
 
@@ -55,16 +55,6 @@
 | `setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)` | スペースフィールドにボタンを設置する。 | [参照](#setspacefieldbutton) |
 | `setSpaceFieldText(spaceField, id, innerHTML)` | スペースフィールドにテキスト・HTMLを設定する。 | [参照](#setspacefieldtext) |
 | `setSpaceFieldDisplay(spaceField, display)` | スペースフィールドの表示・非表示を切り替える。 | [参照](#setspacefielddisplay) |
-
-### サブテーブル操作ボタン制御
-
-> **廃止予定:** kintone がサブテーブルの行追加・行削除ボタンを制御する公式 API を提供したため、この節の3関数は将来的に廃止する方針です。新規実装では公式 API を使用してください。既存実装は直ちに削除・変更されるものではありません。廃止時期・対象バージョンは未定で、決定後に案内します。
-
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `setupSubtableOperationControl(options)` | サブテーブルの行操作ボタン制御を設定する。 | [参照](#setupsubtableoperationcontrol) |
-| `updateSubtableOperationControl(controller, partialOptions)` | 設定済みのサブテーブル行操作ボタン制御を更新する。 | [参照](#updatesubtableoperationcontrol) |
-| `teardownSubtableOperationControl(controller)` | サブテーブル行操作ボタン制御を解除する。 | [参照](#teardownsubtableoperationcontrol) |
 
 ## 関数リファレンス
 
@@ -121,7 +111,7 @@ resetKintoneCustomLibRuntime();
 
 > 注意: ここに書かれた使用例はライブラリの公開 API に合わせたもので、実行環境（ブラウザ / kintone / Node+jsdom）によって前提が異なります。kintone の DOM 要素を参照する関数は、テスト時に `kintone.app` のモックや `document`（jsdom）の用意が必要です。
 
-以下では、個別の公開関数について順に説明します。サブテーブル操作ボタン制御 API は廃止予定のため、移行上の注意とあわせて記載します。その後に一般的なレコード操作・通知・ダイアログ系の関数を解説します。
+以下では、個別の公開関数について順に説明します。
 
 <a id="escapekintonequeryvalue"></a>
 
@@ -165,87 +155,6 @@ if (!checkDependencies()) {
 
 // 初期化時に不足を致命的エラーとして扱う場合
 checkDependencies({ strict: true });
-```
-
-### サブテーブル操作ボタン制御 API
-
-> **廃止予定:** 新規実装では下記の公式 API を使用してください。この節の関数は既存実装との互換性のため現時点では利用できますが、将来的に廃止する方針です。廃止時期・対象バージョンは未定です。
->
-> - 行追加ボタン: [テーブルフィールドの行の追加ボタンの表示／非表示を切り替える](https://cybozu.dev/ja/kintone/docs/js-api/record/show-or-hide-add-table-row-buttons/)
-> - 行削除ボタン: [テーブルフィールドの行の削除ボタンの表示／非表示を切り替える](https://cybozu.dev/ja/kintone/docs/js-api/record/show-or-hide-delete-table-row-buttons/)
->
-> たとえば PC 画面では `kintone.app.record.showAddTableRowButtons(tableCode, false)` と `kintone.app.record.showDeleteTableRowButtons(tableCode, false)` で、それぞれのボタンを非表示にできます。モバイル画面では公式 API のモバイル向けオブジェクトを使用してください。表示条件やイベントなどの詳細は公式仕様を確認してください。
-
-<a id="setupsubtableoperationcontrol"></a>
-
-#### setupSubtableOperationControl(options)
-
-- 動作概要: サブテーブルの操作ボタン（例: `.subtable-operation-gaia`）を一括で非表示にするための共通コントローラを生成します。`observe: true` の場合は DOM 再描画後に自動で再適用されます。
-- 戻り値: `controller` オブジェクト。`apply()` / `refresh()` / `disconnect()` / `destroy()` / `getState()` を持ちます。
-- `options.mode` (string) — `alwaysHide` / `conditionalHide` / `scopedHide` のいずれか。
-- `options.hideWhen` (boolean | function(context) => boolean) — `conditionalHide` で用いる判定条件。
-- `options.target` (string | string[]) — `scopedHide` で対象とするサブテーブル識別子。`'all'` も可。
-- `options.observe` (boolean, default `true`) — DOM 再描画時に再適用するか。
-- `options.observerThrottleMs` (number, default `100`) — MutationObserver のスロットリング間隔。
-- `options.hideLabelAndRowOps` (boolean, default `false`) — 行追加や行削除ラベル等の追加セレクタも対象にするか。
-- `options.strategy` (string, default `'cssPlusInline'`) — `cssOnly` または `cssPlusInline`。
-- `options.styleId` (string) — スタイル要素の重複注入を避けるための ID。
-- `options.debug` (boolean) — デバッグログを出すか。
-- `options.context` (any) — `hideWhen` で参照する任意コンテキスト。
-
-例:
-
-```js
-// 320系: 常時非表示
-const ctrl320 = setupSubtableOperationControl({
-	mode: 'alwaysHide',
-	observe: true,
-});
-
-// 364系: 条件付き非表示
-const ctrl364 = setupSubtableOperationControl({
-	mode: 'conditionalHide',
-	hideWhen: (ctx) => !!(ctx && ctx.context && ctx.context.shouldHide),
-	context: { shouldHide: true },
-	observe: true,
-});
-
-// 626系: 対象サブテーブルだけ非表示
-const ctrl626 = setupSubtableOperationControl({
-	mode: 'scopedHide',
-	target: ['SUBTABLE_CODE_1', 'SUBTABLE_CODE_2'],
-	observe: true,
-});
-
-// 行追加/行削除ボタンや操作ラベルもまとめて非表示
-const ctrlRowOps = setupSubtableOperationControl({
-	mode: 'alwaysHide',
-	hideLabelAndRowOps: true,
-	observe: true,
-});
-```
-
-<a id="updatesubtableoperationcontrol"></a>
-
-#### updateSubtableOperationControl(controller, partialOptions)
-
-- 動作概要: 既存の `controller` の `options` を部分更新し、即時に再適用します。
-- `partialOptions` は `setupSubtableOperationControl()` と同じキーを受け取ります。`mode` や `context` などを変えた場合は、すぐに反映されます。
-
-```js
-updateSubtableOperationControl(ctrl364, {
-	context: { shouldHide: false },
-});
-```
-
-<a id="teardownsubtableoperationcontrol"></a>
-
-#### teardownSubtableOperationControl(controller)
-
-- 動作概要: 指定した `controller` を停止し、Observer・注入スタイル・内部状態を解放します。これにより制御は解除されます。
-
-```js
-teardownSubtableOperationControl(ctrl320);
 ```
 
 <a id="getfieldvalueor"></a>
@@ -688,6 +597,8 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 
 ## 制約・注意事項
 
+サブテーブルの行追加・行削除ボタンを制御する場合は、kintone の公式 API（[行追加ボタン](https://cybozu.dev/ja/kintone/docs/js-api/record/show-or-hide-add-table-row-buttons/)、[行削除ボタン](https://cybozu.dev/ja/kintone/docs/js-api/record/show-or-hide-delete-table-row-buttons/)）を使用してください。モバイル画面では公式 API のモバイル向けオブジェクトを使用します。
+
 文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
 
 ## 更新履歴・配布記録
@@ -696,6 +607,7 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 
 | バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
 | ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| 2.0.0      | 2026-10-17 | サブテーブル操作ボタン制御の3公開関数を削除                  | 現行ソース。通常配布URLとの照合・配布確認は未実施       |
 | 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
 | 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `93fc72e`。初版作成日・配布日は未確認                  |
 | 未設定     | 2026-09-24 | ダイアログボタンをkintoneのスタイルに合わせる               | `e34aa9d`。配布確認は未確認                            |
