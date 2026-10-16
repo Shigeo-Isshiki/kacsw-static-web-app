@@ -24,11 +24,10 @@
 
 ## 公開関数の目次
 
-- [buildRow(schema, data, options) -> string](#api-buildrow)
-  - 単一レコード `data` から CSV の 1 行（改行無し）を返します。
-
-- [buildCSV(schema, dataArray, options) -> string](#api-buildcsv)
-  - レコード配列 `dataArray` から CSV 全体（必要ならヘッダを含む）を返します。改行は `\n` です。
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `buildRow(schema, data, options)` | 単一レコードから CSV の 1 行を生成する。 | [参照](#api-buildrow) |
+| `buildCSV(schema, dataArray, options)` | レコード配列から CSV 全体を生成する。必要に応じてヘッダーを含み、改行は `\n`。 | [参照](#api-buildcsv) |
 
 ## 関数リファレンス
 

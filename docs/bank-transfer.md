@@ -58,32 +58,40 @@ FormBridge向け中継APIは Bank Teraren API 互換のパス・応答形式を�
 
 ### 銀行・支店検索と口座変換
 
-- [`getBank(bankCodeOrName, options?, callback)`](#getBank)
-- [`getBranch(bankCode, branchCodeOrName, options?, callback)`](#getBranch)
-- [`convertYucho(kigou, bangou, callback)`](#convertYucho)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `getBank(bankCodeOrName, options?, callback)` | 銀行コードまたは銀行名から銀行情報を検索する。 | [参照](#getBank) |
+| `getBranch(bankCode, branchCodeOrName, options?, callback)` | 銀行コードと支店コードまたは支店名から支店情報を検索する。 | [参照](#getBranch) |
+| `convertYucho(kigou, bangou, callback)` | ゆうちょ記号・番号を振込用の口座情報に変換する。 | [参照](#convertYucho) |
 
 ### 全銀ファイルの読み込み・生成
 
-- [`parseZenginFile(options)`](#parseZenginFile)
-- [`encodeSjis(input)`](#api-encodesjis)
-- [`generateHeader(headerData, callback)`](#api-generateheader)
-- [`generateDataRecords(records, fromBankNo, options?, callback)`](#api-generatedatarecords)
-- [`generateTrailer(summaryData, callback)`](#api-generatetrailer)
-- [`generateEndRecord(callback)`](#api-generateendrecord)
-- [`generateZenginData(headerData, records, callback)`](#generateZenginData)
-- [`generateZenginDataAsync(headerData, records)`](#generateZenginDataAsync)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `parseZenginFile(options)` | 全銀ファイルを読み込み、レコードを解析する。 | [参照](#parseZenginFile) |
+| `encodeSjis(input)` | Unicode文字列をShift_JISのバイト列に変換する。 | [参照](#api-encodesjis) |
+| `generateHeader(headerData, callback)` | 全銀ファイルのヘッダレコードを生成する。 | [参照](#api-generateheader) |
+| `generateDataRecords(records, fromBankNo, options?, callback)` | 振込データから全銀ファイルのデータレコードを生成する。 | [参照](#api-generatedatarecords) |
+| `generateTrailer(summaryData, callback)` | 全銀ファイルのトレーラレコードを生成する。 | [参照](#api-generatetrailer) |
+| `generateEndRecord(callback)` | 全銀ファイルのエンドレコードを生成する。 | [参照](#api-generateendrecord) |
+| `generateZenginData(headerData, records, callback)` | ヘッダと振込データから全銀データを生成する。 | [参照](#generateZenginData) |
+| `generateZenginDataAsync(headerData, records)` | ヘッダと振込データから全銀データを非同期に生成する。 | [参照](#generateZenginDataAsync) |
 
 ### 入力の正規化
 
-- [`normalizeEdiInfo(input, options)`](#normalizeEdiInfo)
-- [`normalizePayeeName(name, options)`](#normalizePayeeName)
-- [`normalizeAccountNumber(input)`](#normalizeAccountNumber)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `normalizeEdiInfo(input, options)` | EDI情報を全銀データ向けに正規化する。 | [参照](#normalizeEdiInfo) |
+| `normalizePayeeName(name, options)` | 受取人名を全銀データ向けに正規化する。 | [参照](#normalizePayeeName) |
+| `normalizeAccountNumber(input)` | 口座番号の入力を正規化する。 | [参照](#normalizeAccountNumber) |
 
 ### 銀行営業日
 
-- [`nextBankBusinessDay(baseDate, cutoffHour)`](#nextBankBusinessDay)
-- [`nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)`](#nextPayrollTransferDate)
-- [`isBankBusinessDay(targetDate)`](#isBankBusinessDay)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `nextBankBusinessDay(baseDate, cutoffHour)` | 基準日時と締め時刻から次の銀行営業日を算出する。 | [参照](#nextBankBusinessDay) |
+| `nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)` | 基準日時から必要な営業日数を考慮した給与振込日を算出する。 | [参照](#nextPayrollTransferDate) |
+| `isBankBusinessDay(targetDate)` | 指定日が銀行営業日かどうかを判定する。 | [参照](#isBankBusinessDay) |
 
 ## 関数リファレンス
 

@@ -31,11 +31,13 @@
 
 ## 公開関数の目次
 
-- [`isValidPhoneNumber(phoneNumber)`](#isvalidphonenumber)
-- [`formatPhoneNumber(phoneNumber)`](#formatphonenumber)
-- [`getPhoneNumberType(phoneNumber)`](#getphonenumbertype)
-- [`normalizePhoneNumber(phoneNumber)`](#normalizephonenumber)
-- [`registerPhoneNumberHandler(fieldCode, options)`](#registerphonenumberhandler)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `isValidPhoneNumber(phoneNumber)` | 国内電話番号として有効かを判定する。 | [参照](#isvalidphonenumber) |
+| `formatPhoneNumber(phoneNumber)` | 電話番号を正規化・整形し、判定結果を含むオブジェクトを返す。 | [参照](#formatphonenumber) |
+| `getPhoneNumberType(phoneNumber)` | 電話番号の種別を判定する。 | [参照](#getphonenumbertype) |
+| `normalizePhoneNumber(phoneNumber)` | 電話番号の数字を正規化する。 | [参照](#normalizephonenumber) |
+| `registerPhoneNumberHandler(fieldCode, options)` | kintone フィールドの変更時に電話番号の整形・検証ハンドラーを登録する。 | [参照](#registerphonenumberhandler) |
 
 各関数は同期処理です。番号引数は文字列または数値を受け取り、未入力・不正入力の扱いは各関数の契約を参照してください。
 

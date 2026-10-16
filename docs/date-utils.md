@@ -45,11 +45,13 @@
 
 ## 公開関数の目次
 
-- [`convertToSeireki(date) -> string`](#convertToSeireki) — 成功時は `'YYYY-MM-DD'` 形式の文字列を返す。
-- [`convertToEra(date) -> object`](#convertToEra) — `{ kanji, initial, initialOnly, numberOnly }` を返す。
-- [`convertToYear(date) -> number`](#convertToYear) — 西暦の年（数値）を返す。
-- [`convertToYearMonth(date) -> object`](#convertToYearMonth) — `{ year: number, month: number }` を返す（month が欠ける場合は 1 を既定値とする）。
-- [`convertToAge(birthDate, asOfDate?, useLegalAge?) -> number`](#convertToAge) — 生年月日と基準日から年齢を返す（`true`: 法律ベース / `false`: 満年齢、既定値は `false`）。
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `convertToSeireki(date)` | 日付を西暦の `YYYY-MM-DD` 形式に変換する。 | [参照](#convertToSeireki) |
+| `convertToEra(date)` | 日付を元号情報（漢字・イニシャル・年数）に変換する。 | [参照](#convertToEra) |
+| `convertToYear(date)` | 日付から西暦年を取得する。 | [参照](#convertToYear) |
+| `convertToYearMonth(date)` | 日付から西暦年と月を取得する。月が欠ける場合は1を既定値とする。 | [参照](#convertToYearMonth) |
+| `convertToAge(birthDate, asOfDate?, useLegalAge?)` | 生年月日と基準日から年齢を算出する。 | [参照](#convertToAge) |
 
 ---
 

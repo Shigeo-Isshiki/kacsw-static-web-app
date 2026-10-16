@@ -25,8 +25,9 @@
 
 ## 公開関数の目次
 
-- [`parseCSV(schema, options) -> Promise<Result>`](#api-parsecsv)
-  - CSV ファイル選択ダイアログを内部で開き、読み込み・デコード・パース・schema マッピングまでを実行します。
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `parseCSV(schema, options)` | CSV ファイルを読み込み、デコード・解析して schema にマッピングする。 | [参照](#api-parsecsv) |
 
 ## 関数リファレンス
 

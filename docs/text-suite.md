@@ -34,23 +34,28 @@
 
 ### 変換・検証関数
 
-- [`isSingleByteAlnumOnly(str)`](#api-issinglebytealnumonly) — 半角英数字・記号・スペースのみで構成されているか判定
-- [`toFullWidthKatakana(str, [throwOnError=true])`](#api-tofullwidthkatakana) — 可能な限り全角カタカナに変換
-- [`toFullWidthHiragana(str, [throwOnError=true])`](#api-tofullwidthhiragana) — 可能な限り全角ひらがなに変換
-- [`toHalfWidthKana(str, [throwOnError=true])`](#api-tohalfwidthkana) — 可能な限り半角カタカナに変換
-- [`toFullWidth(str, [throwOnError=true])`](#api-tofullwidth) — 文字列中の半角英数字・記号等を全角に変換
-- [`toHalfWidth(str, [throwOnError=true])`](#api-tohalfwidth) — 文字列中の全角英数字・記号等を半角に変換
-- [`assertEmailAddress(emailAddress)`](#api-assertemailaddress) — 半角に正規化し、簡易 RFC5322 相当の形式チェックを行う（正常時は小文字化した文字列を返す、異常時は例外）
-  入力・例外の扱いは各関数と共通契約を参照してください。`isSingleByteAlnumOnly` は判定値を返し、文字変換関数には変換不能文字に対する例外を制御する `throwOnError` があります。
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `isSingleByteAlnumOnly(str)` | 半角ASCIIのみで構成されているか判定する。 | [参照](#api-issinglebytealnumonly) |
+| `toFullWidthKatakana(str, throwOnError = true)` | ひらがな・半角カナなどを全角カタカナに変換する。 | [参照](#api-tofullwidthkatakana) |
+| `toFullWidthHiragana(str, throwOnError = true)` | 入力を全角ひらがなに変換する。 | [参照](#api-tofullwidthhiragana) |
+| `toHalfWidthKana(str, throwOnError = true)` | カナを半角カタカナに変換する。 | [参照](#api-tohalfwidthkana) |
+| `toFullWidth(str, throwOnError = true)` | 半角英数字・記号などを全角に変換する。 | [参照](#api-tofullwidth) |
+| `toHalfWidth(str, throwOnError = true)` | 全角英数字・記号などを半角に変換する。 | [参照](#api-tohalfwidth) |
+| `assertEmailAddress(emailAddress)` | メールアドレスを半角に正規化して形式を検証する。 | [参照](#api-assertemailaddress) |
+
+入力・例外の扱いは各関数と共通契約を参照してください。`isSingleByteAlnumOnly` は判定値を返し、文字変換関数には変換不能文字に対する例外を制御する `throwOnError` があります。
 
 ### イベントハンドラ登録関数
 
-- [`registerFullWidthHandler(fieldCode, [options])`](#api-registerfullwidthhandler) — kintone の追加・編集画面のフィールド変更イベントに全角変換ハンドラを登録する
-- [`registerTableFullWidthHandler(tableFieldCode, fieldCode, [options])`](#api-registertablefullwidthhandler) — サブテーブル列の変更イベントに全角変換ハンドラを登録する
-- [`registerFullWidthHiraganaHandler(fieldCode, [options])`](#api-registerfullwidthhiraganahandler) — kintone の追加・編集画面のフィールド変更イベントに全角ひらがな変換ハンドラを登録する
-- [`registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, [options])`](#api-registertablefullwidthhiraganahandler) — サブテーブル列の変更イベントに全角ひらがな変換ハンドラを登録する
-- [`registerEmailAddressHandler(fieldCode, [options])`](#api-registeremailaddresshandler) — 通常フィールドのメールアドレス変更イベントに検証・正規化ハンドラを登録する
-- [`registerTableEmailAddressHandler(tableCode, columnCode, [options])`](#api-registertableemailaddresshandler) — サブテーブル列のメールアドレス変更イベントに検証・正規化ハンドラを登録する
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `registerFullWidthHandler(fieldCode, options)` | kintoneのフィールド変更時に全角変換ハンドラーを登録する。 | [参照](#api-registerfullwidthhandler) |
+| `registerTableFullWidthHandler(tableFieldCode, fieldCode, options)` | kintoneのサブテーブル列の変更時に全角変換ハンドラーを登録する。 | [参照](#api-registertablefullwidthhandler) |
+| `registerFullWidthHiraganaHandler(fieldCode, options)` | kintoneのフィールド変更時に全角ひらがな変換ハンドラーを登録する。 | [参照](#api-registerfullwidthhiraganahandler) |
+| `registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, options)` | kintoneのサブテーブル列の変更時に全角ひらがな変換ハンドラーを登録する。 | [参照](#api-registertablefullwidthhiraganahandler) |
+| `registerEmailAddressHandler(fieldCode, options)` | kintoneの通常フィールドの変更時にメールアドレス検証・正規化ハンドラーを登録する。 | [参照](#api-registeremailaddresshandler) |
+| `registerTableEmailAddressHandler(tableCode, columnCode, options)` | kintoneのサブテーブル列の変更時にメールアドレス検証・正規化ハンドラーを登録する。 | [参照](#api-registertableemailaddresshandler) |
 
 ---
 

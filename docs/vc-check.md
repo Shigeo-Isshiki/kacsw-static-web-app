@@ -29,9 +29,11 @@
 
 ## 公開関数の目次
 
-- [`validateZoomMeetingId(id, isWebinar = false)`](#api-validatezoommeetingid)
-- [`validateZoomPasscode(passcode)`](#api-validatezoompasscode)
-- [`validateZoomUrl(url)`](#api-validatezoomurl)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `validateZoomMeetingId(id, isWebinar = false)` | ZoomミーティングIDまたはウェビナーIDを正規化して検証する。 | [参照](#api-validatezoommeetingid) |
+| `validateZoomPasscode(passcode)` | Zoomパスコードを正規化して文字数・文字種を検証する。 | [参照](#api-validatezoompasscode) |
+| `validateZoomUrl(url)` | Zoom URLを正規化し、HTTPSと `zoom.us` の条件を検証する。 | [参照](#api-validatezoomurl) |
 
 ## 関数リファレンス
 

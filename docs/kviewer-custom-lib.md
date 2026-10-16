@@ -24,20 +24,26 @@ kViewer専用の独立した基本操作ライブラリです。現行ソース�
 
 ### レコード・依存チェック補助
 
-- [getFieldValueOr(record, fieldCode, fallback)](#getfieldvalueor)
-- [createDependencyChecker(requirements)](#createdependencychecker)
-- [redirectToRecordDetail(recordCode)](#redirecttorecorddetail)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `getFieldValueOr(record, fieldCode, fallback)` | レコードからフィールド値を取得し、取得できない場合は代替値を返す。 | [参照](#getfieldvalueor) |
+| `createDependencyChecker(requirements)` | 必要な外部関数の有無を確認する関数を生成する。 | [参照](#createdependencychecker) |
+| `redirectToRecordDetail(recordCode)` | 指定レコードの詳細画面へ移動する。 | [参照](#redirecttorecorddetail) |
 
 ### 表示制御
 
-- [setFieldShown(context, fieldCode, shown)](#setfieldshown)
-- [setStaticContentShown(context, staticCode, shown)](#setstaticcontentshown)
-- [setFormBridgeButtonShown(context, shown)](#setformbridgebuttonshown)
-- [setPrintCreatorButtonShown(context, shown)](#setprintcreatorbuttonshown)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `setFieldShown(context, fieldCode, shown)` | 指定フィールドの表示・非表示を切り替える。 | [参照](#setfieldshown) |
+| `setStaticContentShown(context, staticCode, shown)` | 指定した静的コンテンツの表示・非表示を切り替える。 | [参照](#setstaticcontentshown) |
+| `setFormBridgeButtonShown(context, shown)` | FormBridgeボタンの表示・非表示を切り替える。 | [参照](#setformbridgebuttonshown) |
+| `setPrintCreatorButtonShown(context, shown)` | PrintCreatorボタンの表示・非表示を切り替える。 | [参照](#setprintcreatorbuttonshown) |
 
 ### ページ全体の操作抑止
 
-- [installCopyPrintRestrictions()](#installcopyprintrestrictions)
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `installCopyPrintRestrictions()` | ページ全体でコピー・印刷の操作を抑止する。 | [参照](#installcopyprintrestrictions) |
 
 ## 関数リファレンス
 
