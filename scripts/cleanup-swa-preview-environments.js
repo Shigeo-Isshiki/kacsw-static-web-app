@@ -203,7 +203,7 @@ const cleanupStalePreviewEnvironments = async ({
 		execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }),
 	httpsClient = require('https'),
 	log = console,
-}) => {
+} = {}) => {
 	if (!env.SWA_NAME) throw new Error('SWA_NAME is required.');
 	if (!env.SWA_RESOURCE_GROUP) throw new Error('SWA_RESOURCE_GROUP is required.');
 	const productionBranch = env.SWA_PRODUCTION_BRANCH || DEFAULT_PRODUCTION_BRANCH;

@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('assert');
+const { spawnSync } = require('child_process');
+const path = require('path');
 const {
 	cleanupStalePreviewEnvironments,
 	findStalePreviewEnvironments,
@@ -40,6 +42,19 @@ assert.strictEqual(isProductionEnvironment(null, 'main'), false);
 assert.deepStrictEqual(parseOpenPullRequests([{ number: 4 }, { number: 24 }]), new Set([4, 24]));
 assert.throws(() => parseOpenPullRequests([{ number: 0 }]), /valid number/);
 console.log('PASS: pull request matching fails closed on ambiguous metadata');
+
+const cliResult = spawnSync(
+	process.execPath,
+	[path.join(__dirname, '../scripts/cleanup-swa-preview-environments.js')],
+	{ encoding: 'utf8', env: { PATH: process.env.PATH } }
+);
+assert.strictEqual(cliResult.status, 1);
+assert.match(
+	cliResult.stderr,
+	/Stale Azure Static Web Apps preview cleanup failed: SWA_NAME is required\./
+);
+assert.doesNotMatch(cliResult.stderr, /Cannot read properties of undefined/);
+console.log('PASS: CLI invocation without configuration reports a clear validation error');
 
 async function runCleanupTests() {
 	const calls = [];
