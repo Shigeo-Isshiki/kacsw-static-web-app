@@ -220,7 +220,7 @@ node -e "const nh = require('./src/national-holidays.js'); console.log(nh.isNati
 
 総務省（あるいは同等の公式データ）が電話番号の割当や範囲を更新した場合、`src/phone-utils.js` 内のデータと挙動を最新化する必要があります。以下は短く実務的にやるべき項目です。
 
-現状メモ: `src/phone-utils.js` のデータ定義は、2026年9月1日時点の総務省公開情報に対応しています。
+現状メモ: `src/phone-utils.js` のデータ定義は、2026年10月1日時点の総務省公開情報に対応しています。
 
 - **更新対象データ**:
   - `/_PU_PHONE_NUMBER_CONFIG.areaCodeList`（市外局番ごとの市内局番桁数）
