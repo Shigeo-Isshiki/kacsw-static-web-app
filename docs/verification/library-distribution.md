@@ -58,3 +58,18 @@
   - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/38957467044)：本番デプロイ成功。
   - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/38957466986)：配布パッケージ作成成功。
 - この確認は通常配布URLの内容一致に関するものです。利用先でのブラウザーキャッシュ更新や実画面動作の確認ではありません。
+
+## 追加確認：51-modern-default.cssの文字色競合対策
+
+- 確認日：2026-10-23 20:54:42（日本時間、UTC+09:00）。
+- 対象：共有スタイルシート `51-modern-default.css`（バージョン番号の定義なし）。
+- 対象ソース：PR #22のマージコミット [`a4467657be0cefd17c4e617e716a287c165487ef`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/a4467657be0cefd17c4e617e716a287c165487ef) の `src/51-modern-default.css`。
+- 変更：部品セレクター11箇所の詳細度を上げ、後から追加される `[class|=kintoneplugin] { color: #333; }` による文字色の上書きを防止しました。
+- 配布URL：[https://js.kacsw.or.jp/51-modern-default.css](https://js.kacsw.or.jp/51-modern-default.css)。`Cache-Control: no-cache` を付けてGETし、HTTP 200を確認しました。`git show a4467657be0cefd17c4e617e716a287c165487ef:src/51-modern-default.css` の出力と取得ファイルを `cmp` で比較し、バイト単位の完全一致を確認しました。
+- SHA-256：`0ed7a5edbb2a8a845b69b2fcd9c21009f6109bd7851378510ed94f4434b00b3f`（ソース・配布ファイル共通）。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/39949284841)：Prettier・ESLint・全テスト成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/39949284769)：本番デプロイ成功。配信元は `src/` です。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/39949284792)：配布パッケージ作成成功。ただし既存のコピー対象リストに本CSSはなく、パッケージ収録の確認ではありません。
+- ローカル検証：`npm test`、`npm run lint`、`./node_modules/.bin/prettier --check 'src/**/*.{js,css,html}' test/test-modern-default-css.js`、`CI=true node test/test-modern-default-css.js`、`git diff --check` はすべて成功しました。Chromiumで修正前相当と修正後の外観一致、競合CSSの前後配置、ボタンのホバー・フォーカスと入力欄のフォーカス色を検証しました。
+- 修正前の利用先実画面では、利用者が競合指定の `color` を一時的に無効化すると青色へ戻ることを確認しました。変更後の利用先実画面動作・ブラウザーキャッシュ更新は未確認です。通常配布の内容一致と実画面検証を区別します。

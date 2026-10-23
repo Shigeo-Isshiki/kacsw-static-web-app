@@ -46,7 +46,7 @@ kintone・kViewer向け、および汎用のJavaScript共通ライブラリ集�
 
 2026-10-23のソース変更では、他のCSSが後から `[class|=kintoneplugin] { color: #333; }` を追加しても、通常・無効・ダイアログボタン、入力欄、アラートなどの既定の文字色を維持するよう、各部品のセレクターに `[class]` を追加しました。既存クラスの対象要素は変えずに詳細度を上げ、入力欄のフォーカス色も維持します。`!important` は使いません。より強い指定、インライン指定、子要素自身の色指定との競合は対象外です。既存の独自CSSで部品色を上書きしている場合は、そのセレクターの詳細度も確認してください。
 
-回帰テストは `node test/test-modern-default-css.js` で実行できます（既存のPuppeteerと対応するChromeが必要です）。この変更の通常配布URLへの反映・内容一致と、変更後の利用先実画面での動作は未確認です。
+回帰テストは `node test/test-modern-default-css.js` で実行できます（既存のPuppeteerと対応するChromeが必要です）。2026-10-23（日本時間）に、コミット `a4467657be0cefd17c4e617e716a287c165487ef` の本番デプロイ成功と通常配布URLの内容一致を確認しました（[配布確認記録](./docs/verification/library-distribution.md#追加確認51-modern-defaultcssの文字色競合対策)）。変更後の利用先実画面での動作・ブラウザーキャッシュ更新は未確認です。
 
 <a id="docs"></a>
 
