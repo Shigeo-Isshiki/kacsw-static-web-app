@@ -32,7 +32,8 @@
   <p>Alert message</p>
 </div>
 */
-.kintoneplugin-alert {
+/* Keep component colors above global [class|='kintoneplugin'] rules from other stylesheets. */
+.kintoneplugin-alert[class] {
 	position: relative;
 	display: block;
 	margin: 8px 0;
@@ -74,7 +75,7 @@
 /*
 <div class="kintoneplugin-desc">Description of the setting</div>
 */
-.kintoneplugin-desc {
+.kintoneplugin-desc[class] {
 	margin-bottom: 8px;
 	font-size: 14px;
 	color: #888;
@@ -84,7 +85,7 @@
 /*
 <div class="kintoneplugin-label">Title<span class="kintoneplugin-require">*</span></div>
 */
-.kintoneplugin-require {
+.kintoneplugin-require[class] {
 	color: #c09853;
 }
 
@@ -100,7 +101,7 @@
 	vertical-align: top;
 }
 
-.kintoneplugin-input-text {
+.kintoneplugin-input-text[class] {
 	display: inline-block;
 	box-sizing: border-box;
 	margin: 0;
@@ -234,7 +235,7 @@
 	display: inline-block;
 }
 
-.kintoneplugin-dropdown {
+.kintoneplugin-dropdown[class] {
 	position: relative;
 	display: inline-block;
 	overflow: hidden;
@@ -263,7 +264,7 @@
 		no-repeat right center;
 }
 
-.kintoneplugin-dropdown-selected-name {
+.kintoneplugin-dropdown-selected-name[class] {
 	color: #3498db;
 	font-size: 14px;
 	line-height: 48px;
@@ -463,7 +464,7 @@
 /*
 <button class="kintoneplugin-button-normal"> A button</button>
 */
-.kintoneplugin-button-normal {
+.kintoneplugin-button-normal[class] {
 	display: inline-block;
 	box-sizing: border-box;
 	padding: 0 16px;
@@ -488,7 +489,7 @@
 /*
 <button class="kintoneplugin-button-disabled">A disabled button</button>
 */
-.kintoneplugin-button-disabled {
+.kintoneplugin-button-disabled[class] {
 	display: inline-block;
 	box-sizing: border-box;
 	padding: 0 16px;
@@ -507,7 +508,7 @@
 /*
 <button class="kintoneplugin-button-dialog-ok">OK</button>
 */
-.kintoneplugin-button-dialog-ok {
+.kintoneplugin-button-dialog-ok[class] {
 	display: inline-block;
 	box-sizing: border-box;
 	padding: 0 16px;
@@ -531,7 +532,7 @@
 /*
 <button class="kintoneplugin-button-dialog-cancel">Cancel</button>
 */
-.kintoneplugin-button-dialog-cancel {
+.kintoneplugin-button-dialog-cancel[class] {
 	display: inline-block;
 	box-sizing: border-box;
 	padding: 0 16px;
@@ -587,7 +588,7 @@
 	margin-bottom: 16px;
 }
 
-.kintoneplugin-table-th {
+.kintoneplugin-table-th[class] {
 	border-color: #3498db;
 	height: 40px;
 	color: #fff;
