@@ -73,3 +73,19 @@
   - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/39949284792)：配布パッケージ作成成功。ただし既存のコピー対象リストに本CSSはなく、パッケージ収録の確認ではありません。
 - ローカル検証：`npm test`、`npm run lint`、`./node_modules/.bin/prettier --check 'src/**/*.{js,css,html}' test/test-modern-default-css.js`、`CI=true node test/test-modern-default-css.js`、`git diff --check` はすべて成功しました。Chromiumで修正前相当と修正後の外観一致、競合CSSの前後配置、ボタンのホバー・フォーカスと入力欄のフォーカス色を検証しました。
 - 修正前の利用先実画面では、利用者が競合指定の `color` を一時的に無効化すると青色へ戻ることを確認しました。変更後の利用先実画面動作・ブラウザーキャッシュ更新は未確認です。通常配布の内容一致と実画面検証を区別します。
+
+## 追加確認：bank-transfer 1.0.1のEDI正規化エラー処理
+
+- 確認日：2026-10-24 11:02:22（日本時間、UTC+09:00）。
+- 対象ライブラリ：[bank-transfer](../bank-transfer.md) 1.0.1。
+- 対象ソース：PR #25のマージコミット [`e9d0fee823f9f259c446bbc8c70325412477984b`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/e9d0fee823f9f259c446bbc8c70325412477984b) の `src/bank-transfer.js`。
+- 変更：総合振込のEDI正規化失敗時に生値出力へ切り替えるフォールバックを廃止し、既存のエラー返却で全体の生成を中止。文字種・コンマ禁止・20バイトの正規化仕様や給与／賞与のレコード構成は変更していません。
+- 配布URL：[https://js.kacsw.or.jp/bank-transfer.js](https://js.kacsw.or.jp/bank-transfer.js)。`Cache-Control: no-cache` を付けてGETし、HTTP 200を確認しました。`git show e9d0fee823f9f259c446bbc8c70325412477984b:src/bank-transfer.js` の出力と取得ファイルを `cmp` で比較し、バイト単位の完全一致とJSDocバージョン `1.0.1` の一致を確認しました。
+- SHA-256：`defc903e1eb99f5c3a2fe35d9f6387547f7f930b5b2029a2ea4b6ae2416d260c`（ソース・配布ファイル共通）。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40052397090)：Prettier・ESLint・全テスト成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40052397103)：本番デプロイ成功。配信元は `src/` です。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40052397249)：配布パッケージ作成成功。
+- ローカル検証：`npm test`、`npm run lint`、`npm run ci-check`、`npm exec -- prettier --check 'src/**/*.{js,css,html}' test/test-bank-transfer-edi.js`、`git diff --check` はすべて成功。EDI正常・空欄・拒否、エラー情報・部分データなし、給与／賞与経路の詳細は [検証記録](bank-transfer.md) を参照してください。
+- 取得した通常配布ファイルをNode.jsのモジュール読み込み時に差し替えて `test/test-bank-transfer-edi.js` を実行し、全項目成功を確認しました。銀行・支店検索はテスト用スタブであり、利用先実画面の検証ではありません。
+- 呼び出し側のコードが提供されていないため、利用者の了承のもと、実アプリでのエラー表示・ダウンロード中止、ブラウザーキャッシュ更新、金融機関へのアップロードは未確認です。通常配布の内容一致と実画面検証は区別します。
