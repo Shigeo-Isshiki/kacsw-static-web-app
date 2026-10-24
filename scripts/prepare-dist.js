@@ -29,9 +29,9 @@ async function run() {
 	try {
 		// ensure node version compatibility (best-effort check)
 		const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
-		if (Number.isNaN(nodeMajor) || nodeMajor < 14) {
+		if (Number.isNaN(nodeMajor) || nodeMajor < 20) {
 			console.warn(
-				'Warning: Node.js 14+ is recommended for prepare-dist (found ' + process.versions.node + ')'
+				'Warning: Node.js 20+ is recommended for prepare-dist (found ' + process.versions.node + ')'
 			);
 		}
 
