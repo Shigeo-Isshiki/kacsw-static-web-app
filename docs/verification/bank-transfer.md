@@ -1,6 +1,43 @@
 # bank-transferの検証記録
 
-[使い方リファレンス](../bank-transfer.md) から分離した過去の確認記録です。今回の文書整理でテストや配布確認を再実行したものではありません。
+[使い方リファレンス](../bank-transfer.md) に対応する確認記録です。自動テスト・実画面確認・配布確認はそれぞれ区別します。
+
+## EDI正規化失敗時の生成中止（1.0.1）
+
+- 確認日：2026-10-24（日本時間）。
+- 対象：`59d68385cf6216583bc432335537d4371f45529a` を基点とする未コミットの作業ツリー、[bank-transfer.js](../../src/bank-transfer.js) 1.0.1。
+- 総合振込のEDI出力は、通常の銀行宛・ゆうちょ銀行間のいずれも `generateDataRecords` から内部の固定長生成処理へ集約されます。この処理から生値フォールバックだけを除去しました。`normalizeEdiInfo` 自体と給与・賞与の分岐は変更していません。
+- 既存の例外捕捉で `{ error, message, index }` が返り、`generateZenginData` は `{ error, message, detail }` に包んで中止します。`generateZenginDataAsync` も同じエラー結果で resolve します。成功フラグや生成済みレコード・ファイル断片は返しません。
+
+### 自動テスト
+
+[EDI回帰テスト](../../test/test-bank-transfer-edi.js) を追加しました。既存の `npm test` ランナーで自動検出されます。銀行・支店検索は非同期スタブを使用し、外部サービスへの通信は行いません。
+
+- 正常なASCII・全角英数／括弧・カナの正規化、20バイト丁度と超過時の切り詰め。
+- 空文字・空白・未指定・`null` の20バイトスペース埋め。
+- 半角／全角コンマ・読点・漢字・絵文字・20バイトより後ろのコンマの拒否。
+- 不正レコードが先頭・中間・末尾にある場合の全体失敗と0始まりの `index`。通常の銀行宛・ゆうちょ銀行間を確認。
+- callback版・Promise版の全銀生成APIで同じエラー情報を返し、成功・部分成功・生値出力をしないこと。
+- 給与・賞与（コード／名称指定）では不正EDIを無視し、EDI未指定時と出力全体が一致すること。
+- 正常時のEDI20バイト、`7Y`、従業員コード、120バイト固定長レコードとCRLF構成。
+
+実行結果（いずれも成功）：
+
+```sh
+node -r ./test/setup-tests.js test/test-bank-transfer-edi.js
+node -r ./test/setup-tests.js test/test-bank-transfer.js
+npm run lint
+npm test
+npm run ci-check
+npm exec -- prettier --check 'src/**/*.{js,css,html}' test/test-bank-transfer-edi.js
+git diff --check
+```
+
+### 呼び出し側・配布の確認範囲
+
+既存の `result.error` 判定でエラー表示・ダウンロード前の処理中止が可能であり、ライブラリの返却方式やkintoneアプリには変更を加えていません。ただし、このリポジトリと隣接する `kintone-customize` に実アプリの全銀生成呼び出しが見つからず、依頼者の了承により実装・実画面での表示とダウンロード中止は未確認としました。実アプリが `result.error` を検査してダウンロード前に終了することは、別途確認が必要です。
+
+コミット・プッシュ・配布・本番反映・ワークフロー確認・通常配布URLの照合は未実施です。本記録はローカルの自動テスト結果であり、配布確認や金融機関システムへのアップロード検証ではありません。
 
 ## 給与振込の実機確認
 

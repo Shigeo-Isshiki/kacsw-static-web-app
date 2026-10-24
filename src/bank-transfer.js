@@ -1,5 +1,5 @@
 /**
- * @version 1.0.0
+ * @version 1.0.1
  * bank-transfer.js（銀行振込ユーティリティファイル）
  * 銀行振込ユーティリティ（kintone向け、コールバックスタイル）
  *
@@ -1541,20 +1541,7 @@ const _bt_generateDataRecordStrings = (dataRecords, transferType, callback) => {
 				middleFields = [emp1, emp2, ' '.repeat(2)];
 			} else {
 				// EDI情報 (20 bytes) — normalize via public helper so kintone と整合する
-				let ediTrunc;
-				try {
-					// normalizeEdiInfo returns padded string when padToBytes=true
-					ediTrunc = normalizeEdiInfo(r.ediInfo || '', { padToBytes: true, bytes: 20 });
-				} catch (e) {
-					// fallback to raw handling
-					let edi = _bt_toStr(r.ediInfo || '');
-					try {
-						edi = _bt_toHalfWidthKana(edi, false);
-					} catch (e) {}
-					ediTrunc = _bt_sjisTruncate(edi, 20);
-					const ediBytes = _bt_sjisByteLength(ediTrunc);
-					if (ediBytes < 20) ediTrunc = ediTrunc + ' '.repeat(20 - ediBytes);
-				}
+				const ediTrunc = normalizeEdiInfo(r.ediInfo || '', { padToBytes: true, bytes: 20 });
 
 				// 振込指定区分 (1 byte)
 				const specify = '7';
