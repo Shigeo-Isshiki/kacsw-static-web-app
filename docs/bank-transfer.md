@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.0.0** です。
+現行ソースは **1.0.1** です（未配布・通常配布URLとの一致は未確認）。確認済み通常配布版は **1.0.0** です。
 
 このドキュメントは `src/bank-transfer.js` が公開する関数と、全銀フォーマット出力に必要な引数の詳細（契約）をまとめた使い方リファレンスです。
 
@@ -595,6 +595,8 @@ window.BANK.isBankBusinessDay('2025-11-10'); // true（月曜日）
 
 エラー時の形式は下で示します（ErrorResult 構造）。
 
+総合振込でEDI情報の正規化に失敗した場合は、`{ error: 'データレコードの生成に失敗しました', message, detail: { error, message, index } }` を返します。`index` は不正な明細の0始まり位置です。`success`・`content`・`parts` は返さず、正常な明細が混在していても全体を失敗とします。呼び出し側は `result.error` を表示して処理を終了し、Shift_JIS変換・ダウンロードへ進まないでください。
+
 備考:
 
 - `content` は CRLF で結合された文字列です。Shift_JIS 変換やファイル出力は呼び出し側で行ってください。
@@ -650,11 +652,12 @@ console.log(result.content);
 - 概要: `records` 配列からデータ行群（CRLFで結合）を生成します。`fromBankNo` があると仕向銀行情報を参照します。
 - 引数:
   - `options` (object, optional) — `transferType` に `headerData.typeCode` と完全に同じ値（`'11'`/`'12'`/`'21'`、`'給与振込'`/`'賞与振込'`/`'総合振込'`）を指定します。`'11'`/`'12'`（給与振込/賞与振込）は従業員コード様式、それ以外（`'21'`等、未指定を含む）は総合振込様式（既定）です。省略時・第三引数にコールバック関数を渡した場合は従来どおり総合振込様式として動作します（後方互換）。
-- 戻り値（コールバック）: `{ data: '<CRLFで結合されたデータ行>' }`
-- 例（総合振込・従来どおり）: `window.BANK.generateDataRecords(records, '0001', res => console.log(res.data));`
-- 例（給与振込）: `window.BANK.generateDataRecords(records, '0001', { transferType: '11' }, res => console.log(res.data));`
+- 戻り値（コールバック）: 成功時は `{ success: true, records: '<CRLFで結合されたデータ行>' }`。EDI情報の正規化に失敗した場合は `{ error: '例外: <正規化エラーの理由>', message, index }` を返し、`success`・`records` や部分的なデータは返しません。`message` は `error` と同じ内容、`index` は0始まりです。
+- 例（総合振込・従来どおり）: `window.BANK.generateDataRecords(records, '0001', res => console.log(res.error || res.records));`
+- 例（給与振込）: `window.BANK.generateDataRecords(records, '0001', { transferType: '11' }, res => console.log(res.error || res.records));`
 - 注意: `toBranchNo`/`toAccountNumber` は常に全銀手順形式（支店コード3桁＋口座番号7桁）として解釈されます。ゆうちょの記号/番号形式からの自動変換は行われないため、必要な場合は事前に [`convertYucho`](#convertYucho) で変換してください。仕向・被仕向の双方がゆうちょ銀行（`9900`）の場合は支店情報の API 照会自体をスキップし、受取側の支店カナ（`toBranchKana`）は空文字として扱われます。
 - 総合振込（`headerData.typeCode` が `'21'`等・既定）ではデータレコードの92～113バイト目に EDI情報（20byte）＋振込指定区分（1byte, 固定 `'7'`）＋識別表示（1byte, 固定 `'Y'`）が設定されます（従来どおり）。
+- EDI情報は [`normalizeEdiInfo`](#normalizeEdiInfo) で正規化し、失敗時は生値へのフォールバックを行わず全体の生成を中止します。文字種・コンマ禁止・20バイトへの切り詰め・空欄のスペース埋めは変更ありません。
 - 給与振込（`headerData.typeCode` が `'11'`/`'12'`）ではデータレコードの92～113バイト目に `employeeCode1`（10byte）＋`employeeCode2`（10byte）＋予備（2byte, スペース固定）が設定されます。`ediInfo` は無視されます。`employeeCode1`/`employeeCode2` は全角数字の半角化・左ゼロ埋めを行い、未指定またはオールスペース入力も許容します。
 - `generateZenginData` / `generateZenginDataAsync` 経由で呼び出す場合は、`headerData.typeCode` から `transferType` 相当の値が自動判定されるため、この `options` を明示的に渡す必要はありません。
 
@@ -883,6 +886,7 @@ window.BANK.generateZenginData(headerData, records, (res) => {
 
 | バージョン | 記録日     | 主な変更                                                                                                                | 記録・配布確認                                                                                                                      |
 | ---------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.1      | 2026-10-24 | EDI正規化失敗時の生値フォールバックを廃止し、既存エラー契約で全銀生成全体を中止 | 未コミット・未配布。自動テストと呼び出し側の確認範囲は [検証記録](verification/bank-transfer.md) を参照 |
 | 1.0.0      | 2026-10-12 | 現行ソースを基準版として記録し、先頭JSDocにバージョンを明記。機能変更なし                                               | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12）                                                                              |
 | 未設定     | 2025-11-03 | 現ファイルのGit履歴で確認できる最古の登録。callback方式の単一ファイルライブラリを復元                                   | `a87a4c4`。初版作成日・配布日は未確認                                                                                               |
 | 未設定     | 2026-09-22 | 給与振込・賞与振込（typeCode 11/12）に対応                                                                              | `893d2f3`。配布確認は未確認                                                                                                         |
