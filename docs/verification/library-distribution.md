@@ -168,3 +168,23 @@
 
 - 利用者から Git 同期の承認を受け、PC・モバイル対応の変更を作業ブランチ `feature/field-code-input-lookup-20261025` でコミット・プッシュする工程へ進みます。上記の未コミット・未プッシュの記述は同期前の記録です。
 - 今回の承認範囲は作業ブランチの同期です。`main` へのマージ・本番配布は行いません。配信日時はなく、通常配布確認・対象コミットのワークフロー結果・利用先の実画面動作は未確認です。
+
+## 追加確認：kintone-custom-lib 2.1.0
+
+- 利用者から本番配信までの継続承認を受け、PR #27 を保護ルールに従ってマージしました。上記の未配布・未確認の記述は配布前の履歴として保持します。
+- 対象ソース：PR #27 のマージコミット [`ac8a0f47147bcd550e1e0a9903d02292678bbbef`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/ac8a0f47147bcd550e1e0a9903d02292678bbbef)。対象ライブラリは [kintone-custom-lib](../kintone-custom-lib.md) 2.1.0 と、その公開登録を追加した `all-window-exports.js` です。
+- 本番デプロイジョブ完了日時：2026-10-25 14:51:41（日本時間、UTC+09:00）。Azure ワークフローの `Build and Deploy Job` の `completed_at` は `2026-10-25T05:51:41Z` です。
+- 配布確認日時：2026-10-25 14:52:21（日本時間、UTC+09:00）。UTC では `2026-10-25T05:52:21.113Z`。
+- 対象コミットの `main` への push に対応する次のワークフローはすべて成功しました。別コミットの成功や PR プレビュー配信で代用していません。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40167002125)：成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40167002115)：本番デプロイ成功。配信元は `src/`。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40167002034)：配布パッケージ作成成功。
+- 通常配布 URL に `Cache-Control: no-cache` を付けて GET し、HTTP 200 と、固定したマージコミットのソースとのバイト単位の完全一致を確認しました。変換なしのソースと直接照合し、候補版・圧縮版・ローカル配信では代用していません。
+
+| 対象・通常配布 URL | HTTP | ソース／配布バイト数 | バージョン | 一致 | SHA-256（ソース・配布共通） |
+| --- | --- | --- | --- | --- | --- |
+| <https://js.kacsw.or.jp/kintone-custom-lib.js> | 200 | 75458 / 75458 | 2.1.0（両方の JSDoc で確認） | 完全一致 | `0a23afc9c23c237fbad3ae6b1c46f5c383e100fba610980ba959527edf8f5fc2` |
+| <https://js.kacsw.or.jp/all-window-exports.js> | 200 | 2901 / 2901 | 定義なし | 完全一致 | `ac8e07c854c555bbb400502a1e9f0ef6b94541d71a638dd46c27315a2db5d9dd` |
+
+- PR #27 の必須 `lint`・`test` とプレビュー配信・パッケージ作成も成功してから、通常のマージ API で反映しました。保護ルールのバイパスは行っていません。
+- ローカルの 28 テスト・既存テスト・Lint・Prettier・ローカル CI チェックの結果は上記のモバイル対応追記を参照してください。本確認は通常配布の内容一致であり、利用側アプリの置き換え、追加・編集両画面での関数の取得結果、必須表示などの全条件、実機の日本語入力・autoKana 動作、ブラウザーキャッシュ更新は未確認です。
