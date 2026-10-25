@@ -9,6 +9,10 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'kintone-custom
 const control = (label, id, content = '<input type="text">', className = `value-${id}`) =>
 	`<div class="control-gaia"><span class="control-label-text-gaia">${label}</span>` +
 	`<div class="${className}">${content}</div></div>`;
+const mobileControl = (label, id, content = '<input class="forms-text-gaia" type="text">') =>
+	`<div class="row-gaia"><div class="control-gaia field-${id}">` +
+	`<h3 class="control-label-gaia label-${id}">${label}</h3>` +
+	`<div class="control-value-gaia value-${id}">${content}</div></div></div>`;
 const field = (label, extra = {}) => ({ type: 'SINGLE_LINE_TEXT', label, ...extra });
 
 function fixture(t, fields = {}, html = '') {
@@ -154,16 +158,16 @@ test('13: warn:false suppresses warnings including invalid input', async (t) => 
 	assert.equal(f.warnings.length, 0);
 });
 
-test('14: explicitly initialized mobile runtime returns null without API calls', async (t) => {
-	const f = fixture(t, { A: field('A') }, control('A', 1));
+test('14: explicitly initialized mobile runtime resolves the observed mobile DOM', async (t) => {
+	const f = fixture(t, { A: field('A') }, mobileControl('A', 1));
 	f.window.initKintoneCustomLibRuntime({ mode: 'mobile' });
 	const result = await f.find(['A', 'B']);
-	assert.equal(result.A, null);
+	assert.equal(result.A, f.document.querySelector('.value-1 input'));
 	assert.equal(result.B, null);
-	assert.equal(f.calls(), 0);
+	assert.equal(f.calls(), 1);
 	assert.equal(f.warnings.length, 1);
-	assert.deepEqual(Object.keys(f.reasons()), ['A', 'B']);
-	assert.match(f.reasons().A, /PC の画面以外/);
+	assert.deepEqual(Object.keys(f.reasons()), ['B']);
+	assert.match(f.reasons().B, /存在しない/);
 });
 
 test('15: absent kintone, app, API, or document returns null without throwing', async (t) => {
@@ -304,13 +308,106 @@ test('empty labels have a reason; inherited and special property names are handl
 	assert.match(f.reasons().toString, /存在しない/);
 });
 
-test('mobile pathname and global runtime settings skip API calls', async (t) => {
-	const f = fixture(t);
+test('mobile pathname and global runtime settings select mobile labels', async (t) => {
+	const f = fixture(t, { A: field('A') }, mobileControl('A', 1));
 	f.window.history.replaceState(null, '', '/k/m/401/edit');
-	assert.equal((await f.find(['A'])).A, null);
+	assert.equal((await f.find(['A'])).A, f.document.querySelector('input'));
 	f.window.history.replaceState(null, '', '/k/401/edit');
 	f.window.KACSW_RUNTIME = { mode: 'mobile', version: 1 };
+	assert.equal((await f.find(['A'])).A, f.document.querySelector('input'));
+	assert.equal(f.calls(), 2);
+	assert.equal(f.warnings.length, 0);
+});
+
+test('mobile uses exact labels, one API call, and preserves DOM, focus and values', async (t) => {
+	const f = fixture(
+		t,
+		{ A: field(' A '), B: field('B') },
+		mobileControl('A_PART', 3) + mobileControl(' A ', 1) + mobileControl('B', 2)
+	);
+	f.window.initKintoneCustomLibRuntime({ mode: 'mobile' });
+	const input = f.document.querySelector('.value-1 input');
+	input.value = 'unchanged';
+	input.focus();
+	const before = f.document.documentElement.outerHTML;
+	const mutations = [];
+	const observer = new f.window.MutationObserver((records) => mutations.push(...records));
+	observer.observe(f.document, {
+		subtree: true,
+		childList: true,
+		attributes: true,
+		characterData: true,
+	});
+	t.after(() => observer.disconnect());
+	input.focus = () => assert.fail('must not focus');
+	input.addEventListener = () => assert.fail('must not register input events');
+	const result = await f.find(['A', 'B']);
+	assert.equal(result.A, input);
+	assert.equal(result.B, f.document.querySelector('.value-2 input'));
+	assert.equal(f.calls(), 1);
+	assert.equal(f.warnings.length, 0);
+	assert.equal(f.document.documentElement.outerHTML, before);
+	assert.equal(f.document.activeElement, input);
+	assert.equal(input.value, 'unchanged');
+	assert.equal(mutations.length + observer.takeRecords().length, 0);
+});
+
+test('mobile preserves all exclusion reasons and warning aggregation', async (t) => {
+	const f = fixture(
+		t,
+		{
+			DUP: field('Duplicate'),
+			TABLE: { type: 'SUBTABLE', label: 'Table', fields: { CHILD: field(' Duplicate ') } },
+			HIDDEN: field('Hidden', { noLabel: true }),
+			NO_INPUT: field('Select'),
+			MULTIPLE: field('Multiple'),
+			ABSENT: field('Absent'),
+		},
+		mobileControl('Duplicate', 1) +
+			mobileControl('Hidden', 2) +
+			mobileControl('Select', 3, '<select></select>') +
+			mobileControl('Multiple', 4) +
+			mobileControl('Multiple', 5)
+	);
+	f.window.initKintoneCustomLibRuntime({ mode: 'mobile' });
+	const codes = ['DUP', 'CHILD', 'HIDDEN', 'NO_INPUT', 'MULTIPLE', 'ABSENT', 'MISSING'];
+	const result = await f.find([...codes, null]);
+	codes.forEach((code) => assert.equal(result[code], null));
+	assert.equal(f.calls(), 1);
+	assert.equal(f.warnings.length, 1);
+	assert.match(f.reasons().DUP, /同じ項目名.*2件/);
+	assert.match(f.reasons().CHILD, /テーブル内/);
+	assert.match(f.reasons().HIDDEN, /フィールド名を表示しない/);
+	assert.match(f.reasons().NO_INPUT, /input がない/);
+	assert.match(f.reasons().MULTIPLE, /画面上.*2件/);
+	assert.match(f.reasons().ABSENT, /画面上.*0件/);
+	assert.match(f.reasons().MISSING, /存在しない/);
+	await f.find(codes, { warn: false });
+	assert.equal(f.warnings.length, 1);
+});
+
+test('mobile rejects the identical API error and safely handles unavailable API', async (t) => {
+	const f = fixture(t);
+	f.window.initKintoneCustomLibRuntime({ mode: 'mobile' });
+	const error = new Error('mobile API failure');
+	f.window.kintone.app.getFormFields = () => Promise.reject(error);
+	await assert.rejects(f.find(['A']), (actual) => actual === error);
+	assert.equal(f.warnings.length, 0);
+	delete f.window.kintone.app.getFormFields;
 	assert.equal((await f.find(['A'])).A, null);
-	assert.equal(f.calls(), 0);
-	assert.equal(f.warnings.length, 2);
+	assert.equal(f.warnings.length, 1);
+	assert.match(f.reasons().A, /利用できない/);
+});
+
+test('PC and mobile selectors remain isolated, including explicit PC override', async (t) => {
+	const f = fixture(t, { A: field('A') }, control('A', 1) + mobileControl('A', 2));
+	assert.equal((await f.find(['A'])).A, f.document.querySelector('.value-1 input'));
+	f.window.initKintoneCustomLibRuntime({ mode: 'mobile' });
+	assert.equal((await f.find(['A'])).A, f.document.querySelector('.value-2 input'));
+	f.window.history.replaceState(null, '', '/k/m/401/edit');
+	f.window.initKintoneCustomLibRuntime({ mode: 'pc' });
+	assert.equal((await f.find(['A'])).A, f.document.querySelector('.value-1 input'));
+	f.window.resetKintoneCustomLibRuntime();
+	assert.equal((await f.find(['A'])).A, f.document.querySelector('.value-2 input'));
+	assert.equal(f.warnings.length, 0);
 });

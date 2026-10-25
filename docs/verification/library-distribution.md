@@ -144,3 +144,27 @@
 | `git diff --check` | 成功 |
 
 文書の 6 章構成、目次・アンカー、相対リンク、コードフェンス、ソースとのバージョン一致、過去の配布証跡を追記のみで保持していることも確認済みです。
+
+### 2026-10-25：未配布 2.1.0 のモバイル対応追記
+
+- 利用者の承認に基づき、上記 PC 限定版の仕様を PC・モバイル対応へ拡張しました。上記の項目 14「モバイルでは対象外」の結果とハッシュは PC 限定版の履歴です。現在の項目 14 はモバイルでの入力欄取得成功と API 呼び出し 1 回を検証します。未配布の機能追加のためバージョンは 2.1.0 を維持します。
+- 対象：作業ブランチ `feature/field-code-input-lookup-20261025` の未コミット変更。ベースは PC 限定版のローカルコミット `a299963395e5420fdf2dbc6e1dddbb53ba9370f9`。現在のソース SHA-256 は `0a23afc9c23c237fbad3ae6b1c46f5c383e100fba610980ba959527edf8f5fc2`（通常配布ファイルのハッシュではありません）。
+- 公式仕様：[getFormFields](https://cybozu.dev/ja/kintone/docs/js-api/app/get-form-fields/) は PC・モバイル共通で `kintone.app.getFormFields()` を使用し、両環境の追加・編集画面に対応しています。
+- 利用者提供のモバイル画面診断では、モバイル URL、入力要素 49 件、`value-数字` 要素 59 件、`.control-label-text-gaia` は 0 件でした。「申出人（姓）」の入力欄は `.control-gaia` 内の `.control-value-gaia.value-数字` にあり、同じコントロール内の `h3.control-label-gaia` の文字列が項目名と完全一致しました。これは特定画面での構造観測であり、関数の実画面動作確認ではありません。診断に使った番号を実装に固定していません。
+- 実装：既存の `_kc_isMobileRuntime()` に従い、PC は `.control-label-text-gaia`、モバイルは `.control-label-gaia` で検索。項目名の完全一致、テーブル内・非表示・重複の除外、API エラー伝播、画面非変更は維持しています。
+- ローカル検証：追加テストは更新後 28 件すべて成功。モバイルの明示初期化・URL・グローバル設定、PC 明示設定・リセット、複数コードの API 呼び出し 1 回、完全一致、全除外理由・警告集約・抑制、API 失敗・欠如、DOM・値・フォーカス・入力イベント登録の非変更を確認しました。PC の既存ケースも成功しています。
+- 次の正確なコマンドはすべて成功しました。
+  - `node -r .\test\setup-tests.js .\test\test-get-input-elements-by-field-codes.js`（28 テスト）
+  - `npm test`（既存テストと追加分を含む）
+  - `npm run lint`
+  - `npx --no-install eslint --config eslint.config.cjs src\kintone-custom-lib.js`（警告なし）
+  - `npx --no-install prettier --check "src/**/*.{js,css,html}" test\test-get-input-elements-by-field-codes.js`
+  - `npm run ci-check`（ローカル配布物生成・VM・Puppeteer）
+  - `git diff --check`
+- モバイル変更のコミット・プッシュ・本番配布：未実施。配信日時：なし。配布対象コミットは未確定、対象コミットの GitHub ワークフローは未実行、通常配布 URL の GET・HTTP 確認・バイト照合は未実行です。
+- 未確認：利用先の追加・編集両画面での関数の取得結果、必須表示を含む全ラベル構造、実機の日本語入力・autoKana 動作、ブラウザーキャッシュ更新。ラベル文字列が項目名と完全一致しなければ安全のため `null` を返します。模擬 DOM テストや今回の構造観測から、これらを確認済みとは扱いません。
+
+### 2026-10-25：Git 同期の承認
+
+- 利用者から Git 同期の承認を受け、PC・モバイル対応の変更を作業ブランチ `feature/field-code-input-lookup-20261025` でコミット・プッシュする工程へ進みます。上記の未コミット・未プッシュの記述は同期前の記録です。
+- 今回の承認範囲は作業ブランチの同期です。`main` へのマージ・本番配布は行いません。配信日時はなく、通常配布確認・対象コミットのワークフロー結果・利用先の実画面動作は未確認です。

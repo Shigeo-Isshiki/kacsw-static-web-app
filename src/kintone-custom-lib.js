@@ -1496,17 +1496,17 @@ const setRecordHeaderMenuSpaceText = (id, innerHTML) => {
 };
 
 /**
- * フィールドコードから PC の追加・編集画面上の input 要素を項目名の完全一致で探します。
+ * フィールドコードから PC・モバイルの追加・編集画面上の input 要素を項目名の完全一致で探します。
  * - getFormFields() は空でない有効なコード配列に対して1回だけ呼び出します。
  * - テーブル内、noLabel、アプリ内で項目名が重複するフィールドは対象外です。
- * - 非公式の DOM 構造（value-数字、control-gaia、control-label-text-gaia）に依存します。
+ * - 非公式の DOM 構造（value-数字、control-gaia、PC/モバイルのラベル要素）に依存します。
  * - DOM・フォーカス・値・イベント登録は変更しません。
  *
  * @param {string[]} fieldCodes 探すフィールドコードの配列。不正な要素は警告して除外します。
  * @param {Object} [options] 検索オプション
  * @param {boolean} [options.warn=true] 不正入力と見つからない理由を console.warn でまとめて出力する
  * @returns {Promise<Object<string, HTMLInputElement|null>>} 入力欄、または見つからなければ null。
- *   モバイル・API/DOM のない環境では全件 null。getFormFields() の失敗はそのまま reject します。
+ *   API/DOM のない環境では全件 null。getFormFields() の失敗はそのまま reject します。
  * @example
  * const inputs = await getInputElementsByFieldCodes(['LAST_NAME', 'LAST_NAME_KANA']);
  * if (inputs.LAST_NAME && inputs.LAST_NAME_KANA) {
@@ -1545,9 +1545,9 @@ const getInputElementsByFieldCodes = async (fieldCodes, options = {}) => {
 		typeof document !== 'undefined' &&
 		document &&
 		typeof document.querySelectorAll === 'function';
-	if (_kc_isMobileRuntime() || !isApiAvailable) {
+	if (!isApiAvailable) {
 		codes.forEach((code) => {
-			reasons.set(code, 'PC の画面以外、または kintone.app.getFormFields / DOM が利用できない環境');
+			reasons.set(code, 'kintone.app.getFormFields / DOM が利用できない環境');
 		});
 		_kc_reportReasons();
 		return result;
@@ -1577,11 +1577,12 @@ const getInputElementsByFieldCodes = async (fieldCodes, options = {}) => {
 		}
 	});
 
+	const labelSelector = _kc_isMobileRuntime() ? '.control-label-gaia' : '.control-label-text-gaia';
 	const screenElementsByLabel = new Map();
 	document.querySelectorAll('[class*="value-"]').forEach((element) => {
 		if (!Array.from(element.classList).some((name) => /^value-\d+$/.test(name))) return;
 		const container = element.closest('.control-gaia');
-		const labelElement = container ? container.querySelector('.control-label-text-gaia') : null;
+		const labelElement = container ? container.querySelector(labelSelector) : null;
 		if (!labelElement) return;
 		const label = _kc_normalizeLabel(labelElement.textContent);
 		if (!screenElementsByLabel.has(label)) screenElementsByLabel.set(label, []);
