@@ -1,9 +1,9 @@
 /** kintone内でよく使われる処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 2.0.0
+ * @version 2.1.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_kc_)で始める
-/* exported escapeKintoneQueryValue, notifyError, createDependencyChecker, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText, initKintoneCustomLibRuntime, resetKintoneCustomLibRuntime */
+/* exported escapeKintoneQueryValue, notifyError, createDependencyChecker, getFieldValueOr, kintoneEventOn, notifyInfo, notifyWarning, showYesNoDialog, showInputDialog, getInputElementsByFieldCodes, setRecordValues, setSpaceFieldButton, setSpaceFieldText, setHeaderMenuSpaceButton, setRecordHeaderMenuSpaceButton, setRecordHeaderMenuSpaceText, initKintoneCustomLibRuntime, resetKintoneCustomLibRuntime */
 
 // 共通定数
 /**
@@ -1496,6 +1496,141 @@ const setRecordHeaderMenuSpaceText = (id, innerHTML) => {
 };
 
 /**
+ * フィールドコードから PC・モバイルの追加・編集画面上の input 要素を項目名の完全一致で探します。
+ * - getFormFields() は空でない有効なコード配列に対して1回だけ呼び出します。
+ * - テーブル内、noLabel、アプリ内で項目名が重複するフィールドは対象外です。
+ * - 非公式の DOM 構造（value-数字、control-gaia、PC/モバイルのラベル要素）に依存します。
+ * - DOM・フォーカス・値・イベント登録は変更しません。
+ *
+ * @param {string[]} fieldCodes 探すフィールドコードの配列。不正な要素は警告して除外します。
+ * @param {Object} [options] 検索オプション
+ * @param {boolean} [options.warn=true] 不正入力と見つからない理由を console.warn でまとめて出力する
+ * @returns {Promise<Object<string, HTMLInputElement|null>>} 入力欄、または見つからなければ null。
+ *   API/DOM のない環境では全件 null。getFormFields() の失敗はそのまま reject します。
+ * @example
+ * const inputs = await getInputElementsByFieldCodes(['LAST_NAME', 'LAST_NAME_KANA']);
+ * if (inputs.LAST_NAME && inputs.LAST_NAME_KANA) {
+ *     $.fn.autoKana($(inputs.LAST_NAME), $(inputs.LAST_NAME_KANA), { katakana: false });
+ * }
+ */
+const getInputElementsByFieldCodes = async (fieldCodes, options = {}) => {
+	const warn = !(options && options.warn === false);
+	const codes = Array.isArray(fieldCodes)
+		? Array.from(fieldCodes).filter((code) => typeof code === 'string' && code.trim())
+		: [];
+	const invalid = !Array.isArray(fieldCodes) || codes.length !== fieldCodes.length;
+	const result = Object.fromEntries(codes.map((code) => [code, null]));
+	const reasons = new Map();
+	const _kc_reportReasons = () => {
+		if (warn && (invalid || reasons.size > 0)) {
+			console.warn(
+				'getInputElementsByFieldCodes: 不正な fieldCodes または入力欄が見つからないフィールドがあります',
+				{
+					...(invalid ? { invalidFieldCodes: fieldCodes } : {}),
+					reasons: Object.fromEntries(reasons),
+				}
+			);
+		}
+	};
+	if (codes.length === 0) {
+		_kc_reportReasons();
+		return result;
+	}
+
+	const isApiAvailable =
+		typeof kintone !== 'undefined' &&
+		kintone &&
+		kintone.app &&
+		typeof kintone.app.getFormFields === 'function' &&
+		typeof document !== 'undefined' &&
+		document &&
+		typeof document.querySelectorAll === 'function';
+	if (!isApiAvailable) {
+		codes.forEach((code) => {
+			reasons.set(code, 'kintone.app.getFormFields / DOM が利用できない環境');
+		});
+		_kc_reportReasons();
+		return result;
+	}
+
+	let formFields;
+	try {
+		formFields = await kintone.app.getFormFields();
+	} catch (error) {
+		_kc_reportReasons();
+		throw error;
+	}
+	const _kc_normalizeLabel = (label) => (typeof label === 'string' ? label.trim() : '');
+	const labelCounts = new Map();
+	const tableFieldCodes = new Set();
+	const _kc_countLabel = (field) => {
+		const label = _kc_normalizeLabel(field && field.label);
+		if (label) labelCounts.set(label, (labelCounts.get(label) || 0) + 1);
+	};
+	Object.values(formFields).forEach((field) => {
+		_kc_countLabel(field);
+		if (field && field.type === 'SUBTABLE' && field.fields) {
+			Object.entries(field.fields).forEach(([subCode, subField]) => {
+				tableFieldCodes.add(subCode);
+				_kc_countLabel(subField);
+			});
+		}
+	});
+
+	const labelSelector = _kc_isMobileRuntime() ? '.control-label-gaia' : '.control-label-text-gaia';
+	const screenElementsByLabel = new Map();
+	document.querySelectorAll('[class*="value-"]').forEach((element) => {
+		if (!Array.from(element.classList).some((name) => /^value-\d+$/.test(name))) return;
+		const container = element.closest('.control-gaia');
+		const labelElement = container ? container.querySelector(labelSelector) : null;
+		if (!labelElement) return;
+		const label = _kc_normalizeLabel(labelElement.textContent);
+		if (!screenElementsByLabel.has(label)) screenElementsByLabel.set(label, []);
+		screenElementsByLabel.get(label).push(element);
+	});
+
+	codes.forEach((code) => {
+		if (tableFieldCodes.has(code)) {
+			reasons.set(code, 'テーブル内のフィールドは対象外');
+			return;
+		}
+		const field = Object.prototype.hasOwnProperty.call(formFields, code) ? formFields[code] : null;
+		if (!field) {
+			reasons.set(code, 'フィールドコードがアプリに存在しない');
+			return;
+		}
+		if (field.noLabel === true) {
+			reasons.set(code, '「フィールド名を表示しない」の設定になっている');
+			return;
+		}
+		const label = _kc_normalizeLabel(field.label);
+		if (!label) {
+			reasons.set(code, '項目名が空');
+			return;
+		}
+		const sameLabelCount = labelCounts.get(label) || 0;
+		if (sameLabelCount > 1) {
+			reasons.set(code, `同じ項目名のフィールドが${sameLabelCount}件ある（項目名: ${label}）`);
+			return;
+		}
+		const matches = screenElementsByLabel.get(label) || [];
+		if (matches.length !== 1) {
+			reasons.set(code, `画面上で項目名に一致する欄が${matches.length}件（項目名: ${label}）`);
+			return;
+		}
+		const input = matches[0].querySelector('input');
+		if (!input) {
+			reasons.set(code, `一致した欄に input がない（項目名: ${label}）`);
+			return;
+		}
+		result[code] = input;
+	});
+
+	_kc_reportReasons();
+	return result;
+};
+
+/**
  * setRecordValues - record の複数フィールドに対して値を一括設定するユーティリティ
  * - 引数チェックを行い、成功時は true、失敗時は false を返します。
  * @param {Object} record 各フィールドの値（kintone の record オブジェクト想定）
@@ -1860,6 +1995,12 @@ if (typeof window !== 'undefined') {
 		window.setRecordHeaderMenuSpaceButton =
 			typeof setRecordHeaderMenuSpaceButton !== 'undefined'
 				? setRecordHeaderMenuSpaceButton
+				: undefined;
+	} catch {}
+	try {
+		window.getInputElementsByFieldCodes =
+			typeof getInputElementsByFieldCodes !== 'undefined'
+				? getInputElementsByFieldCodes
 				: undefined;
 	} catch {}
 	try {

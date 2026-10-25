@@ -30,6 +30,7 @@
 		'kintoneEventOn',
 		'notifyInfo',
 		'notifyWarning',
+		'getInputElementsByFieldCodes',
 		'setRecordValues',
 		'setSpaceFieldDisplay',
 		'setSpaceFieldButton',

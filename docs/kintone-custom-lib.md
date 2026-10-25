@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **2.0.0** です。
+現行ソースは **2.1.0** です。2.1.0 は未配布・通常配布未確認で、確認済み通常配布版は **2.0.0** です。
 
 このドキュメントは `src/kintone-custom-lib.js` が公開する関数ごとに使い方と契約（引数・戻り値・副作用）をまとめたリファレンスです。
 
@@ -43,6 +43,7 @@
 | `createDependencyChecker(requirements)` | 必要な外部関数の有無を確認する関数を生成する。 | [参照](#createdependencychecker) |
 | `getFieldValueOr(record, fieldCode, defaultValue)` | レコードからフィールド値を取得し、取得できない場合は既定値を返す。 | [参照](#getfieldvalueor) |
 | `kintoneEventOn(events, handler)` | kintoneイベントにハンドラーを登録する。 | [参照](#kintoneeventon) |
+| `getInputElementsByFieldCodes(fieldCodes, options)` | PC・モバイルの追加・編集画面の入力欄をフィールドコードから探す。 | [参照](#getinputelementsbyfieldcodes) |
 | `setRecordValues(record, values)` | レコード内の複数フィールドの値を設定する。 | [参照](#setrecordvalues) |
 
 ### ヘッダー・スペース要素操作
@@ -195,6 +196,48 @@ kintoneEventOn('app.record.create', function (event) {
 	return event;
 });
 ```
+
+<a id="getinputelementsbyfieldcodes"></a>
+
+### getInputElementsByFieldCodes(fieldCodes, options)
+
+- 動作概要: PC・モバイル共通の `kintone.app.getFormFields()` から項目名を取得し、画面上の項目名と前後の空白を除いて完全一致で照合します。部分一致はしません。有効なコードと利用可能な API / DOM がある場合、1 回の呼び出しにつき API を 1 回だけ実行し、呼び出し間のキャッシュはしません。既存のランタイム判定に従い、PC とモバイルでラベルの検索方法を切り替えます。
+- `fieldCodes` (string[]) — 探すフィールドコード。コード自体はトリムしません。配列以外の場合は `{}` を返し、空文字・空白だけの文字列・文字列以外の要素は除外して有効なコードだけを処理します。空配列や有効なコードがない場合、API は呼び出しません。同じコードを複数渡しても戻り値のキーは 1 つです。
+- `options.warn` (boolean, optional, default: `true`) — 不正入力や見つからなかったコードと理由を `console.warn` で 1 回にまとめて出力します。`false` では不正入力を含むすべての警告を抑制します。警告の第 2 引数の `reasons` にコードごとの理由、不正入力がある場合は `invalidFieldCodes` に渡された入力を格納します。
+- 戻り値: `Promise<Object<string, HTMLInputElement | null>>`。有効な各コードをキー、対応する `input` 要素を値とします。見つからないコードの値は `null` です。
+- 例外: `getFormFields()` が失敗した場合は、元のエラーで reject します。API または DOM がない環境では例外を投げず全件 `null` を返し、既定では理由を警告します。
+- 副作用: DOM・フォーカス・値を変更せず、イベントも登録しません。
+
+警告では、存在しないコード、テーブル内、`noLabel: true`、空の項目名、アプリ内の同名項目、画面上の一致件数（0 件・複数件）、一致した欄に `input` がない場合を区別します。
+
+運用上の制限:
+
+- PC・モバイルのレコード追加・編集画面にある、テーブル外の文字入力欄が対象です。詳細・印刷画面は対象外です。
+- 項目名がアプリ内で一意である必要があります。テーブル内の項目、テーブル自体の項目名、非表示の項目名との重複も数に含め、重複時は `null` を返します。
+- フォーム設定の「フィールド名を表示しない」（`noLabel: true`）が設定された項目と、テーブル内のフィールドは対象外です。
+- 非公式の画面構造（クラス名が `^value-\d+$` の要素、その `closest('.control-gaia')` 内のラベル要素）に依存します。ラベル要素は PC で `.control-label-text-gaia`、モバイルで `.control-label-gaia` を使用します。kintone のアップデートで取得できなくなる可能性があります。画面上の一致候補がちょうど 1 件の場合のみ、その要素内の最初の `input` を返します。必須表示などでラベルの `textContent.trim()` が項目名と一致しない場合も、安全のため `null` を返します。
+- `input` の型や画面種別そのものの検証はしません。呼び出し側で追加・編集イベントに限定し、取得結果が両方とも非 `null` であることを確認して利用してください。
+
+例（`jquery.autoKana.js` と jQuery を先に読み込んで利用）:
+
+```js
+kintoneEventOn([
+	'app.record.create.show',
+	'app.record.edit.show',
+	'mobile.app.record.create.show',
+	'mobile.app.record.edit.show',
+], async (event) => {
+	const inputs = await getInputElementsByFieldCodes(['LAST_NAME', 'LAST_NAME_KANA']);
+	if (inputs.LAST_NAME && inputs.LAST_NAME_KANA) {
+		$.fn.autoKana($(inputs.LAST_NAME), $(inputs.LAST_NAME_KANA), { katakana: false });
+	}
+	return event;
+});
+```
+
+この API 自体には jQuery / autoKana の依存はありません。API エラーは呼び出し側で通知できます（上例では `kintoneEventOn` の非同期エラー処理に伝播します）。アプリ側の既存セレクターの置き換えは、配布後に別途行ってください。
+
+`getFormFields()` の PC・モバイル対応は [公式仕様](https://cybozu.dev/ja/kintone/docs/js-api/app/get-form-fields/) に基づきます。モバイルの DOM は利用者提供の特定画面の診断結果に基づいています。自動テストと利用先での実動作確認は区別し、追加・編集両画面での入力欄取得やスマートフォンの日本語入力による autoKana 動作は別途確認してください。
 
 <a id="setrecordvalues"></a>
 
@@ -597,6 +640,8 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 
 ## 制約・注意事項
 
+フィールドコードから入力欄を探す際の対象画面・項目名・非公式 DOM 構造の制限は [getInputElementsByFieldCodes](#getinputelementsbyfieldcodes) を参照してください。模擬 DOM の自動テストは利用先の実画面検証や通常配布確認の代わりにはなりません。
+
 サブテーブルの行追加・行削除ボタンを制御する場合は、kintone の公式 API（[行追加ボタン](https://cybozu.dev/ja/kintone/docs/js-api/record/show-or-hide-add-table-row-buttons/)、[行削除ボタン](https://cybozu.dev/ja/kintone/docs/js-api/record/show-or-hide-delete-table-row-buttons/)）を使用してください。モバイル画面では公式 API のモバイル向けオブジェクトを使用します。
 
 文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
@@ -607,6 +652,7 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 
 | バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
 | ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| 2.1.0      | 2026-10-25 | `getInputElementsByFieldCodes` を追加。PC・モバイルの項目名照合・警告集約 | 作業ブランチで管理。本番未反映・通常配布未確認・関数の実画面動作未検証。[状況記録](verification/library-distribution.md#kintone-custom-lib-210-の配布前状況) |
 | 2.0.0      | 2026-10-17 | サブテーブル操作ボタン制御の3公開関数を削除                  | `ee59b6d`。通常配布URLとの完全一致を確認（2026-10-17）  |
 | 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
 | 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `93fc72e`。初版作成日・配布日は未確認                  |
