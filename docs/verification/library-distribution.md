@@ -194,3 +194,20 @@
 - 配布証跡のみの PR #28 の初回チェックは、必須 `lint`・`test` とパッケージ作成が成功しましたが、[Azure プレビュー配信](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40167301022) は `This Static Web App already has the maximum number of staging environments` で失敗しました。本番コミット `ac8a0f4` の成功とは別の実行です。
 - [削除なしのクリーンアップ診断](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40167587226) は成功しましたが、既存処理は安全に削除可能な候補を認識しませんでした。環境の削除やクリーンアップ処理の変更は行っていません。
 - 利用者はプレビュー失敗を明記したうえで、文書 PR を通常の保護ルール（必須 `lint`・`test`）に従ってマージすることを承認しました。文書のみの変更であり、ソース・ハッシュ・本番配布の既存証跡は変更しません。必須チェックの回避や管理者バイパスは行いません。
+
+## 追加確認：formbridge-custom-lib 1.0.0
+
+- 利用者から、PR #29 のAzureプレビュー失敗を承知したうえで、`main` へのマージとpush起点の本番反映を承認されました。PR #29 は保護ルールに従ってマージし、必須チェックを回避していません。
+- 対象ソース：PR #29 のマージコミット [`a14b905c7606f9d2b3d2e7f96c6f84225eb70ed5`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/a14b905c7606f9d2b3d2e7f96c6f84225eb70ed5)、`src/formbridge-custom-lib.js`、バージョン **1.0.0**。
+- 対象コミットの `main` へのpushに対応するワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41059987731)：lint・test成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41059987749)：`Build and Deploy Job` 成功。完了日時は2026-10-30 22:03:34（日本時間、UTC+09:00）。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41059987752)：整形確認・lint・`prepare:dist`・package.zip作成成功。
+- 通常配布確認日時：2026-10-30 22:04:30（日本時間、UTC+09:00）。通常URL `https://js.kacsw.or.jp/formbridge-custom-lib.js` に `Cache-Control: no-cache` を指定してGETし、HTTP 200、対象コミットのソースとのバイト単位の完全一致、JSDocバージョン **1.0.0** を確認しました。
+
+| 対象・通常配布 URL                                | HTTP | ソース／配布バイト数 | バージョン                  | 一致     | SHA-256（ソース・配布共通）                                        |
+| ------------------------------------------------- | ---- | -------------------- | --------------------------- | -------- | ------------------------------------------------------------------ |
+| <https://js.kacsw.or.jp/formbridge-custom-lib.js> | 200  | 9279 / 9279          | 1.0.0（両方のソースで確認） | 完全一致 | `f2ce6d7849669f3f5588aeb02dec36f127626f03d4db3137832573274f6d024f` |
+
+- PR #29 のプレビューAzureワークフローは `Error: Could not detect the language from repo.` で失敗しました。これはPRイベントでの実行であり、マージ後の `main` pushに対するAzure本番デプロイ成功とは別の結果です。
+- 通常配布の内容一致を確認しました。FormBridge利用フォームでの実画面動作、各フィールド型の値適合性、ブラウザーキャッシュの更新は未確認です。
