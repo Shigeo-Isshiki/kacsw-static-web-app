@@ -60,6 +60,7 @@ kintone・kViewer向け、および汎用のJavaScript共通ライブラリ集�
 | csv-builder            | スキーマに基づくCSV生成          | [CSVビルダー](./docs/csv-builder.md)               |
 | csv-parser             | CSVの解析                        | [CSVパーサー](./docs/csv-parser.md)                |
 | date-utils             | 日付・和暦の変換                 | [日付](./docs/date-utils.md)                       |
+| formbridge-custom-lib  | FormBridgeのフォーム操作基盤     | [FormBridge](./docs/formbridge-custom-lib.md)      |
 | kintone-custom-lib     | kintoneのカスタマイズ共通処理    | [kintone](./docs/kintone-custom-lib.md)            |
 | kviewer-custom-lib     | kViewerの表示制御などの共通処理  | [kViewer](./docs/kviewer-custom-lib.md)            |
 | national-holidays      | 日本の祝日判定                   | [国民の祝日](./docs/national-holidays.md)          |

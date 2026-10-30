@@ -10,6 +10,7 @@ const DIST = path.join(ROOT, 'dist');
 const FILES = [
 	'kintone-custom-lib.js',
 	'kviewer-custom-lib.js',
+	'formbridge-custom-lib.js',
 	'zip-code-address-utils.js',
 	'phone-utils.js',
 	'date-utils.js',
