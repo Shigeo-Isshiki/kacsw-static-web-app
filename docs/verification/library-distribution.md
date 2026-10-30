@@ -106,42 +106,42 @@
 
 [追加テスト](../../test/test-get-input-elements-by-field-codes.js) は模擬 DOM と `getFormFields` のスタブを使い、24 テストすべて成功しました。既存の [kintone テスト](../../test/test-kintone-custom-lib.js) は 25 チェック成功、`npm test` は追加分を含む全 20 ファイルが成功しました。
 
-| 受け入れ項目 | 検証内容 | 結果 |
-| --- | --- | --- |
-| 1 | `window` への公開 | 成功 |
-| 2 | 複数コードで API は 1 回 | 成功 |
-| 3 | 従来の番号セレクターと同じ要素 | 成功 |
-| 4 | 前後空白の除去・完全一致 | 成功 |
-| 5 | 存在しないコード | 成功 |
-| 6 | テーブル内も含めた項目名重複 | 成功 |
-| 7 | テーブル内コードの除外 | 成功 |
-| 8 | `input` のない欄 | 成功 |
-| 9 | 画面の一致候補が 2 件 | 成功 |
-| 10 | 画面の一致候補が 0 件 | 成功 |
-| 11 | `noLabel: true` | 成功 |
-| 12 | 複数の理由を警告 1 回に集約 | 成功 |
-| 13 | `warn: false` | 成功 |
-| 14 | 明示初期化されたモバイル | 成功 |
-| 15 | API のない環境 | 成功 |
-| 16 | API 失敗時に同じエラーで reject | 成功 |
-| 17 | 配列以外の入力 | 成功 |
-| 18 | DOM・フォーカス・値・入力イベント登録の非変更 | 成功 |
-| 19 | 既存公開関数の回帰テスト | 成功 |
+| 受け入れ項目 | 検証内容                                      | 結果 |
+| ------------ | --------------------------------------------- | ---- |
+| 1            | `window` への公開                             | 成功 |
+| 2            | 複数コードで API は 1 回                      | 成功 |
+| 3            | 従来の番号セレクターと同じ要素                | 成功 |
+| 4            | 前後空白の除去・完全一致                      | 成功 |
+| 5            | 存在しないコード                              | 成功 |
+| 6            | テーブル内も含めた項目名重複                  | 成功 |
+| 7            | テーブル内コードの除外                        | 成功 |
+| 8            | `input` のない欄                              | 成功 |
+| 9            | 画面の一致候補が 2 件                         | 成功 |
+| 10           | 画面の一致候補が 0 件                         | 成功 |
+| 11           | `noLabel: true`                               | 成功 |
+| 12           | 複数の理由を警告 1 回に集約                   | 成功 |
+| 13           | `warn: false`                                 | 成功 |
+| 14           | 明示初期化されたモバイル                      | 成功 |
+| 15           | API のない環境                                | 成功 |
+| 16           | API 失敗時に同じエラーで reject               | 成功 |
+| 17           | 配列以外の入力                                | 成功 |
+| 18           | DOM・フォーカス・値・入力イベント登録の非変更 | 成功 |
+| 19           | 既存公開関数の回帰テスト                      | 成功 |
 
 追加で、不正要素と疎配列、空配列、重複コード、クラス名の厳密な判定、トップレベル・非表示項目・テーブル自体との項目名重複、空の項目名、特殊なプロパティ名、URL・グローバル設定でのモバイル判定、API 失敗時の不正入力警告を検証しました。
 
 実行コマンドと結果（リポジトリルート、Windows）:
 
-| コマンド | 結果 |
-| --- | --- |
-| `node -r .\test\setup-tests.js .\test\test-get-input-elements-by-field-codes.js` | 成功（24 テスト） |
-| `node -r .\test\setup-tests.js .\test\test-kintone-custom-lib.js` | 成功（25 チェック） |
-| `npm test` | 成功（全 20 ファイル、追加テスト含む） |
-| `npm run lint` | 成功 |
-| `npx --no-install eslint --config eslint.config.cjs src\kintone-custom-lib.js src\all-window-exports.js` | 成功、警告なし |
-| `npm run ci-check` | 成功（ローカル配布物生成・VM の公開確認・Puppeteer） |
-| `npx --no-install prettier --check "src/**/*.{js,css,html}" test\test-get-input-elements-by-field-codes.js` | 成功 |
-| `git diff --check` | 成功 |
+| コマンド                                                                                                    | 結果                                                 |
+| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `node -r .\test\setup-tests.js .\test\test-get-input-elements-by-field-codes.js`                            | 成功（24 テスト）                                    |
+| `node -r .\test\setup-tests.js .\test\test-kintone-custom-lib.js`                                           | 成功（25 チェック）                                  |
+| `npm test`                                                                                                  | 成功（全 20 ファイル、追加テスト含む）               |
+| `npm run lint`                                                                                              | 成功                                                 |
+| `npx --no-install eslint --config eslint.config.cjs src\kintone-custom-lib.js src\all-window-exports.js`    | 成功、警告なし                                       |
+| `npm run ci-check`                                                                                          | 成功（ローカル配布物生成・VM の公開確認・Puppeteer） |
+| `npx --no-install prettier --check "src/**/*.{js,css,html}" test\test-get-input-elements-by-field-codes.js` | 成功                                                 |
+| `git diff --check`                                                                                          | 成功                                                 |
 
 文書の 6 章構成、目次・アンカー、相対リンク、コードフェンス、ソースとのバージョン一致、過去の配布証跡を追記のみで保持していることも確認済みです。
 
@@ -181,10 +181,10 @@
   - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40167002034)：配布パッケージ作成成功。
 - 通常配布 URL に `Cache-Control: no-cache` を付けて GET し、HTTP 200 と、固定したマージコミットのソースとのバイト単位の完全一致を確認しました。変換なしのソースと直接照合し、候補版・圧縮版・ローカル配信では代用していません。
 
-| 対象・通常配布 URL | HTTP | ソース／配布バイト数 | バージョン | 一致 | SHA-256（ソース・配布共通） |
-| --- | --- | --- | --- | --- | --- |
-| <https://js.kacsw.or.jp/kintone-custom-lib.js> | 200 | 75458 / 75458 | 2.1.0（両方の JSDoc で確認） | 完全一致 | `0a23afc9c23c237fbad3ae6b1c46f5c383e100fba610980ba959527edf8f5fc2` |
-| <https://js.kacsw.or.jp/all-window-exports.js> | 200 | 2901 / 2901 | 定義なし | 完全一致 | `ac8e07c854c555bbb400502a1e9f0ef6b94541d71a638dd46c27315a2db5d9dd` |
+| 対象・通常配布 URL                             | HTTP | ソース／配布バイト数 | バージョン                   | 一致     | SHA-256（ソース・配布共通）                                        |
+| ---------------------------------------------- | ---- | -------------------- | ---------------------------- | -------- | ------------------------------------------------------------------ |
+| <https://js.kacsw.or.jp/kintone-custom-lib.js> | 200  | 75458 / 75458        | 2.1.0（両方の JSDoc で確認） | 完全一致 | `0a23afc9c23c237fbad3ae6b1c46f5c383e100fba610980ba959527edf8f5fc2` |
+| <https://js.kacsw.or.jp/all-window-exports.js> | 200  | 2901 / 2901          | 定義なし                     | 完全一致 | `ac8e07c854c555bbb400502a1e9f0ef6b94541d71a638dd46c27315a2db5d9dd` |
 
 - PR #27 の必須 `lint`・`test` とプレビュー配信・パッケージ作成も成功してから、通常のマージ API で反映しました。保護ルールのバイパスは行っていません。
 - ローカルの 28 テスト・既存テスト・Lint・Prettier・ローカル CI チェックの結果は上記のモバイル対応追記を参照してください。本確認は通常配布の内容一致であり、利用側アプリの置き換え、追加・編集両画面での関数の取得結果、必須表示などの全条件、実機の日本語入力・autoKana 動作、ブラウザーキャッシュ更新は未確認です。
@@ -194,3 +194,20 @@
 - 配布証跡のみの PR #28 の初回チェックは、必須 `lint`・`test` とパッケージ作成が成功しましたが、[Azure プレビュー配信](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40167301022) は `This Static Web App already has the maximum number of staging environments` で失敗しました。本番コミット `ac8a0f4` の成功とは別の実行です。
 - [削除なしのクリーンアップ診断](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/40167587226) は成功しましたが、既存処理は安全に削除可能な候補を認識しませんでした。環境の削除やクリーンアップ処理の変更は行っていません。
 - 利用者はプレビュー失敗を明記したうえで、文書 PR を通常の保護ルール（必須 `lint`・`test`）に従ってマージすることを承認しました。文書のみの変更であり、ソース・ハッシュ・本番配布の既存証跡は変更しません。必須チェックの回避や管理者バイパスは行いません。
+
+## 追加確認：formbridge-custom-lib 1.0.0
+
+- 利用者から、PR #29 のAzureプレビュー失敗を承知したうえで、`main` へのマージとpush起点の本番反映を承認されました。PR #29 は保護ルールに従ってマージし、必須チェックを回避していません。
+- 対象ソース：PR #29 のマージコミット [`a14b905c7606f9d2b3d2e7f96c6f84225eb70ed5`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/a14b905c7606f9d2b3d2e7f96c6f84225eb70ed5)、`src/formbridge-custom-lib.js`、バージョン **1.0.0**。
+- 対象コミットの `main` へのpushに対応するワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41059987731)：lint・test成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41059987749)：`Build and Deploy Job` 成功。完了日時は2026-10-30 22:03:34（日本時間、UTC+09:00）。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41059987752)：整形確認・lint・`prepare:dist`・package.zip作成成功。
+- 通常配布確認日時：2026-10-30 22:04:30（日本時間、UTC+09:00）。通常URL `https://js.kacsw.or.jp/formbridge-custom-lib.js` に `Cache-Control: no-cache` を指定してGETし、HTTP 200、対象コミットのソースとのバイト単位の完全一致、JSDocバージョン **1.0.0** を確認しました。
+
+| 対象・通常配布 URL                                | HTTP | ソース／配布バイト数 | バージョン                  | 一致     | SHA-256（ソース・配布共通）                                        |
+| ------------------------------------------------- | ---- | -------------------- | --------------------------- | -------- | ------------------------------------------------------------------ |
+| <https://js.kacsw.or.jp/formbridge-custom-lib.js> | 200  | 9279 / 9279          | 1.0.0（両方のソースで確認） | 完全一致 | `f2ce6d7849669f3f5588aeb02dec36f127626f03d4db3137832573274f6d024f` |
+
+- PR #29 のプレビューAzureワークフローは `Error: Could not detect the language from repo.` で失敗しました。これはPRイベントでの実行であり、マージ後の `main` pushに対するAzure本番デプロイ成功とは別の結果です。
+- 通常配布の内容一致を確認しました。FormBridge利用フォームでの実画面動作、各フィールド型の値適合性、ブラウザーキャッシュの更新は未確認です。
