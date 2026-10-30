@@ -20,6 +20,7 @@
 		<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 		<script src="jquery.autoKana.js"></script>
 		<script src="kintone-custom-lib.js"></script>
+		<script src="formbridge-custom-lib.js"></script>
 		<script src="zip-code-address-utils.js"></script>
 		<script src="phone-utils.js"></script>
 		<script src="date-utils.js"></script>
@@ -52,6 +53,7 @@
 					(names || []).forEach(function (n) {
 						out.textContent += n + ': ' + typeof window[n] + '\n';
 					});
+					out.textContent += 'formBridgeCustomLib: ' + typeof window.formBridgeCustomLib + '\n';
 					out.textContent += '\nwindow keys:\n' + Object.keys(window).slice(0, 300).join(', ');
 				}
 				function runShow() {

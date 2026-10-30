@@ -61,6 +61,7 @@
 - [csv-builder](csv-builder.md)
 - [csv-parser](csv-parser.md)
 - [date-utils](date-utils.md)
+- [formbridge-custom-lib](formbridge-custom-lib.md)
 - [kintone-custom-lib](kintone-custom-lib.md)
 - [kviewer-custom-lib](kviewer-custom-lib.md)
 - [national-holidays](national-holidays.md)
