@@ -18,6 +18,8 @@ const environments = [
 	{ name: 'feature/branch-preview', properties: { sourceBranch: 'feature/branch-preview' } },
 	{ name: 'pr-23', properties: { sourceBranch: 'feature/open-with-number-in-name' } },
 ];
+const subscriptionId = '00000000-0000-0000-0000-000000000001';
+const deletedName = (args) => decodeURIComponent(new URL(args[4]).pathname.split('/').pop());
 
 assert.deepStrictEqual(
 	findStalePreviewEnvironments(environments, new Set([21, 23])).map(
@@ -97,6 +99,7 @@ async function runCleanupTests() {
 	};
 	const result = await cleanupStalePreviewEnvironments({
 		env: {
+			AZURE_SUBSCRIPTION_ID: subscriptionId,
 			SWA_NAME: 'test-app',
 			SWA_RESOURCE_GROUP: 'test-rg',
 			SWA_PRODUCTION_BRANCH: 'main',
@@ -105,7 +108,10 @@ async function runCleanupTests() {
 		},
 		exec(command, args) {
 			calls.push({ type: 'azure', command, args });
-			if (args[2] === 'list') return JSON.stringify(environments);
+			if (args[2] === 'list') {
+				const requested = calls.some((call) => call.type === 'azure' && call.args[0] === 'rest');
+				return JSON.stringify(environments.filter((item) => !requested || item.name !== 'pr-22'));
+			}
 			return '';
 		},
 		httpsClient: fakeHttps,
@@ -114,9 +120,17 @@ async function runCleanupTests() {
 	assert.deepStrictEqual(result.deleted, ['pr-22']);
 	assert.deepStrictEqual(
 		calls
-			.filter((call) => call.type === 'azure' && call.args[2] === 'delete')
-			.map((call) => call.args[6]),
+			.filter((call) => call.type === 'azure' && call.args[0] === 'rest')
+			.map((call) => deletedName(call.args)),
 		['pr-22']
+	);
+	const deleteArgs = calls.find((call) => call.type === 'azure' && call.args[0] === 'rest').args;
+	assert.deepStrictEqual(deleteArgs.slice(0, 4), ['rest', '--method', 'delete', '--url']);
+	assert.strictEqual(
+		deleteArgs[4],
+		'https://management.azure.com/subscriptions/' +
+			subscriptionId +
+			'/resourceGroups/test-rg/providers/Microsoft.Web/staticSites/test-app/builds/pr-22?api-version=2024-11-01'
 	);
 	assert(calls.some((call) => call.type === 'github' && call.url.includes('base=main')));
 	assert(logs.some((entry) => entry[0] === 'Deleting closed PR preview environment:'));
@@ -141,16 +155,28 @@ async function runCleanupTests() {
 	});
 	assert.deepStrictEqual(dryRunResult.planned, ['pr-22']);
 	assert.strictEqual(
-		dryRunCalls.some((args) => args[2] === 'delete'),
+		dryRunCalls.some((args) => args[0] === 'rest'),
 		false
 	);
 	console.log('PASS: manual dry run reports stale environments without deleting');
 
-	const runScenario = async ({ previews, responseFor, dryRun = false }) => {
+	const runScenario = async ({
+		previews,
+		responseFor,
+		dryRun = false,
+		pendingReads = 0,
+		deleteError,
+		listError,
+		subscription = subscriptionId,
+	}) => {
 		const deletes = [];
 		const requests = [];
+		let remainingReads = pendingReads;
+		let listCalls = 0;
+		let waits = 0;
 		const result = cleanupStalePreviewEnvironments({
 			env: {
+				AZURE_SUBSCRIPTION_ID: subscription,
 				SWA_NAME: 'test-app',
 				SWA_RESOURCE_GROUP: 'test-rg',
 				GITHUB_REPOSITORY: 'owner/repo',
@@ -158,9 +184,24 @@ async function runCleanupTests() {
 				SWA_CLEANUP_DRY_RUN: String(dryRun),
 			},
 			exec(command, args) {
-				if (args[2] === 'list') return JSON.stringify(previews);
-				deletes.push(args[6]);
+				if (args[2] === 'list') {
+					listCalls += 1;
+					if (deletes.length > 0) {
+						if (listError) throw listError;
+						if (remainingReads-- <= 0) {
+							return JSON.stringify(previews.filter((item) => !deletes.includes(item.name)));
+						}
+					}
+					return JSON.stringify(previews);
+				}
+				assert.strictEqual(args[0], 'rest');
+				if (deleteError) throw deleteError;
+				deletes.push(deletedName(args));
 				return '';
+			},
+			wait: async (milliseconds) => {
+				assert.strictEqual(milliseconds, 5000);
+				waits += 1;
 			},
 			httpsClient: {
 				get(url, options, callback) {
@@ -180,7 +221,7 @@ async function runCleanupTests() {
 			},
 			log: { log() {} },
 		});
-		return { result: await result, deletes, requests };
+		return { result: await result, deletes, requests, listCalls, waits };
 	};
 	const closedPR = {
 		number: 24,
@@ -195,6 +236,31 @@ async function runCleanupTests() {
 	const numericResult = await runScenario({ previews: [numericPreview], responseFor });
 	assert.deepStrictEqual(numericResult.deletes, ['24']);
 	assert(numericResult.requests.some((url) => url.endsWith('/pulls/24')));
+	assert.strictEqual(numericResult.listCalls, 2);
+	const delayedResult = await runScenario({
+		previews: [numericPreview],
+		responseFor,
+		pendingReads: 2,
+	});
+	assert.deepStrictEqual(delayedResult.result.deleted, ['24']);
+	assert.strictEqual(delayedResult.waits, 2);
+	assert.strictEqual(delayedResult.listCalls, 4);
+	console.log(
+		'PASS: asynchronous deletion is confirmed through environment list without extra RBAC'
+	);
+	for (const scenario of [
+		{ pendingReads: 12, expected: /Timed out confirming preview deletion/ },
+		{ deleteError: new Error('DELETE denied'), expected: /DELETE denied/ },
+		{ listError: new Error('List unavailable'), expected: /List unavailable/ },
+		{ subscription: '', expected: /AZURE_SUBSCRIPTION_ID must be a GUID/ },
+	]) {
+		const { expected, ...options } = scenario;
+		await assert.rejects(
+			runScenario({ previews: [numericPreview], responseFor, ...options }),
+			expected
+		);
+	}
+	console.log('PASS: deletion, completion check, timeout and subscription errors fail explicitly');
 	const numericDryRun = await runScenario({
 		previews: [numericPreview],
 		responseFor,

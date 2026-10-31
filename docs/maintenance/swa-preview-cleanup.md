@@ -17,6 +17,10 @@ PR番号や対応関係を安全に確認できない環境は削除せず、ロ
 
 ログには総環境数・候補数・検証済み数・保持数を出力します。dry runも同じ照合を行い、検証済みの候補だけを表示します。PR由来のワークフローにAzure削除権限を与えないため、クリーンアップは定期実行と手動実行に限定します。
 
+実削除は[Static Sites - Delete Static Site Build REST API（2024-11-01）](https://learn.microsoft.com/en-us/rest/api/appservice/static-sites/delete-static-site-build?view=rest-appservice-2024-11-01)を `az rest` で呼び出します。削除要求が202 Acceptedでも完了扱いにせず、環境一覧から対象名が消えたことを最大12回（初回は即時、以後5秒間隔）確認してから次の環境へ進みます。確認が時間内に完了しない場合は失敗として停止しますが、受理済みの削除は進行している可能性があるため、再度dry runで残存環境を確認してください。
+
+`az staticwebapp environment delete` の自動完了待機は、対象Static Web App外の `Microsoft.Web/locations/staticSitesOperationStatuses/read` 権限を要求する場合があります。このスクリプトは既存のリソース限定RBACを維持するため、その待機方法を使わず環境一覧で完了を確認します。実削除には既存ワークフローの `AZURE_SUBSCRIPTION_ID`（GUID）も使用します。APIの拒否・一覧取得失敗は無視せず、削除完了ログを出しません。
+
 ローカルのモックテストは `node test/test-swa-preview-cleanup.js` で実行します。実際のAzureメタデータとの一致や削除成功は、このテストだけでは確認できません。反映後は必ず `dry_run: true` で対象PR・ブランチと候補を照合し、不一致や未確認の環境を名前だけで削除しないでください。
 
 ## 静的ファイルのデプロイ
