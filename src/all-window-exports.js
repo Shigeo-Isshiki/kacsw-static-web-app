@@ -76,6 +76,7 @@
 		'getPrefectureByZipCode',
 		'hasPrefectureName',
 		'registerZipCodeAddressHandler',
+		'registerFormBridgeZipCodeAddressHandler',
 		'normalizeZipCode',
 		// national-holidays.js
 		'isNationalHoliday',
