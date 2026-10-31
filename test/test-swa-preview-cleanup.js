@@ -36,6 +36,13 @@ assert.strictEqual(getPullRequestNumber(environments[0]), null);
 console.log('PASS: production and production branch are protected');
 
 assert.strictEqual(getPullRequestNumber({ name: 'pr-24' }), 24);
+assert.strictEqual(getPullRequestNumber({ name: '24' }), 24);
+assert.strictEqual(getPullRequestNumber({ name: '24', pullRequestNumber: 25 }), null);
+assert.strictEqual(getPullRequestNumber({ name: '24', pullRequestNumber: 'invalid' }), null);
+assert.strictEqual(getPullRequestNumber({ name: '24', pullRequestNumber: '24' }), 24);
+for (const name of ['0', '024', '-24', '24-preview', '9007199254740992']) {
+	assert.strictEqual(getPullRequestNumber({ name }), null);
+}
 assert.strictEqual(getPullRequestNumber({ name: '#24 - old preview' }), null);
 assert.strictEqual(getPullRequestNumber(null), null);
 assert.strictEqual(isProductionEnvironment(null, 'main'), false);
@@ -67,7 +74,20 @@ async function runCleanupTests() {
 				headers: {},
 				setEncoding() {},
 				on(event, handler) {
-					if (event === 'data') handler(JSON.stringify([{ number: 21 }, { number: 23 }]));
+					if (event === 'data') {
+						handler(
+							JSON.stringify(
+								url.includes('/pulls/22')
+									? {
+											number: 22,
+											state: 'closed',
+											base: { ref: 'main', repo: { full_name: 'owner/repo' } },
+											head: { ref: 'feature/closed', repo: { full_name: 'owner/repo' } },
+										}
+									: [{ number: 21 }, { number: 23 }]
+							)
+						);
+					}
 					if (event === 'end') handler();
 				},
 			};
@@ -125,6 +145,150 @@ async function runCleanupTests() {
 		false
 	);
 	console.log('PASS: manual dry run reports stale environments without deleting');
+
+	const runScenario = async ({ previews, responseFor, dryRun = false }) => {
+		const deletes = [];
+		const requests = [];
+		const result = cleanupStalePreviewEnvironments({
+			env: {
+				SWA_NAME: 'test-app',
+				SWA_RESOURCE_GROUP: 'test-rg',
+				GITHUB_REPOSITORY: 'owner/repo',
+				GITHUB_TOKEN: 'test-token',
+				SWA_CLEANUP_DRY_RUN: String(dryRun),
+			},
+			exec(command, args) {
+				if (args[2] === 'list') return JSON.stringify(previews);
+				deletes.push(args[6]);
+				return '';
+			},
+			httpsClient: {
+				get(url, options, callback) {
+					requests.push(url);
+					const { body, statusCode = 200, link } = responseFor(url);
+					callback({
+						statusCode,
+						headers: { link },
+						setEncoding() {},
+						on(event, handler) {
+							if (event === 'data') handler(JSON.stringify(body));
+							if (event === 'end') handler();
+						},
+					});
+					return { on() {} };
+				},
+			},
+			log: { log() {} },
+		});
+		return { result: await result, deletes, requests };
+	};
+	const closedPR = {
+		number: 24,
+		state: 'closed',
+		base: { ref: 'main', repo: { full_name: 'owner/repo' } },
+		head: { ref: 'feature/closed', repo: { full_name: 'owner/repo' } },
+	};
+	const numericPreview = { name: '24', sourceBranch: 'feature/closed' };
+	const responseFor = (url) => ({
+		body: url.includes('/pulls/') ? closedPR : [],
+	});
+	const numericResult = await runScenario({ previews: [numericPreview], responseFor });
+	assert.deepStrictEqual(numericResult.deletes, ['24']);
+	assert(numericResult.requests.some((url) => url.endsWith('/pulls/24')));
+	const numericDryRun = await runScenario({
+		previews: [numericPreview],
+		responseFor,
+		dryRun: true,
+	});
+	assert.deepStrictEqual(numericDryRun.result, { planned: ['24'], deleted: [] });
+	assert.deepStrictEqual(numericDryRun.deletes, []);
+	console.log('PASS: numeric preview names require verified PR identity, including in dry run');
+
+	for (const unverified of [
+		{ ...closedPR, state: 'open' },
+		{ ...closedPR, number: 25 },
+		{ ...closedPR, base: { ref: 'other', repo: { full_name: 'owner/repo' } } },
+		{ ...closedPR, base: { ref: 'main', repo: { full_name: 'other/repo' } } },
+		{ ...closedPR, head: { ref: 'wrong', repo: { full_name: 'owner/repo' } } },
+		{ ...closedPR, head: { ref: 'feature/closed', repo: { full_name: 'fork/repo' } } },
+		{ ...closedPR, head: { ref: 'feature/closed', repo: null } },
+		null,
+	]) {
+		const retained = await runScenario({
+			previews: [numericPreview],
+			responseFor: (url) => ({ body: url.includes('/pulls/') ? unverified : [] }),
+		});
+		assert.deepStrictEqual(retained.deletes, []);
+		assert.deepStrictEqual(retained.result.planned, []);
+	}
+	for (const preview of [
+		{ name: '24' },
+		{ ...numericPreview, sourceBranch: 'main' },
+		{ name: 'default', pullRequestNumber: 24 },
+		{ ...numericPreview, properties: { isProduction: true } },
+		{ ...numericPreview, isProduction: true },
+	]) {
+		const retained = await runScenario({ previews: [preview], responseFor });
+		assert.deepStrictEqual(retained.deletes, []);
+	}
+	console.log(
+		'PASS: open, mismatched, fork, missing metadata and production environments are kept'
+	);
+
+	const paginated = await runScenario({
+		previews: [numericPreview],
+		responseFor: (url) => {
+			if (url.includes('page=2')) return { body: [{ number: 24 }] };
+			return {
+				body: [],
+				link: '<https://api.github.com/repos/owner/repo/pulls?page=2>; rel="next"',
+			};
+		},
+	});
+	assert.strictEqual(paginated.requests.length, 2);
+	assert.deepStrictEqual(paginated.deletes, []);
+	console.log('PASS: open PRs on later pages remain protected');
+
+	for (const statusCode of [403, 404, 500]) {
+		let deleteCount = 0;
+		await assert.rejects(
+			cleanupStalePreviewEnvironments({
+				env: {
+					SWA_NAME: 'test-app',
+					SWA_RESOURCE_GROUP: 'test-rg',
+					GITHUB_REPOSITORY: 'owner/repo',
+					GITHUB_TOKEN: 'test-token',
+				},
+				exec(command, args) {
+					if (args[2] === 'list') {
+						return JSON.stringify([numericPreview, { name: '25', sourceBranch: 'feature/closed' }]);
+					}
+					deleteCount += 1;
+					return '';
+				},
+				httpsClient: {
+					get(url, options, callback) {
+						callback({
+							statusCode: url.endsWith('/pulls/25') ? statusCode : 200,
+							headers: {},
+							setEncoding() {},
+							on(event, handler) {
+								if (event === 'data') {
+									handler(JSON.stringify(url.includes('/pulls/') ? closedPR : []));
+								}
+								if (event === 'end') handler();
+							},
+						});
+						return { on() {} };
+					},
+				},
+				log: { log() {} },
+			}),
+			new RegExp('HTTP ' + statusCode)
+		);
+		assert.strictEqual(deleteCount, 0);
+	}
+	console.log('PASS: verification API failures stop cleanup before any environment is deleted');
 }
 
 runCleanupTests().catch((error) => {

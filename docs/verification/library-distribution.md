@@ -210,4 +210,5 @@
 | <https://js.kacsw.or.jp/formbridge-custom-lib.js> | 200  | 9279 / 9279          | 1.0.0（両方のソースで確認） | 完全一致 | `f2ce6d7849669f3f5588aeb02dec36f127626f03d4db3137832573274f6d024f` |
 
 - PR #29 のプレビューAzureワークフローは `Error: Could not detect the language from repo.` で失敗しました。これはPRイベントでの実行であり、マージ後の `main` pushに対するAzure本番デプロイ成功とは別の結果です。
+- 上記の失敗原因の訂正（2026-10-31、日本時間）：[同プレビュー実行ログ](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41059700148)では、言語判定エラー後も既存の静的ファイルを使用して処理を継続しています。最終的な失敗理由は `This Static Web App already has the maximum number of staging environments`（プレビュー環境数の上限到達）でした。言語判定の省略と環境数の解消は別の対応です。本番配布の照合結果は変わりません。
 - 通常配布の内容一致を確認しました。FormBridge利用フォームでの実画面動作、各フィールド型の値適合性、ブラウザーキャッシュの更新は未確認です。
