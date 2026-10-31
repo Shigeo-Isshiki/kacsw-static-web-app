@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.1.0** です。2026-10-31に通常配布URLとの一致を確認しました。今回追加した電話番号ハンドラーについて、FormBridge上で問題なく動作した旨の報告を利用者経由で受領しました。配布の証跡は[通常配布確認記録](verification/library-distribution.md#追加確認phone-utils-110)、実画面の確認範囲は[実画面確認報告](verification/library-distribution.md#電話番号ハンドラーのformbridge実画面確認報告2026-10-31)を参照してください。
+現行ソース・確認済み通常配布版は **1.1.0** です。2026-10-31に通常配布URLとの一致を確認しました。2026-11-01に、導入した複数の電話番号欄の検証・整形について、実画面動作確認が完了し、問題なく動作したとの利用者報告を受領しました。配布の証跡は[通常配布確認記録](verification/library-distribution.md#追加確認phone-utils-110)、実画面の確認範囲は[利用側確認報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を参照してください。
 
 このドキュメントは `src/phone-utils.js` が公開する電話番号ユーティリティ関数の使い方、契約（引数・戻り値・副作用）をまとめたリファレンスです。
 
