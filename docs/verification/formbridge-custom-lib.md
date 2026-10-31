@@ -40,7 +40,14 @@
 - 修正後の実フォーム上の読み込み・表示・送信は未確認です。
 - 1.0.0の配布証跡は保持します。1.0.1は2026-10-31 09:40:31（日本時間、UTC+09:00）に通常配布を確認しました。対象コミット `3a8cb6d20be64281281214aa4e4caa562e27af62` のCI・本番デプロイ・パッケージ作成が成功し、通常URLはHTTP 200、ソースと完全一致です。詳細は[1.0.1配布記録](./library-distribution.md#追加確認formbridge-custom-lib-101)を参照してください。実フォームの再検証結果ではありません。
 
-### 自動検証結果（2026-10-31）
+## 1.1.0：サブテーブルAPIラッパーの追加
+
+2026-10-31に公式の[新バージョンJavaScriptカスタマイズAPI](https://formbridge.kintoneapp.com/help/customize/v2)と[公開型定義](https://formbridge.kintoneapp.com/v2/types/formbridge-javascript-customize.d.ts)を再確認しました。型定義ではサブテーブル変更イベントのデータに0始まりの `rowIndex` と変更後の `value` があり、イベント名は `form.field.change` に続いて2つのコードを持つ形式です。また `formBridge.fn.setSubtableFieldValue` と `formBridge.fn.setSubtableFieldValueError` はテーブルコード・列コード・行番号を受け取ります。これに基づき、1.1.0では両APIを公開ラッパーとして追加しました。
+
+- 自動テストでテーブル値・セルエラー設定の引数、0始まり行番号の検証、APIの遅延解決、API例外の伝播を確認しました。
+- FormBridge実画面でのイベント名・行番号の対応、値の表示反映、セルエラーの見え方は未確認です。API型定義と自動テストの結果を、実画面検証済みとして扱いません。
+
+### 1.0.1自動検証結果（2026-10-31）
 
 - `node --test test/test-formbridge-custom-lib.js`：12テスト成功（グローバルconst・遅延APIの回帰テスト2件を含む）。
 - `npm test`：全テスト成功。
@@ -50,3 +57,16 @@
 - `cmp src/formbridge-custom-lib.js dist/formbridge-custom-lib.js`：完全一致。
 - `npx --no-install prettier --check src/formbridge-custom-lib.js test/test-formbridge-custom-lib.js docs/formbridge-custom-lib.md docs/verification/formbridge-custom-lib.md`：成功。
 - `git diff --check`：成功。
+
+### 1.1.0自動検証結果（2026-10-31）
+
+- `node -r ./test/setup-tests.js test/test-formbridge-custom-lib.js`：13テスト成功（サブテーブル値・セルエラーAPIラッパーのテストを含む）。
+- `node --test test/test-text-suite-formbridge.js`：14テスト成功（FormBridgeサブテーブルのイベント名・行指定・変換・エラー処理を含む）。
+- `npm test`：成功。
+- `npm run lint`：成功。
+- `npx --no-install prettier --check .github/instructions/library-docs.instructions.md docs/README.md docs/formbridge-custom-lib.md docs/text-suite.md docs/verification/formbridge-custom-lib.md src/all-window-exports.js src/formbridge-custom-lib.js src/text-suite.js test/test-formbridge-custom-lib.js test/test-text-suite-formbridge.js`：成功。
+- `npm run build`：成功。
+- `npm run ci-check`：成功（生成物のwindow公開確認とPuppeteerブラウザ確認を含む）。
+- `cmp src/text-suite.js dist/text-suite.js`、`cmp src/formbridge-custom-lib.js dist/formbridge-custom-lib.js`、`cmp src/all-window-exports.js dist/all-window-exports.js`：完全一致。
+- `git diff --check`：成功。
+- FormBridge実画面および通常配布URLは未確認です。

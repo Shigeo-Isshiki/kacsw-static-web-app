@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-FormBridge 新バージョン JavaScript カスタマイズ API のうち、レコード取得、フィールド値・エラー設定、値の転記と初期化を補助する独立したブラウザー向けライブラリです。現行ソース・確認済み通常配布版は **1.0.1** です。
+FormBridge 新バージョン JavaScript カスタマイズ API のうち、レコード取得、通常フィールド・サブテーブルの値とエラー設定、値の転記と初期化を補助する独立したブラウザー向けライブラリです。現行ソースは **1.1.0**、確認済み通常配布版は **1.0.1** です。1.1.0は未配布です。
 
 公式仕様との照合結果は[FormBridge API 検証記録](./verification/formbridge-custom-lib.md)を参照してください。
 
@@ -33,15 +33,17 @@ FormBridge 新バージョン JavaScript カスタマイズ API のうち、レ�
 
 ## 公開関数の目次
 
-| 関数名                                       | 機能                                                                   | リファレンス                     |
-| -------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------- |
-| `createDependencyChecker(requiredFunctions)` | グローバル関数やFormBridge APIの不足をまとめて確認する関数を生成する。 | [参照](#createdependencychecker) |
-| `getFormBridgeRecord()`                      | FormBridge の回答レコードを取得する。                                  | [参照](#getformbridgerecord)     |
-| `getFieldValue(record, fieldCode, options)`  | レコードから任意・必須フィールドの値を取得する。                       | [参照](#getfieldvalue)           |
-| `setFieldValue(fieldCode, value)`            | FormBridge の通常フィールドに値を設定する。                            | [参照](#setfieldvalue)           |
-| `setFieldError(fieldCode, errorMessage)`     | フィールドエラーを設定・解除する。                                     | [参照](#setfielderror)           |
-| `copyFieldValues(record, mappings, options)` | 対応表に従ってフィールド値を転記する。                                 | [参照](#copyfieldvalues)         |
-| `initializeFields(record, fields)`           | 明示した複数フィールドに初期値を設定し、指定したエラーを解除する。     | [参照](#initializefields)        |
+| 関数名                                                                          | 機能                                                                   | リファレンス                        |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------- |
+| `createDependencyChecker(requiredFunctions)`                                    | グローバル関数やFormBridge APIの不足をまとめて確認する関数を生成する。 | [参照](#createdependencychecker)    |
+| `getFormBridgeRecord()`                                                         | FormBridge の回答レコードを取得する。                                  | [参照](#getformbridgerecord)        |
+| `getFieldValue(record, fieldCode, options)`                                     | レコードから任意・必須フィールドの値を取得する。                       | [参照](#getfieldvalue)              |
+| `setFieldValue(fieldCode, value)`                                               | FormBridge の通常フィールドに値を設定する。                            | [参照](#setfieldvalue)              |
+| `setFieldError(fieldCode, errorMessage)`                                        | フィールドエラーを設定・解除する。                                     | [参照](#setfielderror)              |
+| `setSubtableFieldValue(tableFieldCode, fieldCode, rowIndex, value)`             | FormBridge のサブテーブルセルに値を設定する。                          | [参照](#setsubtablefieldvalue)      |
+| `setSubtableFieldValueError(tableFieldCode, fieldCode, rowIndex, errorMessage)` | サブテーブルセルのエラーを設定・解除する。                             | [参照](#setsubtablefieldvalueerror) |
+| `copyFieldValues(record, mappings, options)`                                    | 対応表に従ってフィールド値を転記する。                                 | [参照](#copyfieldvalues)            |
+| `initializeFields(record, fields)`                                              | 明示した複数フィールドに初期値を設定し、指定したエラーを解除する。     | [参照](#initializefields)           |
 
 ## 関数リファレンス
 
@@ -135,6 +137,35 @@ fb.setFieldError('EMAIL', 'メールアドレスを確認してください');
 fb.setFieldError('EMAIL', null); // エラー解除
 ```
 
+<a id="setsubtablefieldvalue"></a>
+
+#### setSubtableFieldValue(tableFieldCode, fieldCode, rowIndex, value)
+
+- 動作概要：`formBridge.fn.setSubtableFieldValue(tableFieldCode, fieldCode, rowIndex, value)` を呼び出します。旧式イベントコンテキストの setter は使用しません。
+- `tableFieldCode` / `fieldCode` (`string`)：空白だけではないテーブル・列フィールドコード。
+- `rowIndex` (`number`)：0以上の整数。0始まりの行番号です。
+- `value` (`any`)：設定値。値を変換しません。
+- 戻り値：FormBridge API の戻り値（公式型定義では `void`）。
+- 不正なコード・行番号は `TypeError`、API未定義は `Error`、APIの設定失敗はその例外が伝播します。
+- 回答画面（通常フォーム・ステップフォーム）で利用できます。確認・完了画面では呼び出せません。
+
+<a id="setsubtablefieldvalueerror"></a>
+
+#### setSubtableFieldValueError(tableFieldCode, fieldCode, rowIndex, errorMessage)
+
+- 動作概要：`formBridge.fn.setSubtableFieldValueError(tableFieldCode, fieldCode, rowIndex, errorMessage)` を呼び出します。`null` は対象セルのエラー解除です。
+- `tableFieldCode` / `fieldCode` (`string`)：空白だけではないテーブル・列フィールドコード。
+- `rowIndex` (`number`)：0以上の整数。0始まりの行番号です。
+- `errorMessage` (`string | null`)：空白だけではないエラーメッセージ、または `null`。
+- 戻り値：FormBridge API の戻り値（公式型定義では `void`）。API未定義・設定失敗は例外として伝播します。
+- 回答画面（通常フォーム・ステップフォーム）で利用できます。確認・完了画面では利用できません。
+
+```js
+fb.setSubtableFieldValue('ITEMS', 'SAVED_NAME', 0, '全角の値');
+fb.setSubtableFieldValueError('ITEMS', 'INPUT_NAME', 0, '入力を確認してください');
+fb.setSubtableFieldValueError('ITEMS', 'INPUT_NAME', 0, null); // エラー解除
+```
+
 ### フィールド転記・一括初期化
 
 <a id="copyfieldvalues"></a>
@@ -191,15 +222,16 @@ formBridge.events.on('form.show', function () {
 
 ## 制約・注意事項
 
-- FormBridge 新バージョン JavaScript カスタマイズ API の `formBridge.events.on`、`formBridge.fn.getRecord`、`formBridge.fn.setFieldValue`、`formBridge.fn.setFieldValueError` を使用します。イベントコンテキスト内の `getRecord`、`setFieldValue`、`setFieldValueError` は公式型定義で後方互換用として非推奨です。
+- FormBridge 新バージョン JavaScript カスタマイズ API の `formBridge.events.on` と `formBridge.fn` の公開関数を使用します。イベントコンテキスト内の getter・setter は公式型定義で後方互換用として非推奨です。
 - `formBridge.events` はイベント登録用です。`formBridge.fn` はレコード取得・設定用で、`.show` イベント内またはそれ以降に利用します。値設定・エラー設定APIは回答画面（通常・ステップフォーム）専用です。
-- サブテーブルの操作・エラー管理、イベント登録機構、フィールド型変換、個別業務条件は含みません。
+- サブテーブルAPIは値・エラーを指定されたセルへ設定する機能のみです。サブテーブル全行の初期化や業務条件による行制御は行いません。
 - 必須設定エラーや API エラーを空値に置き換えません。回答レコードや入力値をログ・通知へ出力しません。
 - API の公開仕様は公式資料に基づいています。実際の FormBridge フォーム上の挙動・ファイル設定・権限別動作は別途実画面で確認してください。
 
 ## 更新履歴・配布記録
 
-| バージョン | 記録日     | 内容                                                                                                                                                                                                                                                                | 配布状況 |
-| ---------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 1.0.1      | 2026-10-31 | `window.formBridge` が存在しないグローバル `const formBridge` 環境に対応。依存確認・全API呼び出しを都度解決し、公開APIは維持。2026-10-31にコミット `3a8cb6d` の通常配布を確認（[記録](./verification/library-distribution.md#追加確認formbridge-custom-lib-101)）。 | 確認済み |
-| 1.0.0      | 2026-10-30 | FormBridge の依存確認、値取得・設定、転記、一括初期化を追加。2026-10-30に通常配布を確認（[記録](./verification/library-distribution.md#追加確認formbridge-custom-lib-100)）                                                                                         | 確認済み |
+| バージョン | 記録日     | 内容                                                                                                                                                                                                                                                                | 配布状況                            |
+| ---------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| 1.1.0      | 2026-10-31 | 公式サブテーブル値・セルエラー設定APIを公開ラッパーとして追加                                                                                                                                                                                                       | 未配布。通常配布URL・実画面は未確認 |
+| 1.0.1      | 2026-10-31 | `window.formBridge` が存在しないグローバル `const formBridge` 環境に対応。依存確認・全API呼び出しを都度解決し、公開APIは維持。2026-10-31にコミット `3a8cb6d` の通常配布を確認（[記録](./verification/library-distribution.md#追加確認formbridge-custom-lib-101)）。 | 確認済み                            |
+| 1.0.0      | 2026-10-30 | FormBridge の依存確認、値取得・設定、転記、一括初期化を追加。2026-10-30に通常配布を確認（[記録](./verification/library-distribution.md#追加確認formbridge-custom-lib-100)）                                                                                         | 確認済み                            |

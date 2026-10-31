@@ -1,6 +1,6 @@
 /**
  * FormBridge 新バージョンのフォーム操作を補助する共通ライブラリです。
- * @version 1.0.1
+ * @version 1.1.0
  */
 (function () {
 	'use strict';
@@ -161,6 +161,34 @@
 		return fn.call(owner, fieldCode, errorMessage);
 	};
 
+	const setSubtableFieldValue = (tableFieldCode, fieldCode, rowIndex, value) => {
+		validateFieldCode(tableFieldCode, 'setSubtableFieldValue');
+		validateFieldCode(fieldCode, 'setSubtableFieldValue');
+		if (!Number.isSafeInteger(rowIndex) || rowIndex < 0) {
+			throw new TypeError('setSubtableFieldValue: rowIndex must be a non-negative integer');
+		}
+		const { owner, fn } = requireFunction('formBridge.fn.setSubtableFieldValue');
+		return fn.call(owner, tableFieldCode, fieldCode, rowIndex, value);
+	};
+
+	const setSubtableFieldValueError = (tableFieldCode, fieldCode, rowIndex, errorMessage) => {
+		validateFieldCode(tableFieldCode, 'setSubtableFieldValueError');
+		validateFieldCode(fieldCode, 'setSubtableFieldValueError');
+		if (!Number.isSafeInteger(rowIndex) || rowIndex < 0) {
+			throw new TypeError('setSubtableFieldValueError: rowIndex must be a non-negative integer');
+		}
+		if (
+			errorMessage !== null &&
+			(typeof errorMessage !== 'string' || errorMessage.trim().length === 0)
+		) {
+			throw new TypeError(
+				'setSubtableFieldValueError: errorMessage must be a non-empty string or null'
+			);
+		}
+		const { owner, fn } = requireFunction('formBridge.fn.setSubtableFieldValueError');
+		return fn.call(owner, tableFieldCode, fieldCode, rowIndex, errorMessage);
+	};
+
 	const copyFieldValues = (record, mappings, options = {}) => {
 		const name = 'copyFieldValues';
 		validateRecord(record, name);
@@ -247,6 +275,8 @@
 		getFieldValue,
 		setFieldValue,
 		setFieldError,
+		setSubtableFieldValue,
+		setSubtableFieldValueError,
 		copyFieldValues,
 		initializeFields,
 	});
