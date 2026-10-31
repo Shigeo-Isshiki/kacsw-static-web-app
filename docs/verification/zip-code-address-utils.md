@@ -44,3 +44,15 @@ main反映前の追加検証として、`npm test`（リポジトリ全体）、
 - 705を含む実FormBridgeでのフィールド反映、エラー表示、ステップ移動・確認画面・送信、API通信のCORSと権限、ブラウザーキャッシュ更新は未検証です。モックテストを実画面確認として扱いません。
 - FormBridgeには複数フィールドの更新トランザクションがありません。検索／変換失敗では書き込み前に停止しますが、設定API途中失敗・後続コールバック失敗による既反映値のロールバックは保証しません。
 - 送信待機、送信キャンセル・再送信、地区判定・支部選択、705固有の会社名転記、個別フォーム変更・全フォーム展開は対象外です。
+
+## 1.2.0：郵便番号変更時の選択的な置換
+
+- 記録日：2026-11-01（日本時間、UTC+09:00）。
+- 正式設定名：`replaceOnZipCodeChange`（boolean、既定 `false`）。省略／falseは1.1.0の住所保持を維持し、trueでは応答到着後・書き込み前の保存欄を正規化して検索結果の `apiZipCode` と比較します。
+- 空でない保存済み番号が異なる場合だけ、デジタルアドレスと共通のクリア・変換・入力／保存欄反映・同期 `afterApply` 処理を使います。検索開始時の消去はありません。
+- FormBridgeテストは既存19件に7件追加し、計26件です。省略／false、異なる番号、同じ番号・全角／ハイフン／空白の表記差、保存欄の空値、応答時点の保存欄参照、関連欄と保存欄のクリア、任意結果欠落、同期コールバック、検索／変換失敗時の値保持、連続入力・空入力・画面遷移・独立登録・デジタル置換を確認します。文書の汎用利用例も実行します。
+- `npm test`（全リポジトリ）、`npm run lint`、`npm run ci-check`（配布物生成・VM・Puppeteer）、`cmp src/zip-code-address-utils.js dist/zip-code-address-utils.js` は成功しました。
+- `node --require ./test/setup-tests.js --test test/test-zip-code-address-formbridge.js test/test-zip-code-address-handler.js test/test-zip-code-address-utils.js test/test-formbridge-custom-lib.js` は成功（41件集計、旧形式2ファイルはファイル単位。FormBridge専用は26件）。`npx prettier --check "src/**/*.{js,css,html}" test/test-zip-code-address-formbridge.js` と `git diff --check` も成功し、文書構造・リンク・アンカー・版数・汎用例とkintone関数本体の不変性を確認しました。
+- kintone版・手入力住所の処理・世代管理・呼び出し時resolver・エラー処理は変更していません。送信制御やAPI途中失敗のロールバックは追加しません。
+- この記録時点で未コミット・未配布です。利用者からPR経由のmain反映・本番配布・確認記録の保存まで承認を受けました。配布後の証跡は[通常配布確認記録](library-distribution.md)へ追記します。
+- 実FormBridgeでの新設定の動作・反映・エラー表示・CORS・画面遷移／送信・キャッシュ更新は未検証です。個別フォームのコードは変更していません。
