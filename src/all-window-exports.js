@@ -41,6 +41,7 @@
 		'getPhoneNumberType',
 		'normalizePhoneNumber',
 		'registerPhoneNumberHandler',
+		'registerFormBridgePhoneNumberHandler',
 		// shipping-processing.js
 		'getNextBusinessDay',
 		'kintoneShippingInquiryButton',
