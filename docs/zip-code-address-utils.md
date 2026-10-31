@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.2.0** です。2026-11-01に通常配布URLとの一致を確認しました。実FormBridgeでの新設定の動作は未検証です。詳細は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)を参照してください。
+現行ソース・確認済み通常配布版は **1.2.0** です。2026-11-01に通常配布URLとの一致を確認しました。同日、複数住所欄で `replaceOnZipCodeChange: true` を有効にした検索・補完・置換・入力／保存欄同期の実画面動作確認が完了し、問題なく動作したとの利用者報告を受領しました。配布の証跡は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)、確認範囲は[利用側確認報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を参照してください。
 
 このドキュメントは `src/zip-code-address-utils.js` が公開する郵便番号／デジタルアドレス関連ユーティリティ関数の使い方と引数・戻り値の契約を整理したリファレンスです。テストや Node 環境でも `require('../src/zip-code-address-utils.js')` で利用できます（CommonJS エクスポートあり）。
 
@@ -580,7 +580,7 @@ const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
 - API レスポンスが複数件返ってきた場合はエラー（複数見つかりました）扱いになります。実装は単一ヒットを期待しています。
 - `registerZipCodeAddressHandler` は kintone のイベント・record API と DOM に依存します。テストではこれらのスタブを用意し、PC・モバイルのイベント種別で対応する record API を利用することを確認してください。ランタイム初期化は不要です。
 - ネットワークや API の異常 JSON に対しては安全に `error` オブジェクトを返すよう実装されています。
-- FormBridge向けは新バージョン専用・通常文字列フィールドのみ。送信待機は保証しません。実FormBridgeでの画面動作・通信許可（CORS）・確認画面／送信・キャッシュ更新は未検証です。
+- FormBridge向けは新バージョン専用・通常文字列フィールドのみ。導入した検索・補完・置換・入力／保存欄同期について実画面確認完了の利用者報告を受領しています。全API・全異常系、権限／環境別の通信許可（CORS）、確認画面／送信・キャッシュ更新の網羅確認は未報告です。送信待機は保証しません。
 - 公式仕様とモック単体テストの確認範囲、コマンド結果・未確認事項は[FormBridge住所ハンドラー検証記録](verification/zip-code-address-utils.md)を参照してください。
 
 ---
@@ -600,7 +600,7 @@ const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
 
 | バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
 | ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
-| 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持 | `9cfdc21`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)。実FormBridgeは未検証 |
+| 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持 | `9cfdc21`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)。導入機能の[実画面確認完了報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を利用者から受領 |
 | 1.1.0      | 2026-10-31 | FormBridge専用住所ハンドラー・入力／保存欄同期・世代管理を追加。kintone版は維持 | `cbdfc88`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)。実FormBridgeは未検証 |
 | 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
 | 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `651dead`。初版作成日・配布日は未確認                  |
