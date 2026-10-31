@@ -199,6 +199,7 @@ const cleanupStalePreviewEnvironments = async ({
 	exec = (command, args) =>
 		execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }),
 	httpsClient = require('https'),
+	wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
 	log = console,
 } = {}) => {
 	if (!env.SWA_NAME) throw new Error('SWA_NAME is required.');
@@ -281,6 +282,14 @@ const cleanupStalePreviewEnvironments = async ({
 		log.log('Dry run: stale preview environments:', deletableNames.join(', ') || 'none');
 		return { deleted: [], planned: deletableNames };
 	}
+	if (
+		deletableNames.length > 0 &&
+		!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+			env.AZURE_SUBSCRIPTION_ID || ''
+		)
+	) {
+		throw new Error('AZURE_SUBSCRIPTION_ID must be a GUID to delete preview environments.');
+	}
 
 	const deleted = [];
 	for (let i = 0; i < verifiedEnvironments.length; i += 1) {
@@ -292,20 +301,44 @@ const cleanupStalePreviewEnvironments = async ({
 			environmentName,
 			'(PR #' + pullRequestNumber + ')'
 		);
+		const resourceUrl =
+			'https://management.azure.com/subscriptions/' +
+			encodeURIComponent(env.AZURE_SUBSCRIPTION_ID) +
+			'/resourceGroups/' +
+			encodeURIComponent(env.SWA_RESOURCE_GROUP) +
+			'/providers/Microsoft.Web/staticSites/' +
+			encodeURIComponent(env.SWA_NAME) +
+			'/builds/' +
+			encodeURIComponent(environmentName) +
+			'?api-version=2024-11-01';
 		exec('az', [
-			'staticwebapp',
-			'environment',
+			'rest',
+			'--method',
 			'delete',
-			'--name',
-			env.SWA_NAME,
-			'--environment-name',
-			environmentName,
-			'--resource-group',
-			env.SWA_RESOURCE_GROUP,
-			'--yes',
+			'--url',
+			resourceUrl,
+			'--output',
+			'none',
 			'--only-show-errors',
 		]);
+		let confirmed = false;
+		for (let attempt = 0; attempt < 12; attempt += 1) {
+			if (attempt > 0) await wait(5000);
+			const remaining = loadAzureEnvironments(env, exec);
+			if (!remaining.some((item) => getEnvironmentName(item) === environmentName)) {
+				confirmed = true;
+				break;
+			}
+		}
+		if (!confirmed) {
+			throw new Error(
+				'Timed out confirming preview deletion: ' +
+					environmentName +
+					'. The deletion request may still be in progress.'
+			);
+		}
 		deleted.push(environmentName);
+		log.log('Confirmed preview environment deletion:', environmentName);
 	}
 
 	log.log('Stale preview cleanup complete. Deleted:', deleted.join(', ') || 'none');
