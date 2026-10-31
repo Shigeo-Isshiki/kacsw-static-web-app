@@ -28,3 +28,25 @@
 - `https://js.kacsw.or.jp/formbridge-custom-lib.js` のHTTP応答・ソースとの内容一致・配布ワークフロー結果。
 
 これらは自動テスト・公式型定義の確認だけでは保証されません。利用フォームに導入する前に対象環境で確認してください。
+
+## 1.0.1：グローバルのconstで公開されたAPIへの対応
+
+2026-10-31に利用者から、実画面で `typeof formBridge === 'object'`、`typeof formBridge.events.on === 'function'`、`typeof window.formBridge === 'undefined'` になるとの報告がありました。1.0.0はグローバルオブジェクトだけを参照していたため、その環境で依存確認とAPI呼び出しに失敗します。これは利用者の実画面報告であり、こちらでの実フォーム再検証結果ではありません。
+
+1.0.1では `formBridge.*` の解決時に直接の識別子参照を優先します。ライブラリ読み込み時にAPIや `fn` を固定せず、依存チェック・操作ごとに解決します。`window.formBridge = formBridge` の回避策や公開APIの変更は不要です。
+
+自動テストはNodeの `vm` でブラウザー相当のグローバル環境を作り、別スクリプトで `const formBridge` を定義します。`window` を同じグローバルオブジェクトにしつつ `window.formBridge` は存在しない状態で、依存確認、レコード取得、値取得、値設定、エラー設定・解除、転記、一括初期化を確認します。`fn` の後付け・置換、ライブラリ読み込み後のAPI定義、直接参照の優先、呼び出し先の `this`、既存のwindow公開方式も検証対象です。
+
+- 修正後の実フォーム上の読み込み・表示・送信は未確認です。
+- 1.0.0の配布証跡は保持します。1.0.1の配布はまだ未確認です。
+
+### 自動検証結果（2026-10-31）
+
+- `node --test test/test-formbridge-custom-lib.js`：12テスト成功（グローバルconst・遅延APIの回帰テスト2件を含む）。
+- `npm test`：全テスト成功。
+- `npm run lint`：成功。
+- `npm run build`：成功（非圧縮配布物の生成）。
+- `node --check src/formbridge-custom-lib.js`：成功。
+- `cmp src/formbridge-custom-lib.js dist/formbridge-custom-lib.js`：完全一致。
+- `npx --no-install prettier --check src/formbridge-custom-lib.js test/test-formbridge-custom-lib.js docs/formbridge-custom-lib.md docs/verification/formbridge-custom-lib.md`：成功。
+- `git diff --check`：成功。
