@@ -54,5 +54,5 @@ main反映前の追加検証として、`npm test`（リポジトリ全体）、
 - `npm test`（全リポジトリ）、`npm run lint`、`npm run ci-check`（配布物生成・VM・Puppeteer）、`cmp src/zip-code-address-utils.js dist/zip-code-address-utils.js` は成功しました。
 - `node --require ./test/setup-tests.js --test test/test-zip-code-address-formbridge.js test/test-zip-code-address-handler.js test/test-zip-code-address-utils.js test/test-formbridge-custom-lib.js` は成功（41件集計、旧形式2ファイルはファイル単位。FormBridge専用は26件）。`npx prettier --check "src/**/*.{js,css,html}" test/test-zip-code-address-formbridge.js` と `git diff --check` も成功し、文書構造・リンク・アンカー・版数・汎用例とkintone関数本体の不変性を確認しました。
 - kintone版・手入力住所の処理・世代管理・呼び出し時resolver・エラー処理は変更していません。送信制御やAPI途中失敗のロールバックは追加しません。
-- この記録時点で未コミット・未配布です。利用者からPR経由のmain反映・本番配布・確認記録の保存まで承認を受けました。配布後の証跡は[通常配布確認記録](library-distribution.md)へ追記します。
+- 利用者承認に基づきPR #44をmainへマージしました。対象コミット `9cfdc218d2fa19c011fc3520d1aefbe7b09070b9` のCI・本番デプロイ・パッケージ作成はすべて成功し、2026-11-01 07:15:28（日本時間、UTC+09:00）に通常URLのHTTP 200・JSDoc 1.2.0・対象ソースとのバイト単位の完全一致を確認しました。詳細は[通常配布確認記録](library-distribution.md#追加確認zip-code-address-utils-120)を参照してください。
 - 実FormBridgeでの新設定の動作・反映・エラー表示・CORS・画面遷移／送信・キャッシュ更新は未検証です。個別フォームのコードは変更していません。

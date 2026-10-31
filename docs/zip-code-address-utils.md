@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソースは **1.2.0** です。新設定の追加分は未配布・通常URL未照合です。確認済み通常配布版は **1.1.0** です。実FormBridgeでの動作は未検証です。過去の配布確認は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)を参照してください。
+現行ソース・確認済み通常配布版は **1.2.0** です。2026-11-01に通常配布URLとの一致を確認しました。実FormBridgeでの新設定の動作は未検証です。詳細は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)を参照してください。
 
 このドキュメントは `src/zip-code-address-utils.js` が公開する郵便番号／デジタルアドレス関連ユーティリティ関数の使い方と引数・戻り値の契約を整理したリファレンスです。テストや Node 環境でも `require('../src/zip-code-address-utils.js')` で利用できます（CommonJS エクスポートあり）。
 
@@ -600,7 +600,7 @@ const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
 
 | バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
 | ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
-| 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持 | ローカル変更。未配布・通常URL未照合。[検証記録](verification/zip-code-address-utils.md) |
+| 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持 | `9cfdc21`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)。実FormBridgeは未検証 |
 | 1.1.0      | 2026-10-31 | FormBridge専用住所ハンドラー・入力／保存欄同期・世代管理を追加。kintone版は維持 | `cbdfc88`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)。実FormBridgeは未検証 |
 | 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
 | 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `651dead`。初版作成日・配布日は未確認                  |
