@@ -264,3 +264,22 @@
 - text-suite 1.2.0とformbridge-custom-lib 1.1.0のリリースに関する利用者報告として、実FormBridge画面での「イベント動作・値反映・エラー表示」は問題なく完了したと確認しました。AIによる実画面の直接検証ではありません。
 - 上記の各配布確認時点の「実画面未確認」という記録は履歴として保持し、この報告を後続の確認結果として追記します。配布対象コミット・ハッシュ・ワークフローの証跡は変更しません。
 - 対象フォーム、実画面で読み込まれたファイルの版数・ハッシュ、通常フィールド／サブテーブル別の検証内訳は未提示です。送信・確認画面への遷移、全オプション・境界値・権限別動作、ブラウザーキャッシュ更新まで確認済みとは扱いません。
+
+## 追加確認：phone-utils 1.1.0
+
+- 確認日時：2026-10-31 21:10:39～21:10:40（日本時間、UTC+09:00）。
+- 対象ソース：PR #40のマージコミット [`5dee887a9f93d793d5c82c8eb8014e4dc83b10ff`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/5dee887a9f93d793d5c82c8eb8014e4dc83b10ff) の `src/phone-utils.js` と `src/all-window-exports.js`。
+- 利用者からコミット・push・PR作成・mainマージ・自動本番デプロイの承認を受けて実施しました。個別フォームは変更していません。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41199840866)：Prettier・ESLint・全テスト成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41199840883)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41199840902)：配布パッケージ作成成功。
+- デプロイ成功後、通常URLへ `Cache-Control: no-cache` を指定してGETし、HTTP 200と対象コミットのソースとのバイト単位の完全一致を確認しました。phone-utilsのJSDocバージョンは `1.1.0` です。
+
+| 対象・通常配布 URL | HTTP | ソース／配布バイト数 | バージョン | 一致 | SHA-256（ソース・配布共通） |
+| --- | --- | --- | --- | --- | --- |
+| <https://js.kacsw.or.jp/phone-utils.js> | 200 | 42853 / 42853 | 1.1.0 | 完全一致 | `8fbb236db79f0e56b0467d22607d5f6c8215f9d202b37dba4bef5db086e7f5b2` |
+| <https://js.kacsw.or.jp/all-window-exports.js> | 200 | 3129 / 3129 | 定義なし | 完全一致 | `adee9a515aaa343afe773b5f59f461d3c4135fdc8c7991c5d50085d23bfa5016` |
+
+- ローカルの `npm test`、`npm run lint`、`npm run build`、`npm run ci-check`、`git diff --check` は成功しました。文書構造・リンク・コードフェンス・バージョン・両環境のメッセージ順序も確認しました。
+- 今回追加した電話番号ハンドラーの実FormBridge画面でのイベント動作・値反映・エラー表示・送信、ブラウザーキャッシュ更新は未確認です。通常配布の一致と実画面検証を混同しません。上記のtext-suite・共通基盤に対する利用者報告を、本ハンドラーの検証結果として流用していません。
