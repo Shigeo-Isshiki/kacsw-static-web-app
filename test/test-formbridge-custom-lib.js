@@ -1,8 +1,11 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const libraryPath = path.join(__dirname, '..', 'src', 'formbridge-custom-lib.js');
+const librarySource = fs.readFileSync(libraryPath, 'utf8');
 
 const loadLibrary = (windowObject = {}) => {
 	global.window = windowObject;
@@ -41,6 +44,115 @@ test('does not overwrite an existing namespace', () => {
 		() => loadLibrary({ formBridgeCustomLib: existing }),
 		/formBridgeCustomLib global name is already in use/
 	);
+});
+
+test('uses a global const formBridge for all public operations and resolves fn lazily', () => {
+	const calls = [];
+	const record = {
+		source: { value: 0 },
+		target: { value: '' },
+		choices: { value: ['selected'] },
+	};
+	const events = {
+		on() {
+			throw new Error('Loading the library must not register events.');
+		},
+	};
+	const warnings = [];
+	const context = vm.createContext({
+		console: { warn: (message) => warnings.push(message) },
+		mockEvents: events,
+		customHelper() {},
+	});
+	context.window = context;
+	vm.runInContext('const formBridge = { events: mockEvents };', context);
+	vm.runInContext(librarySource, context);
+	const lib = context.formBridgeCustomLib;
+
+	assert.equal(vm.runInContext('typeof formBridge', context), 'object');
+	assert.equal(vm.runInContext('typeof formBridge.events.on', context), 'function');
+	assert.equal(vm.runInContext('typeof window.formBridge', context), 'undefined');
+	assert.equal(lib.createDependencyChecker(['formBridge.events.on', 'customHelper'])(), true);
+	const check = lib.createDependencyChecker([
+		'formBridge.fn.getRecord',
+		'formBridge.fn.setFieldValue',
+		'formBridge.fn.setFieldValueError',
+	]);
+	assert.equal(check(), false);
+	assert.match(warnings[0], /formBridge\.fn\.getRecord/);
+	assert.throws(() => lib.getFormBridgeRecord(), /FormBridge API is unavailable/);
+	assert.throws(() => lib.setFieldValue('target', false), /FormBridge API is unavailable/);
+	assert.throws(() => lib.setFieldError('target', null), /FormBridge API is unavailable/);
+	assert.deepEqual(calls, []);
+
+	const fn = {
+		getRecord() {
+			assert.equal(this, fn);
+			return record;
+		},
+		setFieldValue(code, value) {
+			assert.equal(this, fn);
+			calls.push(['value', code, value]);
+			record[code].value = value;
+		},
+		setFieldValueError(code, message) {
+			assert.equal(this, fn);
+			calls.push(['error', code, message]);
+		},
+	};
+	context.mockFn = fn;
+	vm.runInContext('formBridge.fn = mockFn;', context);
+	assert.equal(check(), true);
+	assert.equal(lib.getFormBridgeRecord(), record);
+	assert.equal(lib.getFieldValue(record, 'source', { required: true }), 0);
+	lib.setFieldValue('target', false);
+	lib.setFieldError('target', 'Invalid value');
+	lib.setFieldError('target', null);
+	assert.equal(lib.copyFieldValues(record, [{ source: 'source', target: 'target' }]), 1);
+	assert.equal(
+		lib.initializeFields(record, [
+			{ fieldCode: 'target', value: '', clearError: true },
+			{ fieldCode: 'choices', value: [], clearError: true },
+		]),
+		2
+	);
+	assert.deepEqual(calls, [
+		['value', 'target', false],
+		['error', 'target', 'Invalid value'],
+		['error', 'target', null],
+		['value', 'target', 0],
+		['value', 'target', ''],
+		['error', 'target', null],
+		['value', 'choices', []],
+		['error', 'choices', null],
+	]);
+	assert.equal(vm.runInContext('typeof window.formBridge', context), 'undefined');
+
+	context.replacementFn = { getRecord: () => ({ replacement: { value: true } }) };
+	vm.runInContext('formBridge.fn = replacementFn;', context);
+	assert.equal(lib.getFormBridgeRecord().replacement.value, true);
+	assert.equal(check(), false);
+	assert.throws(() => lib.setFieldValue('target', 1), /FormBridge API is unavailable/);
+});
+
+test('resolves a later global const and prefers it over a window property', () => {
+	const context = vm.createContext({ console });
+	context.window = context;
+	vm.runInContext(librarySource, context);
+	const lib = context.formBridgeCustomLib;
+	context.formBridge = {
+		fn: {
+			getRecord() {
+				throw new Error('The window property must not override the lexical API.');
+			},
+		},
+	};
+	vm.runInContext(
+		'const formBridge = { fn: { getRecord() { return { lexical: { value: true } }; } } };',
+		context
+	);
+	assert.equal(lib.createDependencyChecker(['formBridge.fn.getRecord'])(), true);
+	assert.equal(lib.getFormBridgeRecord().lexical.value, true);
 });
 
 test('checks required global and FormBridge API functions together', () => {

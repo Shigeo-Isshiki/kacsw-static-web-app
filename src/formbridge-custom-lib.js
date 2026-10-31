@@ -1,6 +1,6 @@
 /**
  * FormBridge 新バージョンのフォーム操作を補助する共通ライブラリです。
- * @version 1.0.0
+ * @version 1.0.1
  */
 (function () {
 	'use strict';
@@ -20,7 +20,13 @@
 		if (!isFunctionPath(path)) return null;
 		const parts = path.split('.');
 		let owner = globalObject;
-		for (let index = 0; index < parts.length - 1; index += 1) {
+		let start = 0;
+		if (parts[0] === 'formBridge' && parts.length > 1) {
+			// A global lexical binding is not necessarily a window property.
+			owner = typeof formBridge !== 'undefined' ? formBridge : globalObject.formBridge;
+			start = 1;
+		}
+		for (let index = start; index < parts.length - 1; index += 1) {
 			owner = owner == null ? undefined : owner[parts[index]];
 		}
 		const name = parts[parts.length - 1];

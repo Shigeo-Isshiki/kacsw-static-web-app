@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-FormBridge 新バージョン JavaScript カスタマイズ API のうち、レコード取得、フィールド値・エラー設定、値の転記と初期化を補助する独立したブラウザー向けライブラリです。現行ソース・確認済み通常配布版は **1.0.0** です。
+FormBridge 新バージョン JavaScript カスタマイズ API のうち、レコード取得、フィールド値・エラー設定、値の転記と初期化を補助する独立したブラウザー向けライブラリです。現行ソースは **1.0.1**、確認済み通常配布版は **1.0.0** です。1.0.1の配布は未確認です。
 
 公式仕様との照合結果は[FormBridge API 検証記録](./verification/formbridge-custom-lib.md)を参照してください。
 
@@ -15,6 +15,7 @@ FormBridge 新バージョン JavaScript カスタマイズ API のうち、レ�
 - `window.formBridgeCustomLib` 名前空間に公開します。既に同名のグローバルがある場合は上書きせず、読み込み時に例外を投げます。
 - ライブラリ自体はイベント登録、フォーム値の変更、外部通信を行いません。利用側でイベントを登録し、必要な関数のみ呼び出してください。
 - `formBridge.events.on` はフォーム読み込み直後から利用できます。一方、`formBridge.fn` の関数は各画面の `.show` イベント内またはそれ以降で利用します。初期化時点での `formBridge.fn` 依存チェックは行わず、利用するイベント内で確認してください。
+- `formBridge.*` の依存確認と内部API呼び出しは、直接参照できる `formBridge`（グローバルの `const` など）を優先し、未定義の場合は `window.formBridge` を参照します。`window.formBridge` への代入は不要です。読み込み時には取得せず、呼び出しごとに解決するため、表示時に利用可能になる `formBridge.fn` にも対応します。他の関数パスは従来どおりグローバルオブジェクトから解決します。
 
 共通ライブラリが読み込まれなかった場合は、ライブラリ内の依存確認を呼べません。利用側は最初に名前空間を確認してください。
 以下の関数例は、利用側の初期化コードを IIFE に入れ、最初の確認後に `fb` を定義した状態を前提とします。
@@ -50,7 +51,7 @@ FormBridge 新バージョン JavaScript カスタマイズ API のうち、レ�
 
 #### createDependencyChecker(requiredFunctions)
 
-- `requiredFunctions` (`string[]`)：存在を確認するグローバル関数のパス。例：`'notifyError'`、`'formBridge.events.on'`、`'formBridge.fn.getRecord'`。空配列は有効です。
+- `requiredFunctions` (`string[]`)：存在を確認する関数のパス。例：`'notifyError'`、`'formBridge.events.on'`、`'formBridge.fn.getRecord'`。`formBridge.*` は直接参照とグローバルオブジェクトの両方に対応します。空配列は有効です。
 - 戻り値：`checkDependencies(options)` 関数。全て存在すれば `true`、不足があれば `false` を返します。
 - `options.strict` (`boolean`, optional, default `false`)：`true` の場合、不足をまとめた `Error` を投げます。
 - 不正な配列・パス・options は `TypeError` です。依存不足では不足パスを `console.warn` にまとめ、`notifyError` が存在すれば一般的な不足通知を試みます。通知失敗は `console.debug` に記録し、依存チェック結果を返します。
@@ -200,4 +201,5 @@ formBridge.events.on('form.show', function () {
 
 | バージョン | 記録日     | 内容                                                                                                                                                                        | 配布状況 |
 | ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| 1.0.1      | 2026-10-31 | `window.formBridge` が存在しないグローバル `const formBridge` 環境に対応。依存確認・全API呼び出しを都度解決し、公開APIは維持。                                              | 未確認   |
 | 1.0.0      | 2026-10-30 | FormBridge の依存確認、値取得・設定、転記、一括初期化を追加。2026-10-30に通常配布を確認（[記録](./verification/library-distribution.md#追加確認formbridge-custom-lib-100)） | 確認済み |
