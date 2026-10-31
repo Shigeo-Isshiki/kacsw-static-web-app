@@ -1,6 +1,6 @@
 /** 郵便番号から住所などを出力する処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.1.0
+ * @version 1.2.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
 /* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, registerZipCodeAddressHandler, registerFormBridgeZipCodeAddressHandler, normalizeZipCode */
@@ -853,6 +853,7 @@ const registerZipCodeAddressHandler = (options) => {
  * @param {Object<string, string>} options.addressFields 検索結果プロパティと入力欄の対応
  * @param {Object<string, string>} [options.fieldMappings] 住所入力欄と保存欄の対応
  * @param {string[]} [options.clearFields] 置換時にクリアする追加欄
+ * @param {boolean} [options.replaceOnZipCodeChange=false] 空でない保存済み郵便番号と異なる場合に住所を置換
  * @param {function} [options.transformAddress] 同期文字列変換
  * @param {function} [options.afterApply] 住所反映後の同期処理
  * @returns {{whenIdle: function, dispose: function}} 最新処理の観測・無効化用。送信制御用ではない。
@@ -877,6 +878,7 @@ const registerFormBridgeZipCodeAddressHandler = (options) => {
 		'addressFields',
 		'fieldMappings',
 		'clearFields',
+		'replaceOnZipCodeChange',
 		'transformAddress',
 		'afterApply',
 	];
@@ -889,9 +891,12 @@ const registerFormBridgeZipCodeAddressHandler = (options) => {
 		addressFields,
 		fieldMappings = {},
 		clearFields = [],
+		replaceOnZipCodeChange = false,
 		transformAddress = (value) => value,
 		afterApply,
 	} = options;
+	if (typeof replaceOnZipCodeChange !== 'boolean')
+		throw new TypeError('replaceOnZipCodeChangeはbooleanで指定してください');
 	if (![zipCodeInputField, zipCodeSavedField, mainAddressField].every(isCode))
 		throw new TypeError('郵便番号入力・保存・メイン住所のフィールドコードを指定してください');
 	if (
@@ -1023,7 +1028,10 @@ const registerFormBridgeZipCodeAddressHandler = (options) => {
 					throw new Error('APIレスポンスが不正です（住所設定の必須項目）');
 				const record = fb.getFormBridgeRecord();
 				requireFields(record);
-				const replace = result.normalizedZipCode !== result.apiZipCode;
+				const savedZipCode = _zc_normalizeZipCodeInput(textValue(record, zipCodeSavedField));
+				const replace =
+					result.normalizedZipCode !== result.apiZipCode ||
+					(replaceOnZipCodeChange && savedZipCode !== '' && savedZipCode !== result.apiZipCode);
 				const assignAddress = replace || textValue(record, mainAddressField) === '';
 				const values = new Map();
 				if (assignAddress) {

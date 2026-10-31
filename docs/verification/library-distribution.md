@@ -327,3 +327,12 @@
 - ローカルの `npm test`、`npm run lint`、`npm run build`、`npm run ci-check`、`npx prettier --check "src/**/*.{js,css,html}"`、`git diff --check` は成功しました。単体テスト・文書利用例の結果は[検証記録](zip-code-address-utils.md)を参照してください。
 - 住所ハンドラーの実FormBridgeでのイベント動作・住所反映・エラー表示・通信許可（CORS）・確認画面／送信、ブラウザーキャッシュ更新は未検証です。配布一致を実画面検証として扱わず、電話番号や文字変換ハンドラーの確認報告も流用していません。検索中の送信待機は保証しません。
 - 配布前記録は履歴として保持します。この確認結果の保存は文書のみの変更であり、ライブラリのバージョン・ソースには変更を加えません。
+
+## 配布前記録：zip-code-address-utils 1.2.0
+
+- 記録日：2026-11-01（日本時間、UTC+09:00）。配布確認日ではありません。
+- 対象：`src/zip-code-address-utils.js`。`replaceOnZipCodeChange`（既定false）を追加し、kintone版と既定のFormBridge動作は維持します。
+- 作業元コミット：`6786d0d902c86716272983a59b4e6488ea29b140`。対象変更はローカル未コミットで配布対象コミットは未確定です。
+- 利用者からコミット・push・PR作成・mainマージ・本番配布・配布記録保存の承認を受けました。この記録時点では本番反映・対象変更のワークフローは未実行、通常URL <https://js.kacsw.or.jp/zip-code-address-utils.js> のGET・HTTP・内容一致は未確認です。
+- ローカル生成物とソースの `cmp` は成功。ローカルソースSHA-256は `122d55a955555dcc976d9df78e1f7be5810e54cc3c13a4c7f1051feda1548a3d` です（配布ハッシュではありません）。
+- ローカルテスト・lint・ビルド／スモークチェックの結果は[検証記録](zip-code-address-utils.md)を参照してください。実FormBridgeでの新設定の動作・反映・送信・CORS・キャッシュ更新は未検証です。個別フォーム変更・送信制御は実施していません。

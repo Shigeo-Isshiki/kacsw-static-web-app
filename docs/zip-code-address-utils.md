@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.1.0** です。2026-10-31に通常配布URLとの一致を確認しました。実FormBridgeでの動作は未検証です。詳細は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)を参照してください。
+現行ソースは **1.2.0** です。新設定の追加分は未配布・通常URL未照合です。確認済み通常配布版は **1.1.0** です。実FormBridgeでの動作は未検証です。過去の配布確認は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)を参照してください。
 
 このドキュメントは `src/zip-code-address-utils.js` が公開する郵便番号／デジタルアドレス関連ユーティリティ関数の使い方と引数・戻り値の契約を整理したリファレンスです。テストや Node 環境でも `require('../src/zip-code-address-utils.js')` で利用できます（CommonJS エクスポートあり）。
 
@@ -46,6 +46,8 @@ FormBridge専用ハンドラーは次の順で読み込みます。
 4. 利用フォームの登録スクリプト
 
 登録スクリプトは初期読み込み時に実行し、`form.show` 内で登録しないでください。`formBridge.events.on` が必要ですが、登録時には `formBridge.fn` を参照しません。各 `.show` 後に利用可能になる `fn` は共通基盤のresolver経由で呼び出し時に解決します。グローバル `const formBridge` のみで `window.formBridge` がない環境にも対応します。
+
+`replaceOnZipCodeChange` を使用する場合は `zip-code-address-utils.js` **1.2.0以上**が必要です。
 
 ## 公開関数の目次
 
@@ -476,6 +478,7 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 | `addressFields` | object、必須 | `{ 検索結果プロパティ: 住所入力コード }`。割り当て先は一意 |
 | `fieldMappings` | object、`{}` | `{ 住所入力コード: 保存コード }`。検索時と手入力変更時に保存欄も設定 |
 | `clearFields` | string[]、`[]` | 置換時にクリアする追加の入力欄／関連欄。その保存欄も自動でクリア |
+| `replaceOnZipCodeChange` | boolean、`false`（1.2.0追加） | `true` の場合、空でない保存済み郵便番号が検索結果の郵便番号と異なると住所を置換。真偽値以外は登録時にエラー |
 | `transformAddress` | function、値をそのまま返す | `(value, { fieldCode, property, result? }) => string`。同期・副作用なしの変換 |
 | `afterApply` | function、省略可 | `({ result, record, isCurrent }) => void`。住所反映後のみ実行する同期コールバック |
 
@@ -492,12 +495,18 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 | 操作 | 郵便番号入力・保存欄 | 住所 |
 | --- | --- | --- |
 | `form.show` | 検索・整形しない | 変更しない。前画面の検索を無効化 |
-| 通常郵便番号の変更 | 成功後に両欄を整形 | 応答時点でメイン住所が空の場合のみ補完。既存住所なら全住所・関連欄を保持 |
+| 通常郵便番号の変更（設定省略／`false`） | 成功後に両欄を整形 | 応答時点でメイン住所が空の場合のみ補完。既存住所なら全住所・関連欄を保持 |
+| 通常郵便番号の変更（`true`、保存済み番号が空でなく異なる） | 成功後に両欄を整形 | デジタルアドレスと同じ処理で住所・関連欄・保存欄を置換 |
+| 通常郵便番号の変更（`true`、保存済み番号が同じ／空） | 成功後に両欄を整形 | メイン住所が空の場合のみ補完。既存住所・関連欄は保持 |
 | デジタルアドレスの変更 | 成功後にAPI郵便番号へ置換 | 全割り当て先・`clearFields` と対応する保存欄をクリアする計画を作り、存在する検索結果で置換 |
 | 空の郵便番号への変更 | 保存欄だけ空にする | 検索せず住所保持。先行検索を無効化 |
 | 検索・変換・必須項目の検証失敗 | 値を変更しない | 値を変更しない。エラーを表示 |
 
 デジタル判定はkintone同様 **`normalizedZipCode !== apiZipCode`** であり、英字の有無ではありません。任意結果の欠落・nullは通常補完では既存欄を保持し、置換では空になります。正規化後に空となる記号・空白だけの郵便番号も空入力とします。
+
+`replaceOnZipCodeChange: true` の比較は、応答到着後・検索結果を書き込む前の `zipCodeSavedField` の値を既存処理で正規化し、`result.apiZipCode` と比較します。全角・ハイフン・空白等の表記差では置換しません。保存欄の `null`・空文字・正規化後の空値では置換しません。検索開始時点で住所を消さず、置換時のクリア・変換・保存欄同期・`afterApply` はデジタルアドレスと共用します。省略／`false` は1.1.0の動作を維持します。
+
+入力と保存に同じ郵便番号コードを使う場合、入力変更によって比較元の値も変わり、以前の保存済み番号を参照できない場合があります。この設定で保存済み番号との比較を行う場合は、入力欄と保存欄を別コードにし、検索成功前に別ハンドラーで保存欄を上書きしないでください。
 
 検索結果の必須項目と全割り当て先の変換結果（文字列）を検証してから設定APIを呼び出すため、検索・変換失敗による部分消去を防ぎます。検索時のメイン住所は変換後も空白だけ・空文字を許可しません（意図しない住所消去を防ぐFormBridge版の追加検証）。ただしFormBridgeには一括更新トランザクションがなく、**設定APIが途中で失敗した場合や `afterApply` が失敗した場合、反映済みの値はロールバックしません**。設定失敗を成功扱いにはしません。
 
@@ -522,6 +531,7 @@ kintone版との差分は、置換ボタン・`apply()`・DOM表示・業務条�
 ##### 複数の住所欄を登録する例
 
 以下のフィールドコードは説明用の架空の名前です。実際のフォームに合わせて、入力欄と保存欄の対応を明示してください。2組目は追加の住所欄を置換時にクリアする例です。
+2組目では `replaceOnZipCodeChange: true` を指定し、通常郵便番号が保存済み番号と異なる場合の置換も有効にしています。1組目は設定を省略して既存住所を保持します。
 
 ```js
 const primaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
@@ -553,6 +563,7 @@ const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
 		Secondary_line_3_entry: 'Secondary_line_3_value',
 	},
 	clearFields: ['Secondary_line_3_entry'],
+	replaceOnZipCodeChange: true,
 	transformAddress: (value) => value === '' ? '' : toFullWidth(value, false),
 });
 ```
@@ -589,6 +600,7 @@ const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
 
 | バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
 | ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持 | ローカル変更。未配布・通常URL未照合。[検証記録](verification/zip-code-address-utils.md) |
 | 1.1.0      | 2026-10-31 | FormBridge専用住所ハンドラー・入力／保存欄同期・世代管理を追加。kintone版は維持 | `cbdfc88`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)。実FormBridgeは未検証 |
 | 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
 | 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `651dead`。初版作成日・配布日は未確認                  |

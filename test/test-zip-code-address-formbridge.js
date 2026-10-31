@@ -192,6 +192,179 @@ test('ordinary ZIP retains existing addresses, and only fills a currently empty 
 	assert.equal(env.record.address.value, '検索中の手入力');
 });
 
+test('omitted and false replacement option retain existing addresses for a different saved ZIP', async () => {
+	for (const options of [{}, { replaceOnZipCodeChange: false }]) {
+		const env = setup({ options });
+		const controller = env.register();
+		env.show();
+		env.record.savedZip.value = '765-4321';
+		for (const code of ['address', 'savedAddress', 'other', 'savedOther', 'extra', 'savedExtra'])
+			env.record[code].value = '保持';
+		env.change('1234567');
+		await tick();
+		env.requests[0].resolve(response());
+		assert.equal((await controller.whenIdle()).status, 'formatted');
+		assert.equal(env.record.savedZip.value, '123-4567');
+		for (const code of ['address', 'savedAddress', 'other', 'savedOther', 'extra', 'savedExtra'])
+			assert.equal(env.record[code].value, '保持');
+	}
+});
+
+test('enabled replacement normalizes saved ZIP and preserves same-number or empty baselines', async () => {
+	for (const saved of [
+		'1234567',
+		'123-4567',
+		'１２３－４５６７',
+		' １２３ ４５６７ ',
+		'',
+		null,
+		'　－',
+	]) {
+		for (const emptyAddress of [false, true]) {
+			const env = setup({ options: { replaceOnZipCodeChange: true } });
+			const applied = [];
+			const controller = env.register({ afterApply: (context) => applied.push(context.result) });
+			env.show();
+			env.record.savedZip.value = saved;
+			env.record.address.value = emptyAddress ? '' : '保持';
+			env.record.extra.value = '関連';
+			env.record.savedExtra.value = '関連保存';
+			env.change('１２３－４５６７');
+			await tick();
+			env.requests[0].resolve(response());
+			assert.equal((await controller.whenIdle()).status, emptyAddress ? 'applied' : 'formatted');
+			assert.equal(env.record.address.value, emptyAddress ? '東京都千代田区千代田1-1' : '保持');
+			assert.equal(env.record.extra.value, '関連');
+			assert.equal(env.record.savedExtra.value, '関連保存');
+			assert.equal(applied.length, emptyAddress ? 1 : 0);
+		}
+	}
+});
+
+test('enabled replacement uses pre-write saved ZIP and shares clear, transform and afterApply behavior', async () => {
+	const env = setup({ options: { replaceOnZipCodeChange: true } });
+	const hooks = [];
+	const controller = env.register({
+		transformAddress: (value) => value + '変換',
+		afterApply: (context) => hooks.push(context),
+	});
+	env.show();
+	for (const field of Object.values(env.record)) field.value = '既存';
+	env.record.savedZip.value = '765-4321';
+	env.change('1234567');
+	await tick();
+	assert.equal(env.record.address.value, '既存', 'no clearing at lookup start');
+	env.requests[0].resolve(response(row({ other_name: null })));
+	assert.equal((await controller.whenIdle()).status, 'applied');
+	assert.equal(env.record.savedZip.value, '123-4567');
+	assert.equal(env.record.address.value, '東京都千代田区千代田1-1変換');
+	assert.equal(env.record.savedAddress.value, env.record.address.value);
+	for (const code of ['other', 'savedOther', 'extra', 'savedExtra'])
+		assert.equal(env.record[code].value, '');
+	assert.equal(hooks.length, 1);
+	assert.equal(hooks[0].record.savedZip.value, '123-4567');
+	assert.equal(hooks[0].isCurrent(), true);
+
+	// Re-read the baseline at response time, before writing the search result.
+	env.change('7654321');
+	await tick();
+	env.record.savedZip.value = '７６５－４３２１';
+	env.requests[1].resolve(response(row({ zip_code: '7654321' })));
+	assert.equal((await controller.whenIdle()).status, 'formatted');
+	assert.equal(hooks.length, 1);
+});
+
+test('enabled replacement preserves values on lookup or conversion failure', async () => {
+	for (const failure of ['search', 'conversion']) {
+		const env = setup({ options: { replaceOnZipCodeChange: true } });
+		const controller = env.register({
+			transformAddress: (value, { property }) => {
+				if (failure === 'conversion' && property === 'otherName') throw new Error('conversion');
+				return value;
+			},
+		});
+		env.show();
+		for (const field of Object.values(env.record)) field.value = '保持';
+		env.record.savedZip.value = '765-4321';
+		const before = clone(env.record);
+		env.change('1234567');
+		await tick();
+		if (failure === 'search') env.requests[0].reject(new Error('offline'));
+		else env.requests[0].resolve(response());
+		assert.equal((await controller.whenIdle()).status, 'error');
+		assert.deepEqual(env.record, before);
+		assert.ok(env.errors.length);
+		assert.equal(env.calls.filter(([kind]) => kind === 'value').length, 0);
+	}
+});
+
+test('enabled replacement discards outdated requests on continuous, empty or screen changes', async () => {
+	for (const stop of ['new-input', 'empty', 'form.show', 'confirm.show', 'finish.show']) {
+		const env = setup({ options: { replaceOnZipCodeChange: true } });
+		const controller = env.register();
+		env.show();
+		env.record.savedZip.value = '999-9999';
+		env.record.address.value = '保持';
+		env.change('1234567');
+		await tick();
+		const old = controller.whenIdle();
+		if (stop === 'new-input') {
+			env.change('7654321');
+			await tick();
+			env.requests[1].resolve(response(row({ zip_code: '7654321', town_name: '最新' })));
+			assert.equal((await controller.whenIdle()).status, 'applied');
+		} else if (stop === 'empty') {
+			env.change('');
+			assert.equal((await controller.whenIdle()).status, 'skipped');
+			assert.equal(env.record.savedZip.value, '');
+		} else env.dispatch(stop);
+		const before = clone(env.record);
+		env.requests[0].resolve(response());
+		assert.equal((await old).status, 'stale');
+		assert.deepEqual(env.record, before);
+		if (stop !== 'new-input') assert.equal(env.record.address.value, '保持');
+	}
+});
+
+test('enabled option leaves digital replacement and independent registration generations intact', async () => {
+	const env = setup({ options: { replaceOnZipCodeChange: true } });
+	Object.assign(env.record, initialRecord('second'));
+	const first = env.register();
+	const second = env.register({}, 'second');
+	env.show();
+	env.record.address.value = '保持';
+	env.record.savedZip.value = '123-4567';
+	env.record.secondaddress.value = '旧住所';
+	env.record.secondsavedZip.value = '999-9999';
+	env.change('A1B2C3D');
+	env.change('7654321', 'secondzip');
+	await tick();
+	env.change('');
+	await first.whenIdle();
+	env.requests[0].resolve(response());
+	env.requests[1].resolve(response(row({ zip_code: '7654321' })));
+	assert.equal((await second.whenIdle()).status, 'applied');
+	assert.equal(env.record.address.value, '保持');
+	assert.equal(env.record.secondsavedZip.value, '765-4321');
+	env.change('A1B2C3D');
+	await tick();
+	env.requests[2].resolve(response(row({ other_name: null })));
+	assert.equal((await first.whenIdle()).status, 'applied');
+	assert.equal(env.record.address.value, '東京都千代田区千代田1-1');
+	assert.equal(env.record.savedOther.value, '');
+});
+
+test('replacement option requires a boolean before any event registration', () => {
+	for (const replaceOnZipCodeChange of [null, 0, 1, '', 'true', [], {}, () => true]) {
+		const env = setup();
+		assert.throws(
+			() => env.register({ replaceOnZipCodeChange }),
+			/replaceOnZipCodeChange.*boolean/
+		);
+		assert.equal(env.handlers.size, 0);
+	}
+});
+
 test('digital mismatch replaces addresses and clears related input and saved fields', async () => {
 	const env = setup();
 	const controller = env.register();
@@ -615,4 +788,14 @@ test('documented generic example updates both address pairs and clears the extra
 	assert.equal(env.record.Secondary_line_3_value.value, '');
 	assert.equal(env.record.Unrelated_entry.value, '既存会社');
 	assert.equal(env.record.Unrelated_value.value, '既存会社');
+	env.record.Secondary_line_3_entry.value = '追加欄';
+	env.record.Secondary_line_3_value.value = '追加欄';
+	env.change('7654321', 'Secondary_postal_entry');
+	await tick();
+	env.requests[3].resolve(response(row({ zip_code: '7654321', other_name: null })));
+	assert.equal((await secondary.whenIdle()).status, 'applied');
+	assert.equal(env.record.Secondary_postal_value.value, '765-4321');
+	assert.equal(env.record.Secondary_line_2_value.value, '');
+	assert.equal(env.record.Secondary_line_3_entry.value, '');
+	assert.equal(env.record.Secondary_line_3_value.value, '');
 });
