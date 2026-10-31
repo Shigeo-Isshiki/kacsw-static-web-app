@@ -212,3 +212,20 @@
 - PR #29 のプレビューAzureワークフローは `Error: Could not detect the language from repo.` で失敗しました。これはPRイベントでの実行であり、マージ後の `main` pushに対するAzure本番デプロイ成功とは別の結果です。
 - 上記の失敗原因の訂正（2026-10-31、日本時間）：[同プレビュー実行ログ](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41059700148)では、言語判定エラー後も既存の静的ファイルを使用して処理を継続しています。最終的な失敗理由は `This Static Web App already has the maximum number of staging environments`（プレビュー環境数の上限到達）でした。言語判定の省略と環境数の解消は別の対応です。本番配布の照合結果は変わりません。
 - 通常配布の内容一致を確認しました。FormBridge利用フォームでの実画面動作、各フィールド型の値適合性、ブラウザーキャッシュの更新は未確認です。
+
+## 追加確認：formbridge-custom-lib 1.0.1
+
+- 確認日時：2026-10-31 09:40:31（日本時間、UTC+09:00）。
+- 対象ライブラリ：`formbridge-custom-lib` **1.0.1**。利用者の修正・配布依頼によりPR #33を保護ルールに従ってマージしました。対象ソースはマージコミット [`3a8cb6d20be64281281214aa4e4caa562e27af62`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/3a8cb6d20be64281281214aa4e4caa562e27af62) の `src/formbridge-custom-lib.js` です。
+- 対象コミットのワークフロー結果：
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41151339780)：lint・全テスト成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41151339943)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41151339912)：非圧縮配布物生成・パッケージ作成成功。
+- 通常URLへ `Cache-Control: no-cache` を指定してGETし、HTTP 200、JSDocバージョン1.0.1、対象コミットのソースとのバイト単位の完全一致を確認しました。
+
+| 対象・通常配布 URL | HTTP | ソース／配布バイト数 | バージョン | 一致 | SHA-256（ソース・配布共通） |
+| --- | --- | --- | --- | --- | --- |
+| <https://js.kacsw.or.jp/formbridge-custom-lib.js> | 200 | 9527 / 9527 | 1.0.1 | 完全一致 | `08ab66e846778a223141cd7aa4032bb9234297e44776c8f91c07e44e10ded26e` |
+
+- グローバル `const formBridge` と `window.formBridge` 未定義の組み合わせは、Nodeのvmによる自動テストで再現し、依存確認・全公開操作・`fn` の遅延利用と置換を検証済みです。
+- 修正後の実FormBridge画面での読み込み・表示・送信、ブラウザーキャッシュの更新は未確認です。配布一致と実画面検証を混同しません。
