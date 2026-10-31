@@ -24,19 +24,21 @@ const getPullRequestNumber = (environment) => {
 	if (!environment || typeof environment !== 'object') return null;
 	const properties = getEnvironmentProperties(environment);
 	const rawNumber = properties.pullRequestNumber ?? environment.pullRequestNumber;
-	if (typeof rawNumber === 'number' && Number.isSafeInteger(rawNumber) && rawNumber > 0) {
-		return rawNumber;
-	}
-	if (typeof rawNumber === 'string' && /^[1-9]\d*$/.test(rawNumber)) {
-		const parsedNumber = Number(rawNumber);
-		return Number.isSafeInteger(parsedNumber) ? parsedNumber : null;
-	}
-
 	const environmentName = getEnvironmentName(environment);
-	const match = environmentName && environmentName.match(/^pr-(\d+)$/i);
-	if (!match) return null;
-	const parsedNameNumber = Number(match[1]);
-	return Number.isSafeInteger(parsedNameNumber) && parsedNameNumber > 0 ? parsedNameNumber : null;
+	const match = environmentName && environmentName.match(/^(?:pr-)?([1-9]\d*)$/i);
+	const nameNumber = match ? Number(match[1]) : null;
+	if (rawNumber !== null && rawNumber !== undefined) {
+		const parsedNumber =
+			typeof rawNumber === 'number'
+				? rawNumber
+				: typeof rawNumber === 'string' && /^[1-9]\d*$/.test(rawNumber)
+					? Number(rawNumber)
+					: null;
+		if (!Number.isSafeInteger(parsedNumber) || parsedNumber <= 0) return null;
+		if (match && nameNumber !== parsedNumber) return null;
+		return parsedNumber;
+	}
+	return Number.isSafeInteger(nameNumber) && nameNumber > 0 ? nameNumber : null;
 };
 
 const isProductionEnvironment = (environment, productionBranch) => {
@@ -46,6 +48,7 @@ const isProductionEnvironment = (environment, productionBranch) => {
 	const sourceBranch = properties.sourceBranch ?? environment.sourceBranch;
 	return (
 		properties.isProduction === true ||
+		environment.isProduction === true ||
 		(typeof environmentName === 'string' &&
 			['default', 'production', 'prod'].includes(environmentName.toLowerCase())) ||
 		sourceBranch === productionBranch
@@ -96,6 +99,41 @@ const getNextPageUrl = (linkHeader) => {
 	return null;
 };
 
+const fetchGitHubJson = ({ url, token, httpsClient }) =>
+	new Promise((resolve, reject) => {
+		const request = httpsClient.get(
+			url,
+			{
+				headers: {
+					Accept: 'application/vnd.github+json',
+					Authorization: 'Bearer ' + token,
+					'X-GitHub-Api-Version': '2022-11-28',
+					'User-Agent': 'kacsw-swa-preview-cleanup',
+				},
+			},
+			(res) => {
+				let body = '';
+				res.setEncoding('utf8');
+				res.on('error', reject);
+				res.on('data', (chunk) => {
+					body += chunk;
+				});
+				res.on('end', () => {
+					if (res.statusCode < 200 || res.statusCode >= 300) {
+						reject(new Error('GitHub pull request API returned HTTP ' + res.statusCode));
+						return;
+					}
+					try {
+						resolve({ body: JSON.parse(body), linkHeader: res.headers.link });
+					} catch (error) {
+						reject(new Error('GitHub pull request API returned invalid JSON: ' + error.message));
+					}
+				});
+			}
+		);
+		request.on('error', reject);
+	});
+
 const fetchOpenPullRequests = async ({
 	repository,
 	token,
@@ -119,48 +157,7 @@ const fetchOpenPullRequests = async ({
 	const pullRequests = [];
 
 	while (nextUrl) {
-		const response = await new Promise((resolve, reject) => {
-			const request = httpsClient.get(
-				nextUrl,
-				{
-					headers: {
-						Accept: 'application/vnd.github+json',
-						Authorization: 'Bearer ' + token,
-						'X-GitHub-Api-Version': '2022-11-28',
-						'User-Agent': 'kacsw-swa-preview-cleanup',
-					},
-				},
-				(res) => {
-					let body = '';
-					res.setEncoding('utf8');
-					res.on('data', (chunk) => {
-						body += chunk;
-					});
-					res.on('end', () => {
-						if (res.statusCode < 200 || res.statusCode >= 300) {
-							reject(
-								new Error(
-									'GitHub pull request API returned HTTP ' +
-										res.statusCode +
-										': ' +
-										body.slice(0, 500)
-								)
-							);
-							return;
-						}
-						try {
-							resolve({
-								body: JSON.parse(body),
-								linkHeader: res.headers.link,
-							});
-						} catch (error) {
-							reject(new Error('GitHub pull request API returned invalid JSON: ' + error.message));
-						}
-					});
-				}
-			);
-			request.on('error', reject);
-		});
+		const response = await fetchGitHubJson({ url: nextUrl, token, httpsClient });
 
 		if (!Array.isArray(response.body)) {
 			throw new TypeError('GitHub pull request API response must be an array.');
@@ -224,12 +221,40 @@ const cleanupStalePreviewEnvironments = async ({
 		openPullRequestNumbers,
 		productionBranch
 	);
-	const deletableNames = staleEnvironments.map(getEnvironmentName);
+	// Verify all candidates before deleting any environment.
+	const verifiedEnvironments = [];
+	for (const environment of staleEnvironments) {
+		const number = getPullRequestNumber(environment);
+		const apiBase = (env.GITHUB_API_URL || 'https://api.github.com').replace(/\/+$/, '');
+		const { body: pullRequest } = await fetchGitHubJson({
+			url: apiBase + '/repos/' + env.GITHUB_REPOSITORY + '/pulls/' + number,
+			token: env.GITHUB_TOKEN,
+			httpsClient,
+		});
+		const properties = getEnvironmentProperties(environment);
+		const sourceBranch = properties.sourceBranch ?? environment.sourceBranch;
+		if (
+			pullRequest &&
+			pullRequest.number === number &&
+			pullRequest.state === 'closed' &&
+			pullRequest.base?.ref === productionBranch &&
+			pullRequest.base?.repo?.full_name === env.GITHUB_REPOSITORY &&
+			pullRequest.head?.repo?.full_name === env.GITHUB_REPOSITORY &&
+			typeof sourceBranch === 'string' &&
+			sourceBranch.length > 0 &&
+			pullRequest.head?.ref === sourceBranch
+		) {
+			verifiedEnvironments.push(environment);
+		} else {
+			log.log('Keeping environment with unverified PR identity:', getEnvironmentName(environment));
+		}
+	}
+	const deletableNames = verifiedEnvironments.map(getEnvironmentName);
 	if (deletableNames.some((name) => !name)) {
 		throw new Error('A stale preview environment has no environment name; refusing to delete.');
 	}
 
-	const staleSet = new Set(staleEnvironments);
+	const staleSet = new Set(verifiedEnvironments);
 	environments.forEach((environment) => {
 		if (staleSet.has(environment)) return;
 		if (
@@ -242,6 +267,15 @@ const cleanupStalePreviewEnvironments = async ({
 			);
 		}
 	});
+	log.log(
+		'Preview cleanup counts:',
+		JSON.stringify({
+			total: environments.length,
+			candidates: staleEnvironments.length,
+			verified: verifiedEnvironments.length,
+			kept: environments.length - verifiedEnvironments.length,
+		})
+	);
 
 	if (env.SWA_CLEANUP_DRY_RUN === 'true') {
 		log.log('Dry run: stale preview environments:', deletableNames.join(', ') || 'none');
@@ -249,8 +283,8 @@ const cleanupStalePreviewEnvironments = async ({
 	}
 
 	const deleted = [];
-	for (let i = 0; i < staleEnvironments.length; i += 1) {
-		const environment = staleEnvironments[i];
+	for (let i = 0; i < verifiedEnvironments.length; i += 1) {
+		const environment = verifiedEnvironments[i];
 		const environmentName = deletableNames[i];
 		const pullRequestNumber = getPullRequestNumber(environment);
 		log.log(
