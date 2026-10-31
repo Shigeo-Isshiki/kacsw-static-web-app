@@ -307,3 +307,23 @@
 - 対象テスト・lint・ローカルビルドの結果は[FormBridge住所ハンドラー検証記録](zip-code-address-utils.md)を参照してください。
 - 705を含む実FormBridgeでの住所反映・エラー表示・送信・確認画面、CORS、ブラウザーキャッシュ更新は未検証です。個別フォーム変更・横展開は実施していません。送信待機・キャンセル・再送信は対象外です。
 - 承認後の配布時には、配布対象コミットを固定し、同コミットのワークフロー成功・通常URLのGETと内容一致を標準手順で確認して追記してください。過去の配布証跡は保持します。
+
+## 追加確認：zip-code-address-utils 1.1.0
+
+- 確認日時：2026-10-31 21:46:28（日本時間、UTC+09:00）。
+- 対象ソース：PR #42のマージコミット [`cbdfc884b7f210ef01d5b74969f0fb8bb32ea5d1`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/cbdfc884b7f210ef01d5b74969f0fb8bb32ea5d1) の `src/zip-code-address-utils.js` と `src/all-window-exports.js`。
+- 利用者からコミット・push・PR経由でのmain反映の承認を受けて実施しました。電話番号ハンドラーの実画面確認報告の文書変更も、利用者の明示的な承認により同PRに含めました。個別フォームは変更していません。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41202511071)：Prettier・ESLint・全テスト成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41202511074)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41202511079)：配布パッケージ作成成功。
+- デプロイ成功後、通常URLへ `Cache-Control: no-cache` を指定してGETし、HTTP 200と対象コミットのソースとのバイト単位の完全一致を確認しました（`git show <対象コミット>:src/<対象ファイル>` と取得ファイルを `cmp` で照合）。郵便番号ライブラリのJSDocバージョンは `1.1.0` です。
+
+| 対象・通常配布URL | HTTP | ソース／配布バイト数 | バージョン | 一致 | SHA-256（ソース・配布共通） |
+| --- | --- | --- | --- | --- | --- |
+| <https://js.kacsw.or.jp/zip-code-address-utils.js> | 200 | 43672 / 43672 | 1.1.0 | 完全一致 | `4cae385c48fcdb816439ec7936c069cf1bdae12fd6854218f8ecd78a931817bf` |
+| <https://js.kacsw.or.jp/all-window-exports.js> | 200 | 3174 / 3174 | 定義なし | 完全一致 | `cc464d17f67a17cbb77455ad716fc000bfb54435c32515cf0c3b4ea239d571bd` |
+
+- ローカルの `npm test`、`npm run lint`、`npm run build`、`npm run ci-check`、`npx prettier --check "src/**/*.{js,css,html}"`、`git diff --check` は成功しました。単体テスト・文書利用例の結果は[検証記録](zip-code-address-utils.md)を参照してください。
+- 住所ハンドラーの実FormBridgeでのイベント動作・住所反映・エラー表示・通信許可（CORS）・確認画面／送信、ブラウザーキャッシュ更新は未検証です。配布一致を実画面検証として扱わず、電話番号や文字変換ハンドラーの確認報告も流用していません。検索中の送信待機は保証しません。
+- 配布前記録は履歴として保持します。この確認結果の保存は文書のみの変更であり、ライブラリのバージョン・ソースには変更を加えません。
