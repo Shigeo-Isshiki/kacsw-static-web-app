@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.0.0** です。
+現行ソースは **1.2.0**、確認済み通常配布版は **1.0.0** です。1.2.0はFormBridge用通常フィールド・サブテーブルの文字変換ハンドラを追加した未配布版です。
 
 `src/text-suite.js` は文字列変換・正規化に関するユーティリティ群を提供します。主に日本語の全角⇄半角変換、かなの相互変換（ひらがな⇄カタカナ、全角⇄半角カナ）、メールアドレスの簡易検証など、kintone カスタマイズやフォーム入力の正規化に便利な関数を収録しています。
 
@@ -19,6 +19,7 @@
 - メールアドレスの半角化と簡易検証
 - 文字種の簡易チェック（半角英数字のみか等）
 - kintone フィールド変更イベントへの全角変換ハンドラ登録
+- FormBridge フィールド・サブテーブル変更イベントへの全角・全角ひらがな変換ハンドラ登録
 
 ---
 
@@ -27,6 +28,8 @@
 - ソース：[src/text-suite.js](../src/text-suite.js)
 - 配布URL：https://js.kacsw.or.jp/text-suite.js
 - 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
+- FormBridge用通常フィールドハンドラは、FormBridge新バージョンAPI用の [formbridge-custom-lib.js](formbridge-custom-lib.md) **1.0.1以上**を、サブテーブルハンドラは **1.1.0以上**を先に読み込み、その後に本ライブラリ、最後に利用側コードの順で読み込んでください。`text-suite.js` は読み込むだけではFormBridge APIを参照せず、各関数を登録するときに `formBridge.events.on` と必要な公開関数を確認します。`formBridge.fn` は変更イベント内で共通ライブラリ関数を呼ぶ時点に解決されます。
+- FormBridge APIにはグローバル識別子 `formBridge` を使い、`window.formBridge` への依存・代入はありません。既存のkintone用関数は従来どおりkintone APIのみを登録時に必要とします。
 
 ブラウザでは各関数を `window` に公開します。イベントハンドラー登録には `kintone.events.on` が必要です。登録処理は本ライブラリ内で完結し、kintone-custom-libには依存しません。Nodeのテストでは `window` と、登録APIを検証する場合はkintone APIを用意してください。
 
@@ -34,28 +37,39 @@
 
 ### 変換・検証関数
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `isSingleByteAlnumOnly(str)` | 半角ASCIIのみで構成されているか判定する。 | [参照](#api-issinglebytealnumonly) |
-| `toFullWidthKatakana(str, throwOnError = true)` | ひらがな・半角カナなどを全角カタカナに変換する。 | [参照](#api-tofullwidthkatakana) |
-| `toFullWidthHiragana(str, throwOnError = true)` | 入力を全角ひらがなに変換する。 | [参照](#api-tofullwidthhiragana) |
-| `toHalfWidthKana(str, throwOnError = true)` | カナを半角カタカナに変換する。 | [参照](#api-tohalfwidthkana) |
-| `toFullWidth(str, throwOnError = true)` | 半角英数字・記号などを全角に変換する。 | [参照](#api-tofullwidth) |
-| `toHalfWidth(str, throwOnError = true)` | 全角英数字・記号などを半角に変換する。 | [参照](#api-tohalfwidth) |
-| `assertEmailAddress(emailAddress)` | メールアドレスを半角に正規化して形式を検証する。 | [参照](#api-assertemailaddress) |
+| 関数名                                          | 機能                                             | リファレンス                       |
+| ----------------------------------------------- | ------------------------------------------------ | ---------------------------------- |
+| `isSingleByteAlnumOnly(str)`                    | 半角ASCIIのみで構成されているか判定する。        | [参照](#api-issinglebytealnumonly) |
+| `toFullWidthKatakana(str, throwOnError = true)` | ひらがな・半角カナなどを全角カタカナに変換する。 | [参照](#api-tofullwidthkatakana)   |
+| `toFullWidthHiragana(str, throwOnError = true)` | 入力を全角ひらがなに変換する。                   | [参照](#api-tofullwidthhiragana)   |
+| `toHalfWidthKana(str, throwOnError = true)`     | カナを半角カタカナに変換する。                   | [参照](#api-tohalfwidthkana)       |
+| `toFullWidth(str, throwOnError = true)`         | 半角英数字・記号などを全角に変換する。           | [参照](#api-tofullwidth)           |
+| `toHalfWidth(str, throwOnError = true)`         | 全角英数字・記号などを半角に変換する。           | [参照](#api-tohalfwidth)           |
+| `assertEmailAddress(emailAddress)`              | メールアドレスを半角に正規化して形式を検証する。 | [参照](#api-assertemailaddress)    |
 
 入力・例外の扱いは各関数と共通契約を参照してください。`isSingleByteAlnumOnly` は判定値を返し、文字変換関数には変換不能文字に対する例外を制御する `throwOnError` があります。
 
-### イベントハンドラ登録関数
+イベントハンドラの目次はプラットフォームごとに分け、共通機能は全角変換、全角ひらがな変換の順に揃えています。
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `registerFullWidthHandler(fieldCode, options)` | kintoneのフィールド変更時に全角変換ハンドラーを登録する。 | [参照](#api-registerfullwidthhandler) |
-| `registerTableFullWidthHandler(tableFieldCode, fieldCode, options)` | kintoneのサブテーブル列の変更時に全角変換ハンドラーを登録する。 | [参照](#api-registertablefullwidthhandler) |
-| `registerFullWidthHiraganaHandler(fieldCode, options)` | kintoneのフィールド変更時に全角ひらがな変換ハンドラーを登録する。 | [参照](#api-registerfullwidthhiraganahandler) |
-| `registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, options)` | kintoneのサブテーブル列の変更時に全角ひらがな変換ハンドラーを登録する。 | [参照](#api-registertablefullwidthhiraganahandler) |
-| `registerEmailAddressHandler(fieldCode, options)` | kintoneの通常フィールドの変更時にメールアドレス検証・正規化ハンドラーを登録する。 | [参照](#api-registeremailaddresshandler) |
-| `registerTableEmailAddressHandler(tableCode, columnCode, options)` | kintoneのサブテーブル列の変更時にメールアドレス検証・正規化ハンドラーを登録する。 | [参照](#api-registertableemailaddresshandler) |
+### kintone用イベントハンドラ登録関数
+
+| 関数名                                                                      | 機能                                                                              | リファレンス                                       |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `registerFullWidthHandler(fieldCode, options)`                              | kintoneのフィールド変更時に全角変換ハンドラーを登録する。                         | [参照](#api-registerfullwidthhandler)              |
+| `registerTableFullWidthHandler(tableFieldCode, fieldCode, options)`         | kintoneのサブテーブル列の変更時に全角変換ハンドラーを登録する。                   | [参照](#api-registertablefullwidthhandler)         |
+| `registerFullWidthHiraganaHandler(fieldCode, options)`                      | kintoneのフィールド変更時に全角ひらがな変換ハンドラーを登録する。                 | [参照](#api-registerfullwidthhiraganahandler)      |
+| `registerTableFullWidthHiraganaHandler(tableFieldCode, fieldCode, options)` | kintoneのサブテーブル列の変更時に全角ひらがな変換ハンドラーを登録する。           | [参照](#api-registertablefullwidthhiraganahandler) |
+| `registerEmailAddressHandler(fieldCode, options)`                           | kintoneの通常フィールドの変更時にメールアドレス検証・正規化ハンドラーを登録する。 | [参照](#api-registeremailaddresshandler)           |
+| `registerTableEmailAddressHandler(tableCode, columnCode, options)`          | kintoneのサブテーブル列の変更時にメールアドレス検証・正規化ハンドラーを登録する。 | [参照](#api-registertableemailaddresshandler)      |
+
+### FormBridge用イベントハンドラ登録関数
+
+| 関数名                                                                                                     | 機能                                                                       | リファレンス                                                 |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `registerFormBridgeFullWidthHandler(inputFieldCode, savedFieldCode, options)`                              | FormBridgeの入力フィールドを全角変換し、保存フィールドへ設定する。         | [参照](#api-registerformbridgefullwidthhandler)              |
+| `registerFormBridgeTableFullWidthHandler(tableFieldCode, inputFieldCode, savedFieldCode, options)`         | FormBridgeの入力列を全角変換し、同じ行の保存列へ設定する。                 | [参照](#api-registerformbridgetablefullwidthhandler)         |
+| `registerFormBridgeFullWidthHiraganaHandler(inputFieldCode, savedFieldCode, options)`                      | FormBridgeの入力フィールドを全角ひらがな変換し、保存フィールドへ設定する。 | [参照](#api-registerformbridgefullwidthhiraganahandler)      |
+| `registerFormBridgeTableFullWidthHiraganaHandler(tableFieldCode, inputFieldCode, savedFieldCode, options)` | FormBridgeの入力列を全角ひらがな変換し、同じ行の保存列へ設定する。         | [参照](#api-registerformbridgetablefullwidthhiraganahandler) |
 
 ---
 
@@ -123,7 +137,11 @@
 
 ### イベントハンドラ登録関数の詳細
 
-同じ変換について、通常フィールドの変更イベント、サブテーブル列の変更イベントの順に説明します。いずれも `devices` の既定値は `'desktop'` で、画面表示イベントには登録しません。
+各プラットフォーム向けの関数は、プラットフォーム別に分けて記載します。共通する全角変換、全角ひらがな変換の順序は目次・説明で揃えています。
+
+### kintone用イベントハンドラ
+
+kintone向けのイベントハンドラは、通常フィールド、サブテーブル列の順に説明します。`devices` の既定値は `'desktop'` で、画面表示イベントには登録しません。
 
 <a id="api-registerfullwidthhandler"></a>
 
@@ -316,6 +334,74 @@ registerTableEmailAddressHandler('Contacts', 'Email_address', {
 
 ---
 
+### FormBridge用イベントハンドラ
+
+以下の関数は [FormBridge新バージョンAPI](https://formbridge.kintoneapp.com/help/customize/v2) の `formBridge.events.on` を使います。FormBridge新バージョン向けの [formbridge-custom-lib.js](formbridge-custom-lib.md) が必要です。`formBridge.fn` の値設定APIはイベント内で共通ライブラリを通じて呼び出します。
+
+#### 共通オプション
+
+4つのハンドラで共通するオプションです。既定値は空白保持・上限なし・厳格でない変換・空欄時の保存欄消去です。
+
+| オプション               | 型             | 既定値                                                | 説明                                                                                                                     |
+| ------------------------ | -------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `throwOnError`           | boolean        | `false`                                               | 変換関数へ渡す厳格さ指定です。                                                                                           |
+| `removeWhitespace`       | boolean        | `false`                                               | `true` の場合、変換後に `/[\s\u3000]+/g` ですべての空白を削除します。                                                    |
+| `maxLength`              | number \| null | `null`                                                | 変換・空白処理後の `.length` による上限です。正の整数または `null` を指定します。                                        |
+| `maxLengthErrorMessage`  | string         | `全角変換後、{maxLength}文字以内で入力してください。` | 文字数超過時のエラーメッセージ。指定時は空でない文字列にします。                                                         |
+| `clearSavedFieldOnEmpty` | boolean        | `true`                                                | 空欄時に保存欄を消去するかを選びます。`false` の場合は保存欄を保持します。どちらの場合も入力欄の既存エラーを解除します。 |
+
+`null` / `undefined` / `''` は空欄、文字列以外の値は入力エラーです。文字変換・文字数検証の失敗では保存欄を空にして入力欄にエラーを設定します。FormBridgeの値・エラー設定APIの例外は変換エラーにせず、そのまま伝播します。
+
+<a id="api-registerformbridgefullwidthhandler"></a>
+
+#### `registerFormBridgeFullWidthHandler(inputFieldCode, savedFieldCode, options = {})`
+
+通常フィールドの変更時に `form.field.change.{inputFieldCode}` を登録し、イベント引数の `value` を全角変換して保存フィールドへ設定します。入力欄そのものは変更しません。
+
+- 引数のフィールドコードは空白だけではない文字列で、入力と保存には別のコードを指定します。
+- 共通オプションと戻り値は前述のとおりです。
+- 登録時に `formBridge.events.on` と共通ライブラリの必要関数を検証します。`formBridge.fn` は登録時に要求しません。
+- イベントに `value` がない場合は `TypeError` です。不正な入力値型も変換エラーとして入力欄に表示します。
+
+<a id="api-registerformbridgetablefullwidthhandler"></a>
+
+#### `registerFormBridgeTableFullWidthHandler(tableFieldCode, inputFieldCode, savedFieldCode, options = {})`
+
+サブテーブルの入力列変更時に `form.field.change.{tableFieldCode}.{inputFieldCode}` を登録します。公式型定義に従い、イベント引数の `rowIndex`（0始まり）と `value` を使い、変換結果を同じ行の保存列へ設定します。行データから行番号を推測しません。
+
+- `tableFieldCode`、`inputFieldCode`、`savedFieldCode` は空白だけではない文字列です。入力列と保存列は異なるコードにしてください。
+- イベントに `value` または `rowIndex` がない場合、`rowIndex` が0以上の安全な整数でない場合は明示的に例外になります。
+- セルの値・エラー設定には `formbridge-custom-lib.js` **1.1.0以上**の `setSubtableFieldValue` / `setSubtableFieldValueError` を使います。
+- 空欄、変換エラー、空白処理、文字数上限の動作は通常フィールド版と同じです。FormBridge APIによる値設定は変更イベントを再発火しません。
+
+```js
+registerFormBridgeTableFullWidthHandler('Items', 'Name_input', 'Name', {
+	throwOnError: true,
+});
+```
+
+<a id="api-registerformbridgefullwidthhiraganahandler"></a>
+
+#### `registerFormBridgeFullWidthHiraganaHandler(inputFieldCode, savedFieldCode, options = {})`
+
+通常フィールド版の全角変換ハンドラと同じイベント・引数・オプション・エラー動作で、`toFullWidthHiragana(value, throwOnError)` による変換を行います。
+
+<a id="api-registerformbridgetablefullwidthhiraganahandler"></a>
+
+#### `registerFormBridgeTableFullWidthHiraganaHandler(tableFieldCode, inputFieldCode, savedFieldCode, options = {})`
+
+サブテーブル版の全角変換ハンドラと同じイベント・行特定・オプション・エラー動作で、`toFullWidthHiragana(value, throwOnError)` による変換を行います。
+
+```js
+registerFormBridgeTableFullWidthHiraganaHandler('Members', 'Name_kana_input', 'Name_kana', {
+	throwOnError: true,
+});
+```
+
+登録関数はフィールド変更イベントのみを扱い、初期表示時の値転記、行追加・削除、個別業務条件、サブテーブル以外への一括検証は行いません。
+
+---
+
 ### 例
 
 ```js
@@ -355,6 +441,60 @@ registerFullWidthHiraganaHandler(F.FURIGANA, {
 });
 ```
 
+```js
+// FormBridge 705用の登録例です。下記フィールドコードを実際のフォームと照合してください。
+const strictNameOptions = { throwOnError: true, clearSavedFieldOnEmpty: true };
+const addressOptions = {
+	throwOnError: false,
+	maxLength: 20,
+	maxLengthErrorMessage: '住所は20文字以内で入力してください。',
+	clearSavedFieldOnEmpty: true,
+};
+const lenientFullWidthOptions = { throwOnError: false, clearSavedFieldOnEmpty: true };
+
+registerFormBridgeFullWidthHandler('Last_name_input', 'Last_name', strictNameOptions);
+registerFormBridgeFullWidthHandler('First_name_input', 'First_name', strictNameOptions);
+registerFormBridgeFullWidthHiraganaHandler(
+	'Last_name_kana_input',
+	'Last_name_kana',
+	strictNameOptions
+);
+registerFormBridgeFullWidthHiraganaHandler(
+	'First_name_kana_input',
+	'First_name_kana',
+	strictNameOptions
+);
+
+registerFormBridgeFullWidthHandler('Home_address_1_input', 'Home_address_1', addressOptions);
+registerFormBridgeFullWidthHandler('Home_address_2_input', 'Home_address_2', addressOptions);
+registerFormBridgeFullWidthHandler(
+	'Delivery_address_1_input',
+	'Delivery_address_1',
+	addressOptions
+);
+registerFormBridgeFullWidthHandler(
+	'Delivery_address_2_input',
+	'Delivery_address_2',
+	addressOptions
+);
+registerFormBridgeFullWidthHandler(
+	'Delivery_address_3_input',
+	'Delivery_address_3',
+	addressOptions
+);
+
+registerFormBridgeFullWidthHandler(
+	'Billing_company_name_input',
+	'Billing_company_name',
+	lenientFullWidthOptions
+);
+registerFormBridgeFullWidthHandler(
+	'Delivery_recipient_name_input',
+	'Delivery_recipient_name',
+	lenientFullWidthOptions
+);
+```
+
 ---
 
 ## 制約・注意事項
@@ -369,12 +509,14 @@ registerFullWidthHiraganaHandler(F.FURIGANA, {
 
 2026-10-12に、`4acf76f` のソースと通常配布URLの内容が完全一致することを確認しました。CI・デプロイ・配布パッケージ作成も成功しています。確認日であり、初版の公開日を示すものではありません。詳細は [通常配布確認記録](verification/library-distribution.md) を参照してください。
 
-| バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
-| ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
-| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
-| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `0299cda`。初版作成日・配布日は未確認                  |
-| 未設定     | 2026-10-03 | IDのない新規テーブル行の処理を修正                          | `ee2b5c0`。配布確認は未確認                            |
-| 未設定     | 2026-10-04 | メールハンドラーを追加し、テキストハンドラー登録を統一      | `5cddccf`。配布確認は未確認                            |
-| 未設定     | 2026-10-04 | 任意のメールドメイン制約と依存検証を追加                    | `47aa625`。配布確認は未確認                            |
+| バージョン | 記録日     | 主な変更                                                                 | 記録・配布確認                                         |
+| ---------- | ---------- | ------------------------------------------------------------------------ | ------------------------------------------------------ |
+| 1.2.0      | 2026-10-31 | FormBridgeサブテーブルの全角・全角ひらがな変換イベントハンドラを追加     | 未配布。通常配布URL・実画面は未確認                    |
+| 1.1.0      | 2026-10-31 | FormBridge通常フィールド用の全角・全角ひらがな変換イベントハンドラを追加 | 未配布。通常配布URL・実画面は未確認                    |
+| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし              | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
+| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                             | `0299cda`。初版作成日・配布日は未確認                  |
+| 未設定     | 2026-10-03 | IDのない新規テーブル行の処理を修正                                       | `ee2b5c0`。配布確認は未確認                            |
+| 未設定     | 2026-10-04 | メールハンドラーを追加し、テキストハンドラー登録を統一                   | `5cddccf`。配布確認は未確認                            |
+| 未設定     | 2026-10-04 | 任意のメールドメイン制約と依存検証を追加                                 | `47aa625`。配布確認は未確認                            |
 
 過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。過去の各コミット時点の配布URLの内容・CI・デプロイは未確認です。過去のバージョンは推測で割り当てていません。

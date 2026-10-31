@@ -280,6 +280,48 @@ test('sets values and field errors through formBridge.fn, including clearing wit
 	assert.throws(() => throwingLib.setFieldValue('NAME', 'x'), /API failed/);
 });
 
+test('sets subtable values and cell errors through the new FormBridge APIs', () => {
+	const calls = [];
+	const fn = {
+		setSubtableFieldValue(tableFieldCode, fieldCode, rowIndex, value) {
+			assert.equal(this, fn);
+			calls.push(['value', tableFieldCode, fieldCode, rowIndex, value]);
+		},
+		setSubtableFieldValueError(tableFieldCode, fieldCode, rowIndex, errorMessage) {
+			assert.equal(this, fn);
+			calls.push(['error', tableFieldCode, fieldCode, rowIndex, errorMessage]);
+		},
+	};
+	const lib = loadLibrary({ formBridge: { fn } });
+
+	assert.equal(lib.setSubtableFieldValue('TABLE', 'SAVED', 0, 'converted'), undefined);
+	assert.equal(lib.setSubtableFieldValue('TABLE', 'SAVED', 2, ''), undefined);
+	assert.equal(lib.setSubtableFieldValueError('TABLE', 'INPUT', 0, 'Invalid'), undefined);
+	assert.equal(lib.setSubtableFieldValueError('TABLE', 'INPUT', 0, null), undefined);
+	assert.deepEqual(calls, [
+		['value', 'TABLE', 'SAVED', 0, 'converted'],
+		['value', 'TABLE', 'SAVED', 2, ''],
+		['error', 'TABLE', 'INPUT', 0, 'Invalid'],
+		['error', 'TABLE', 'INPUT', 0, null],
+	]);
+
+	assert.throws(() => lib.setSubtableFieldValue('', 'SAVED', 0, ''), TypeError);
+	assert.throws(() => lib.setSubtableFieldValue('TABLE', 'SAVED', -1, ''), TypeError);
+	assert.throws(() => lib.setSubtableFieldValue('TABLE', 'SAVED', 1.5, ''), TypeError);
+	assert.throws(() => lib.setSubtableFieldValue('TABLE', 'SAVED', Number.MAX_VALUE, ''), TypeError);
+	assert.throws(() => lib.setSubtableFieldValueError('TABLE', 'INPUT', 0, ''), TypeError);
+
+	const unresolvedLib = loadLibrary({ formBridge: { fn: {} } });
+	assert.throws(
+		() => unresolvedLib.setSubtableFieldValue('TABLE', 'SAVED', 0, ''),
+		/FormBridge API is unavailable: formBridge\.fn\.setSubtableFieldValue/
+	);
+	assert.throws(
+		() => unresolvedLib.setSubtableFieldValueError('TABLE', 'INPUT', 0, null),
+		/FormBridge API is unavailable: formBridge\.fn\.setSubtableFieldValueError/
+	);
+});
+
 test('copies mapped values and can skip empty values without dropping zero or false', () => {
 	const calls = [];
 	const lib = loadLibrary({

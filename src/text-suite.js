@@ -1,10 +1,10 @@
 /** 文字列処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.0.0
+ * @version 1.2.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_ts_)で始める
-/* exported isSingleByteAlnumOnly, toFullWidthKatakana, toFullWidth, toFullWidthHiragana, toHalfWidthKana, toHalfWidth, assertEmailAddress, registerFullWidthHandler, registerFullWidthHiraganaHandler, registerTableFullWidthHandler, registerTableFullWidthHiraganaHandler, registerEmailAddressHandler, registerTableEmailAddressHandler */
-/* global kintone */
+/* exported isSingleByteAlnumOnly, toFullWidthKatakana, toFullWidth, toFullWidthHiragana, toHalfWidthKana, toHalfWidth, assertEmailAddress, registerFullWidthHandler, registerFullWidthHiraganaHandler, registerFormBridgeFullWidthHandler, registerFormBridgeTableFullWidthHandler, registerFormBridgeFullWidthHiraganaHandler, registerFormBridgeTableFullWidthHiraganaHandler, registerTableFullWidthHandler, registerTableFullWidthHiraganaHandler, registerEmailAddressHandler, registerTableEmailAddressHandler */
+/* global formBridge, kintone */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // ハイフン類を検出するための正規表現（全角・半角・ダッシュ類）
@@ -692,6 +692,291 @@ const registerFullWidthHiraganaHandler = (fieldCode, options = {}) => {
 };
 
 /**
+ * FormBridge文字変換ハンドラのオプション
+ * @typedef {object} _TS_FORM_BRIDGE_TEXT_HANDLER_OPTIONS
+ * @property {boolean} [throwOnError=false] 変換関数に渡す throwOnError
+ * @property {boolean} [removeWhitespace=false] 変換後に空白文字をすべて削除するか
+ * @property {number|null} [maxLength=null] 変換・空白処理後の最大文字数
+ * @property {string} [maxLengthErrorMessage] 文字数超過時のエラーメッセージ
+ * @property {boolean} [clearSavedFieldOnEmpty=true] 入力が空のとき保存欄を消去するか
+ */
+
+/**
+ * FormBridge文字変換ハンドラの共通オプションを検証する関数
+ * @param {object} options オプション
+ * @returns {object} 検証済みオプション
+ * @throws {Error} オプションが不正な場合
+ */
+const _ts_validateFormBridgeTextHandlerOptions = (options) => {
+	if (options === null || typeof options !== 'object' || Array.isArray(options))
+		throw new Error('optionsはオブジェクトである必要があります');
+	const {
+		throwOnError = false,
+		removeWhitespace = false,
+		maxLength = null,
+		maxLengthErrorMessage,
+		clearSavedFieldOnEmpty = true,
+	} = options;
+	if (!_ts_checkBoolean(throwOnError))
+		throw new Error('throwOnErrorはboolean型である必要があります');
+	if (!_ts_checkBoolean(removeWhitespace))
+		throw new Error('removeWhitespaceはboolean型である必要があります');
+	if (maxLength !== null && !(Number.isInteger(maxLength) && maxLength > 0))
+		throw new Error('maxLengthは正の整数またはnullである必要があります');
+	if (
+		maxLengthErrorMessage !== undefined &&
+		(!_ts_checkString(maxLengthErrorMessage) || !maxLengthErrorMessage.trim())
+	)
+		throw new Error('maxLengthErrorMessageは空でない文字列である必要があります');
+	if (!_ts_checkBoolean(clearSavedFieldOnEmpty))
+		throw new Error('clearSavedFieldOnEmptyはboolean型である必要があります');
+	return {
+		throwOnError,
+		removeWhitespace,
+		maxLength,
+		maxLengthErrorMessage,
+		clearSavedFieldOnEmpty,
+	};
+};
+
+/**
+ * FormBridge用の変換文字列を生成し、空白・文字数を検証する関数
+ * @param {*} value 入力値
+ * @param {object} handlerOptions 検証済みオプション
+ * @param {(value: string, throwOnError: boolean) => string} converter 文字変換関数
+ * @returns {string} 変換後の文字列
+ * @throws {Error} 入力値・文字変換・文字数が不正な場合
+ */
+const _ts_convertFormBridgeTextValue = (value, handlerOptions, converter) => {
+	if (!_ts_checkString(value))
+		throw new TypeError('入力値は文字列、null、undefined、または空文字列である必要があります');
+	let converted = converter(value, handlerOptions.throwOnError);
+	if (handlerOptions.removeWhitespace) converted = converted.replace(_TS_WHITESPACE_REGEX, '');
+	if (handlerOptions.maxLength !== null && converted.length > handlerOptions.maxLength) {
+		throw new Error(
+			handlerOptions.maxLengthErrorMessage ??
+				`全角変換後、${handlerOptions.maxLength}文字以内で入力してください。`
+		);
+	}
+	return converted;
+};
+
+/**
+ * FormBridgeの通常フィールド変更イベントに文字変換ハンドラを登録する関数
+ * @param {string} inputFieldCode 入力フィールドコード
+ * @param {string} savedFieldCode 保存フィールドコード
+ * @param {_TS_FORM_BRIDGE_TEXT_HANDLER_OPTIONS} [options] オプション
+ * @param {(value: string, throwOnError: boolean) => string} converter 文字変換関数
+ * @returns {void}
+ * @throws {Error} 引数、依存API、またはオプションが不正な場合
+ */
+const _ts_registerFormBridgeTextHandler = (inputFieldCode, savedFieldCode, options, converter) => {
+	if (!_ts_checkString(inputFieldCode) || !inputFieldCode.trim())
+		throw new Error('inputFieldCodeは空でない文字列である必要があります');
+	if (!_ts_checkString(savedFieldCode) || !savedFieldCode.trim())
+		throw new Error('savedFieldCodeは空でない文字列である必要があります');
+	if (inputFieldCode === savedFieldCode)
+		throw new Error('inputFieldCodeとsavedFieldCodeには異なるコードを指定してください');
+	if (typeof converter !== 'function') throw new Error('converterは関数である必要があります');
+	const handlerOptions = _ts_validateFormBridgeTextHandlerOptions(options);
+
+	if (
+		typeof formBridge === 'undefined' ||
+		!formBridge.events ||
+		typeof formBridge.events.on !== 'function'
+	)
+		throw new Error('formBridge.events.onが利用できません');
+	if (
+		typeof window === 'undefined' ||
+		!window.formBridgeCustomLib ||
+		typeof window.formBridgeCustomLib.setFieldValue !== 'function' ||
+		typeof window.formBridgeCustomLib.setFieldError !== 'function'
+	)
+		throw new Error('formBridgeCustomLib v1.0.1以上が利用できません');
+	const formBridgeCustomLib = window.formBridgeCustomLib;
+
+	formBridge.events.on(`form.field.change.${inputFieldCode}`, (event) => {
+		if (
+			!event ||
+			typeof event !== 'object' ||
+			!Object.prototype.hasOwnProperty.call(event, 'value')
+		)
+			throw new TypeError('FormBridgeの変更イベントにvalueがありません');
+
+		formBridgeCustomLib.setFieldError(inputFieldCode, null);
+		const value = event.value;
+		if (value === null || value === undefined || value === '') {
+			if (handlerOptions.clearSavedFieldOnEmpty)
+				formBridgeCustomLib.setFieldValue(savedFieldCode, '');
+			return;
+		}
+
+		let converted;
+		try {
+			converted = _ts_convertFormBridgeTextValue(value, handlerOptions, converter);
+		} catch (error) {
+			const message = error && error.message ? error.message : String(error);
+			formBridgeCustomLib.setFieldValue(savedFieldCode, '');
+			formBridgeCustomLib.setFieldError(inputFieldCode, message);
+			return;
+		}
+
+		formBridgeCustomLib.setFieldValue(savedFieldCode, converted);
+	});
+};
+
+/**
+ * FormBridgeの指定入力フィールドを全角変換して保存フィールドへ設定する関数
+ * @param {string} inputFieldCode 入力フィールドコード
+ * @param {string} savedFieldCode 保存フィールドコード
+ * @param {_TS_FORM_BRIDGE_TEXT_HANDLER_OPTIONS} [options] オプション
+ * @returns {void}
+ * @throws {Error} 引数、依存API、またはオプションが不正な場合
+ */
+const registerFormBridgeFullWidthHandler = (inputFieldCode, savedFieldCode, options = {}) =>
+	_ts_registerFormBridgeTextHandler(inputFieldCode, savedFieldCode, options, toFullWidth);
+
+/**
+ * FormBridgeのサブテーブル変更イベントに文字変換ハンドラを登録する関数
+ * @param {string} tableFieldCode サブテーブルフィールドコード
+ * @param {string} inputFieldCode 入力列のフィールドコード
+ * @param {string} savedFieldCode 保存列のフィールドコード
+ * @param {_TS_FORM_BRIDGE_TEXT_HANDLER_OPTIONS} [options] オプション
+ * @param {(value: string, throwOnError: boolean) => string} converter 文字変換関数
+ * @returns {void}
+ * @throws {Error} 引数、依存API、またはオプションが不正な場合
+ */
+const _ts_registerFormBridgeSubtableTextHandler = (
+	tableFieldCode,
+	inputFieldCode,
+	savedFieldCode,
+	options,
+	converter
+) => {
+	for (const [name, fieldCode] of [
+		['tableFieldCode', tableFieldCode],
+		['inputFieldCode', inputFieldCode],
+		['savedFieldCode', savedFieldCode],
+	]) {
+		if (!_ts_checkString(fieldCode) || !fieldCode.trim())
+			throw new Error(`${name}は空でない文字列である必要があります`);
+	}
+	if (inputFieldCode === savedFieldCode)
+		throw new Error('inputFieldCodeとsavedFieldCodeには異なるコードを指定してください');
+	if (typeof converter !== 'function') throw new Error('converterは関数である必要があります');
+	const handlerOptions = _ts_validateFormBridgeTextHandlerOptions(options);
+
+	if (
+		typeof formBridge === 'undefined' ||
+		!formBridge.events ||
+		typeof formBridge.events.on !== 'function'
+	)
+		throw new Error('formBridge.events.onが利用できません');
+	if (
+		typeof window === 'undefined' ||
+		!window.formBridgeCustomLib ||
+		typeof window.formBridgeCustomLib.setSubtableFieldValue !== 'function' ||
+		typeof window.formBridgeCustomLib.setSubtableFieldValueError !== 'function'
+	)
+		throw new Error('formBridgeCustomLib v1.1.0以上が利用できません');
+	const formBridgeCustomLib = window.formBridgeCustomLib;
+
+	formBridge.events.on(`form.field.change.${tableFieldCode}.${inputFieldCode}`, (event) => {
+		if (
+			!event ||
+			typeof event !== 'object' ||
+			!Object.prototype.hasOwnProperty.call(event, 'value') ||
+			!Object.prototype.hasOwnProperty.call(event, 'rowIndex')
+		)
+			throw new TypeError('FormBridgeのサブテーブル変更イベントにvalueまたはrowIndexがありません');
+		if (!Number.isSafeInteger(event.rowIndex) || event.rowIndex < 0)
+			throw new TypeError('FormBridgeのサブテーブル変更イベントのrowIndexが不正です');
+
+		const { rowIndex, value } = event;
+		formBridgeCustomLib.setSubtableFieldValueError(tableFieldCode, inputFieldCode, rowIndex, null);
+		if (value === null || value === undefined || value === '') {
+			if (handlerOptions.clearSavedFieldOnEmpty)
+				formBridgeCustomLib.setSubtableFieldValue(tableFieldCode, savedFieldCode, rowIndex, '');
+			return;
+		}
+
+		let converted;
+		try {
+			converted = _ts_convertFormBridgeTextValue(value, handlerOptions, converter);
+		} catch (error) {
+			const message = error && error.message ? error.message : String(error);
+			formBridgeCustomLib.setSubtableFieldValue(tableFieldCode, savedFieldCode, rowIndex, '');
+			formBridgeCustomLib.setSubtableFieldValueError(
+				tableFieldCode,
+				inputFieldCode,
+				rowIndex,
+				message
+			);
+			return;
+		}
+
+		formBridgeCustomLib.setSubtableFieldValue(tableFieldCode, savedFieldCode, rowIndex, converted);
+	});
+};
+
+/**
+ * FormBridgeのサブテーブル入力列を全角変換して同じ行の保存列へ設定する関数
+ * @param {string} tableFieldCode サブテーブルフィールドコード
+ * @param {string} inputFieldCode 入力列のフィールドコード
+ * @param {string} savedFieldCode 保存列のフィールドコード
+ * @param {_TS_FORM_BRIDGE_TEXT_HANDLER_OPTIONS} [options] オプション
+ * @returns {void}
+ * @throws {Error} 引数、依存API、またはオプションが不正な場合
+ */
+const registerFormBridgeTableFullWidthHandler = (
+	tableFieldCode,
+	inputFieldCode,
+	savedFieldCode,
+	options = {}
+) =>
+	_ts_registerFormBridgeSubtableTextHandler(
+		tableFieldCode,
+		inputFieldCode,
+		savedFieldCode,
+		options,
+		toFullWidth
+	);
+
+/**
+ * FormBridgeの指定入力フィールドを全角ひらがな変換して保存フィールドへ設定する関数
+ * @param {string} inputFieldCode 入力フィールドコード
+ * @param {string} savedFieldCode 保存フィールドコード
+ * @param {_TS_FORM_BRIDGE_TEXT_HANDLER_OPTIONS} [options] オプション
+ * @returns {void}
+ * @throws {Error} 引数、依存API、またはオプションが不正な場合
+ */
+const registerFormBridgeFullWidthHiraganaHandler = (inputFieldCode, savedFieldCode, options = {}) =>
+	_ts_registerFormBridgeTextHandler(inputFieldCode, savedFieldCode, options, toFullWidthHiragana);
+
+/**
+ * FormBridgeのサブテーブル入力列を全角ひらがな変換して同じ行の保存列へ設定する関数
+ * @param {string} tableFieldCode サブテーブルフィールドコード
+ * @param {string} inputFieldCode 入力列のフィールドコード
+ * @param {string} savedFieldCode 保存列のフィールドコード
+ * @param {_TS_FORM_BRIDGE_TEXT_HANDLER_OPTIONS} [options] オプション
+ * @returns {void}
+ * @throws {Error} 引数、依存API、またはオプションが不正な場合
+ */
+const registerFormBridgeTableFullWidthHiraganaHandler = (
+	tableFieldCode,
+	inputFieldCode,
+	savedFieldCode,
+	options = {}
+) =>
+	_ts_registerFormBridgeSubtableTextHandler(
+		tableFieldCode,
+		inputFieldCode,
+		savedFieldCode,
+		options,
+		toFullWidthHiragana
+	);
+
+/**
  * メールアドレスハンドラのオプション
  * @typedef {object} _TS_EMAIL_ADDRESS_HANDLER_OPTIONS
  * @property {'desktop'|'mobile'|'both'} [devices='desktop'] 登録対象のデバイス
@@ -1037,6 +1322,11 @@ if (typeof window !== 'undefined') {
 	window.assertEmailAddress = assertEmailAddress;
 	window.registerFullWidthHandler = registerFullWidthHandler;
 	window.registerFullWidthHiraganaHandler = registerFullWidthHiraganaHandler;
+	window.registerFormBridgeFullWidthHandler = registerFormBridgeFullWidthHandler;
+	window.registerFormBridgeTableFullWidthHandler = registerFormBridgeTableFullWidthHandler;
+	window.registerFormBridgeFullWidthHiraganaHandler = registerFormBridgeFullWidthHiraganaHandler;
+	window.registerFormBridgeTableFullWidthHiraganaHandler =
+		registerFormBridgeTableFullWidthHiraganaHandler;
 	window.registerTableFullWidthHandler = registerTableFullWidthHandler;
 	window.registerTableFullWidthHiraganaHandler = registerTableFullWidthHiraganaHandler;
 	window.registerEmailAddressHandler = registerEmailAddressHandler;
