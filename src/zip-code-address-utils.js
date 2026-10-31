@@ -1,9 +1,9 @@
 /** 郵便番号から住所などを出力する処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.0.0
+ * @version 1.1.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
-/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, registerZipCodeAddressHandler, normalizeZipCode */
+/* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, registerZipCodeAddressHandler, registerFormBridgeZipCodeAddressHandler, normalizeZipCode */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
 // 郵便番号APIベースURL
@@ -844,6 +844,276 @@ const registerZipCodeAddressHandler = (options) => {
 };
 
 /**
+ * FormBridge新バージョンの郵便番号変更に住所補完・置換を登録する。
+ * イベントは同期終了し、検索完了や送信待機を保証しない。
+ * @param {object} options 設定（詳細はAPIリファレンス参照）
+ * @param {string} options.zipCodeInputField 郵便番号入力欄
+ * @param {string} options.zipCodeSavedField 郵便番号保存欄
+ * @param {string} options.mainAddressField メイン住所入力欄
+ * @param {Object<string, string>} options.addressFields 検索結果プロパティと入力欄の対応
+ * @param {Object<string, string>} [options.fieldMappings] 住所入力欄と保存欄の対応
+ * @param {string[]} [options.clearFields] 置換時にクリアする追加欄
+ * @param {function} [options.transformAddress] 同期文字列変換
+ * @param {function} [options.afterApply] 住所反映後の同期処理
+ * @returns {{whenIdle: function, dispose: function}} 最新処理の観測・無効化用。送信制御用ではない。
+ */
+const registerFormBridgeZipCodeAddressHandler = (options) => {
+	const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+	const isCode = (value) => typeof value === 'string' && value.trim() !== '';
+	const properties = new Set([
+		'address',
+		'prefName',
+		'cityName',
+		'townName',
+		'blockName',
+		'otherName',
+		'bizName',
+		'businessName',
+	]);
+	const optionNames = [
+		'zipCodeInputField',
+		'zipCodeSavedField',
+		'mainAddressField',
+		'addressFields',
+		'fieldMappings',
+		'clearFields',
+		'transformAddress',
+		'afterApply',
+	];
+	if (!isObject(options) || Object.keys(options).some((key) => !optionNames.includes(key)))
+		throw new TypeError('optionsに有効なFormBridge住所設定を指定してください');
+	const {
+		zipCodeInputField,
+		zipCodeSavedField,
+		mainAddressField,
+		addressFields,
+		fieldMappings = {},
+		clearFields = [],
+		transformAddress = (value) => value,
+		afterApply,
+	} = options;
+	if (![zipCodeInputField, zipCodeSavedField, mainAddressField].every(isCode))
+		throw new TypeError('郵便番号入力・保存・メイン住所のフィールドコードを指定してください');
+	if (
+		!isObject(addressFields) ||
+		!Object.keys(addressFields).length ||
+		!Object.entries(addressFields).every(([key, code]) => properties.has(key) && isCode(code))
+	)
+		throw new TypeError('addressFieldsは住所検索結果と入力フィールドコードの対応表です');
+	const assignments = Object.entries(addressFields);
+	const inputs = Object.values(addressFields);
+	if (
+		!inputs.includes(mainAddressField) ||
+		new Set(inputs).size !== inputs.length ||
+		!Array.isArray(clearFields) ||
+		!clearFields.every(isCode) ||
+		!isObject(fieldMappings)
+	)
+		throw new TypeError('住所フィールドの対応・クリア対象が不正です');
+	const sources = [...new Set([...inputs, ...clearFields])];
+	const mappings = Object.entries(fieldMappings);
+	if (
+		!mappings.every(
+			([source, target]) => sources.includes(source) && isCode(target) && !sources.includes(target)
+		) ||
+		new Set(Object.values(fieldMappings)).size !== mappings.length
+	)
+		throw new TypeError('fieldMappingsは住所入力欄から異なる一意の保存欄への対応表です');
+	const targets = [...sources, ...Object.values(fieldMappings)];
+	if (targets.some((code) => [zipCodeInputField, zipCodeSavedField].includes(code)))
+		throw new TypeError('郵便番号欄を住所・クリア対象に指定できません');
+	if (
+		typeof transformAddress !== 'function' ||
+		(afterApply !== undefined && typeof afterApply !== 'function')
+	)
+		throw new TypeError('変換・後続処理は同期関数で指定してください');
+	const globalObject = typeof window !== 'undefined' ? window : globalThis;
+	const fb = globalObject.formBridgeCustomLib;
+	if (
+		!fb ||
+		![
+			'createDependencyChecker',
+			'getFormBridgeRecord',
+			'getFieldValue',
+			'setFieldValue',
+			'setFieldError',
+		].every((name) => typeof fb[name] === 'function')
+	)
+		throw new Error('formBridgeCustomLib v1.0.1以上が利用できません');
+	fb.createDependencyChecker(['formBridge.events.on'])({ strict: true });
+	const events = (typeof formBridge !== 'undefined' ? formBridge : globalObject.formBridge).events;
+	let sequence = 0;
+	let active = false;
+	let disposed = false;
+	let pending = Promise.resolve({ status: 'skipped' });
+	const logError = (error) => console.error('registerFormBridgeZipCodeAddressHandler:', error);
+	const requireActive = () => {
+		if (!active) throw new Error('FormBridgeのform.show後に処理してください');
+	};
+	const requireValue = (event) => {
+		if (!isObject(event) || !Object.prototype.hasOwnProperty.call(event, 'value'))
+			throw new TypeError('FormBridgeの変更イベントにvalueがありません');
+		return event.value;
+	};
+	const textValue = (record, code) => {
+		const value = fb.getFieldValue(record, code, { required: true });
+		if (value !== null && typeof value !== 'string')
+			throw new TypeError(`文字列フィールド「${code}」の値が不正です`);
+		return value === null ? '' : value;
+	};
+	const requireFields = (record) => {
+		for (const code of new Set([zipCodeInputField, zipCodeSavedField, ...targets]))
+			textValue(record, code);
+	};
+	const requireSync = (value) => {
+		if (value && typeof value.then === 'function') {
+			Promise.resolve(value).catch(logError);
+			throw new TypeError('住所変換・後続処理にPromiseは利用できません');
+		}
+		return value;
+	};
+	const convert = (value, context) => {
+		const converted = requireSync(transformAddress(value, context));
+		if (typeof converted !== 'string')
+			throw new TypeError(`住所変換「${context.fieldCode}」は文字列を返す必要があります`);
+		if (context.result && context.fieldCode === mainAddressField && converted.trim() === '')
+			throw new TypeError('検索結果のメイン住所を変換後に空にすることはできません');
+		return converted;
+	};
+	const savedFields = new Map(mappings);
+	const addValue = (values, code, value) => {
+		values.set(code, value);
+		const saved = savedFields.get(code);
+		if (saved) values.set(saved, value);
+	};
+	const start = (input) => {
+		const token = ++sequence;
+		const isCurrent = () => !disposed && active && sequence === token;
+		pending = Promise.resolve().then(async () => {
+			let errorField = zipCodeInputField;
+			try {
+				if (!isCurrent()) return { status: 'stale' };
+				if (input !== null && input !== undefined && typeof input !== 'string')
+					throw new TypeError('郵便番号は文字列で入力してください');
+				requireFields(fb.getFormBridgeRecord());
+				fb.setFieldError(zipCodeInputField, null);
+				if (input === null || input === undefined || _zc_normalizeZipCodeInput(input) === '') {
+					fb.setFieldValue(zipCodeSavedField, '');
+					return { status: 'skipped' };
+				}
+				const result = await new Promise((resolve) => getAddressByZipCode(input, resolve));
+				if (!isCurrent()) return { status: 'stale' };
+				if (result.error) throw new Error(result.error);
+				if (
+					result.normalizedZipCode !== _zc_normalizeZipCodeInput(input) ||
+					typeof result.apiZipCode !== 'string' ||
+					!/^[0-9A-Z]{7}$/.test(result.apiZipCode) ||
+					typeof result.zipCode !== 'string' ||
+					_zc_normalizeZipCodeInput(result.zipCode) !== result.apiZipCode ||
+					!['address', 'prefName', 'cityName'].every(
+						(key) => typeof result[key] === 'string' && result[key].trim() !== ''
+					) ||
+					!assignments.some(
+						([property, code]) =>
+							code === mainAddressField &&
+							typeof result[property] === 'string' &&
+							result[property].trim() !== ''
+					)
+				)
+					throw new Error('APIレスポンスが不正です（住所設定の必須項目）');
+				const record = fb.getFormBridgeRecord();
+				requireFields(record);
+				const replace = result.normalizedZipCode !== result.apiZipCode;
+				const assignAddress = replace || textValue(record, mainAddressField) === '';
+				const values = new Map();
+				if (assignAddress) {
+					if (replace) for (const code of sources) addValue(values, code, '');
+					for (const [property, code] of assignments) {
+						errorField = code;
+						const value = result[property];
+						if (value === null || value === undefined) continue;
+						if (typeof value !== 'string')
+							throw new TypeError(`検索結果「${property}」は文字列である必要があります`);
+						addValue(values, code, convert(value, { fieldCode: code, property, result }));
+					}
+				}
+				// 全結果を検証後に設定する。設定APIは変更イベントを発火しない。
+				if (!isCurrent()) return { status: 'stale' };
+				errorField = zipCodeInputField;
+				fb.setFieldValue(zipCodeInputField, result.zipCode);
+				fb.setFieldValue(zipCodeSavedField, result.zipCode);
+				for (const [code, value] of values) {
+					errorField = code;
+					fb.setFieldValue(code, value);
+					fb.setFieldError(code, null);
+				}
+				if (assignAddress && afterApply) {
+					errorField = mainAddressField;
+					requireSync(afterApply({ result, record: fb.getFormBridgeRecord(), isCurrent }));
+				}
+				return { status: assignAddress ? 'applied' : 'formatted', result };
+			} catch (error) {
+				logError(error);
+				const message = error && error.message ? error.message : String(error);
+				if (isCurrent()) {
+					try {
+						fb.setFieldError(errorField, message);
+					} catch (displayError) {
+						logError(displayError);
+					}
+				}
+				return { status: 'error', error: message };
+			}
+		});
+	};
+	for (const name of ['form.show', 'confirm.show', 'finish.show']) {
+		events.on(name, () => {
+			if (disposed) return;
+			sequence++;
+			active = name === 'form.show';
+		});
+	}
+	events.on(`form.field.change.${zipCodeInputField}`, (event) => {
+		if (disposed) return;
+		requireActive();
+		// getRecord()は変更前の郵便番号を返す場合があるため、event.valueを使う。
+		start(requireValue(event));
+	});
+	for (const [source, target] of mappings) {
+		events.on(`form.field.change.${source}`, (event) => {
+			if (disposed) return;
+			requireActive();
+			const value = requireValue(event);
+			let converted;
+			try {
+				if (value !== null && value !== undefined && typeof value !== 'string')
+					throw new TypeError(`文字列フィールド「${source}」の値が不正です`);
+				const record = fb.getFormBridgeRecord();
+				textValue(record, source);
+				textValue(record, target);
+				const property = assignments.find(([, code]) => code === source)?.[0];
+				converted =
+					value == null || value === '' ? '' : convert(value, { fieldCode: source, property });
+			} catch (error) {
+				logError(error);
+				fb.setFieldError(source, error && error.message ? error.message : String(error));
+				return;
+			}
+			fb.setFieldValue(target, converted);
+			fb.setFieldError(source, null);
+		});
+	}
+	return {
+		whenIdle: () => pending,
+		dispose: () => {
+			disposed = true;
+			active = false;
+			sequence++;
+		},
+	};
+};
+
+/**
  * 郵便番号を正規化（空白・記号除去、全角→半角、APIで存在確認、callback型）
  * @param {string|number} zipCode 郵便番号またはデジタルアドレス（7桁の半角英数字）。
  * @param {function} callback - (result: { zipCode: string } | { error: string }) => void
@@ -889,6 +1159,7 @@ if (typeof window !== 'undefined') {
 	window.getPrefectureByZipCode = getPrefectureByZipCode;
 	window.hasPrefectureName = hasPrefectureName;
 	window.registerZipCodeAddressHandler = registerZipCodeAddressHandler;
+	window.registerFormBridgeZipCodeAddressHandler = registerFormBridgeZipCodeAddressHandler;
 	window.normalizeZipCode = normalizeZipCode;
 }
 
@@ -903,6 +1174,7 @@ try {
 			getPrefectureByZipCode,
 			hasPrefectureName,
 			registerZipCodeAddressHandler,
+			registerFormBridgeZipCodeAddressHandler,
 			normalizeZipCode,
 		};
 	}

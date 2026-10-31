@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.0.0** です。
+現行ソースは **1.1.0** です。今回の追加分は未配布・通常URL未照合です。過去の確認済み通常配布版は **1.0.0** です。
 
 このドキュメントは `src/zip-code-address-utils.js` が公開する郵便番号／デジタルアドレス関連ユーティリティ関数の使い方と引数・戻り値の契約を整理したリファレンスです。テストや Node 環境でも `require('../src/zip-code-address-utils.js')` で利用できます（CommonJS エクスポートあり）。
 
@@ -16,6 +16,7 @@
 - 郵便番号／デジタルアドレスの存在確認・表示用フォーマット作成
 - API 応答を整形して住所や都道府県・市区町村だけを取り出す
 - kintone の住所自動補完・明示的な置換・ボタンと案内表示を登録するユーティリティ
+- FormBridge新バージョンの郵便番号変更に住所補完・置換と入力／保存欄の同期を登録するユーティリティ
 
 主な前処理:
 
@@ -35,7 +36,16 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 - 配布URL：https://js.kacsw.or.jp/zip-code-address-utils.js
 - 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
 
-ブラウザでは各関数を `window` に公開し、NodeではCommonJSエクスポートも提供します。検索には郵便番号APIへの通信が必要です。kintoneでは `kintone.proxy`、その他のブラウザでは `fetch` を使用します。住所設定ハンドラーにはkintoneのイベント・record APIとDOMが必要です。
+ブラウザでは各関数を `window` に公開し、NodeではCommonJSエクスポートも提供します。検索には郵便番号APIへの通信が必要です。kintoneでは `kintone.proxy`、その他のブラウザでは `fetch` を使用します。`registerZipCodeAddressHandler` はkintoneのイベント・record APIとDOM専用であり、FormBridgeから利用しません。
+
+FormBridge専用ハンドラーは次の順で読み込みます。
+
+1. [formbridge-custom-lib.js](formbridge-custom-lib.md) **1.0.1以上**（現行1.1.0）
+2. `zip-code-address-utils.js` **1.1.0以上**
+3. [text-suite.js](text-suite.md)（全角変換を使う場合。下記例では必要）
+4. 利用フォームの登録スクリプト
+
+登録スクリプトは初期読み込み時に実行し、`form.show` 内で登録しないでください。`formBridge.events.on` が必要ですが、登録時には `formBridge.fn` を参照しません。各 `.show` 後に利用可能になる `fn` は共通基盤のresolver経由で呼び出し時に解決します。グローバル `const formBridge` のみで `window.formBridge` がない環境にも対応します。
 
 ## 公開関数の目次
 
@@ -49,7 +59,15 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 
 `registerZipCodeAddressHandler` の登録対象は `devices` で指定します。実際に使用する PC/モバイルの record API は Kintone のイベント種別から選択するため、ランタイム初期化、`KACSW_RUNTIME`、URL による画面判定は不要です。
 
-### 郵便番号の存在確認・整形・正規化
+### FormBridge の住所設定
+
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `registerFormBridgeZipCodeAddressHandler(options)` | 郵便番号変更後の非同期住所補完・置換と入力／保存欄の同期を登録する。 | [参照](#registerFormBridgeZipCodeAddressHandler) |
+
+### 共通（kintone・FormBridge・Node）
+
+#### 郵便番号の存在確認・整形・正規化
 
 | 関数名 | 機能 | リファレンス |
 | --- | --- | --- |
@@ -57,7 +75,7 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 | `formatZipCode(zipCode, callback)` | 郵便番号を表示用に整形して結果をコールバックに返す。 | [参照](#formatZipCode) |
 | `normalizeZipCode(zipCode, callback)` | 郵便番号を7文字の半角英数字に正規化して結果を返す。 | [参照](#normalizeZipCode) |
 
-### 住所・市区町村・都道府県の検索
+#### 住所・市区町村・都道府県の検索
 
 | 関数名 | 機能 | リファレンス |
 | --- | --- | --- |
@@ -65,7 +83,7 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 | `getCityByZipCode(zipCode, callback)` | 郵便番号から市区町村名を検索する。 | [参照](#getCityByZipCode) |
 | `getPrefectureByZipCode(zipCode, callback)` | 郵便番号から都道府県名を検索する。 | [参照](#getPrefectureByZipCode) |
 
-### 住所文字列の検証
+#### 住所文字列の検証
 
 | 関数名 | 機能 | リファレンス |
 | --- | --- | --- |
@@ -77,11 +95,13 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 
 <a id="api-details"></a>
 
-**注意**: 検索 API は非同期コールバック型です。新しい登録 API の `apply()` / `whenIdle()` は Promise 型です。
+**注意**: 検索 API は非同期コールバック型です。kintone登録 API の `apply()` / `whenIdle()`、FormBridge登録 API の `whenIdle()` は観測用のPromiseです。FormBridgeイベントや送信を待機させません。
+
+### 共通（kintone・FormBridge・Node）
 
 <a id="checkZipCodeExists"></a>
 
-### `checkZipCodeExists(zipCode, callback)`
+#### `checkZipCodeExists(zipCode, callback)`
 
 - 引数:
   - `zipCode` (string|number) — 郵便番号またはデジタルアドレス（全角や記号を含む可能性あり）。
@@ -99,7 +119,7 @@ API ベース URL: `https://api.kacsw.or.jp/zipcode/index.php/api/v1/address/dig
 
 <a id="formatZipCode"></a>
 
-### `formatZipCode(zipCode, callback)`
+#### `formatZipCode(zipCode, callback)`
 
 - 引数:
   - `zipCode` (string|number)
@@ -125,7 +145,7 @@ formatZipCode('１２３－４５６７', (res) => {
 
 <a id="getAddressByZipCode"></a>
 
-### `getAddressByZipCode(zipCode, callback)`
+#### `getAddressByZipCode(zipCode, callback)`
 
 - 引数:
   - `zipCode` (string|number)
@@ -175,7 +195,7 @@ formatZipCode('１２３－４５６７', (res) => {
 
 <a id="getCityByZipCode"></a>
 
-### `getCityByZipCode(zipCode, callback)`
+#### `getCityByZipCode(zipCode, callback)`
 
 - 引数:
   - `zipCode` (string|number)
@@ -189,7 +209,7 @@ formatZipCode('１２３－４５６７', (res) => {
 
 <a id="getPrefectureByZipCode"></a>
 
-### `getPrefectureByZipCode(zipCode, callback)`
+#### `getPrefectureByZipCode(zipCode, callback)`
 
 - 引数:
   - `zipCode` (string|number)
@@ -203,7 +223,7 @@ formatZipCode('１２３－４５６７', (res) => {
 
 <a id="hasPrefectureName"></a>
 
-### `hasPrefectureName(address)`
+#### `hasPrefectureName(address)`
 
 - 引数:
   - `address` (string) — 判定対象の住所文字列。
@@ -228,7 +248,7 @@ hasPrefectureName(' 東京都千代田区千代田1-1'); // false
 
 <a id="normalizeZipCode"></a>
 
-### `normalizeZipCode(zipCode, callback)`
+#### `normalizeZipCode(zipCode, callback)`
 
 - 引数:
   - `zipCode` (string|number)
@@ -243,15 +263,17 @@ hasPrefectureName(' 東京都千代田区千代田1-1'); // false
 
 ---
 
+### kintone 向け
+
 <a id="registerZipCodeAddressHandler"></a>
 
-### `registerZipCodeAddressHandler(options)`
+#### `registerZipCodeAddressHandler(options)`
 
 アプリ初期化時に一度登録します。住所の地区判定など、業務固有処理は含めません。既存の `getAddressByZipCode` を検索 API として使用します。
 
 <a id="handler-options"></a>
 
-#### 設定オブジェクト
+##### 設定オブジェクト
 
 | キー                   | 型・既定値                                                                 | 契約                                                                                                 |
 | ---------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -277,7 +299,7 @@ hasPrefectureName(' 東京都千代田区千代田1-1'); // false
 
 <a id="handler-application"></a>
 
-#### 反映ルール
+##### 反映ルール
 
 | 操作                       | 郵便番号             | 住所                                                                           |
 | -------------------------- | -------------------- | ------------------------------------------------------------------------------ |
@@ -298,7 +320,7 @@ hasPrefectureName(' 東京都千代田区千代田1-1'); // false
 
 <a id="handler-promises"></a>
 
-#### 戻り値と Promise
+##### 戻り値と Promise
 
 ```js
 {
@@ -327,7 +349,7 @@ Kintone のフィールド変更イベントでは Promise を返せず、ハン
 
 <a id="handler-example"></a>
 
-#### 登録例
+##### 登録例
 
 ```js
 const zipErrors = {};
@@ -373,7 +395,7 @@ const addressHandler = registerZipCodeAddressHandler({
 
 <a id="removed-apis"></a>
 
-#### 案内文と旧 API の削除
+##### 案内文と旧 API の削除
 
 案内文は `textContent` と `white-space: pre-line` で描画し、既定の2行の文言・改行表示を維持します。`text` に HTML が含まれても実行せず文字列として表示します。任意 HTML 文字列の指定には対応しません。リッチな案内が必要なら、アプリ側で信頼済み DOM を別途構築してください。表示制御は生成した要素だけを削除・追加し、共有スペースの親要素を隠しません。ボタンは `kintoneplugin-button-normal` クラスを維持します。外観を合わせるには [51-modern-default.css](https://js.kacsw.or.jp/51-modern-default.css) をアプリに適用してください。
 
@@ -436,6 +458,107 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 
 ---
 
+### FormBridge 向け
+
+<a id="registerFormBridgeZipCodeAddressHandler"></a>
+
+#### `registerFormBridgeZipCodeAddressHandler(options)`
+
+新バージョンFormBridgeの通常文字列フィールド専用です。郵便番号の変更イベントは同期的に終了し、既存の `getAddressByZipCode` で非同期検索した結果をフィールドAPIから反映します。利用側の業務処理、送信キャンセル・再送信は実装しません。
+
+##### 設定
+
+| キー | 型・既定値 | 契約 |
+| --- | --- | --- |
+| `zipCodeInputField` | string、必須 | 郵便番号の入力フィールド |
+| `zipCodeSavedField` | string、必須 | 郵便番号の保存フィールド。同一コードも可 |
+| `mainAddressField` | string、必須 | 補完の可否を判定する住所入力欄。`addressFields` の割り当て先に含める |
+| `addressFields` | object、必須 | `{ 検索結果プロパティ: 住所入力コード }`。割り当て先は一意 |
+| `fieldMappings` | object、`{}` | `{ 住所入力コード: 保存コード }`。検索時と手入力変更時に保存欄も設定 |
+| `clearFields` | string[]、`[]` | 置換時にクリアする追加の入力欄／関連欄。その保存欄も自動でクリア |
+| `transformAddress` | function、値をそのまま返す | `(value, { fieldCode, property, result? }) => string`。同期・副作用なしの変換 |
+| `afterApply` | function、省略可 | `({ result, record, isCurrent }) => void`。住所反映後のみ実行する同期コールバック |
+
+`addressFields` のキーは `address` / `prefName` / `cityName` / `townName` / `blockName` / `otherName` / `bizName` / `businessName` です。メイン住所に対応する検索結果は空でない文字列が必須です。汎用の割り当て設定はできますが、ライブラリが会社名のフィールドや `bizName` / `businessName` の優先順位を推測することはありません。
+
+`fieldMappings` の入力側は `addressFields` の割り当て先または `clearFields` に含めます。保存側は一意で、入力側のどのコードとも重複させません。同一欄で保存する住所は対応表への指定不要です。郵便番号欄を住所・保存・クリア対象と重複させることは禁止します。未知のオプション、空コード、重複割り当て等は登録時に例外とします。コード名や `_input` の規則は推測しません。
+
+実行時は必要なフィールドの存在と文字列値を検証します。FormBridgeの未入力 `null` は空文字相当として扱います。欠落・`undefined`・数値・配列等はエラーです。空白だけの住所は既存住所として保持します（空欄判定は `null` または `''`）。
+
+検索時は変換済み住所を入力・保存の両欄へ直接設定します。`setFieldValue()` は変更イベントを発火しないため、別の文字変換ハンドラーの発火に依存しません。対応表の入力欄を手入力した場合も `event.value` から同期変換して保存欄だけを更新し、入力欄自体は書き換えません。手入力の空値（`null` / `undefined` / `''`）は変換せず保存欄を空にします。手入力の変換時は `result` がなく、クリア専用欄では `property` もありません。同じ欄の保存処理を他のハンドラーと二重登録しないでください。
+
+##### 反映とエラー
+
+| 操作 | 郵便番号入力・保存欄 | 住所 |
+| --- | --- | --- |
+| `form.show` | 検索・整形しない | 変更しない。前画面の検索を無効化 |
+| 通常郵便番号の変更 | 成功後に両欄を整形 | 応答時点でメイン住所が空の場合のみ補完。既存住所なら全住所・関連欄を保持 |
+| デジタルアドレスの変更 | 成功後にAPI郵便番号へ置換 | 全割り当て先・`clearFields` と対応する保存欄をクリアする計画を作り、存在する検索結果で置換 |
+| 空の郵便番号への変更 | 保存欄だけ空にする | 検索せず住所保持。先行検索を無効化 |
+| 検索・変換・必須項目の検証失敗 | 値を変更しない | 値を変更しない。エラーを表示 |
+
+デジタル判定はkintone同様 **`normalizedZipCode !== apiZipCode`** であり、英字の有無ではありません。任意結果の欠落・nullは通常補完では既存欄を保持し、置換では空になります。正規化後に空となる記号・空白だけの郵便番号も空入力とします。
+
+検索結果の必須項目と全割り当て先の変換結果（文字列）を検証してから設定APIを呼び出すため、検索・変換失敗による部分消去を防ぎます。検索時のメイン住所は変換後も空白だけ・空文字を許可しません（意図しない住所消去を防ぐFormBridge版の追加検証）。ただしFormBridgeには一括更新トランザクションがなく、**設定APIが途中で失敗した場合や `afterApply` が失敗した場合、反映済みの値はロールバックしません**。設定失敗を成功扱いにはしません。
+
+検索／変換エラーと非同期中のAPI例外は `console.error` へ記録し、郵便番号入力欄または該当住所欄に `setFieldValueError` で表示して `status: 'error'` とします。表示API自体の失敗もログに残します。手入力の変換失敗は保存値を保持し入力欄へエラーを表示します。イベント引数不正、表示前の処理、手入力時の設定APIの例外は同期的に呼び出し元へ伝播します。
+
+`afterApply` は住所補完・置換後のみ呼びます（通常郵便番号で住所保持した場合は呼びません）。`result` には `bizName` / `businessName` を含む検索結果全体、`record` には反映後のレコードを渡します。検索結果を使った追加転記はこのコールバック内で利用側がコード・優先順位を明示し、共通基盤の `setFieldValue` で入力／保存欄を両方設定できます。戻り値のPromiseはエラーです。同期コールバックでも実行済みの副作用は取り消せません。
+
+##### 非同期・戻り値
+
+- 変更後の郵便番号は `event.value` だけから取得します。変更前を返すことがある `getRecord()` の郵便番号値で代用しません。
+- 登録ごとの世代番号で最新変更だけを反映します。空入力、A→B→A、再表示、`confirm.show` / `finish.show`、`dispose()` でも先行結果を無効化します。通信自体はキャンセルしません。
+- 複数の住所欄は各1回、別々のコードで登録します。同一入力欄への重複登録や外部スクリプトによる郵便番号のプログラム変更は自動追跡しません（APIによる変更はイベントが発火しないため）。
+- 戻り値は `{ whenIdle, dispose }`。`whenIdle()` は呼び出し時点の最新処理の `Promise<Outcome>`、`dispose()` はイベント登録を残してコールバックを無効化する同期関数です。公式にないイベント解除APIには依存しません。
+- `Outcome` は `{ status: 'applied' | 'formatted', result }`、`{ status: 'skipped' | 'stale' }`、または `{ status: 'error', error: string }`。`afterApply` の `isCurrent()` でその検索世代が現在も有効か確認できます。
+
+**FormBridgeは非同期ハンドラーの完了を待ちません。戻り値をPromiseにした場合や `async` 関数でも同様です。** 本ハンドラーは同期終了し、`whenIdle()` もフォーム送信や次のイベントを待機させません。**検索中に送信すると住所反映前のデータが送信される可能性があります。** 送信キャンセル・再送信・送信待機保証は対象外であり、必要になった場合は別要件です。
+
+kintone版との差分は、置換ボタン・`apply()`・DOM表示・業務条件判定を設けず郵便番号変更だけで補完／置換すること、保存用の別コードを明示すること、FormBridgeの `null` 空値を扱うこと、空郵便番号では古い保存用郵便番号も空にすることです。kintoneのイベント・レコードAPIは利用せず、既存kintone版の動作は変更しません。
+
+<a id="formbridge-example"></a>
+
+##### 複数の住所欄を登録する例
+
+以下のフィールドコードは説明用の架空の名前です。実際のフォームに合わせて、入力欄と保存欄の対応を明示してください。2組目は追加の住所欄を置換時にクリアする例です。
+
+```js
+const primaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
+	zipCodeInputField: 'Primary_postal_entry',
+	zipCodeSavedField: 'Primary_postal_value',
+	mainAddressField: 'Primary_line_1_entry',
+	addressFields: {
+		address: 'Primary_line_1_entry',
+		otherName: 'Primary_line_2_entry',
+	},
+	fieldMappings: {
+		Primary_line_1_entry: 'Primary_line_1_value',
+		Primary_line_2_entry: 'Primary_line_2_value',
+	},
+	transformAddress: (value) => value === '' ? '' : toFullWidth(value, false),
+});
+
+const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
+	zipCodeInputField: 'Secondary_postal_entry',
+	zipCodeSavedField: 'Secondary_postal_value',
+	mainAddressField: 'Secondary_line_1_entry',
+	addressFields: {
+		address: 'Secondary_line_1_entry',
+		otherName: 'Secondary_line_2_entry',
+	},
+	fieldMappings: {
+		Secondary_line_1_entry: 'Secondary_line_1_value',
+		Secondary_line_2_entry: 'Secondary_line_2_value',
+		Secondary_line_3_entry: 'Secondary_line_3_value',
+	},
+	clearFields: ['Secondary_line_3_entry'],
+	transformAddress: (value) => value === '' ? '' : toFullWidth(value, false),
+});
+```
+
+郵便番号・住所の同期処理を重複して登録しないでください。業務固有の追加転記はこの例に含めていません。
+
 ## 制約・注意事項
 
 <a id="notes"></a>
@@ -446,6 +569,8 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 - API レスポンスが複数件返ってきた場合はエラー（複数見つかりました）扱いになります。実装は単一ヒットを期待しています。
 - `registerZipCodeAddressHandler` は kintone のイベント・record API と DOM に依存します。テストではこれらのスタブを用意し、PC・モバイルのイベント種別で対応する record API を利用することを確認してください。ランタイム初期化は不要です。
 - ネットワークや API の異常 JSON に対しては安全に `error` オブジェクトを返すよう実装されています。
+- FormBridge向けは新バージョン専用・通常文字列フィールドのみ。送信待機は保証しません。実FormBridgeでの画面動作・通信許可（CORS）・確認画面／送信・キャッシュ更新は未検証です。
+- 公式仕様とモック単体テストの確認範囲、コマンド結果・未確認事項は[FormBridge住所ハンドラー検証記録](verification/zip-code-address-utils.md)を参照してください。
 
 ---
 
@@ -454,6 +579,7 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 ### 参照
 
 - 実装ソース: `src/zip-code-address-utils.js`
+- [FormBridge新バージョンJavaScriptカスタマイズ公式仕様](https://formbridge.kintoneapp.com/help/customize/v2)
 
 文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
 
@@ -463,6 +589,7 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 
 | バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
 | ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| 1.1.0      | 2026-10-31 | FormBridge専用住所ハンドラー・入力／保存欄同期・世代管理を追加。kintone版は維持 | ローカル変更。未配布・ワークフロー未実行・通常URL未照合。[検証記録](verification/zip-code-address-utils.md) |
 | 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
 | 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `651dead`。初版作成日・配布日は未確認                  |
 | 未設定     | 2026-10-05 | 住所検索時の不要なZIP API再リクエストを回避                 | `7b1da89`。配布確認は未確認                            |
