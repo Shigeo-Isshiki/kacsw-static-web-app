@@ -49,14 +49,24 @@ jobs:
           ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    name: Close Pull Request Job
+    name: Request PR preview cleanup
+    permissions:
+      actions: write
     steps:
-      - name: Close Pull Request
-        id: closepullrequest
-        uses: Azure/static-web-apps-deploy@v1
+      - name: Dispatch trusted main cleanup
+        uses: actions/github-script@v8
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_WONDERFUL_DUNE_09934F50F }}
-          app_location: './src'
-          action: 'close'
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo,
+              workflow_id: 'swa-preview-cleanup.yml',
+              ref: 'main',
+              inputs: { dry_run: 'false' },
+            });
+            await core.summary
+              .addHeading('Preview cleanup requested')
+              .addRaw('The main cleanup workflow was dispatched. This is not deletion confirmation. ')
+              .addLink('Check cleanup execution and deletion results', `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/workflows/swa-preview-cleanup.yml`)
+              .write();
