@@ -245,3 +245,15 @@
 | <https://js.kacsw.or.jp/text-suite.js> | 200  | 52251 / 52251        | 1.2.0      | 完全一致 | `7b045826550851e5f1b399f863ac4d0e552301120d34388949ab9e50e4f877b8` |
 
 - FormBridgeの実画面でのイベント動作・値反映・エラー表示と、利用フォーム上のブラウザーキャッシュ更新は未確認です。通常配布の一致と実画面検証を混同しません。
+
+## 追加確認：formbridge-custom-lib 1.1.0
+
+- 確認日時：2026-10-31 11:09:28（日本時間、UTC+09:00）。text-suite 1.2.0と同じデプロイで配布されました。
+- 対象ソースはマージコミット [`ec932c0aeeaaf8ec505c7dc41690266dec4cd025`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/ec932c0aeeaaf8ec505c7dc41690266dec4cd025) の `src/formbridge-custom-lib.js` です。対象コミットのCI・デプロイ・パッケージ作成結果は[同じデプロイの記録](#追加確認text-suite-120)を参照してください。
+- 通常URL <https://js.kacsw.or.jp/formbridge-custom-lib.js> に `Cache-Control: no-cache` を指定してGETし、HTTP 200、JSDocバージョン1.1.0、対象コミットのソースとのバイト単位の完全一致を確認しました。
+
+| 対象・通常配布 URL                                | HTTP | ソース／配布バイト数 | バージョン | 一致     | SHA-256（ソース・配布共通）                                        |
+| ------------------------------------------------- | ---- | -------------------- | ---------- | -------- | ------------------------------------------------------------------ |
+| <https://js.kacsw.or.jp/formbridge-custom-lib.js> | 200  | 10862 / 10862        | 1.1.0      | 完全一致 | `e631a11f372f3d84b1ef90b497f1f729ce8de8e5f04e5e2ced7536d715526c49` |
+
+- FormBridge実画面での関数読み込み・表示・送信、ブラウザーキャッシュ更新は未確認です。通常配布の一致と実画面検証を混同しません。
