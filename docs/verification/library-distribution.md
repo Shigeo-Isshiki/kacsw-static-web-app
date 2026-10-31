@@ -336,3 +336,22 @@
 - 利用者からコミット・push・PR作成・mainマージ・本番配布・配布記録保存の承認を受けました。この記録時点では本番反映・対象変更のワークフローは未実行、通常URL <https://js.kacsw.or.jp/zip-code-address-utils.js> のGET・HTTP・内容一致は未確認です。
 - ローカル生成物とソースの `cmp` は成功。ローカルソースSHA-256は `122d55a955555dcc976d9df78e1f7be5810e54cc3c13a4c7f1051feda1548a3d` です（配布ハッシュではありません）。
 - ローカルテスト・lint・ビルド／スモークチェックの結果は[検証記録](zip-code-address-utils.md)を参照してください。実FormBridgeでの新設定の動作・反映・送信・CORS・キャッシュ更新は未検証です。個別フォーム変更・送信制御は実施していません。
+
+## 追加確認：zip-code-address-utils 1.2.0
+
+- 確認日時：2026-11-01 07:15:28（日本時間、UTC+09:00）。
+- 対象ソース：PR #44のマージコミット [`9cfdc218d2fa19c011fc3520d1aefbe7b09070b9`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/9cfdc218d2fa19c011fc3520d1aefbe7b09070b9) の `src/zip-code-address-utils.js`。
+- 新設定は `replaceOnZipCodeChange`（boolean、既定false）。利用者承認に基づきコミット・push・PR・mainマージ・自動本番デプロイを実施しました。個別フォームは変更していません。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41247271598)：Prettier・ESLint・全テスト成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41247271512)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41247271539)：配布パッケージ作成成功。
+- デプロイ成功後、通常URLへ `Cache-Control: no-cache` を指定してGETし、HTTP 200と対象コミットのソースとのバイト単位の完全一致を確認しました（`git show <対象コミット>:src/zip-code-address-utils.js` と取得ファイルを `cmp` で照合）。JSDocバージョンは `1.2.0` です。
+
+| 対象・通常配布URL | HTTP | ソース／配布バイト数 | バージョン | 一致 | SHA-256（ソース・配布共通） |
+| --- | --- | --- | --- | --- | --- |
+| <https://js.kacsw.or.jp/zip-code-address-utils.js> | 200 | 44191 / 44191 | 1.2.0 | 完全一致 | `122d55a955555dcc976d9df78e1f7be5810e54cc3c13a4c7f1051feda1548a3d` |
+
+- ローカルの全テスト・関連41件（FormBridge専用26件）・lint・整形・配布物生成／VM／Puppeteer・文書検査の結果は[検証記録](zip-code-address-utils.md)を参照してください。kintone版と既定のFormBridge動作は維持しています。
+- 実FormBridgeでの新設定の住所置換・既存住所保持・エラー表示・CORS・画面遷移／送信・キャッシュ更新は未検証です。配布一致を実画面確認とは扱いません。送信待機・キャンセル・再送信は追加していません。
+- 配布前記録は履歴として保持します。配布証跡を保存する後続変更は文書のみで、ライブラリのソース・版数は変更しません。
