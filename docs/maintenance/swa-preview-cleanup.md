@@ -2,7 +2,13 @@
 
 ## 動作
 
-[`.github/workflows/swa-preview-cleanup.yml`](../../.github/workflows/swa-preview-cleanup.yml) は、毎日 03:17 UTC にAzure環境をGitHubのオープンPR一覧と照合します。`workflow_dispatch` では既定でdry runし、削除候補だけを表示します。PRクローズ時は既存のAzure Static Web Apps標準処理を維持し、この定期照合で失敗・取りこぼしを回収します（回収まで最大約24時間かかる場合があります）。
+[`.github/workflows/swa-preview-cleanup.yml`](../../.github/workflows/swa-preview-cleanup.yml) は、毎日 03:17 UTC にAzure環境をGitHubのオープンPR一覧と照合します。手動の `workflow_dispatch` では既定でdry runし、削除候補だけを表示します。同一リポジトリ内のPRがクローズされた場合は、[Azureデプロイワークフロー](../../.github/workflows/azure-static-web-apps-wonderful-dune-09934f50f.yml) の `Request PR preview cleanup` ジョブが `main` 上のクリーンアップを `dry_run: false` で起動します。マージせずに閉じたPRも対象です。
+
+クローズ時も定期処理と同じ安全条件で照合し、対象PRだけでなく他の終了済みPR環境も回収します。fork由来のPRは起動対象外で、対応関係が確認できない環境も保持します。定期照合は起動失敗・取りこぼしの回収用として継続します。GitHubのキューやスケジュール遅延があるため、即時完了や最大24時間以内の回収は保証しません。
+
+クローズジョブの成功は**起動要求の成功**であり、環境削除完了ではありません。ジョブのSummaryから **Azure Static Web Apps preview cleanup** の実行結果へ進み、`Confirmed preview environment deletion` と最終件数を確認してください。起動APIの拒否はクローズジョブを失敗させ、Azure/GitHub APIや削除完了確認の失敗は別のクリーンアップ実行を失敗させます。両方のワークフロー結果を確認してください。
+
+この方式は、PR #34のクローズ時にAzure標準の `action: close` が `No matching static site found` で失敗したため採用しています。そのエラーはクローズ専用処理の照合失敗であり、本番デプロイ失敗を意味しません。エラーを無視する設定や再実行の繰り返しではなく、既に削除成功を確認したARM API方式へ統一します。過去の失敗実行は記録として残り、修正で成功へ書き換わるものではありません。
 
 処理は次の条件をすべて満たす環境だけを削除します。
 
@@ -15,13 +21,15 @@
 
 PR番号や対応関係を安全に確認できない環境は削除せず、ログに残します。明示されたPR番号と環境名の番号が矛盾する環境、ブランチ情報がない環境、fork由来やheadリポジトリが削除済みのPR環境も保持し、手動で確認します。全候補の照合が完了してから削除を開始するため、個別PR APIの403・404などの取得失敗時は削除せずワークフローを失敗させます。削除途中でAzure APIが失敗した場合、既に完了した削除は取り消されません。
 
-ログには総環境数・候補数・検証済み数・保持数を出力します。dry runも同じ照合を行い、検証済みの候補だけを表示します。PR由来のワークフローにAzure削除権限を与えないため、クリーンアップは定期実行と手動実行に限定します。
+ログには総環境数・候補数・検証済み数・保持数を出力します。dry runも同じ照合を行い、検証済みの候補だけを表示します。クローズジョブはチェックアウトもAzureログインも行わず、ジョブ限定の `actions: write` 権限で固定のワークフローと `main` を指定します。PR由来コードへAzure削除権限は与えず、既存OIDCの `main` 制約を維持します。クリーンアップの同時実行は既存のconcurrency設定で直列化されます。
 
 実削除は[Static Sites - Delete Static Site Build REST API（2024-11-01）](https://learn.microsoft.com/en-us/rest/api/appservice/static-sites/delete-static-site-build?view=rest-appservice-2024-11-01)を `az rest` で呼び出します。削除要求が202 Acceptedでも完了扱いにせず、環境一覧から対象名が消えたことを最大12回（初回は即時、以後5秒間隔）確認してから次の環境へ進みます。確認が時間内に完了しない場合は失敗として停止しますが、受理済みの削除は進行している可能性があるため、再度dry runで残存環境を確認してください。
 
 `az staticwebapp environment delete` の自動完了待機は、対象Static Web App外の `Microsoft.Web/locations/staticSitesOperationStatuses/read` 権限を要求する場合があります。このスクリプトは既存のリソース限定RBACを維持するため、その待機方法を使わず環境一覧で完了を確認します。実削除には既存ワークフローの `AZURE_SUBSCRIPTION_ID`（GUID）も使用します。APIの拒否・一覧取得失敗は無視せず、削除完了ログを出しません。
 
 ローカルのモックテストは `node test/test-swa-preview-cleanup.js` で実行します。実際のAzureメタデータとの一致や削除成功は、このテストだけでは確認できません。反映後は必ず `dry_run: true` で対象PR・ブランチと候補を照合し、不一致や未確認の環境を名前だけで削除しないでください。
+
+PRクローズ時の起動スクリプトは `node --test test/test-swa-pr-close-workflow.js` で検証します。固定の起動先、fork除外、権限・チェックアウト不使用、起動API失敗の伝播を確認します。実際のGitHubトークンでの起動可否は、反映後のPRクローズ実行と、それに続くクリーンアップ実行で別途確認してください。
 
 ## 静的ファイルのデプロイ
 
