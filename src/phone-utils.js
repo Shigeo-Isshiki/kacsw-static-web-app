@@ -1,6 +1,6 @@
 /** 日本の電話番号のフォーマット統一と日本の電話番号の種類を判定する処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.0.0
+ * @version 1.1.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_pu_)で始める
 'use strict';
@@ -1314,6 +1314,13 @@ const normalizePhoneNumber = (phoneNumber) => {
 	}
 };
 
+const _PU_PHONE_TYPE_ERROR_MESSAGES = Object.freeze({
+	callCapable: '通話可能な電話番号を入力してください。',
+	homeLine: '携帯電話以外の通話可能な電話番号を入力してください。',
+	faxCapable: 'FAX可能な電話番号を入力してください。',
+	mobile: '携帯電話番号を入力してください。',
+});
+
 /**
  * 電話番号フィールドの変更イベントに正規化ハンドラを登録する関数
  * @param {string} fieldCode 対象フィールドコード
@@ -1331,12 +1338,7 @@ const registerPhoneNumberHandler = (fieldCode, options = {}) => {
 		throw new Error('optionsはオブジェクトである必要があります');
 
 	const { type, errorMessages, devices = 'both' } = options;
-	const errorMessageByType = {
-		callCapable: '通話可能な電話番号を入力してください。',
-		homeLine: '携帯電話以外の通話可能な電話番号を入力してください。',
-		faxCapable: 'FAX可能な電話番号を入力してください。',
-		mobile: '携帯電話番号を入力してください。',
-	};
+	const errorMessageByType = _PU_PHONE_TYPE_ERROR_MESSAGES;
 	if (!Object.prototype.hasOwnProperty.call(errorMessageByType, type))
 		throw new Error(
 			'typeはcallCapable、homeLine、faxCapable、mobileのいずれかである必要があります'
@@ -1380,8 +1382,94 @@ const registerPhoneNumberHandler = (fieldCode, options = {}) => {
 	});
 };
 
+/**
+ * FormBridge新バージョンAPIの入力変更時に電話番号を検証し、別の保存欄へ整形結果を設定する
+ * @param {string} inputFieldCode 入力フィールドコード
+ * @param {string} savedFieldCode 保存フィールドコード（入力欄とは異なるコード）
+ * @param {object} options 登録オプション
+ * @param {'callCapable'|'faxCapable'|'homeLine'|'mobile'} options.type 必須の電話番号種別
+ * @param {string} [options.typeErrorMessage] 種別不一致時のメッセージ
+ * @returns {void}
+ * @throws {Error} 登録引数・依存APIが不正な場合、またはイベント内の値・エラー設定が失敗した場合
+ */
+const registerFormBridgePhoneNumberHandler = (inputFieldCode, savedFieldCode, options = {}) => {
+	if (typeof inputFieldCode !== 'string' || !inputFieldCode.trim())
+		throw new Error('inputFieldCodeは空でない文字列である必要があります');
+	if (typeof savedFieldCode !== 'string' || !savedFieldCode.trim())
+		throw new Error('savedFieldCodeは空でない文字列である必要があります');
+	if (inputFieldCode === savedFieldCode)
+		throw new Error('inputFieldCodeとsavedFieldCodeには異なるコードを指定してください');
+	if (options === null || typeof options !== 'object' || Array.isArray(options))
+		throw new Error('optionsはオブジェクトである必要があります');
+	if (Object.keys(options).some((key) => !['type', 'typeErrorMessage'].includes(key)))
+		throw new Error('optionsにはtypeとtypeErrorMessageのみ指定できます');
+
+	const errorMessageByType = _PU_PHONE_TYPE_ERROR_MESSAGES;
+	const { type, typeErrorMessage = errorMessageByType[type] } = options;
+	if (typeof type !== 'string' || !Object.prototype.hasOwnProperty.call(errorMessageByType, type))
+		throw new Error(
+			'typeはcallCapable、faxCapable、homeLine、mobileのいずれかである必要があります'
+		);
+	if (typeof typeErrorMessage !== 'string' || !typeErrorMessage.trim())
+		throw new Error('typeErrorMessageは空でない文字列である必要があります');
+	if (
+		typeof formBridge === 'undefined' ||
+		!formBridge ||
+		!formBridge.events ||
+		typeof formBridge.events.on !== 'function'
+	)
+		throw new Error('formBridge.events.onが利用できません');
+	if (
+		typeof window === 'undefined' ||
+		!window.formBridgeCustomLib ||
+		typeof window.formBridgeCustomLib.setFieldValue !== 'function' ||
+		typeof window.formBridgeCustomLib.setFieldError !== 'function'
+	)
+		throw new Error('formBridgeCustomLib v1.0.1以上が利用できません');
+	const fb = window.formBridgeCustomLib;
+
+	formBridge.events.on(`form.field.change.${inputFieldCode}`, (event) => {
+		if (
+			!event ||
+			typeof event !== 'object' ||
+			!Object.prototype.hasOwnProperty.call(event, 'value')
+		)
+			throw new TypeError('FormBridgeの変更イベントにvalueがありません');
+
+		fb.setFieldError(inputFieldCode, null);
+		const value = event.value;
+		if (value === null || value === undefined || value === '') {
+			fb.setFieldValue(savedFieldCode, '');
+			return;
+		}
+		if (typeof value !== 'string') {
+			fb.setFieldValue(savedFieldCode, '');
+			fb.setFieldError(inputFieldCode, '電話番号は文字列で入力してください。');
+			return;
+		}
+
+		let result;
+		try {
+			result = formatPhoneNumber(value);
+		} catch (error) {
+			// 設定APIの例外はこの解析専用のcatchに含めない。
+			const message = error && error.message ? error.message : String(error);
+			fb.setFieldValue(savedFieldCode, '');
+			fb.setFieldError(inputFieldCode, message);
+			return;
+		}
+		if (result[type] !== true) {
+			fb.setFieldValue(savedFieldCode, '');
+			fb.setFieldError(inputFieldCode, typeErrorMessage);
+			return;
+		}
+		fb.setFieldValue(savedFieldCode, result.formattedNumber);
+	});
+};
+
 // 公開: 電話番号ユーティリティをグローバルに露出（ファイル末尾に非破壊的に追加）
 if (typeof window !== 'undefined') {
+	window.registerFormBridgePhoneNumberHandler = registerFormBridgePhoneNumberHandler;
 	try {
 		window.isValidPhoneNumber =
 			typeof isValidPhoneNumber !== 'undefined' ? isValidPhoneNumber : undefined;
