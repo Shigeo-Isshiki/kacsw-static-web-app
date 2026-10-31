@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.2.0** です。1.2.0ではFormBridge用通常フィールド・サブテーブルの文字変換ハンドラを追加しました。配布ファイルと対象ソースの一致を確認済みですが、実FormBridge画面での動作確認は未実施です。
+現行ソース・確認済み通常配布版は **1.2.0** です。1.2.0ではFormBridge用通常フィールド・サブテーブルの文字変換ハンドラを追加しました。配布ファイルと対象ソースの一致を確認済みです。2026-10-31に利用者から、実FormBridge画面でのイベント動作・値反映・エラー表示に問題がないとの報告を受けました。確認範囲は[実画面確認報告](verification/library-distribution.md#利用者によるformbridge実画面確認報告2026-10-31)を参照してください。
 
 `src/text-suite.js` は文字列変換・正規化に関するユーティリティ群を提供します。主に日本語の全角⇄半角変換、かなの相互変換（ひらがな⇄カタカナ、全角⇄半角カナ）、メールアドレスの簡易検証など、kintone カスタマイズやフォーム入力の正規化に便利な関数を収録しています。
 
@@ -415,18 +415,19 @@ assertEmailAddress('ＴＥＳＴ@Example.COM'); // -> 'test@example.com'
 ```
 
 ```js
-// kintone カスタマイズJSでの利用例
+// kintoneでの汎用的な登録例です。フィールドコードは説明用の例です。
+// 実際のアプリのフィールドコードに置き換えてください。
 const fullWidthHandlerErrorMessage = {};
 
 // 氏名: 変換不能文字があればエラーにし、PC・モバイル両方へ登録
-registerFullWidthHandler(F.LAST_NAME, {
+registerFullWidthHandler('Name', {
 	throwOnError: true,
 	devices: 'both',
 	errorMessages: fullWidthHandlerErrorMessage,
 });
 
 // 住所: 空白を除去したうえで20文字以内に制限
-registerFullWidthHandler(F.ADDRESS, {
+registerFullWidthHandler('Address', {
 	maxLength: 20,
 	maxLengthErrorMessage: '住所は20文字以内で入力してください。',
 	removeWhitespace: true,
@@ -434,7 +435,7 @@ registerFullWidthHandler(F.ADDRESS, {
 });
 
 // フリガナ: ひらがなへ変換し、空白を除去。PC・モバイル両方へ登録
-registerFullWidthHiraganaHandler(F.FURIGANA, {
+registerFullWidthHiraganaHandler('Name_kana', {
 	removeWhitespace: true,
 	devices: 'both',
 	errorMessages: fullWidthHandlerErrorMessage,
@@ -442,57 +443,33 @@ registerFullWidthHiraganaHandler(F.FURIGANA, {
 ```
 
 ```js
-// FormBridge 705用の登録例です。下記フィールドコードを実際のフォームと照合してください。
-const strictNameOptions = { throwOnError: true, clearSavedFieldOnEmpty: true };
-const addressOptions = {
+// FormBridgeでの汎用的な登録例です。フィールドコードは説明用の例です。
+// 実際のフォームの入力欄・保存欄のコードに置き換えてください。
+// 氏名など、変換不能文字をエラーにする例
+registerFormBridgeFullWidthHandler('Name_input', 'Name_saved', {
+	throwOnError: true,
+	clearSavedFieldOnEmpty: true,
+});
+
+// 住所など、空白を保持し、変換後の長さを20文字以内に制限する例
+registerFormBridgeFullWidthHandler('Address_input', 'Address_saved', {
 	throwOnError: false,
 	maxLength: 20,
 	maxLengthErrorMessage: '住所は20文字以内で入力してください。',
 	clearSavedFieldOnEmpty: true,
-};
-const lenientFullWidthOptions = { throwOnError: false, clearSavedFieldOnEmpty: true };
+});
 
-registerFormBridgeFullWidthHandler('Last_name_input', 'Last_name', strictNameOptions);
-registerFormBridgeFullWidthHandler('First_name_input', 'First_name', strictNameOptions);
-registerFormBridgeFullWidthHiraganaHandler(
-	'Last_name_kana_input',
-	'Last_name_kana',
-	strictNameOptions
-);
-registerFormBridgeFullWidthHiraganaHandler(
-	'First_name_kana_input',
-	'First_name_kana',
-	strictNameOptions
-);
+// フリガナなど、ひらがな以外の文字をエラーにする例
+registerFormBridgeFullWidthHiraganaHandler('Name_kana_input', 'Name_kana_saved', {
+	throwOnError: true,
+	clearSavedFieldOnEmpty: true,
+});
 
-registerFormBridgeFullWidthHandler('Home_address_1_input', 'Home_address_1', addressOptions);
-registerFormBridgeFullWidthHandler('Home_address_2_input', 'Home_address_2', addressOptions);
-registerFormBridgeFullWidthHandler(
-	'Delivery_address_1_input',
-	'Delivery_address_1',
-	addressOptions
-);
-registerFormBridgeFullWidthHandler(
-	'Delivery_address_2_input',
-	'Delivery_address_2',
-	addressOptions
-);
-registerFormBridgeFullWidthHandler(
-	'Delivery_address_3_input',
-	'Delivery_address_3',
-	addressOptions
-);
-
-registerFormBridgeFullWidthHandler(
-	'Billing_company_name_input',
-	'Billing_company_name',
-	lenientFullWidthOptions
-);
-registerFormBridgeFullWidthHandler(
-	'Delivery_recipient_name_input',
-	'Delivery_recipient_name',
-	lenientFullWidthOptions
-);
+// 名称など、変換不能文字を許容し、文字数を制限しない例
+registerFormBridgeFullWidthHandler('Company_name_input', 'Company_name_saved', {
+	throwOnError: false,
+	clearSavedFieldOnEmpty: true,
+});
 ```
 
 ---
@@ -509,12 +486,12 @@ registerFormBridgeFullWidthHandler(
 
 2026-10-12に、`4acf76f` のソースと通常配布URLの内容が完全一致することを確認しました。CI・デプロイ・配布パッケージ作成も成功しています。確認日であり、初版の公開日を示すものではありません。詳細は [通常配布確認記録](verification/library-distribution.md) を参照してください。
 
-2026-10-31にPR #36をマージし、1.2.0を通常配布しました。対象コミット、CI・デプロイ結果、通常URLとの一致は[1.2.0配布確認記録](verification/library-distribution.md#追加確認text-suite-120)を参照してください。実FormBridge画面での動作は未確認です。
+2026-10-31にPR #36をマージし、1.2.0を通常配布しました。対象コミット、CI・デプロイ結果、通常URLとの一致は[1.2.0配布確認記録](verification/library-distribution.md#追加確認text-suite-120)を参照してください。同日、利用者から実画面でのイベント動作・値反映・エラー表示に問題がないとの報告を受けました。
 
 | バージョン | 記録日     | 主な変更                                                                 | 記録・配布確認                                         |
 | ---------- | ---------- | ------------------------------------------------------------------------ | ------------------------------------------------------ |
 | 1.2.0      | 2026-10-31 | FormBridgeサブテーブルの全角・全角ひらがな変換イベントハンドラを追加     | `ec932c0`。通常配布URLとの完全一致を確認（2026-10-31） |
-| 1.1.0      | 2026-10-31 | FormBridge通常フィールド用の全角・全角ひらがな変換イベントハンドラを追加 | 1.2.0に含めて配布。実画面は未確認                      |
+| 1.1.0      | 2026-10-31 | FormBridge通常フィールド用の全角・全角ひらがな変換イベントハンドラを追加 | 1.2.0に含めて配布。実画面の確認範囲は上記報告を参照    |
 | 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし              | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
 | 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                             | `0299cda`。初版作成日・配布日は未確認                  |
 | 未設定     | 2026-10-03 | IDのない新規テーブル行の処理を修正                                       | `ee2b5c0`。配布確認は未確認                            |

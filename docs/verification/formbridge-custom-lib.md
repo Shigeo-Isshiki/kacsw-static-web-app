@@ -70,3 +70,7 @@
 - `cmp src/text-suite.js dist/text-suite.js`、`cmp src/formbridge-custom-lib.js dist/formbridge-custom-lib.js`、`cmp src/all-window-exports.js dist/all-window-exports.js`：完全一致。
 - `git diff --check`：成功。
 - FormBridge実画面および通常配布URLは未確認です。
+
+## 2026-10-31：利用者による実画面確認報告
+
+上記の未確認表記は各検証時点の記録です。その後、通常配布の照合に加え、利用者から実FormBridge画面でのイベント動作・値反映・エラー表示に問題がないとの報告を受けました。AIによる直接検証や、全API・通常フィールドとサブテーブル双方の全条件の確認を意味しません。報告内容と未確認範囲は[実画面確認報告](./library-distribution.md#利用者によるformbridge実画面確認報告2026-10-31)を参照してください。
