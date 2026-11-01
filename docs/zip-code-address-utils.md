@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソースは **1.2.1**、確認済み通常配布版は **1.2.0** です。1.2.1はFormBridgeの入力検証エラーをフィールドに表示し、コンソールログだけを抑制する未配布版です。2026-11-01に1.2.0の通常配布URLとの一致を確認しました。同日、複数住所欄で `replaceOnZipCodeChange: true` を有効にした検索・補完・置換・入力／保存欄同期の実画面動作確認が完了し、問題なく動作したとの利用者報告を受領しました。配布の証跡は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)、確認範囲は[利用側確認報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を参照してください。1.2.1の変更は実画面未検証です。
+現行ソース・確認済み通常配布版は **1.2.1** です。FormBridgeの入力検証エラーをフィールドに表示し、コンソールログだけを抑制します。2026-11-01に1.2.1の通常配布URLとの一致を確認しました。同日、1.2.0で複数住所欄の `replaceOnZipCodeChange: true` を有効にした検索・補完・置換・入力／保存欄同期の実画面動作確認が完了し、問題なく動作したとの利用者報告を受領しました。配布の証跡は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-121)、確認範囲は[利用側確認報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を参照してください。1.2.1の変更は実画面未検証です。
 
 このドキュメントは `src/zip-code-address-utils.js` が公開する郵便番号／デジタルアドレス関連ユーティリティ関数の使い方と引数・戻り値の契約を整理したリファレンスです。テストや Node 環境でも `require('../src/zip-code-address-utils.js')` で利用できます（CommonJS エクスポートあり）。
 
@@ -539,7 +539,7 @@ kintone版との差分は、置換ボタン・`apply()`・DOM表示・業務条�
 
 以下のフィールドコードは説明用の架空の名前です。実際のフォームに合わせて、入力欄と保存欄の対応を明示してください。2組目は追加の住所欄を置換時にクリアする例です。
 2組目では `replaceOnZipCodeChange: true` を指定し、通常郵便番号が保存済み番号と異なる場合の置換も有効にしています。1組目は設定を省略して既存住所を保持します。
-1.2.1の配布後は、既存設定のまま入力途中・形式不正のフィールドエラー表示を維持し、コンソールログだけを抑制します。
+1.2.1では、既存設定のまま入力途中・形式不正のフィールドエラー表示を維持し、コンソールログだけを抑制します。
 
 ```js
 const primaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
@@ -608,7 +608,7 @@ const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
 
 | バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
 | ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
-| 1.2.1      | 2026-11-01 | FormBridgeの入力検証エラーはフィールド表示を維持し、コンソールログだけ抑制。追加設定なし・kintone版は維持 | 未配布・実画面未検証。[検証記録](verification/zip-code-address-utils.md#121入力検証エラーのコンソールログ抑制) |
+| 1.2.1      | 2026-11-01 | FormBridgeの入力検証エラーはフィールド表示を維持し、コンソールログだけ抑制。追加設定なし・kintone版は維持 | `6b0717e`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-121)。今回変更の実画面は未検証 |
 | 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持 | `9cfdc21`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)。導入機能の[実画面確認完了報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を利用者から受領 |
 | 1.1.0      | 2026-10-31 | FormBridge専用住所ハンドラー・入力／保存欄同期・世代管理を追加。kintone版は維持 | `cbdfc88`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)。実FormBridgeは未検証 |
 | 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
