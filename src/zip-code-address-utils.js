@@ -1,6 +1,6 @@
 /** 郵便番号から住所などを出力する処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.2.0
+ * @version 1.2.1
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
 /* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, registerZipCodeAddressHandler, registerFormBridgeZipCodeAddressHandler, normalizeZipCode */
@@ -1005,6 +1005,11 @@ const registerFormBridgeZipCodeAddressHandler = (options) => {
 				if (input === null || input === undefined || _zc_normalizeZipCodeInput(input) === '') {
 					fb.setFieldValue(zipCodeSavedField, '');
 					return { status: 'skipped' };
+				}
+				const validation = _zc_getValidatedNormalized(input);
+				if (!validation.ok) {
+					fb.setFieldError(zipCodeInputField, validation.error);
+					return { status: 'error', error: validation.error };
 				}
 				const result = await new Promise((resolve) => getAddressByZipCode(input, resolve));
 				if (!isCurrent()) return { status: 'stale' };

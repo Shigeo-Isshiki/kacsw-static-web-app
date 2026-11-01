@@ -63,3 +63,15 @@ main反映前の追加検証として、`npm test`（リポジトリ全体）、
 - 利用側VM検証560件・静的チェックの合格は利用側の報告であり、この文書の共通ライブラリ側26件／関連41件とは別の証跡です。AIによる再実行や実画面の直接確認ではありません。
 - 詳細な導入範囲・利用側処理・未確認事項は[利用側確認報告](library-distribution.md#formbridge-consumer-verification-2026-11-01)を参照してください。全フォーム・全API・全異常系の網羅確認ではなく、送信待機は保証しません。
 - 上記の配布確認時点の未検証記録とコミット・ハッシュ・ワークフロー証跡は履歴として保持します。今回の記録では共通ライブラリのソース・版数や個別フォームのコードを変更していません。
+
+## 1.2.1：入力検証エラーのコンソールログ抑制
+
+- 記録日：2026-11-01（日本時間、UTC+09:00）。
+- 追加設定なし。通常動作として、既存正規化後の入力途中・桁超過・不正文字を入力欄に検証エラーとして表示し、`status: 'error'` を返します。1.2.0のフィールド表示・戻り値を維持し、入力検証のコンソールログだけを抑制します。
+- 正規化後7文字の英数字は通常郵便番号・デジタルアドレスとも検索します。非文字列値・必須フィールド欠落・通信・変換・設定・表示API等の処理異常はログとエラー処理を維持します。
+- 入力途中・形式不正でも世代を更新し、先行する検索成功／失敗応答を破棄します。保存郵便番号・住所は保持し、変換・`afterApply` は実行しません。空入力は従来どおり保存郵便番号だけ消去し、入力エラーを解除します。検索可能な入力への変更でも前回の入力エラーを解除します。
+- FormBridgeテストは7件追加して計33件です。全桁の入力途中・全角／ハイフン／空白正規化、不正文字・桁超過、正常7文字・デジタル検索、古い成功／失敗応答の破棄、空入力・独立登録・再検索、処理／表示API異常を検証します。汎用利用例は追加設定なしで入力途中のエラー表示とログ抑制も確認します。
+- `node --require ./test/setup-tests.js --test test/test-zip-code-address-formbridge.js test/test-zip-code-address-handler.js test/test-zip-code-address-utils.js test/test-formbridge-custom-lib.js` は成功（48件集計、FormBridge専用33件。旧形式2ファイルはファイル単位の集計）。既存kintone・検索・共通基盤の回帰テストも成功しました。
+- `npm run lint`、`npx prettier --check src/zip-code-address-utils.js test/test-zip-code-address-formbridge.js`、`npm run build`、`cmp src/zip-code-address-utils.js dist/zip-code-address-utils.js`、`git diff --check` は成功しました。文書の章立て・リンク・アンカー・コードフェンス・ソース版数一致と、kintone／検索実装の不変性も確認しました。
+- main反映前の追加検証として、`npm test`（全リポジトリ）、`npm run lint`、`npx prettier --check "src/**/*.{js,css,html}" test/test-zip-code-address-formbridge.js`、`npm run ci-check`（配布物生成・window VM・Puppeteer）、`cmp src/zip-code-address-utils.js dist/zip-code-address-utils.js` はすべて成功しました。
+- 配布・実画面検証は未実施です。1.2.0の利用者報告を今回変更の実画面確認へ流用しません。個別フォームは変更せず、デバウンス・送信時の完成チェック・送信待機／キャンセル／再送信は追加しません。入力途中・形式不正のまま送信すると、入力欄と以前の保存値が一致しない可能性があります。
