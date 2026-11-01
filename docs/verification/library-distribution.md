@@ -394,3 +394,19 @@
 - 対象：`zip-code-address-utils.js` 1.2.1。FormBridgeの入力途中・形式不正は通常動作としてフィールドにエラー表示し、コンソールログだけ抑制。追加設定はなく、kintone版・処理異常のログは維持します。
 - 対象コミット・SHA-256・ワークフロー結果：未確定／未実行。コミット・プッシュ・main反映・通常配布URL照合は未実施です。確認済み通常配布版は引き続き1.2.0で、過去の証跡を保持します。
 - テスト・未確認事項は[検証記録](zip-code-address-utils.md#121入力検証エラーのコンソールログ抑制)を参照してください。今回変更の実FormBridge動作は未検証です。個別フォーム・送信制御は変更しません。
+
+## 追加確認：zip-code-address-utils 1.2.1
+
+- 確認日時：2026-11-01 22:32:59（日本時間、UTC+09:00）。
+- 配布対象コミット：`6b0717efbfd2df4b91d447df28c2c44812a3bfeb`（PR #47のmainマージ）。
+- 対象ワークフロー：[CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41311689155)、[Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41311689162)、[Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41311689227) はすべて成功。別コミットの結果ではなく、上記SHAを対象とする実行結果を確認しました。
+
+| 対象 | 通常配布URL | 版数 | HTTP | 対象ソースとの一致 | SHA-256 | バイト数 |
+| --- | --- | --- | --- | --- | --- | --- |
+| zip-code-address-utils | https://js.kacsw.or.jp/zip-code-address-utils.js | 1.2.1 | 200 | 完全一致 | `75ed73a6ab7f252bdd2cb23c120bcc346ad88dddfc92ddc91f14196bf6acc7d5` | 44399 |
+
+- `Cache-Control: no-cache` を付けた通常URLのGETで取得し、固定コミットの `src/zip-code-address-utils.js` と `cmp` でバイト単位の完全一致を確認。JSDocの版数とSHA-256も確認しました。変更対象はこのライブラリだけで、他ライブラリは今回再照合していません。
+- 全リポジトリテスト・関連48件（FormBridge専用33件）・lint・整形・配布物生成／VM／Puppeteer・文書検査は成功。詳細は[検証記録](zip-code-address-utils.md#121入力検証エラーのコンソールログ抑制)を参照してください。
+- 入力途中・形式不正はフィールドにエラー表示し、コンソールログだけ抑制。追加設定はなく、kintone版・処理異常のログ・戻り値のエラー状態は維持しています。新たな送信制御はありません。
+- 今回変更の実FormBridgeでのエラー表示・コンソールログ・CORS・画面遷移／送信・キャッシュ更新は未検証です。1.2.0の利用者確認報告は対象機能・版数の範囲に限り、今回の配布一致を実画面確認へ読み替えません。
+- 配布前記録と過去の証跡は履歴として保持します。配布証跡を保存する後続変更は文書のみで、ソース・版数は変更しません。
