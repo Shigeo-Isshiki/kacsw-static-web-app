@@ -547,8 +547,202 @@ test('all conversion results are validated before any field writes; Promise is r
 	}
 });
 
+test('short input shows validation errors without console logging or field writes', async () => {
+	const env = setup();
+	const controller = env.register({
+		transformAddress: () => assert.fail('short input must not convert addresses'),
+		afterApply: () => assert.fail('short input must not run afterApply'),
+	});
+	env.show();
+	for (const field of Object.values(env.record)) field.value = '保持';
+	const before = clone(env.record);
+	env.change('12345678');
+	assert.equal((await controller.whenIdle()).status, 'error');
+	for (const value of [
+		'1',
+		'12',
+		'123',
+		'1234',
+		'12345',
+		'123456',
+		'１２３－４５６',
+		'ａ１　ｂ２－ｃ３',
+	]) {
+		env.change(value);
+		const outcome = await controller.whenIdle();
+		assert.equal(outcome.status, 'error');
+		assert.match(outcome.error, /7桁/);
+		assert.deepEqual(env.calls.at(-1), ['error', 'zip', outcome.error]);
+		assert.deepEqual(env.record, before);
+	}
+	assert.equal(env.requests.length, 0);
+	assert.equal(env.calls.filter(([kind]) => kind === 'value').length, 0);
+	assert.deepEqual(env.errors, []);
+});
+
+test('malformed input shows validation errors only in the field', async () => {
+	const env = setup();
+	const controller = env.register();
+	env.show();
+	for (const field of Object.values(env.record)) field.value = '保持';
+	const before = clone(env.record);
+	for (const value of [
+		'12345678',
+		'１２３－４５６７８',
+		'A1B2C3D4',
+		'123?',
+		'〒1234567',
+		'あ',
+		'\t',
+	]) {
+		env.change(value);
+		const outcome = await controller.whenIdle();
+		assert.equal(outcome.status, 'error');
+		assert.match(outcome.error, /7桁/);
+		assert.deepEqual(env.calls.at(-1), ['error', 'zip', outcome.error]);
+		assert.deepEqual(env.record, before);
+	}
+	assert.equal(env.requests.length, 0);
+	assert.deepEqual(env.errors, []);
+});
+
+test('complete postal and digital addresses search and clear prior validation errors', async () => {
+	const env = setup();
+	const controller = env.register();
+	env.show();
+	env.change('12');
+	assert.equal((await controller.whenIdle()).status, 'error');
+	for (const value of ['１２３－４５６７', 'ａ１ｂ２ｃ３ｄ']) {
+		env.change(value);
+		await tick();
+		assert.deepEqual(env.calls.at(-1), ['error', 'zip', null]);
+		assert.match(env.requests.at(-1).url, /search_code=(1234567|A1B2C3D)$/);
+		env.requests.at(-1).resolve(response());
+		assert.equal((await controller.whenIdle()).status, 'applied');
+		assert.equal(env.record.savedZip.value, '123-4567');
+	}
+	assert.equal(env.requests.length, 2);
+	assert.deepEqual(env.errors, []);
+});
+
+test('short, malformed and empty input invalidate older successful and failed searches', async () => {
+	for (const value of ['１２３－４５６', '12345678', '', null, undefined, '－　']) {
+		for (const fail of [false, true]) {
+			const env = setup({ options: { replaceOnZipCodeChange: true } });
+			const controller = env.register();
+			env.show();
+			for (const field of Object.values(env.record)) field.value = '保持';
+			env.change('1234567');
+			await tick();
+			const pending = controller.whenIdle();
+			env.change(value);
+			const outcome = await controller.whenIdle();
+			assert.equal(
+				outcome.status,
+				value === '１２３－４５６' || value === '12345678' ? 'error' : 'skipped'
+			);
+			assert.equal(env.record.savedZip.value, outcome.status === 'skipped' ? '' : '保持');
+			const before = clone(env.record);
+			const calls = env.calls.length;
+			if (fail) env.requests[0].reject(new Error('offline'));
+			else env.requests[0].resolve(response());
+			assert.equal((await pending).status, 'stale');
+			assert.deepEqual(env.record, before);
+			assert.equal(env.calls.length, calls);
+			assert.deepEqual(env.errors, []);
+		}
+	}
+});
+
+test('incomplete input isolates registrations and permits the next complete search', async () => {
+	const env = setup();
+	Object.assign(env.record, initialRecord('second'));
+	const first = env.register();
+	const second = env.register({}, 'second');
+	env.show();
+	env.change('1234567');
+	env.change('7654321', 'secondzip');
+	await tick();
+	const stale = first.whenIdle();
+	env.change('12');
+	assert.equal((await first.whenIdle()).status, 'error');
+	env.requests[1].resolve(response(row({ zip_code: '7654321' })));
+	assert.equal((await second.whenIdle()).status, 'applied');
+	env.change('1234567');
+	await tick();
+	env.requests[2].resolve(response());
+	assert.equal((await first.whenIdle()).status, 'applied');
+	env.requests[0].resolve(response(row({ zip_code: '7654321' })));
+	assert.equal((await stale).status, 'stale');
+	assert.equal(env.record.savedZip.value, '123-4567');
+	assert.equal(env.record.secondsavedZip.value, '765-4321');
+});
+
+test('runtime and display failures retain console logging', async () => {
+	for (const value of [1234567, {}, false]) {
+		const env = setup();
+		const controller = env.register();
+		env.show();
+		env.change(value);
+		assert.equal((await controller.whenIdle()).status, 'error');
+		assert.ok(env.errors.length);
+	}
+	for (const invalid of ['field', 'fn', 'display']) {
+		const env = setup();
+		const controller = env.register();
+		env.show();
+		if (invalid === 'field') delete env.record.savedAddress;
+		if (invalid === 'fn') delete env.context.mockFormBridge.fn;
+		if (invalid === 'display')
+			env.context.mockFormBridge.fn.setFieldValueError = () => {
+				throw new Error('display');
+			};
+		env.change('12');
+		assert.equal((await controller.whenIdle()).status, 'error');
+		assert.ok(env.errors.length);
+	}
+	const env = setup();
+	const controller = env.register();
+	env.show();
+	const display = env.context.mockFormBridge.fn.setFieldValueError;
+	env.context.mockFormBridge.fn.setFieldValueError = (code, message) => {
+		if (message !== null) throw new Error('validation display');
+		display(code, message);
+	};
+	env.change('12345678');
+	assert.equal((await controller.whenIdle()).error, 'validation display');
+	assert.equal(env.errors.length, 2);
+});
+
+test('lookup, conversion and setter failures retain console logging and field errors', async () => {
+	for (const failure of ['lookup', 'conversion', 'setter']) {
+		const env = setup();
+		const controller = env.register({
+			transformAddress: (value) => {
+				if (failure === 'conversion') throw new Error('conversion');
+				return value;
+			},
+		});
+		env.show();
+		for (const field of Object.values(env.record)) field.value = '保持';
+		const before = clone(env.record);
+		if (failure === 'setter')
+			env.context.mockFormBridge.fn.setFieldValue = () => {
+				throw new Error('setter');
+			};
+		env.change('A1B2C3D');
+		await tick();
+		if (failure === 'lookup') env.requests[0].reject(new Error('offline'));
+		else env.requests[0].resolve(response());
+		assert.equal((await controller.whenIdle()).status, 'error');
+		assert.deepEqual(env.record, before);
+		assert.equal(env.errors.length, 1);
+		assert.equal(env.calls.at(-1)[0], 'error');
+	}
+});
+
 test('invalid input, missing record fields and missing fn are explicit errors', async () => {
-	for (const value of [1234567, {}, false, 'bad']) {
+	for (const value of [1234567, {}, false]) {
 		const env = setup();
 		const controller = env.register();
 		env.show();
@@ -798,4 +992,26 @@ test('documented generic example updates both address pairs and clears the extra
 	assert.equal(env.record.Secondary_line_2_value.value, '');
 	assert.equal(env.record.Secondary_line_3_entry.value, '');
 	assert.equal(env.record.Secondary_line_3_value.value, '');
+	const before = clone(env.record);
+	env.change('１２３', 'Primary_postal_entry');
+	env.change('ａ１ｂ２', 'Secondary_postal_entry');
+	assert.equal((await primary.whenIdle()).status, 'error');
+	assert.equal((await secondary.whenIdle()).status, 'error');
+	assert.ok(
+		env.calls.some(
+			([kind, code, message]) =>
+				kind === 'error' && code === 'Primary_postal_entry' && message !== null
+		)
+	);
+	assert.ok(
+		env.calls.some(
+			([kind, code, message]) =>
+				kind === 'error' && code === 'Secondary_postal_entry' && message !== null
+		)
+	);
+	assert.deepEqual(env.record, before);
+	assert.equal(env.requests.length, 4);
+	assert.deepEqual(env.errors, []);
+	env.change('手入力', 'Primary_line_1_entry');
+	assert.equal(env.record.Primary_line_1_value.value, env.context.toFullWidth('手入力', false));
 });
