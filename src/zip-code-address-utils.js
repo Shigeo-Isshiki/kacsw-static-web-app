@@ -1,6 +1,6 @@
 /** 郵便番号から住所などを出力する処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.2.1
+ * @version 1.3.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
 /* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, registerZipCodeAddressHandler, registerFormBridgeZipCodeAddressHandler, normalizeZipCode */
@@ -856,7 +856,7 @@ const registerZipCodeAddressHandler = (options) => {
  * @param {boolean} [options.replaceOnZipCodeChange=false] 空でない保存済み郵便番号と異なる場合に住所を置換
  * @param {function} [options.transformAddress] 同期文字列変換
  * @param {function} [options.afterApply] 住所反映後の同期処理
- * @returns {{whenIdle: function, dispose: function}} 最新処理の観測・無効化用。送信制御用ではない。
+ * @returns {{invalidate: function, whenIdle: function, dispose: function}} invalidateは先行検索だけを無効化する同期関数。whenIdleの待機対象は変えず、送信制御用ではない。
  */
 const registerFormBridgeZipCodeAddressHandler = (options) => {
 	const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -951,6 +951,9 @@ const registerFormBridgeZipCodeAddressHandler = (options) => {
 	let active = false;
 	let disposed = false;
 	let pending = Promise.resolve({ status: 'skipped' });
+	const invalidate = () => {
+		sequence++;
+	};
 	const logError = (error) => console.error('registerFormBridgeZipCodeAddressHandler:', error);
 	const requireActive = () => {
 		if (!active) throw new Error('FormBridgeのform.show後に処理してください');
@@ -1042,6 +1045,7 @@ const registerFormBridgeZipCodeAddressHandler = (options) => {
 				if (assignAddress) {
 					if (replace) for (const code of sources) addValue(values, code, '');
 					for (const [property, code] of assignments) {
+						if (!isCurrent()) return { status: 'stale' };
 						errorField = code;
 						const value = result[property];
 						if (value === null || value === undefined) continue;
@@ -1054,18 +1058,26 @@ const registerFormBridgeZipCodeAddressHandler = (options) => {
 				if (!isCurrent()) return { status: 'stale' };
 				errorField = zipCodeInputField;
 				fb.setFieldValue(zipCodeInputField, result.zipCode);
+				if (!isCurrent()) return { status: 'stale' };
 				fb.setFieldValue(zipCodeSavedField, result.zipCode);
 				for (const [code, value] of values) {
+					if (!isCurrent()) return { status: 'stale' };
 					errorField = code;
 					fb.setFieldValue(code, value);
+					if (!isCurrent()) return { status: 'stale' };
 					fb.setFieldError(code, null);
 				}
+				if (!isCurrent()) return { status: 'stale' };
 				if (assignAddress && afterApply) {
 					errorField = mainAddressField;
-					requireSync(afterApply({ result, record: fb.getFormBridgeRecord(), isCurrent }));
+					const appliedRecord = fb.getFormBridgeRecord();
+					if (!isCurrent()) return { status: 'stale' };
+					requireSync(afterApply({ result, record: appliedRecord, isCurrent }));
 				}
+				if (!isCurrent()) return { status: 'stale' };
 				return { status: assignAddress ? 'applied' : 'formatted', result };
 			} catch (error) {
+				if (!isCurrent()) return { status: 'stale' };
 				logError(error);
 				const message = error && error.message ? error.message : String(error);
 				if (isCurrent()) {
@@ -1082,7 +1094,7 @@ const registerFormBridgeZipCodeAddressHandler = (options) => {
 	for (const name of ['form.show', 'confirm.show', 'finish.show']) {
 		events.on(name, () => {
 			if (disposed) return;
-			sequence++;
+			invalidate();
 			active = name === 'form.show';
 		});
 	}
@@ -1117,11 +1129,12 @@ const registerFormBridgeZipCodeAddressHandler = (options) => {
 		});
 	}
 	return {
+		invalidate,
 		whenIdle: () => pending,
 		dispose: () => {
 			disposed = true;
 			active = false;
-			sequence++;
+			invalidate();
 		},
 	};
 };

@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.2.1** です。FormBridgeの入力検証エラーをフィールドに表示し、コンソールログだけを抑制します。2026-11-01に1.2.1の通常配布URLとの一致を確認しました。同日、1.2.0で複数住所欄の `replaceOnZipCodeChange: true` を有効にした検索・補完・置換・入力／保存欄同期の実画面動作確認が完了し、問題なく動作したとの利用者報告を受領しました。配布の証跡は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-121)、確認範囲は[利用側確認報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を参照してください。1.2.1についても、入力途中のコンソールエラーがなくなり、正しい出力ができ、存在しない郵便番号ではコンソールエラーが出るとの[利用者実画面確認報告](verification/library-distribution.md#zip-121-consumer-verification-2026-11-01)を受領しました。全API・全異常系の網羅確認ではありません。
+現行ソースは **1.3.0** です。FormBridge住所ハンドラーの戻り値に `invalidate()` を追加しました。1.3.0の配布・実画面動作は未確認です。確認済み通常配布版は **1.2.1** です。2026-11-01に1.2.1の通常配布URLとの一致を確認しました。同日、1.2.0で複数住所欄の `replaceOnZipCodeChange: true` を有効にした検索・補完・置換・入力／保存欄同期の実画面動作確認が完了し、問題なく動作したとの利用者報告を受領しました。配布の証跡は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-121)、確認範囲は[利用側確認報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を参照してください。1.2.1についても、入力途中のコンソールエラーがなくなり、正しい出力ができ、存在しない郵便番号ではコンソールエラーが出るとの[利用者実画面確認報告](verification/library-distribution.md#zip-121-consumer-verification-2026-11-01)を受領しました。全API・全異常系の網羅確認ではありません。
 
 このドキュメントは `src/zip-code-address-utils.js` が公開する郵便番号／デジタルアドレス関連ユーティリティ関数の使い方と引数・戻り値の契約を整理したリファレンスです。テストや Node 環境でも `require('../src/zip-code-address-utils.js')` で利用できます（CommonJS エクスポートあり）。
 
@@ -522,10 +522,18 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 ##### 非同期・戻り値
 
 - 変更後の郵便番号は `event.value` だけから取得します。変更前を返すことがある `getRecord()` の郵便番号値で代用しません。
-- 登録ごとの世代番号で最新変更だけを反映します。空入力、A→B→A、再表示、`confirm.show` / `finish.show`、`dispose()` でも先行結果を無効化します。通信自体はキャンセルしません。
-- 複数の住所欄は各1回、別々のコードで登録します。同一入力欄への重複登録や外部スクリプトによる郵便番号のプログラム変更は自動追跡しません（APIによる変更はイベントが発火しないため）。
-- 戻り値は `{ whenIdle, dispose }`。`whenIdle()` は呼び出し時点の最新処理の `Promise<Outcome>`、`dispose()` はイベント登録を残してコールバックを無効化する同期関数です。公式にないイベント解除APIには依存しません。
+- 登録ごとの世代番号で最新変更だけを反映する保護は常時有効です。新しい番号・空入力、A→B→A、再表示、`confirm.show` / `finish.show`、`dispose()` でも先行結果を無効化します。有効・無効を選択する設定はありません。通信自体はキャンセルしません。
+- 複数の住所欄は各1回、別々のコードで登録します。同一入力欄への重複登録や外部スクリプトによる郵便番号のプログラム変更は自動追跡しません（APIによる変更はイベントが発火しないため）。そのような業務操作では、値の消去・切り替え前に対象登録の `invalidate()` を呼びます。具体的な業務条件は利用側で判断します。
+- 戻り値は `{ invalidate, whenIdle, dispose }`。各メソッドの契約は下表のとおりです。イベントの再登録・公式にないイベント解除APIには依存しません。
 - `Outcome` は `{ status: 'applied' | 'formatted', result }`、`{ status: 'skipped' | 'stale' }`、または `{ status: 'error', error: string }`。`afterApply` の `isCurrent()` でその検索世代が現在も有効か確認できます。
+
+| メソッド | 戻り値・契約 |
+| --- | --- |
+| `invalidate()`（1.3.0追加） | 同期、`undefined`。呼び出し時点までに開始・予約された検索を無効化し、以後の値・エラー表示・検索用 `transformAddress`・`afterApply` への反映を止めます。古い成功・失敗とも `stale` です。値・既存エラーには触れず、反映済み値・実行済み副作用は巻き戻しません。何度でも呼べ、他の登録には影響しません。次回の郵便番号検索・手入力住所の保存欄同期は引き続き有効です |
+| `whenIdle()` | 呼び出し時点の最新処理の `Promise<Outcome>`。`invalidate()`・画面遷移・`dispose()` だけでは待機対象を差し替えません。無効化前に取得したPromiseと、無効化後（次の郵便番号変更前）に取得したPromiseは同一です。予約だけなら通信せず `stale`、通信中なら応答／失敗による処理終了を待って `stale`。通信が終わらなければ解決時期は保証しません。次の郵便番号変更後は新しい処理だけを観測し、古い通信を一括待機しません。検索前の初期値は `skipped`、既に完了した処理の結果は無効化しても変わりません |
+| `dispose()` | 同期、`undefined`。先行検索を無効化し、その登録の検索・手入力同期を永久停止します。`invalidate()` や再表示で復帰しません |
+
+`invalidate()` は業務操作から常時有効の保護へ通知するAPIであり、保護のオン・オフではありません。通信中断、反映済み値の巻き戻し、送信待機・キャンセル・再送信は保証しません。無効化時点で既に実行中の同期コールバックは中断できませんが、それ以降の変換・設定・後続コールバックは実行しません。
 
 **FormBridgeは非同期ハンドラーの完了を待ちません。戻り値をPromiseにした場合や `async` 関数でも同様です。** 本ハンドラーは同期終了し、`whenIdle()` もフォーム送信や次のイベントを待機させません。**検索中に送信すると住所反映前のデータが送信される可能性があります。** 送信キャンセル・再送信・送信待機保証は対象外であり、必要になった場合は別要件です。
 
@@ -578,6 +586,30 @@ const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
 
 郵便番号・住所の同期処理を重複して登録しないでください。業務固有の追加転記はこの例に含めていません。
 
+<a id="formbridge-invalidate-example"></a>
+
+##### 業務操作による住所消去・切り替え前の通知例
+
+上記の架空フィールド構成を使い、利用側の業務処理から次の同期関数を呼びます。別の住所へ切り替える場合も、最初の値設定より前に通知します。APIの値設定は変更イベントを発火しないため、入力・保存欄を明示して更新します。もう一方の登録には通知しません。
+
+```js
+function clearPrimaryAddress() {
+	primaryAddressHandler.invalidate();
+	for (const code of [
+		'Primary_postal_entry',
+		'Primary_postal_value',
+		'Primary_line_1_entry',
+		'Primary_line_1_value',
+		'Primary_line_2_entry',
+		'Primary_line_2_value',
+	]) {
+		formBridgeCustomLib.setFieldValue(code, '');
+	}
+}
+```
+
+この消去関数は値だけを変更します。エラーの消去が業務上必要なら利用側で明示的に行ってください。通知後もイベント再登録は不要です。
+
 ## 制約・注意事項
 
 <a id="notes"></a>
@@ -608,6 +640,7 @@ const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
 
 | バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
 | ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| 1.3.0      | 2026-11-02 | FormBridgeに `invalidate()` を追加。常時有効の世代保護を業務操作から通知可能にし、`whenIdle()` の観測契約を明文化 | 未コミット・配布未確認。[検証記録](verification/zip-code-address-utils.md#formbridge-invalidate-verification) |
 | 1.2.1      | 2026-11-01 | FormBridgeの入力検証エラーはフィールド表示を維持し、コンソールログだけ抑制。追加設定なし・kintone版は維持 | `6b0717e`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-121)。入力途中のログ抑制・正しい出力・存在しない番号のログについて[実画面確認報告](verification/library-distribution.md#zip-121-consumer-verification-2026-11-01)を受領 |
 | 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持 | `9cfdc21`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)。導入機能の[実画面確認完了報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を利用者から受領 |
 | 1.1.0      | 2026-10-31 | FormBridge専用住所ハンドラー・入力／保存欄同期・世代管理を追加。kintone版は維持 | `cbdfc88`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)。実FormBridgeは未検証 |
