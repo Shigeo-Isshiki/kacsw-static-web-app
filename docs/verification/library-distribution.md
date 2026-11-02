@@ -474,3 +474,22 @@
 - 利用側で取得した公開ライブラリのSHA-256が、[配布確認記録](#zip-130-distribution)の値と一致したとの報告です。配布内容の一致確認とは別に、上記の実画面確認が実施されています。
 - 実画面確認の操作別内訳は記録されていないため、全入力パターン・全競合条件の実画面での網羅確認を意味しません。通信中断・送信待機・送信キャンセル・再送信を保証しない既存方針は維持します。
 - 過去の配布前・配布確認時点の未確認記録は履歴として保持します。配布対象コミット・ハッシュ・ワークフロー証跡は変更せず、今回の記録更新では共通ライブラリのソース・版数・個別フォームを変更していません。
+
+## 追加確認：date-utils 1.1.0
+
+- 確認日時：2026-11-02 23:32～23:33（日本時間、UTC+09:00）。
+- 対象ソース：PR [#53](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/pull/53) のマージコミット [`8960985fe4c9f56196e4e040e3172d8b7f98adb2`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/8960985fe4c9f56196e4e040e3172d8b7f98adb2) の `src/date-utils.js` と `src/all-window-exports.js`。
+- 利用者からコミット・push・PR作成・mainマージ・自動本番デプロイの承認を受けて実施しました。個別フォームは変更していません。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41462692315)：Prettier・ESLint・全テスト成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41462692618)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41462692400)：配布パッケージ作成成功。
+- デプロイ成功後、通常URLへ `Cache-Control: no-cache` を指定してGETし、HTTP 200と対象コミットのソースとのバイト単位の完全一致を確認しました。date-utilsのJSDocバージョンは `1.1.0` です。
+
+| 対象・通常配布 URL | HTTP | ソース／配布バイト数 | バージョン | 一致 | SHA-256（ソース・配布共通） |
+| --- | --- | --- | --- | --- | --- |
+| <https://js.kacsw.or.jp/date-utils.js> | 200 | 26488 / 26488 | 1.1.0 | 完全一致 | `029565407e281f750e1f63ed0d4b76b3b2ed2d6dfb90e90f0f57410df4ec9e3b` |
+| <https://js.kacsw.or.jp/all-window-exports.js> | 200 | 3214 / 3214 | 定義なし | 完全一致 | `a5184f5f82fbae7afd53d0c0881c544619a361373cac47f992f0bdfb222a8ffd` |
+
+- マージ前のローカル `npm test`、`npm run lint`、`npm run ci-check`、`git diff --check` は成功しました。対象コミットのCIでもテスト・lint・デプロイ・配布パッケージ作成が成功しました。
+- 通常配布の一致確認は、個別のFormBridge画面でのイベント動作・値反映・エラー表示・送信やブラウザーキャッシュ更新を確認したものではありません。実FormBridgeへの適用・実画面確認は利用側で実施します。
