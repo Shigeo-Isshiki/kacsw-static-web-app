@@ -462,3 +462,289 @@ test('migration examples for apps 202/428/692 register independently without int
 	const touchedFields = calls.map(([, field]) => field);
 	assert.ok(!touchedFields.includes('Birthday_input_input'));
 });
+
+test('afterChange must be a function at registration and never fires on registration', () => {
+	const { context, registrations, calls } = createEnvironment();
+	const register = (...args) => context.window.DATE.registerFormBridgeDateInputHandler(...args);
+	for (const callback of [null, '', 'callback', 0, false, [], {}, Symbol()]) {
+		assert.throws(
+			() => register('raw', 'saved', { type: 'date', afterChange: callback }),
+			/afterChange/
+		);
+	}
+	assert.equal(registrations.length, 0, 'invalid afterChange registers no handler');
+	let notified = 0;
+	register('raw', 'saved', { type: 'date', afterChange: () => notified++ });
+	assert.equal(registrations.length, 1);
+	assert.equal(notified, 0, 'registration itself must not notify');
+	assert.deepEqual(calls, [], 'registration with afterChange changes no values or errors');
+});
+
+test('afterChange notifies success, empty, exception, and non-string exactly once after settings', () => {
+	for (const [type, clearValue] of [
+		['date', null],
+		['year', ''],
+		['yearMonth', ''],
+	]) {
+		const { context, calls, registrations, show } = createEnvironment();
+		const notifications = [];
+		context.window.DATE.registerFormBridgeDateInputHandler('raw', 'saved', {
+			type,
+			afterChange: (result) => {
+				notifications.push({ result, callCountAtNotify: calls.length });
+			},
+		});
+		const handler = registrations.at(-1).handler;
+		show();
+		const valid = { date: '2026-11-02', year: '2026', yearMonth: '2026-04' }[type];
+		const saved = { date: '2026-11-02', year: '2026年', yearMonth: '2026年4月' }[type];
+		const assertNotified = (event, status, savedValue, errorMessage) => {
+			assert.equal(notifications.length, 1, 'exactly one notification per change event');
+			const { result, callCountAtNotify } = notifications.pop();
+			assert.equal(result.event, event, 'the original event object is notified');
+			assert.equal(result.inputFieldCode, 'raw');
+			assert.equal(result.savedFieldCode, 'saved');
+			assert.equal(result.status, status);
+			assert.ok(Object.is(result.savedValue, savedValue), 'savedValue is strictly identical');
+			assert.equal(result.errorMessage, errorMessage);
+			assert.equal(
+				callCountAtNotify,
+				calls.length,
+				'notification happens synchronously after all value/error settings'
+			);
+		};
+		// 正常変換
+		const successEvent = { value: valid };
+		handler(successEvent);
+		assert.deepEqual(calls.slice(-2), [
+			['error', 'raw', null],
+			['value', 'saved', saved],
+		]);
+		assertNotified(successEvent, 'success', saved, null);
+		// 空欄化（日付は厳密にnull、年・年月は厳密に''）
+		for (const value of [null, undefined, '']) {
+			const emptyEvent = { value };
+			handler(emptyEvent);
+			assert.deepEqual(calls.slice(-2), [
+				['error', 'raw', null],
+				['value', 'saved', clearValue],
+			]);
+			assertNotified(emptyEvent, 'empty', clearValue, null);
+		}
+		// 変換例外（通知される文言は実際に表示した文言）
+		let conversionError;
+		assert.throws(
+			() => {
+				const convert = {
+					date: context.window.DATE.convertToSeireki,
+					year: context.window.DATE.convertToYear,
+					yearMonth: context.window.DATE.convertToYearMonth,
+				}[type];
+				convert('不正な値');
+			},
+			(error) => {
+				conversionError = error.message;
+				return true;
+			}
+		);
+		const exceptionEvent = { value: '不正な値' };
+		handler(exceptionEvent);
+		assert.deepEqual(calls.slice(-3), [
+			['error', 'raw', null],
+			['value', 'saved', clearValue],
+			['error', 'raw', conversionError],
+		]);
+		assertNotified(exceptionEvent, 'invalid', clearValue, conversionError);
+		// 非文字列入力
+		const typeErrorEvent = { value: 20261102 };
+		handler(typeErrorEvent);
+		assert.deepEqual(calls.slice(-3), [
+			['error', 'raw', null],
+			['value', 'saved', clearValue],
+			['error', 'raw', '文字列で入力してください。'],
+		]);
+		assertNotified(typeErrorEvent, 'invalid', clearValue, '文字列で入力してください。');
+	}
+});
+
+test('afterChange reports invalid with the shown invalidMessage when conversion yields no acceptable value', () => {
+	const { context, calls, registrations, show } = createEnvironment();
+	// Date型の範囲を超える元号年は例外なしで不成立（保存形式に合わない文字列）になる
+	assert.equal(context.window.DATE.convertToSeireki('R300000-1-1'), 'NaN-NaN-NaN');
+	const notifications = [];
+	context.window.DATE.registerFormBridgeDateInputHandler('raw', 'saved', {
+		type: 'date',
+		afterChange: (result) => notifications.push(result),
+	});
+	const handler = registrations.at(-1).handler;
+	show();
+	const invalidEvent = { value: 'R300000-1-1' };
+	handler(invalidEvent);
+	assert.deepEqual(calls, [
+		['error', 'raw', null],
+		['value', 'saved', null],
+		['error', 'raw', '日付の形式で入力してください。'],
+	]);
+	assert.equal(notifications.length, 1);
+	assert.equal(notifications[0].event, invalidEvent);
+	assert.equal(notifications[0].status, 'invalid');
+	assert.equal(notifications[0].savedValue, null);
+	assert.equal(notifications[0].errorMessage, '日付の形式で入力してください。');
+});
+
+test('afterChange is not called when field APIs fail and the failure propagates unchanged', () => {
+	for (const [value, expectedCalls] of [
+		['2026-11-02', 2],
+		['', 2],
+		['不正な値', 3],
+	]) {
+		for (let failAt = 1; failAt <= expectedCalls; failAt++) {
+			const { context, calls, registrations, show } = createEnvironment();
+			let notified = 0;
+			context.window.DATE.registerFormBridgeDateInputHandler('raw', 'saved', {
+				type: 'date',
+				afterChange: () => notified++,
+			});
+			const handler = registrations.at(-1).handler;
+			const failure = new Error('API failure');
+			let count = 0;
+			const setter = (kind) => (field, nextValue) => {
+				calls.push([kind, field, nextValue]);
+				if (++count === failAt) throw failure;
+			};
+			show({ setFieldValue: setter('value'), setFieldValueError: setter('error') });
+			assert.throws(
+				() => handler({ value }),
+				(error) => error === failure,
+				'the API failure must propagate unchanged'
+			);
+			assert.equal(notified, 0, 'afterChange must not be called when a setting API fails');
+			assert.equal(calls.length, failAt);
+		}
+	}
+});
+
+test('afterChange exceptions propagate unchanged and are never treated as conversion errors', () => {
+	const { calls, register, show } = createEnvironment();
+	const failure = new Error('業務チェック失敗');
+	const handler = register({
+		type: 'date',
+		afterChange: () => {
+			throw failure;
+		},
+	});
+	show();
+	assert.throws(
+		() => handler({ value: '2026-11-02' }),
+		(error) => error === failure,
+		'the callback exception must propagate unchanged'
+	);
+	// 保存値は消去されず、変換エラーへの置き換え・追加の設定も行われない
+	assert.deepEqual(calls, [
+		['error', 'raw', null],
+		['value', 'saved', '2026-11-02'],
+	]);
+	assert.throws(
+		() => handler({ value: '' }),
+		(error) => error === failure
+	);
+	assert.deepEqual(calls.slice(-2), [
+		['error', 'raw', null],
+		['value', 'saved', null],
+	]);
+});
+
+test('consumer business errors set inside afterChange persist after the handler returns', () => {
+	const { context, calls, registrations, show } = createEnvironment();
+	context.window.DATE.registerFormBridgeDateInputHandler('raw', 'saved', {
+		type: 'date',
+		afterChange: ({ status, savedValue, errorMessage, inputFieldCode }) => {
+			const fb = context.window.formBridgeCustomLib;
+			if (status === 'success' && savedValue > '2026-01-01') {
+				// 個別フォーム側の業務チェック（例: 基準日との整合性）によるエラー設定
+				fb.setFieldError(inputFieldCode, '生年月日が報告基準日より後です。');
+			}
+			if (status === 'invalid') {
+				// 業務チェック後に、通知された変換エラー文言を再表示できる
+				fb.setFieldError(inputFieldCode, errorMessage);
+			}
+		},
+	});
+	const handler = registrations.at(-1).handler;
+	show();
+	// 正常変換後に利用側が設定した業務エラーは、ライブラリに解除・上書きされず残る
+	handler({ value: '2026-11-02' });
+	assert.deepEqual(calls.slice(-3), [
+		['error', 'raw', null],
+		['value', 'saved', '2026-11-02'],
+		['error', 'raw', '生年月日が報告基準日より後です。'],
+	]);
+	// 失敗時は、利用側が業務チェック後に変換エラーを再表示できる
+	let conversionError;
+	assert.throws(
+		() => context.window.DATE.convertToSeireki('不正な値'),
+		(error) => {
+			conversionError = error.message;
+			return true;
+		}
+	);
+	handler({ value: '不正な値' });
+	assert.deepEqual(calls.slice(-4), [
+		['error', 'raw', null],
+		['value', 'saved', null],
+		['error', 'raw', conversionError],
+		['error', 'raw', conversionError],
+	]);
+	// 次の変更イベントの冒頭で業務エラーも解除され、空欄通知で再判定できる
+	handler({ value: '' });
+	assert.deepEqual(calls.slice(-2), [
+		['error', 'raw', null],
+		['value', 'saved', null],
+	]);
+});
+
+test('afterChange works in window.formBridge-only environments and registrations stay independent', () => {
+	const { context, registrations, calls, show } = createEnvironment({ windowFormBridge: true });
+	const notifications = [];
+	context.window.DATE.registerFormBridgeDateInputHandler(
+		'Person_birth_date_input',
+		'Person_birth_date',
+		{
+			type: 'date',
+			afterChange: (result) => notifications.push(['birth', result.status, result.savedValue]),
+		}
+	);
+	context.window.DATE.registerFormBridgeDateInputHandler('Contract_date_input', 'Contract_date', {
+		type: 'date',
+		afterChange: (result) => notifications.push(['contract', result.status, result.savedValue]),
+	});
+	// コールバック未指定の登録は従来どおり通知なしで動作する
+	context.window.DATE.registerFormBridgeDateInputHandler('Report_year_input', 'Report_year', {
+		type: 'year',
+	});
+	assert.deepEqual(
+		registrations.map((r) => r.eventName),
+		[
+			'form.field.change.Person_birth_date_input',
+			'form.field.change.Contract_date_input',
+			'form.field.change.Report_year_input',
+		]
+	);
+	assert.deepEqual(notifications, [], 'no notification at registration');
+	show();
+	registrations[0].handler({ value: '平成2年4月15日' });
+	registrations[1].handler({ value: '' });
+	registrations[2].handler({ value: '2026' });
+	assert.deepEqual(notifications, [
+		['birth', 'success', '1990-04-15'],
+		['contract', 'empty', null],
+	]);
+	assert.deepEqual(calls, [
+		['error', 'Person_birth_date_input', null],
+		['value', 'Person_birth_date', '1990-04-15'],
+		['error', 'Contract_date_input', null],
+		['value', 'Contract_date', null],
+		['error', 'Report_year_input', null],
+		['value', 'Report_year', '2026年'],
+	]);
+});

@@ -1,6 +1,6 @@
 /** 日付処理に関する処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.1.0
+ * @version 1.2.0
  */
 /* exported convertToSeireki, convertToEra, convertToYear, convertToYearMonth, convertToAge, registerFormBridgeDateInputHandler */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_du_)で始める
@@ -563,6 +563,8 @@ const _DU_FORM_BRIDGE_DATE_INPUT_TYPES = {
  * @param {'date'|'year'|'yearMonth'} options.type 必須の変換種別
  * @param {string} [options.invalidMessage] 変換不成立時のメッセージ（省略時は種別ごとの既定文）
  * @param {string} [options.exceptionMessage] 変換関数の例外時に表示する固定メッセージ（省略時は例外のメッセージ）
+ * @param {function} [options.afterChange] 値・エラー設定の完了後に同期実行するコールバック。
+ *   `{ event, inputFieldCode, savedFieldCode, status, savedValue, errorMessage }` を1回だけ受け取る
  * @returns {void}
  * @throws {Error} 登録引数・依存APIが不正な場合、またはイベント内の値・エラー設定が失敗した場合
  */
@@ -577,12 +579,14 @@ const registerFormBridgeDateInputHandler = (inputFieldCode, savedFieldCode, opti
 		throw new Error('optionsはオブジェクトである必要があります');
 	if (
 		Object.keys(options).some(
-			(key) => !['type', 'invalidMessage', 'exceptionMessage'].includes(key)
+			(key) => !['type', 'invalidMessage', 'exceptionMessage', 'afterChange'].includes(key)
 		)
 	)
-		throw new Error('optionsにはtype、invalidMessage、exceptionMessageのみ指定できます');
+		throw new Error(
+			'optionsにはtype、invalidMessage、exceptionMessage、afterChangeのみ指定できます'
+		);
 
-	const { type, invalidMessage, exceptionMessage } = options;
+	const { type, invalidMessage, exceptionMessage, afterChange } = options;
 	if (
 		typeof type !== 'string' ||
 		!Object.prototype.hasOwnProperty.call(_DU_FORM_BRIDGE_DATE_INPUT_TYPES, type)
@@ -598,6 +602,8 @@ const registerFormBridgeDateInputHandler = (inputFieldCode, savedFieldCode, opti
 		(typeof exceptionMessage !== 'string' || !exceptionMessage.trim())
 	)
 		throw new Error('exceptionMessageは空でない文字列である必要があります');
+	if (afterChange !== undefined && typeof afterChange !== 'function')
+		throw new Error('afterChangeは関数である必要があります');
 	const typeConfig = _DU_FORM_BRIDGE_DATE_INPUT_TYPES[type];
 	const invalidText =
 		invalidMessage === undefined ? typeConfig.defaultInvalidMessage : invalidMessage;
@@ -626,15 +632,31 @@ const registerFormBridgeDateInputHandler = (inputFieldCode, savedFieldCode, opti
 		)
 			throw new TypeError('FormBridgeの変更イベントにvalueがありません');
 
+		// 値・エラー設定の正常完了後に、変更イベント1回につき1回だけ同期通知する。
+		// コールバックの例外はそのまま伝播させ、変換エラーへの置き換え・保存値の消去は行わない。
+		const notifyAfterChange = (status, notifiedSavedValue, errorMessage) => {
+			if (afterChange === undefined) return;
+			afterChange({
+				event,
+				inputFieldCode,
+				savedFieldCode,
+				status,
+				savedValue: notifiedSavedValue,
+				errorMessage,
+			});
+		};
+
 		fb.setFieldError(inputFieldCode, null);
 		const value = event.value;
 		if (value === null || value === undefined || value === '') {
 			fb.setFieldValue(savedFieldCode, typeConfig.clearValue);
+			notifyAfterChange('empty', typeConfig.clearValue, null);
 			return;
 		}
 		if (typeof value !== 'string') {
 			fb.setFieldValue(savedFieldCode, typeConfig.clearValue);
 			fb.setFieldError(inputFieldCode, '文字列で入力してください。');
+			notifyAfterChange('invalid', typeConfig.clearValue, '文字列で入力してください。');
 			return;
 		}
 
@@ -651,14 +673,17 @@ const registerFormBridgeDateInputHandler = (inputFieldCode, savedFieldCode, opti
 						: typeConfig.defaultInvalidMessage;
 			fb.setFieldValue(savedFieldCode, typeConfig.clearValue);
 			fb.setFieldError(inputFieldCode, errorText);
+			notifyAfterChange('invalid', typeConfig.clearValue, errorText);
 			return;
 		}
 		if (savedValue === undefined) {
 			fb.setFieldValue(savedFieldCode, typeConfig.clearValue);
 			fb.setFieldError(inputFieldCode, invalidText);
+			notifyAfterChange('invalid', typeConfig.clearValue, invalidText);
 			return;
 		}
 		fb.setFieldValue(savedFieldCode, savedValue);
+		notifyAfterChange('success', savedValue, null);
 	});
 };
 
