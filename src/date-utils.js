@@ -1,8 +1,8 @@
 /** 日付処理に関する処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.0.0
+ * @version 1.1.0
  */
-/* exported convertToSeireki, convertToEra, convertToYear, convertToYearMonth, convertToAge */
+/* exported convertToSeireki, convertToEra, convertToYear, convertToYearMonth, convertToAge, registerFormBridgeDateInputHandler */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_du_)で始める
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
@@ -523,6 +523,145 @@ const convertToAge = (birthDate, asOfDate = new Date(), useLegalAge = false) => 
 
 	return age;
 };
+
+// FormBridge用日付入力ハンドラーの種別定義（変換関数・保存形式・消去値・既定文言）
+const _DU_FORM_BRIDGE_DATE_INPUT_TYPES = {
+	date: {
+		clearValue: null,
+		defaultInvalidMessage: '日付の形式で入力してください。',
+		convert: (value) => convertToSeireki(value),
+		toSavedValue: (result) =>
+			typeof result === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : undefined,
+	},
+	year: {
+		clearValue: '',
+		defaultInvalidMessage: '年の形式で入力してください。',
+		convert: (value) => convertToYear(value),
+		toSavedValue: (result) => (Number.isSafeInteger(result) ? `${result}年` : undefined),
+	},
+	yearMonth: {
+		clearValue: '',
+		defaultInvalidMessage: '年月の形式で入力してください。',
+		convert: (value) => convertToYearMonth(value),
+		toSavedValue: (result) =>
+			result !== null &&
+			typeof result === 'object' &&
+			Number.isSafeInteger(result.year) &&
+			Number.isSafeInteger(result.month) &&
+			result.month >= 1 &&
+			result.month <= 12
+				? `${result.year}年${result.month}月`
+				: undefined,
+	},
+};
+
+/**
+ * FormBridge新バージョンAPIの入力欄変更時に日付・年・年月を変換し、別の保存欄へ設定する
+ * @param {string} inputFieldCode 入力フィールドコード
+ * @param {string} savedFieldCode 保存フィールドコード（入力欄とは異なるコード）
+ * @param {object} options 登録オプション
+ * @param {'date'|'year'|'yearMonth'} options.type 必須の変換種別
+ * @param {string} [options.invalidMessage] 変換不成立時のメッセージ（省略時は種別ごとの既定文）
+ * @param {string} [options.exceptionMessage] 変換関数の例外時に表示する固定メッセージ（省略時は例外のメッセージ）
+ * @returns {void}
+ * @throws {Error} 登録引数・依存APIが不正な場合、またはイベント内の値・エラー設定が失敗した場合
+ */
+const registerFormBridgeDateInputHandler = (inputFieldCode, savedFieldCode, options = {}) => {
+	if (typeof inputFieldCode !== 'string' || !inputFieldCode.trim())
+		throw new Error('inputFieldCodeは空でない文字列である必要があります');
+	if (typeof savedFieldCode !== 'string' || !savedFieldCode.trim())
+		throw new Error('savedFieldCodeは空でない文字列である必要があります');
+	if (inputFieldCode === savedFieldCode)
+		throw new Error('inputFieldCodeとsavedFieldCodeには異なるコードを指定してください');
+	if (options === null || typeof options !== 'object' || Array.isArray(options))
+		throw new Error('optionsはオブジェクトである必要があります');
+	if (
+		Object.keys(options).some(
+			(key) => !['type', 'invalidMessage', 'exceptionMessage'].includes(key)
+		)
+	)
+		throw new Error('optionsにはtype、invalidMessage、exceptionMessageのみ指定できます');
+
+	const { type, invalidMessage, exceptionMessage } = options;
+	if (
+		typeof type !== 'string' ||
+		!Object.prototype.hasOwnProperty.call(_DU_FORM_BRIDGE_DATE_INPUT_TYPES, type)
+	)
+		throw new Error('typeはdate、year、yearMonthのいずれかである必要があります');
+	if (
+		invalidMessage !== undefined &&
+		(typeof invalidMessage !== 'string' || !invalidMessage.trim())
+	)
+		throw new Error('invalidMessageは空でない文字列である必要があります');
+	if (
+		exceptionMessage !== undefined &&
+		(typeof exceptionMessage !== 'string' || !exceptionMessage.trim())
+	)
+		throw new Error('exceptionMessageは空でない文字列である必要があります');
+	const typeConfig = _DU_FORM_BRIDGE_DATE_INPUT_TYPES[type];
+	const invalidText =
+		invalidMessage === undefined ? typeConfig.defaultInvalidMessage : invalidMessage;
+
+	if (
+		typeof formBridge === 'undefined' ||
+		!formBridge ||
+		!formBridge.events ||
+		typeof formBridge.events.on !== 'function'
+	)
+		throw new Error('formBridge.events.onが利用できません');
+	if (
+		typeof window === 'undefined' ||
+		!window.formBridgeCustomLib ||
+		typeof window.formBridgeCustomLib.setFieldValue !== 'function' ||
+		typeof window.formBridgeCustomLib.setFieldError !== 'function'
+	)
+		throw new Error('formBridgeCustomLib v1.0.1以上が利用できません');
+	const fb = window.formBridgeCustomLib;
+
+	formBridge.events.on(`form.field.change.${inputFieldCode}`, (event) => {
+		if (
+			!event ||
+			typeof event !== 'object' ||
+			!Object.prototype.hasOwnProperty.call(event, 'value')
+		)
+			throw new TypeError('FormBridgeの変更イベントにvalueがありません');
+
+		fb.setFieldError(inputFieldCode, null);
+		const value = event.value;
+		if (value === null || value === undefined || value === '') {
+			fb.setFieldValue(savedFieldCode, typeConfig.clearValue);
+			return;
+		}
+		if (typeof value !== 'string') {
+			fb.setFieldValue(savedFieldCode, typeConfig.clearValue);
+			fb.setFieldError(inputFieldCode, '文字列で入力してください。');
+			return;
+		}
+
+		let savedValue;
+		try {
+			// 設定APIの例外はこの変換専用のcatchに含めない。
+			savedValue = typeConfig.toSavedValue(typeConfig.convert(value));
+		} catch (error) {
+			const errorText =
+				exceptionMessage !== undefined
+					? exceptionMessage
+					: error && typeof error.message === 'string' && error.message.trim()
+						? error.message
+						: typeConfig.defaultInvalidMessage;
+			fb.setFieldValue(savedFieldCode, typeConfig.clearValue);
+			fb.setFieldError(inputFieldCode, errorText);
+			return;
+		}
+		if (savedValue === undefined) {
+			fb.setFieldValue(savedFieldCode, typeConfig.clearValue);
+			fb.setFieldError(inputFieldCode, invalidText);
+			return;
+		}
+		fb.setFieldValue(savedFieldCode, savedValue);
+	});
+};
+
 if (typeof window !== 'undefined') {
 	window.DATE = window.DATE || {};
 	Object.assign(window.DATE, {
@@ -531,6 +670,7 @@ if (typeof window !== 'undefined') {
 		convertToYear,
 		convertToYearMonth,
 		convertToAge,
+		registerFormBridgeDateInputHandler,
 	});
 }
 
@@ -543,6 +683,7 @@ try {
 			convertToYear,
 			convertToYearMonth,
 			convertToAge,
+			registerFormBridgeDateInputHandler,
 		};
 	}
 } catch (e) {}

@@ -22,6 +22,7 @@
 		'convertToYear',
 		'convertToYearMonth',
 		'convertToAge',
+		'registerFormBridgeDateInputHandler',
 		// kintone-custom-lib.js
 		'escapeKintoneQueryValue',
 		'notifyError',
