@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.0.0** です。
+現行ソースは **1.1.0** です。確認済み通常配布版は **1.0.0** です（1.1.0の配布確認は未実施）。
 
 このドキュメントは `src/date-utils.js` が公開する日付ユーティリティ関数群の使い方と引数・戻り値の契約を整理したリファレンスです。ブラウザや kintone 上で直接 `window` 経由で利用できることを前提としています。
 
@@ -23,6 +23,7 @@
 - `convertToYear`: 様々な入力から西暦年（数値）だけを抽出します。
 - `convertToYearMonth`: 様々な入力から西暦の年と月を抽出し、`{ year, month }` 形式で返します（月が欠ける場合は月を `1` として扱います）。
 - `convertToAge`: 生年月日と基準日から年齢を返します（`false`: 満年齢、`true`: 法律ベース年齢）。
+- `registerFormBridgeDateInputHandler`: FormBridge新バージョンAPIの入力欄変更時に日付・年・年月を変換し、別の保存欄へ設定するハンドラーを登録します。
 
 このライブラリは内部で次のような前処理・正規化を行います:
 
@@ -41,9 +42,23 @@
 - 配布URL：https://js.kacsw.or.jp/date-utils.js
 - 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
 
-ブラウザでは `window.DATE` 名前空間に公開します。Nodeでは `require("../src/date-utils.js")` のCommonJSエクスポートを利用できます。元号定義は内蔵しています。
+ブラウザでは `window.DATE` 名前空間に公開します。Nodeでは `require("../src/date-utils.js")` のCommonJSエクスポートを利用できます。元号定義は内蔵しています。日付変換関数の利用にイベント登録や外部ライブラリは不要です。
+
+FormBridge用ハンドラーは、次の順で読み込んで利用してください。
+
+1. [formbridge-custom-lib.js](formbridge-custom-lib.md) **v1.0.1以上**（公開名前空間 `window.formBridgeCustomLib`）
+2. `date-utils.js` **v1.1.0以上**
+3. 利用側の登録コード
+
+FormBridge用の依存は登録関数を呼ぶ時点で確認します。読み込むだけではイベント登録・値変更・外部通信は行いません。通常のWebページやkintoneでの既存機能にFormBridgeの依存は追加されません。`text-suite.js`、`kintone-custom-lib.js`、`all-window-exports.js` はFormBridge用日付入力ハンドラーには不要です。
+
+登録時には直接参照できる `formBridge.events.on` と共通基盤の公開設定関数を確認します。`window.formBridge` は参照せず、そこへのAPIのコピーも不要です（`window.formBridge` のみ存在する環境でも動作します）。登録時には `formBridge.fn` を要求しません。値・エラー設定は回答画面の表示後に発生する変更イベント内で共通基盤を通して行います。DOM操作には依存しません。
+
+利用側で `formBridgeCustomLib.createDependencyChecker` により依存確認する場合の正式な関数パスは `DATE.registerFormBridgeDateInputHandler` です（既存日付関数と同様に `window.DATE` 配下に公開されます）。
 
 ## 公開関数の目次
+
+### 共通ユーティリティ
 
 | 関数名 | 機能 | リファレンス |
 | --- | --- | --- |
@@ -53,13 +68,21 @@
 | `convertToYearMonth(date)` | 日付から西暦年と月を取得する。月が欠ける場合は1を既定値とする。 | [参照](#convertToYearMonth) |
 | `convertToAge(birthDate, asOfDate?, useLegalAge?)` | 生年月日と基準日から年齢を算出する。 | [参照](#convertToAge) |
 
+### FormBridge
+
+| 関数名 | 機能 | リファレンス |
+| --- | --- | --- |
+| `registerFormBridgeDateInputHandler(inputFieldCode, savedFieldCode, options)` | 入力欄の変更時に日付・年・年月を変換し、別の保存欄へ設定する。 | [参照](#registerformbridgedateinputhandler) |
+
 ---
 
 ## 関数リファレンス
 
+### 共通ユーティリティ
+
 <a id="convertToSeireki"></a>
 
-### `convertToSeireki(date)`
+#### `convertToSeireki(date)`
 
 概要:
 
@@ -98,7 +121,7 @@ convertToSeireki(new Date('2025-10-14')); // -> '2025-10-14'
 
 <a id="convertToEra"></a>
 
-### `convertToEra(date)`
+#### `convertToEra(date)`
 
 概要:
 
@@ -130,7 +153,7 @@ convertToEra('2025-10-14');
 
 <a id="convertToYear"></a>
 
-### `convertToYear(date)`
+#### `convertToYear(date)`
 
 概要:
 
@@ -162,7 +185,7 @@ convertToYear('2025'); // -> 2025
 
 <a id="convertToYearMonth"></a>
 
-### `convertToYearMonth(date)`
+#### `convertToYearMonth(date)`
 
 概要:
 
@@ -196,7 +219,7 @@ convertToYearMonth('2025'); // -> { year: 2025, month: 1 }
 
 <a id="convertToAge"></a>
 
-### `convertToAge(birthDate, asOfDate, useLegalAge)`
+#### `convertToAge(birthDate, asOfDate, useLegalAge)`
 
 概要:
 
@@ -268,6 +291,77 @@ console.log(DATE.convertToEra('1989-01-08')); // { kanji: '平成1年', initial:
 
 ---
 
+### FormBridge
+
+<a id="registerformbridgedateinputhandler"></a>
+
+#### `registerFormBridgeDateInputHandler(inputFieldCode, savedFieldCode, options)`
+
+入力欄の `form.field.change.<inputFieldCode>` に同期ハンドラーを1つ登録します。戻り値は `void` です。登録関数は一組につき一度だけ呼んでください（重複登録の抑止・解除は行いません）。初期読み込み時に登録でき、`form.show` 内での再登録は不要です。登録しただけでは値・エラーを変更しません。
+
+| 引数・オプション           | 型・既定値         | 契約                                                                 |
+| -------------------------- | ------------------ | -------------------------------------------------------------------- |
+| `inputFieldCode`           | string、必須       | 空白のみでない入力欄コード                                           |
+| `savedFieldCode`           | string、必須       | 空白のみでない保存欄コード。入力欄と同じコードは登録時エラー         |
+| `options`                  | object、必須       | 配列・nullは不可。下記以外のキーは登録時エラー                       |
+| `options.type`             | string、必須       | `'date'`／`'year'`／`'yearMonth'` のいずれか1つ                      |
+| `options.invalidMessage`   | string、下表の文言 | 変換不成立時のみ上書き。空文字・空白のみは不可                       |
+| `options.exceptionMessage` | string、省略可     | 変換関数の例外時に表示する固定文言。省略時は例外のメッセージを表示   |
+
+フィールドコードは別々に明示指定し、`_input` などの命名規則には依存しません。不正引数・不正オプション・登録時の依存不足は例外として表面化し、イベントは登録しません。`clearValue` や空欄時の保存値保持などのオプションはありません。消去値は `type` から一意に決まります。
+
+| `type`      | 使用する既存関数     | 保存形式                            | 空欄・変換失敗時の消去値 | 既定の変換不成立メッセージ         |
+| ----------- | -------------------- | ----------------------------------- | ------------------------ | ---------------------------------- |
+| `date`      | `convertToSeireki`   | `YYYY-MM-DD`（例: `2026-11-02`）    | **`null`**               | 日付の形式で入力してください。     |
+| `year`      | `convertToYear`      | `${year}年`（例: `2026年`）         | **`''`**                 | 年の形式で入力してください。       |
+| `yearMonth` | `convertToYearMonth` | `${year}年${month}月`（例: `2026年4月`） | **`''`**            | 年月の形式で入力してください。     |
+
+年月の月はゼロ埋めしません（例: `2026年4月`）。受理する表記・日付の妥当性・和暦等の解釈は既存変換関数の仕様のままで、独自の解析処理は追加していません。既存関数の戻り値が所定の形（日付は `YYYY-MM-DD` 文字列、年は整数、年月は年・月とも整数で月が1〜12）でない場合は変換不成立として扱い、不成立結果を文字列化して保存しません。
+
+イベント処理は次の順序です。
+
+1. イベント引数に自身の `value` があることを確認し、入力欄の既存エラーを `setFieldError(inputFieldCode, null)` で解除します。`value` のないイベントは例外です。変更イベント中のレコード取得値は変更前の場合があるため、レコード取得・旧context getter/setterは使用しません。
+2. `value` が `null`、`undefined`、`''` の場合は空欄として保存欄を種別の消去値（日付は `null`、年・年月は `''`）にします。変換関数は呼びません。空白のみの文字列は空欄扱いせず、既存変換関数へ渡してその結果に従います。
+3. 空欄以外の非文字列（`0`、`false`、配列、オブジェクト、その他の数値等）は暗黙に文字列化せず、保存欄を種別の消去値にし、入力欄に `文字列で入力してください。` と表示します。
+4. 文字列は種別の既存変換関数に渡します。変換例外では保存欄を種別の消去値にし、`exceptionMessage`（省略時は例外のメッセージ、例外に利用可能なメッセージがない場合は種別ごとの既定文）を入力欄に表示します。
+5. 変換不成立では保存欄を種別の消去値にし、`invalidMessage`（省略時は種別ごとの既定文）を入力欄に表示します。正常時は所定の形式で保存欄へ設定します。
+
+入力欄の値・イベント内のレコードは変更しません。値・エラー設定はすべて `window.formBridgeCustomLib.setFieldValue` / `setFieldError` を使用します。変換失敗として処理する `try/catch` は変換処理に限定しており、これらの設定APIの例外はそのまま伝播し、変換エラーへの置き換え・再試行・フォールバックは行いません。初期表示時の保存欄から入力欄への転記や登録直後の自動変換は行わないため、初期転記が必要な場合は利用側の既存処理を維持してください。
+
+##### 日付・年・年月の登録例
+
+生年月日（日付）・国家試験年（年）・養成施設卒業年月（年月）を登録する例です。フィールドコードは説明用であり、利用するフォームに合わせて置き換えてください。
+
+```js
+(function () {
+	registerFormBridgeDateInputHandler('Birthday_input', 'Birthday', {
+		type: 'date',
+	});
+	registerFormBridgeDateInputHandler(
+		'National_examination_year_input',
+		'National_examination_year',
+		{
+			type: 'year',
+			invalidMessage: '国家試験年の形式で入力してください。',
+			exceptionMessage: '国家試験年の形式が正しくありません。',
+		}
+	);
+	registerFormBridgeDateInputHandler(
+		'Training_facility_school_completion_date_input',
+		'Training_facility_school_completion_date',
+		{
+			type: 'yearMonth',
+			invalidMessage: '年月の形式で入力してください。',
+			exceptionMessage: '年月の形式が正しくありません。',
+		}
+	);
+})();
+```
+
+このAPIは、日付・年・年月の変換、保存欄への設定、エラー表示の共通部分を扱います。変換後の値に業務処理を連動させる仕組み（コールバック等）はありません。フォーム固有の実装・業務条件まで一律に置き換えられることは保証しません。
+
+---
+
 ## 制約・注意事項
 
 ### 注意事項 / エッジケース
@@ -278,6 +372,15 @@ console.log(DATE.convertToEra('1989-01-08')); // { kanji: '平成1年', initial:
 - 日付の部分（年/月/日）に 0 が来た場合は `1` に補正する挙動が一部の変換で採用されています（内部の互換処理に起因）。
 - 西暦形式（`YYYY-MM-DD`）での入力では、月が 1～12、日が各月の有効範囲内であることが厳密に検証されます。例えば `2026-13-27`（13月）や `2026-02-30`（2月30日）のような不在の日付はエラーになります。
 - 出力は常に安定した形式（`YYYY-MM-DD` など）を返すようにしていますが、利用先での表示やローカライズは呼び出し側で行ってください。
+
+### FormBridge用ハンドラーの注意事項
+
+- FormBridgeは[新バージョンAPI](https://formbridge.kintoneapp.com/help/customize/v2)のみ対象です。旧context APIへの自動切り替えはありません。
+- 対象は通常フィールドの変更イベントのみです。サブテーブル、初期表示時の値転記、変換後の値に連動する業務処理（コールバック等）は対象外です。
+- `YYYY-MM-DD` を保存する日付欄の消去値は `null`、文字列を保存する年・年月欄の消去値は `''` に固定です。日付保存欄へ `''` を設定することはありません。空欄時に保存値を保持する設定もありません。
+- 既存の個別フォーム処理から移行する場合は、利用側で旧ハンドラーを削除して二重登録を防いでください。初期表示時の保存欄から入力欄への転記は、利用側の既存処理を維持してください。
+- 自動テストはグローバルの `const formBridge` のみ存在する環境と `window.formBridge` のみ存在する環境、表示前の登録・表示後の設定、エラー解除、設定APIの例外伝播などをモックで確認します。実画面での動作を保証するものではありません。
+- 本番配布前に、実FormBridgeでライブラリ順序、回答画面表示前の登録、対象の各欄の正常変換・入力欄保持、変換不成立・例外時のエラー表示、その後の正常入力・空欄化での解除、空欄時の保存欄消去（日付は `null`、年・年月は `''`）を確認してください。既存のフォーム固有処理との競合や重複登録も確認が必要です。
 
 ---
 
@@ -295,6 +398,7 @@ console.log(DATE.convertToEra('1989-01-08')); // { kanji: '平成1年', initial:
 
 | バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
 | ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| 1.1.0      | 2026-11-02 | FormBridge用日付・年・年月入力ハンドラー（`registerFormBridgeDateInputHandler`）、公開設定・自動テストを追加。既存変換関数の仕様変更なし | 配布・配布確認は未実施                                 |
 | 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
 | 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `226cf91`。初版作成日・配布日は未確認                  |
 | 未設定     | 2026-03-06 | `H13/5` などの和暦年月フォールバック解析を修正              | `5d64233`。配布確認は未確認                            |
