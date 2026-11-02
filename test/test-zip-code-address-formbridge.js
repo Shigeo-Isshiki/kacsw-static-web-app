@@ -108,6 +108,186 @@ function setup({ base = true, lexical = true, options = {}, prefix = '' } = {}) 
 	return { context, handlers, calls, errors, requests, record, register, dispatch, show, change };
 }
 
+test('invalidate suppresses reserved and running successes and failures without side effects', async () => {
+	for (const running of [false, true]) {
+		for (const fail of [false, true]) {
+			const env = setup();
+			let transforms = 0;
+			let callbacks = 0;
+			const controller = env.register({
+				transformAddress: (value) => {
+					transforms++;
+					return value;
+				},
+				afterApply: () => callbacks++,
+			});
+			env.show();
+			env.change('A1B2C3D');
+			if (running) await tick();
+			const pending = controller.whenIdle();
+			env.context.mockFormBridge.fn.setFieldValueError('zip', '業務側のエラー');
+			const before = clone(env.record);
+			const calls = clone(env.calls);
+			const handlers = [...env.handlers.values()].map((list) => list.length);
+			assert.equal(controller.invalidate(), undefined);
+			controller.invalidate();
+			assert.equal(controller.whenIdle(), pending, 'invalidation keeps the observation target');
+			assert.deepEqual(env.calls, calls);
+			assert.deepEqual(env.record, before);
+			assert.equal(transforms, 0);
+			assert.equal(callbacks, 0);
+			if (running) {
+				let settled = false;
+				pending.then(() => {
+					settled = true;
+				});
+				await tick();
+				assert.equal(settled, false, 'observation still waits for the old request to finish');
+				if (fail) env.requests[0].reject(new Error('old failure'));
+				else env.requests[0].resolve(response());
+			}
+			assert.equal((await pending).status, 'stale');
+			assert.equal(env.requests.length, running ? 1 : 0);
+			assert.deepEqual(env.calls, calls, 'including the existing field error');
+			assert.deepEqual(env.record, before);
+			assert.equal(transforms, 0);
+			assert.equal(callbacks, 0);
+			assert.deepEqual(env.errors, []);
+			assert.deepEqual(
+				[...env.handlers.values()].map((list) => list.length),
+				handlers,
+				'no event re-registration'
+			);
+		}
+	}
+});
+
+test('invalidate distinguishes identical ZIPs and preserves new results in either response order', async () => {
+	for (const oldFirst of [false, true]) {
+		const env = setup();
+		let callbacks = 0;
+		const controller = env.register({ afterApply: () => callbacks++ });
+		env.show();
+		env.change('1234567');
+		await tick();
+		const old = controller.whenIdle();
+		controller.invalidate();
+		env.change('1234567');
+		const latest = controller.whenIdle();
+		assert.notEqual(old, latest);
+		await tick();
+		if (oldFirst) {
+			env.requests[0].resolve(response(row({ town_name: '古い住所' })));
+			assert.equal((await old).status, 'stale');
+			assert.equal(env.record.address.value, '');
+		}
+		env.requests[1].resolve(response(row({ town_name: '新しい住所' })));
+		assert.equal((await latest).status, 'applied');
+		const before = clone(env.record);
+		if (!oldFirst) {
+			env.requests[0].resolve(response(row({ town_name: '古い住所' })));
+			assert.equal((await old).status, 'stale');
+		}
+		assert.deepEqual(env.record, before);
+		assert.match(env.record.savedAddress.value, /新しい住所/);
+		assert.equal(callbacks, 1);
+		controller.invalidate();
+		assert.equal(controller.whenIdle(), latest, 'settled results are not rewritten');
+		assert.equal((await controller.whenIdle()).status, 'applied');
+		assert.deepEqual(env.record, before, 'applied values are not rolled back');
+	}
+});
+
+test('invalidate isolates registrations and leaves manual synchronization enabled', async () => {
+	const env = setup();
+	Object.assign(env.record, initialRecord('second'));
+	const first = env.register();
+	const second = env.register({}, 'second');
+	const initial = first.whenIdle();
+	first.invalidate();
+	assert.equal(first.whenIdle(), initial);
+	assert.equal((await initial).status, 'skipped');
+	env.show();
+	env.change('1234567');
+	env.change('7654321', 'secondzip');
+	await tick();
+	first.invalidate();
+	env.change('手入力住所', 'address');
+	assert.equal(env.record.savedAddress.value, '手入力住所');
+	env.change(null, 'extra');
+	assert.equal(env.record.savedExtra.value, '');
+	env.requests[0].resolve(response());
+	env.requests[1].resolve(response(row({ zip_code: '7654321' })));
+	assert.equal((await first.whenIdle()).status, 'stale');
+	assert.equal((await second.whenIdle()).status, 'applied');
+	assert.equal(env.record.savedAddress.value, '手入力住所');
+	assert.equal(env.record.secondsavedZip.value, '765-4321');
+});
+
+test('invalidate remains repeatable across navigation and cannot revive a disposed registration', async () => {
+	const env = setup();
+	const controller = env.register();
+	for (const stop of ['confirm.show', 'finish.show', 'form.show', 'dispose']) {
+		env.show();
+		env.change('1234567');
+		await tick();
+		const request = env.requests.at(-1);
+		const pending = controller.whenIdle();
+		controller.invalidate();
+		if (stop === 'dispose') controller.dispose();
+		else env.dispatch(stop);
+		controller.invalidate();
+		request.reject(new Error('late failure'));
+		assert.equal((await pending).status, 'stale');
+	}
+	const calls = clone(env.calls);
+	const count = env.requests.length;
+	controller.dispose();
+	controller.invalidate();
+	env.show();
+	env.change('1234567');
+	env.change('停止後', 'address');
+	await tick();
+	assert.equal(env.requests.length, count);
+	assert.deepEqual(env.calls, calls);
+	assert.deepEqual(env.errors, []);
+});
+
+test('invalidation during synchronous conversion or setting stops remaining callbacks and writes', async () => {
+	for (const during of ['conversion', 'setter', 'throwing-conversion']) {
+		const env = setup();
+		let transforms = 0;
+		let callbacks = 0;
+		const controller = env.register({
+			transformAddress: (value) => {
+				transforms++;
+				if (during !== 'setter') controller.invalidate();
+				if (during === 'throwing-conversion') throw new Error('invalidated conversion');
+				return value;
+			},
+			afterApply: () => callbacks++,
+		});
+		env.show();
+		if (during === 'setter') {
+			const set = env.context.mockFormBridge.fn.setFieldValue;
+			env.context.mockFormBridge.fn.setFieldValue = (code, value) => {
+				set(code, value);
+				controller.invalidate();
+			};
+		}
+		env.change('1234567');
+		await tick();
+		env.requests[0].resolve(response());
+		assert.equal((await controller.whenIdle()).status, 'stale');
+		assert.equal(transforms, during === 'setter' ? 2 : 1);
+		assert.equal(callbacks, 0);
+		assert.equal(env.record.zip.value, during === 'setter' ? '123-4567' : '');
+		assert.equal(env.record.savedZip.value, '');
+		assert.equal(env.record.address.value, '');
+		assert.deepEqual(env.errors, []);
+	}
+});
+
 test('exports are inert; lexical const API can register before fn and resolves fn after show', async () => {
 	const env = setup();
 	assert.equal(env.context.formBridge, undefined);
@@ -1014,4 +1194,22 @@ test('documented generic example updates both address pairs and clears the extra
 	assert.deepEqual(env.errors, []);
 	env.change('手入力', 'Primary_line_1_entry');
 	assert.equal(env.record.Primary_line_1_value.value, env.context.toFullWidth('手入力', false));
+
+	const clearExample = doc
+		.split('<a id="formbridge-invalidate-example"></a>')[1]
+		.match(/```js\n([\s\S]*?)```/)[1];
+	vm.runInContext(clearExample, env.context);
+	env.change('A1B2C3D', 'Primary_postal_entry');
+	env.change('7654321', 'Secondary_postal_entry');
+	await tick();
+	const old = primary.whenIdle();
+	vm.runInContext('clearPrimaryAddress()', env.context);
+	for (const [code, field] of Object.entries(env.record))
+		if (code.startsWith('Primary_')) assert.equal(field.value, '');
+	env.requests[4].resolve(response());
+	env.requests[5].resolve(response(row({ zip_code: '7654321' })));
+	assert.equal((await old).status, 'stale');
+	assert.equal((await secondary.whenIdle()).status, 'formatted');
+	assert.equal(env.record.Primary_line_1_value.value, '');
+	assert.equal(env.record.Secondary_postal_value.value, '765-4321');
 });
