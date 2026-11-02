@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソースは **1.3.0** です。FormBridge住所ハンドラーの戻り値に `invalidate()` を追加しました。1.3.0の配布・実画面動作は未確認です。確認済み通常配布版は **1.2.1** です。2026-11-01に1.2.1の通常配布URLとの一致を確認しました。同日、1.2.0で複数住所欄の `replaceOnZipCodeChange: true` を有効にした検索・補完・置換・入力／保存欄同期の実画面動作確認が完了し、問題なく動作したとの利用者報告を受領しました。配布の証跡は[通常配布確認記録](verification/library-distribution.md#追加確認zip-code-address-utils-121)、確認範囲は[利用側確認報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を参照してください。1.2.1についても、入力途中のコンソールエラーがなくなり、正しい出力ができ、存在しない郵便番号ではコンソールエラーが出るとの[利用者実画面確認報告](verification/library-distribution.md#zip-121-consumer-verification-2026-11-01)を受領しました。全API・全異常系の網羅確認ではありません。
+現行ソース・確認済み通常配布版は **1.3.0** です。FormBridge住所ハンドラーの戻り値に `invalidate()` を追加しました。2026-11-02に対象コミットのCI・本番デプロイ・パッケージ作成成功と通常配布URLの内容一致を確認しました。[配布証跡](verification/library-distribution.md#zip-130-distribution)を参照してください。1.3.0の実FormBridge動作は未確認です。2026-11-01には、1.2.0で複数住所欄の `replaceOnZipCodeChange: true` を有効にした検索・補完・置換・入力／保存欄同期の実画面動作確認が完了し、問題なく動作したとの利用者報告を受領しました。確認範囲は[利用側確認報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を参照してください。1.2.1についても、入力途中のコンソールエラーがなくなり、正しい出力ができ、存在しない郵便番号ではコンソールエラーが出るとの[利用者実画面確認報告](verification/library-distribution.md#zip-121-consumer-verification-2026-11-01)を受領しました。全API・全異常系の網羅確認ではありません。
 
 このドキュメントは `src/zip-code-address-utils.js` が公開する郵便番号／デジタルアドレス関連ユーティリティ関数の使い方と引数・戻り値の契約を整理したリファレンスです。テストや Node 環境でも `require('../src/zip-code-address-utils.js')` で利用できます（CommonJS エクスポートあり）。
 
@@ -640,7 +640,7 @@ function clearPrimaryAddress() {
 
 | バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
 | ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
-| 1.3.0      | 2026-11-02 | FormBridgeに `invalidate()` を追加。常時有効の世代保護を業務操作から通知可能にし、`whenIdle()` の観測契約を明文化 | 未コミット・配布未確認。[検証記録](verification/zip-code-address-utils.md#formbridge-invalidate-verification) |
+| 1.3.0      | 2026-11-02 | FormBridgeに `invalidate()` を追加。常時有効の世代保護を業務操作から通知可能にし、`whenIdle()` の観測契約を明文化 | `5cfb3dd`。2026-11-02に通常URLとの完全一致・CI・本番デプロイ・パッケージ作成成功を確認。[配布証跡](verification/library-distribution.md#zip-130-distribution)・[自動検証](verification/zip-code-address-utils.md#formbridge-invalidate-verification)。実FormBridgeは未確認 |
 | 1.2.1      | 2026-11-01 | FormBridgeの入力検証エラーはフィールド表示を維持し、コンソールログだけ抑制。追加設定なし・kintone版は維持 | `6b0717e`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-121)。入力途中のログ抑制・正しい出力・存在しない番号のログについて[実画面確認報告](verification/library-distribution.md#zip-121-consumer-verification-2026-11-01)を受領 |
 | 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持 | `9cfdc21`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)。導入機能の[実画面確認完了報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を利用者から受領 |
 | 1.1.0      | 2026-10-31 | FormBridge専用住所ハンドラー・入力／保存欄同期・世代管理を追加。kintone版は維持 | `cbdfc88`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)。実FormBridgeは未検証 |

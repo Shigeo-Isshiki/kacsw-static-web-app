@@ -433,3 +433,17 @@
 - SHA-256（通常URL取得物、1.2.1）：`75ed73a6ab7f252bdd2cb23c120bcc346ad88dddfc92ddc91f14196bf6acc7d5`。
 - 全体テスト・lint・ビルド・VM・Puppeteer・生成物一致は成功。[自動検証記録](zip-code-address-utils.md#formbridge-invalidate-verification)を参照してください。ローカル生成物の一致を通常配布の一致と混同しません。
 - 承認されたブランチ・PR手順で配布した後、確定コミットの各ワークフロー成功・通常URLのバイト一致・版数・ハッシュを改めて確認する必要があります。実FormBridgeでの通知APIと全フォーム横断の組み込み・移行は未確認・未実施です。
+
+<a id="zip-130-distribution"></a>
+
+## 追加確認：zip-code-address-utils 1.3.0
+
+- 確認日時：2026-11-02 21:57:32（日本時間、UTC+09:00）。
+- 対象：`zip-code-address-utils.js` 1.3.0。利用者承認後、PR #50を必須チェック成功後にマージ。対象コミットは [`5cfb3ddccf63b7a1da601ceef157107afe6614e1`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/5cfb3ddccf63b7a1da601ceef157107afe6614e1)。
+- 通常配布URL：[https://js.kacsw.or.jp/zip-code-address-utils.js](https://js.kacsw.or.jp/zip-code-address-utils.js)。`Cache-Control: no-cache` を付けたGETでHTTP 200、JSDoc 1.3.0、対象コミットのソースとバイト単位で完全一致。配布時変換はなく、ソースを直接照合しました。
+- SHA-256（対象コミットのソース・通常URL取得物）：`4d86c5ecddff9a41c1832e8e600ece0951800bd383a4b06a6517d9220739a0fb`。
+- 対象コミットのワークフロー結果：
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41448718537)：成功（Prettier・ESLint・全体テスト）。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41448718607)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41448718648)：パッケージ作成成功。生成された `package-zip` アーティファクトを取得し、`package.zip` 内の `zip-code-address-utils.js` が対象ソースとバイト単位・SHA-256とも一致することも確認しました。他ライブラリの収録内容を今回再検証したものではありません。
+- 配布前の不一致記録は履歴として保持します。今回の一致確認は、実FormBridgeでの通知APIの動作、利用側のキャッシュ更新、全フォームへの組み込み・移行の完了を保証しません。個別フォームは変更していません。
