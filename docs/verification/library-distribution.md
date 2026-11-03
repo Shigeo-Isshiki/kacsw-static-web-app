@@ -539,3 +539,17 @@
 - 今回の導入対象について利用者による実画面確認が完了しており、FormBridge共通化に関する追加改修依頼・回答待ち事項はないとの報告です。
 - この報告は記載された導入対象の動作確認を示すもので、共通ライブラリの全API・全入力条件・全異常系を実画面で網羅検証したことを意味しません。報告には実画面で読み込んだファイルの版数・ハッシュや個別条件ごとの確認内訳も含まれていません。
 - 過去の配布照合・自動テスト・実画面確認の未確認事項は、それぞれの確認時点の記録として保持します。今回の報告を配布内容の再照合やライブラリ全APIの検証結果として扱いません。
+
+<a id="text-suite-1-3-0-distribution-2026-11-03"></a>
+
+## text-suite 1.3.0 通常配布確認
+
+- 確認日：2026-11-03（日本時間、UTC+09:00）。
+- 対象コミット：[PR #58のマージコミット `a75fc7ce24855e3603be66b55d6170aa1fa8b68b`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/a75fc7ce24855e3603be66b55d6170aa1fa8b68b) の `src/text-suite.js`。
+- 配布URL：[https://js.kacsw.or.jp/text-suite.js](https://js.kacsw.or.jp/text-suite.js)。`Cache-Control: no-cache` を指定してGETし、HTTP 200、JSDocバージョン `1.3.0`、ソースとのバイト単位の完全一致（59,139 bytes）を確認しました。
+- SHA-256：`b1db36d4d27b095cd36f0d5fcb49233c6f0cb2429362b363a4eadedae145c378`（ソース・配布ファイル共通）。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41655785496)：成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41655785523)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41655785527)：配布パッケージ作成成功。
+- この記録は通常配布URLの内容一致を示すものであり、202フォームを含む利用先でのブラウザーキャッシュ更新や実画面動作の確認ではありません。
