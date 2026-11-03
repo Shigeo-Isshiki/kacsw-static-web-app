@@ -20,42 +20,42 @@
 
 ### ランタイム初期化
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `initKintoneCustomLibRuntime(options)` | PC・モバイルの実行環境を明示して初期化する。 | [参照](#initkintonecustomlibruntime) |
-| `resetKintoneCustomLibRuntime()` | 保持している実行環境設定をリセットする。 | [参照](#resetkintonecustomlibruntime) |
+| 関数名                                 | 機能                                         | リファレンス                          |
+| -------------------------------------- | -------------------------------------------- | ------------------------------------- |
+| `initKintoneCustomLibRuntime(options)` | PC・モバイルの実行環境を明示して初期化する。 | [参照](#initkintonecustomlibruntime)  |
+| `resetKintoneCustomLibRuntime()`       | 保持している実行環境設定をリセットする。     | [参照](#resetkintonecustomlibruntime) |
 
 ### 通知・ダイアログ
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `notifyError(message, title = 'エラー', allowHtml = false)` | エラー通知を表示する。 | [参照](#notifyerror) |
-| `notifyInfo(message, title = '情報', allowHtml = false)` | 情報通知を表示する。 | [参照](#notifyinfo) |
-| `notifyWarning(message, title = '注意', allowHtml = false)` | 警告通知を表示する。 | [参照](#notifywarning) |
-| `showYesNoDialog(message, title = '確認', options)` | はい・いいえの確認ダイアログを表示する。 | [参照](#showyesnodialog) |
-| `showInputDialog(options)` | 入力ダイアログを表示する。 | [参照](#showinputdialog) |
+| 関数名                                                      | 機能                                     | リファレンス             |
+| ----------------------------------------------------------- | ---------------------------------------- | ------------------------ |
+| `notifyError(message, title = 'エラー', allowHtml = false)` | エラー通知を表示する。                   | [参照](#notifyerror)     |
+| `notifyInfo(message, title = '情報', allowHtml = false)`    | 情報通知を表示する。                     | [参照](#notifyinfo)      |
+| `notifyWarning(message, title = '注意', allowHtml = false)` | 警告通知を表示する。                     | [参照](#notifywarning)   |
+| `showYesNoDialog(message, title = '確認', options)`         | はい・いいえの確認ダイアログを表示する。 | [参照](#showyesnodialog) |
+| `showInputDialog(options)`                                  | 入力ダイアログを表示する。               | [参照](#showinputdialog) |
 
 ### レコード・イベント補助
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `escapeKintoneQueryValue(value)` | kintoneクエリに埋め込む値をエスケープする。 | [参照](#escapekintonequeryvalue) |
-| `createDependencyChecker(requirements)` | 必要な外部関数の有無を確認する関数を生成する。 | [参照](#createdependencychecker) |
-| `getFieldValueOr(record, fieldCode, defaultValue)` | レコードからフィールド値を取得し、取得できない場合は既定値を返す。 | [参照](#getfieldvalueor) |
-| `kintoneEventOn(events, handler)` | kintoneイベントにハンドラーを登録する。 | [参照](#kintoneeventon) |
-| `getInputElementsByFieldCodes(fieldCodes, options)` | PC・モバイルの追加・編集画面の入力欄をフィールドコードから探す。 | [参照](#getinputelementsbyfieldcodes) |
-| `setRecordValues(record, values)` | レコード内の複数フィールドの値を設定する。 | [参照](#setrecordvalues) |
+| 関数名                                              | 機能                                                               | リファレンス                          |
+| --------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------- |
+| `escapeKintoneQueryValue(value)`                    | kintoneクエリに埋め込む値をエスケープする。                        | [参照](#escapekintonequeryvalue)      |
+| `createDependencyChecker(requirements)`             | 必要な外部関数の有無を確認する関数を生成する。                     | [参照](#createdependencychecker)      |
+| `getFieldValueOr(record, fieldCode, defaultValue)`  | レコードからフィールド値を取得し、取得できない場合は既定値を返す。 | [参照](#getfieldvalueor)              |
+| `kintoneEventOn(events, handler)`                   | kintoneイベントにハンドラーを登録する。                            | [参照](#kintoneeventon)               |
+| `getInputElementsByFieldCodes(fieldCodes, options)` | PC・モバイルの追加・編集画面の入力欄をフィールドコードから探す。   | [参照](#getinputelementsbyfieldcodes) |
+| `setRecordValues(record, values)`                   | レコード内の複数フィールドの値を設定する。                         | [参照](#setrecordvalues)              |
 
 ### ヘッダー・スペース要素操作
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `setHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)` | ヘッダーメニュースペースにボタンを設置する。 | [参照](#setheadermenuspacebutton) |
-| `setRecordHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)` | レコードヘッダースペースにボタンを設置する。 | [参照](#setrecordheadermenuspacebutton) |
-| `setRecordHeaderMenuSpaceText(id, innerHTML)` | レコードヘッダースペースにテキスト・HTMLを設定する。 | [参照](#setrecordheadermenuspacetext) |
-| `setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)` | スペースフィールドにボタンを設置する。 | [参照](#setspacefieldbutton) |
-| `setSpaceFieldText(spaceField, id, innerHTML)` | スペースフィールドにテキスト・HTMLを設定する。 | [参照](#setspacefieldtext) |
-| `setSpaceFieldDisplay(spaceField, display)` | スペースフィールドの表示・非表示を切り替える。 | [参照](#setspacefielddisplay) |
+| 関数名                                                                    | 機能                                                 | リファレンス                            |
+| ------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------- |
+| `setHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)`        | ヘッダーメニュースペースにボタンを設置する。         | [参照](#setheadermenuspacebutton)       |
+| `setRecordHeaderMenuSpaceButton(id, textContent, onClick, styleOptions)`  | レコードヘッダースペースにボタンを設置する。         | [参照](#setrecordheadermenuspacebutton) |
+| `setRecordHeaderMenuSpaceText(id, innerHTML)`                             | レコードヘッダースペースにテキスト・HTMLを設定する。 | [参照](#setrecordheadermenuspacetext)   |
+| `setSpaceFieldButton(spaceField, id, textContent, onClick, styleOptions)` | スペースフィールドにボタンを設置する。               | [参照](#setspacefieldbutton)            |
+| `setSpaceFieldText(spaceField, id, innerHTML)`                            | スペースフィールドにテキスト・HTMLを設定する。       | [参照](#setspacefieldtext)              |
+| `setSpaceFieldDisplay(spaceField, display)`                               | スペースフィールドの表示・非表示を切り替える。       | [参照](#setspacefielddisplay)           |
 
 ## 関数リファレンス
 
@@ -221,18 +221,21 @@ kintoneEventOn('app.record.create', function (event) {
 例（`jquery.autoKana.js` と jQuery を先に読み込んで利用）:
 
 ```js
-kintoneEventOn([
-	'app.record.create.show',
-	'app.record.edit.show',
-	'mobile.app.record.create.show',
-	'mobile.app.record.edit.show',
-], async (event) => {
-	const inputs = await getInputElementsByFieldCodes(['LAST_NAME', 'LAST_NAME_KANA']);
-	if (inputs.LAST_NAME && inputs.LAST_NAME_KANA) {
-		$.fn.autoKana($(inputs.LAST_NAME), $(inputs.LAST_NAME_KANA), { katakana: false });
+kintoneEventOn(
+	[
+		'app.record.create.show',
+		'app.record.edit.show',
+		'mobile.app.record.create.show',
+		'mobile.app.record.edit.show',
+	],
+	async (event) => {
+		const inputs = await getInputElementsByFieldCodes(['LAST_NAME', 'LAST_NAME_KANA']);
+		if (inputs.LAST_NAME && inputs.LAST_NAME_KANA) {
+			$.fn.autoKana($(inputs.LAST_NAME), $(inputs.LAST_NAME_KANA), { katakana: false });
+		}
+		return event;
 	}
-	return event;
-});
+);
 ```
 
 この API 自体には jQuery / autoKana の依存はありません。API エラーは呼び出し側で通知できます（上例では `kintoneEventOn` の非同期エラー処理に伝播します）。アプリ側の既存セレクターの置き換えは、配布後に別途行ってください。
@@ -650,14 +653,14 @@ setSpaceFieldButton('space-A', 'btn-3', '実行', () => console.log('clicked'), 
 
 2026-10-12に、`4acf76f` のソースと通常配布URLの内容が完全一致することを確認しました。CI・デプロイ・配布パッケージ作成も成功しています。確認日であり、初版の公開日を示すものではありません。詳細は [通常配布確認記録](verification/library-distribution.md) を参照してください。
 
-| バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
-| ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| バージョン | 記録日     | 主な変更                                                                  | 記録・配布確認                                                                                                                                |
+| ---------- | ---------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2.1.0      | 2026-10-25 | `getInputElementsByFieldCodes` を追加。PC・モバイルの項目名照合・警告集約 | `ac8a0f4`。通常配布 URL との完全一致を確認（2026-10-25）。[配布確認記録](verification/library-distribution.md#追加確認kintone-custom-lib-210) |
-| 2.0.0      | 2026-10-17 | サブテーブル操作ボタン制御の3公開関数を削除                  | `ee59b6d`。通常配布URLとの完全一致を確認（2026-10-17）  |
-| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
-| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `93fc72e`。初版作成日・配布日は未確認                  |
-| 未設定     | 2026-09-24 | ダイアログボタンをkintoneのスタイルに合わせる               | `e34aa9d`。配布確認は未確認                            |
-| 未設定     | 2026-09-26 | 依存チェックを追加し、仕様書を更新                          | `f75e4a7`。配布確認は未確認                            |
-| 未設定     | 2026-09-27 | kintoneクエリ値のエスケープヘルパーを追加                   | `67d7c6a`。配布確認は未確認                            |
+| 2.0.0      | 2026-10-17 | サブテーブル操作ボタン制御の3公開関数を削除                               | `ee59b6d`。通常配布URLとの完全一致を確認（2026-10-17）                                                                                        |
+| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし               | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12）                                                                                        |
+| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                              | `93fc72e`。初版作成日・配布日は未確認                                                                                                         |
+| 未設定     | 2026-09-24 | ダイアログボタンをkintoneのスタイルに合わせる                             | `e34aa9d`。配布確認は未確認                                                                                                                   |
+| 未設定     | 2026-09-26 | 依存チェックを追加し、仕様書を更新                                        | `f75e4a7`。配布確認は未確認                                                                                                                   |
+| 未設定     | 2026-09-27 | kintoneクエリ値のエスケープヘルパーを追加                                 | `67d7c6a`。配布確認は未確認                                                                                                                   |
 
 過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。過去の各コミット時点の配布URLの内容・CI・デプロイは未確認です。過去のバージョンは推測で割り当てていません。

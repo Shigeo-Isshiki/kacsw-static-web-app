@@ -24,15 +24,15 @@
 
 実行結果：
 
-| コマンド | 結果 |
-| --- | --- |
+| コマンド                                                                                                                                                                                                                    | 結果                                                                                                                                                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `node --require ./test/setup-tests.js --test test/test-zip-code-address-formbridge.js test/test-zip-code-address-handler.js test/test-zip-code-address-utils.js test/test-formbridge-custom-lib.js test/test-text-suite.js` | 成功。新規FormBridgeテスト19件、既存kintoneハンドラー・検索・共通基盤・文字変換テストがすべて成功（Node runnerの集計35件。旧形式のテスト3ファイルはファイル単位の集計） |
-| `npm run lint` | 成功 |
-| `npx prettier --check src/zip-code-address-utils.js src/all-window-exports.js test/test-zip-code-address-formbridge.js` | 成功 |
-| `npm run build` | 成功 |
-| `cmp src/zip-code-address-utils.js dist/zip-code-address-utils.js` | 成功。ローカル生成物とソースがバイト単位で一致 |
-| `cmp src/all-window-exports.js dist/all-window-exports.js` | 成功。ローカル生成物とソースがバイト単位で一致 |
-| `git diff --check` | 成功 |
+| `npm run lint`                                                                                                                                                                                                              | 成功                                                                                                                                                                    |
+| `npx prettier --check src/zip-code-address-utils.js src/all-window-exports.js test/test-zip-code-address-formbridge.js`                                                                                                     | 成功                                                                                                                                                                    |
+| `npm run build`                                                                                                                                                                                                             | 成功                                                                                                                                                                    |
+| `cmp src/zip-code-address-utils.js dist/zip-code-address-utils.js`                                                                                                                                                          | 成功。ローカル生成物とソースがバイト単位で一致                                                                                                                          |
+| `cmp src/all-window-exports.js dist/all-window-exports.js`                                                                                                                                                                  | 成功。ローカル生成物とソースがバイト単位で一致                                                                                                                          |
+| `git diff --check`                                                                                                                                                                                                          | 成功                                                                                                                                                                    |
 
 Nodeによる文書検査で、リファレンスの6章構成、相対リンク・明示アンカー・コードフェンスとソースのバージョン一致を確認しました。kintone版の関数本体・検索処理は変更していません。
 
@@ -106,18 +106,18 @@ FormBridge専用は既存33件に5件を追加して38件。各テスト内で�
 
 ### 実行結果
 
-| コマンド | 結果 |
-| --- | --- |
-| `npm run format -- --list-different` | 成功。変更前の既存整形コマンド。差分なし |
-| `node --require ./test/setup-tests.js --test test/test-zip-code-address-formbridge.js test/test-zip-code-address-handler.js test/test-zip-code-address-utils.js test/test-formbridge-custom-lib.js` | 成功、53件集計（旧形式2ファイルはファイル単位） |
-| `npm test` | 全体成功。FormBridge専用38件、既存kintone・住所検索を含む |
-| `npm run lint` | 成功 |
-| `npx prettier --check "src/**/*.{js,css,html}" test/test-zip-code-address-formbridge.js` | 成功 |
-| `npm run build` | 成功 |
-| `node scripts/check-window-vm.js` | 成功 |
-| `node scripts/puppeteer-check.js` | 成功。ローカル配布物のブラウザー確認であり、実FormBridgeの検証ではない |
-| `cmp src/zip-code-address-utils.js dist/zip-code-address-utils.js` | 成功。ソースと生成物がバイト単位で一致 |
-| `git diff --check` | 成功 |
+| コマンド                                                                                                                                                                                            | 結果                                                                   |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `npm run format -- --list-different`                                                                                                                                                                | 成功。変更前の既存整形コマンド。差分なし                               |
+| `node --require ./test/setup-tests.js --test test/test-zip-code-address-formbridge.js test/test-zip-code-address-handler.js test/test-zip-code-address-utils.js test/test-formbridge-custom-lib.js` | 成功、53件集計（旧形式2ファイルはファイル単位）                        |
+| `npm test`                                                                                                                                                                                          | 全体成功。FormBridge専用38件、既存kintone・住所検索を含む              |
+| `npm run lint`                                                                                                                                                                                      | 成功                                                                   |
+| `npx prettier --check "src/**/*.{js,css,html}" test/test-zip-code-address-formbridge.js`                                                                                                            | 成功                                                                   |
+| `npm run build`                                                                                                                                                                                     | 成功                                                                   |
+| `node scripts/check-window-vm.js`                                                                                                                                                                   | 成功                                                                   |
+| `node scripts/puppeteer-check.js`                                                                                                                                                                   | 成功。ローカル配布物のブラウザー確認であり、実FormBridgeの検証ではない |
+| `cmp src/zip-code-address-utils.js dist/zip-code-address-utils.js`                                                                                                                                  | 成功。ソースと生成物がバイト単位で一致                                 |
+| `git diff --check`                                                                                                                                                                                  | 成功                                                                   |
 
 文書の6章構成、相対リンク・明示アンカー・コードフェンス、ソースとの版数一致を検査しました。
 
