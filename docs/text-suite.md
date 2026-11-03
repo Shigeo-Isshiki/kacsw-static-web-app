@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.2.0** です。1.2.0ではFormBridge用通常フィールド・サブテーブルの文字変換ハンドラを追加しました。配布ファイルと対象ソースの一致を確認済みです。2026-11-01の確認に加え、2026-11-03にもFormBridge共通化の導入対象で通常フィールド・テーブル内の文字変換を確認したとの利用者報告を受領しました。報告範囲と未確認事項は[利用者による確認記録](verification/library-distribution.md#formbridge-rollout-completion-2026-11-03)を参照してください。
+現行ソースは **1.3.0** です。確認済み通常配布版は **1.2.0** で、1.3.0の通常配布は未確認です。1.3.0ではFormBridge新バージョンのフォームで氏名入力中のかなをふりがな欄へ補完するイベントハンドラを追加しました。1.2.0ではFormBridge用通常フィールド・サブテーブルの文字変換ハンドラを追加しました。2026-11-01の確認に加え、2026-11-03にもFormBridge共通化の導入対象で通常フィールド・テーブル内の文字変換を確認したとの利用者報告を受領しました。報告範囲と未確認事項は[利用者による確認記録](verification/library-distribution.md#formbridge-rollout-completion-2026-11-03)を参照してください。
 
 `src/text-suite.js` は文字列変換・正規化に関するユーティリティ群を提供します。主に日本語の全角⇄半角変換、かなの相互変換（ひらがな⇄カタカナ、全角⇄半角カナ）、メールアドレスの簡易検証など、kintone カスタマイズやフォーム入力の正規化に便利な関数を収録しています。
 
@@ -20,6 +20,7 @@
 - 文字種の簡易チェック（半角英数字のみか等）
 - kintone フィールド変更イベントへの全角変換ハンドラ登録
 - FormBridge フィールド・サブテーブル変更イベントへの全角・全角ひらがな変換ハンドラ登録
+- FormBridge フォームでの氏名入力中のかなをふりがな欄へ補完するハンドラ登録（jquery.autoKana.js利用）
 
 ---
 
@@ -29,6 +30,7 @@
 - 配布URL：https://js.kacsw.or.jp/text-suite.js
 - 本ライブラリを呼び出すカスタマイズより先に読み込んでください。
 - FormBridge用通常フィールドハンドラは、FormBridge新バージョンAPI用の [formbridge-custom-lib.js](formbridge-custom-lib.md) **1.0.1以上**を、サブテーブルハンドラは **1.1.0以上**を先に読み込み、その後に本ライブラリ、最後に利用側コードの順で読み込んでください。`text-suite.js` は読み込むだけではFormBridge APIを参照せず、各関数を登録するときに `formBridge.events.on` と必要な公開関数を確認します。`formBridge.fn` は変更イベント内で共通ライブラリ関数を呼ぶ時点に解決されます。
+- `registerFormBridgeAutoKanaHandler` は上記に加えて jQuery と `jquery.autoKana.js` を登録時に必要とします。読み込み順は jQuery（4.0.0で動作確認）→ `https://js.kacsw.or.jp/jquery.autoKana.js` → formbridge-custom-lib.js（1.0.1以上）→ 本ライブラリ → 利用側コードです。`jquery.autoKana.js` が使うイベントショートハンド（`.blur()`・`.focus()`・`.keydown()`・`.change()`）はjQuery 4.0の削除対象（[公式アップグレードガイド](https://jquery.com/upgrade-guide/4.0/)）に含まれず、jQuery 4.0.0環境の実フォームで動作報告があります。他のハンドラはjQueryを必要としません。
 - FormBridge APIにはグローバル識別子 `formBridge` を使い、`window.formBridge` への依存・代入はありません。既存のkintone用関数は従来どおりkintone APIのみを登録時に必要とします。
 
 ブラウザでは各関数を `window` に公開します。イベントハンドラー登録には `kintone.events.on` が必要です。登録処理は本ライブラリ内で完結し、kintone-custom-libには依存しません。Nodeのテストでは `window` と、登録APIを検証する場合はkintone APIを用意してください。
@@ -64,12 +66,13 @@
 
 ### FormBridge用イベントハンドラ登録関数
 
-| 関数名                                                                                                     | 機能                                                                       | リファレンス                                                 |
-| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `registerFormBridgeFullWidthHandler(inputFieldCode, savedFieldCode, options)`                              | FormBridgeの入力フィールドを全角変換し、保存フィールドへ設定する。         | [参照](#api-registerformbridgefullwidthhandler)              |
-| `registerFormBridgeTableFullWidthHandler(tableFieldCode, inputFieldCode, savedFieldCode, options)`         | FormBridgeの入力列を全角変換し、同じ行の保存列へ設定する。                 | [参照](#api-registerformbridgetablefullwidthhandler)         |
-| `registerFormBridgeFullWidthHiraganaHandler(inputFieldCode, savedFieldCode, options)`                      | FormBridgeの入力フィールドを全角ひらがな変換し、保存フィールドへ設定する。 | [参照](#api-registerformbridgefullwidthhiraganahandler)      |
-| `registerFormBridgeTableFullWidthHiraganaHandler(tableFieldCode, inputFieldCode, savedFieldCode, options)` | FormBridgeの入力列を全角ひらがな変換し、同じ行の保存列へ設定する。         | [参照](#api-registerformbridgetablefullwidthhiraganahandler) |
+| 関数名                                                                                                     | 機能                                                                         | リファレンス                                                 |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `registerFormBridgeFullWidthHandler(inputFieldCode, savedFieldCode, options)`                              | FormBridgeの入力フィールドを全角変換し、保存フィールドへ設定する。           | [参照](#api-registerformbridgefullwidthhandler)              |
+| `registerFormBridgeTableFullWidthHandler(tableFieldCode, inputFieldCode, savedFieldCode, options)`         | FormBridgeの入力列を全角変換し、同じ行の保存列へ設定する。                   | [参照](#api-registerformbridgetablefullwidthhandler)         |
+| `registerFormBridgeFullWidthHiraganaHandler(inputFieldCode, savedFieldCode, options)`                      | FormBridgeの入力フィールドを全角ひらがな変換し、保存フィールドへ設定する。   | [参照](#api-registerformbridgefullwidthhiraganahandler)      |
+| `registerFormBridgeTableFullWidthHiraganaHandler(tableFieldCode, inputFieldCode, savedFieldCode, options)` | FormBridgeの入力列を全角ひらがな変換し、同じ行の保存列へ設定する。           | [参照](#api-registerformbridgetablefullwidthhiraganahandler) |
+| `registerFormBridgeAutoKanaHandler(nameInputFieldCode, kanaInputFieldCode, kanaSavedFieldCode, options)`   | FormBridgeの氏名入力中のかなをふりがな欄へ補完し、保存フィールドへ設定する。 | [参照](#api-registerformbridgeautokanahandler)               |
 
 ---
 
@@ -340,7 +343,7 @@ registerTableEmailAddressHandler('Contacts', 'Email_address', {
 
 #### 共通オプション
 
-4つのハンドラで共通するオプションです。既定値は空白保持・上限なし・厳格でない変換・空欄時の保存欄消去です。
+4つの文字変換ハンドラで共通するオプションです。既定値は空白保持・上限なし・厳格でない変換・空欄時の保存欄消去です。ふりがな補完ハンドラのオプションは[個別の説明](#api-registerformbridgeautokanahandler)を参照してください。
 
 | オプション               | 型             | 既定値                                                | 説明                                                                                                                     |
 | ------------------------ | -------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -399,6 +402,33 @@ registerFormBridgeTableFullWidthHiraganaHandler('Members', 'Name_kana_input', 'N
 ```
 
 登録関数はフィールド変更イベントのみを扱い、初期表示時の値転記、行追加・削除、個別業務条件、サブテーブル以外への一括検証は行いません。
+
+<a id="api-registerformbridgeautokanahandler"></a>
+
+#### `registerFormBridgeAutoKanaHandler(nameInputFieldCode, kanaInputFieldCode, kanaSavedFieldCode, options = {})`
+
+FormBridge新バージョンのフォームで、氏名入力欄に入力中のかなを `jquery.autoKana.js` でふりがな欄へ補完するハンドラを `form.show` に登録します。漢字から読みを自動推測する機能ではありません。補完・復元・消去の結果は、画面表示に加えて formbridge-custom-lib の `setFieldValue` を通じて表示用のかな入力フィールドとkintone保存先フィールドの両方へ反映します。
+
+- `nameInputFieldCode`（氏名の入力欄）、`kanaInputFieldCode`（ふりがなの表示用入力欄）、`kanaSavedFieldCode`（ふりがなのkintone保存先）は空白だけではない文字列で、互いに異なるコードを指定します。保存先コードを入力欄コードから推測しません。戻り値はありません。
+- 登録時に `formBridge.events.on`、formbridge-custom-lib（**1.0.1以上**の `setFieldValue`）、jQueryと `jquery.autoKana.js` を検証し、不足していれば例外になります。
+- `form.show` のたびに対象フィールドの入力要素を取得します。既定ではFormBridge新バージョンの標準マークアップ `.fb-custom--field[data-field-code="…"] input` を検索します。同じ入力要素への初期化は1回だけ行い、再表示でDOMが作り直された場合は新しい要素へ再初期化します。対象の入力要素が見つからない場合は `console.error` で明示し、他のカスタマイズは停止させません。
+- 通常のかな入力では、入力中のかなが補完されるたびにふりがな欄の変更として通知され、表示用・保存先の両フィールドへ設定されます。
+- IME変換確定直後に `jquery.autoKana.js` が一時的にかな欄を空へ戻した場合（確定後約100ミリ秒以内の空変更）だけ、直近の有効なふりがなを復元します。それ以外の空変更は消去として扱います。
+- 氏名欄が空になった場合は、以前のふりがなを復元せず、表示用のかな欄と保存値を消去します。
+- 利用者がふりがな欄を手修正した場合、その値は変更として両フィールドへ反映され、以後の復元にも手修正後の値を使います。氏名欄への追加入力では `jquery.autoKana.js` の仕様により手修正後のふりがなへ追記され、全体は消去されません。
+
+オプション:
+
+| オプション        | 型       | 既定値                 | 説明                                                                               |
+| ----------------- | -------- | ---------------------- | ---------------------------------------------------------------------------------- |
+| `katakana`        | boolean  | `false`                | `true` の場合、ふりがなをカタカナで補完します。                                    |
+| `getInputElement` | function | 標準マークアップの検索 | `(fieldCode) => HTMLInputElement \| null` 形式で入力要素の取得方法を差し替えます。 |
+
+```js
+// 姓・名など複数組のフィールドへ個別に登録できます。フィールドコードは説明用の例です。
+registerFormBridgeAutoKanaHandler('Last_name_input', 'Last_name_kana_input', 'Last_name_kana');
+registerFormBridgeAutoKanaHandler('First_name_input', 'First_name_kana_input', 'First_name_kana');
+```
 
 ---
 
@@ -480,6 +510,10 @@ registerFormBridgeFullWidthHandler('Company_name_input', 'Company_name_saved', {
 
 `assertEmailAddress` は簡易検証です。厳密なRFC準拠を保証しません。長音符と波ダッシュ・ハイフン類は異なる変換規則を使います。
 
+### ふりがな補完の制約
+
+`registerFormBridgeAutoKanaHandler` は入力中のかなの補完であり、入力済みの漢字から読みを推測しません。既定のDOM検索はFormBridge新バージョンの標準マークアップを前提とし、構成が異なるフォームでは `getInputElement` オプションで取得方法を指定してください。IME確定直後の復元はイベント順に依存する回避策で、確定後約100ミリ秒の時間窓で判定します。ブラウザ・IMEの組み合わせによる動作差は実画面で確認してください。
+
 文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
 
 ## 更新履歴・配布記録
@@ -490,6 +524,7 @@ registerFormBridgeFullWidthHandler('Company_name_input', 'Company_name_saved', {
 
 | バージョン | 記録日     | 主な変更                                                                 | 記録・配布確認                                         |
 | ---------- | ---------- | ------------------------------------------------------------------------ | ------------------------------------------------------ |
+| 1.3.0      | 2026-11-03 | FormBridge用のふりがな自動補完イベントハンドラを追加                     | 通常配布は未実施・未確認                               |
 | 1.2.0      | 2026-10-31 | FormBridgeサブテーブルの全角・全角ひらがな変換イベントハンドラを追加     | `ec932c0`。通常配布URLとの完全一致を確認（2026-10-31） |
 | 1.1.0      | 2026-10-31 | FormBridge通常フィールド用の全角・全角ひらがな変換イベントハンドラを追加 | 1.2.0に含めて配布。実画面の確認範囲は上記報告を参照    |
 | 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし              | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
