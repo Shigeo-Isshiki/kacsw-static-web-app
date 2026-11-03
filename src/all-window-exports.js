@@ -61,6 +61,7 @@
 		'registerFormBridgeTableFullWidthHandler',
 		'registerFormBridgeFullWidthHiraganaHandler',
 		'registerFormBridgeTableFullWidthHiraganaHandler',
+		'registerFormBridgeAutoKanaHandler',
 		'registerTableFullWidthHandler',
 		'registerTableFullWidthHiraganaHandler',
 		'registerEmailAddressHandler',

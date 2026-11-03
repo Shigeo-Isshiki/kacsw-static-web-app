@@ -1,9 +1,9 @@
 /** 文字列処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.2.0
+ * @version 1.3.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_ts_)で始める
-/* exported isSingleByteAlnumOnly, toFullWidthKatakana, toFullWidth, toFullWidthHiragana, toHalfWidthKana, toHalfWidth, assertEmailAddress, registerFullWidthHandler, registerFullWidthHiraganaHandler, registerFormBridgeFullWidthHandler, registerFormBridgeTableFullWidthHandler, registerFormBridgeFullWidthHiraganaHandler, registerFormBridgeTableFullWidthHiraganaHandler, registerTableFullWidthHandler, registerTableFullWidthHiraganaHandler, registerEmailAddressHandler, registerTableEmailAddressHandler */
+/* exported isSingleByteAlnumOnly, toFullWidthKatakana, toFullWidth, toFullWidthHiragana, toHalfWidthKana, toHalfWidth, assertEmailAddress, registerFullWidthHandler, registerFullWidthHiraganaHandler, registerFormBridgeFullWidthHandler, registerFormBridgeTableFullWidthHandler, registerFormBridgeFullWidthHiraganaHandler, registerFormBridgeTableFullWidthHiraganaHandler, registerFormBridgeAutoKanaHandler, registerTableFullWidthHandler, registerTableFullWidthHiraganaHandler, registerEmailAddressHandler, registerTableEmailAddressHandler */
 /* global formBridge, kintone */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
@@ -977,6 +977,159 @@ const registerFormBridgeTableFullWidthHiraganaHandler = (
 	);
 
 /**
+ * FormBridgeふりがな自動補完ハンドラのオプション
+ * @typedef {object} _TS_FORM_BRIDGE_AUTO_KANA_HANDLER_OPTIONS
+ * @property {boolean} [katakana=false] ふりがなをカタカナで補完するか
+ * @property {(fieldCode: string) => (HTMLInputElement|null)} [getInputElement] フィールドコードから入力要素を解決する関数（既定はFormBridge新バージョンの標準マークアップを検索）
+ */
+
+// IME確定直後に補完ライブラリが一時的にかな欄を空へ戻すのを待ち受ける時間（ミリ秒）
+const _TS_AUTO_KANA_COMPOSITION_PENDING_MS = 100;
+
+/**
+ * FormBridge新バージョンの標準マークアップからフィールドの入力要素を取得する関数
+ * @param {string} fieldCode フィールドコード
+ * @returns {HTMLInputElement|null} 入力要素
+ */
+const _ts_getFormBridgeInputElement = (fieldCode) =>
+	document.querySelector(`.fb-custom--field[data-field-code="${fieldCode}"] input`);
+
+/**
+ * FormBridgeの氏名入力欄に、入力中のかなをふりがな欄へ補完するハンドラを登録する関数
+ * 漢字から読みを推測する機能ではなく、jquery.autoKana.jsによる入力中のかなの補完です。
+ * 補完・復元・消去の結果は、表示用のかな入力フィールドとkintone保存先フィールドの両方へ
+ * formbridge-custom-libの値管理APIを通じて反映します。
+ * @param {string} nameInputFieldCode 氏名の入力フィールドコード
+ * @param {string} kanaInputFieldCode ふりがなの表示用入力フィールドコード
+ * @param {string} kanaSavedFieldCode ふりがなのkintone保存先フィールドコード
+ * @param {_TS_FORM_BRIDGE_AUTO_KANA_HANDLER_OPTIONS} [options] オプション
+ * @returns {void}
+ * @throws {Error} 引数、依存API、またはオプションが不正な場合
+ */
+const registerFormBridgeAutoKanaHandler = (
+	nameInputFieldCode,
+	kanaInputFieldCode,
+	kanaSavedFieldCode,
+	options = {}
+) => {
+	for (const [name, fieldCode] of [
+		['nameInputFieldCode', nameInputFieldCode],
+		['kanaInputFieldCode', kanaInputFieldCode],
+		['kanaSavedFieldCode', kanaSavedFieldCode],
+	]) {
+		if (!_ts_checkString(fieldCode) || !fieldCode.trim())
+			throw new Error(`${name}は空でない文字列である必要があります`);
+	}
+	if (new Set([nameInputFieldCode, kanaInputFieldCode, kanaSavedFieldCode]).size !== 3)
+		throw new Error(
+			'nameInputFieldCode・kanaInputFieldCode・kanaSavedFieldCodeには異なるコードを指定してください'
+		);
+	if (options === null || typeof options !== 'object' || Array.isArray(options))
+		throw new Error('optionsはオブジェクトである必要があります');
+	const { katakana = false, getInputElement } = options;
+	if (!_ts_checkBoolean(katakana)) throw new Error('katakanaはboolean型である必要があります');
+	if (getInputElement !== undefined && typeof getInputElement !== 'function')
+		throw new Error('getInputElementは関数である必要があります');
+
+	if (
+		typeof formBridge === 'undefined' ||
+		!formBridge.events ||
+		typeof formBridge.events.on !== 'function'
+	)
+		throw new Error('formBridge.events.onが利用できません');
+	if (
+		typeof window === 'undefined' ||
+		!window.formBridgeCustomLib ||
+		typeof window.formBridgeCustomLib.setFieldValue !== 'function'
+	)
+		throw new Error('formBridgeCustomLib v1.0.1以上が利用できません');
+	const jquery = window.jQuery;
+	if (typeof jquery !== 'function' || !jquery.fn || typeof jquery.fn.autoKana !== 'function')
+		throw new Error('jQueryまたはjquery.autoKana.jsが利用できません');
+	const formBridgeCustomLib = window.formBridgeCustomLib;
+	const resolveInputElement = getInputElement ?? _ts_getFormBridgeInputElement;
+	// 再表示などでform.showが複数回発生しても、同じ入力要素への重複初期化を防ぐ
+	const boundNameInputs = new WeakSet();
+
+	formBridge.events.on('form.show', () => {
+		try {
+			const nameInput = resolveInputElement(nameInputFieldCode);
+			const kanaInput = resolveInputElement(kanaInputFieldCode);
+			if (!nameInput || !kanaInput) {
+				console.error(
+					`registerFormBridgeAutoKanaHandler: ふりがな自動補完の対象フィールドが見つかりません: ${nameInputFieldCode}, ${kanaInputFieldCode}`
+				);
+				return;
+			}
+			if (boundNameInputs.has(nameInput)) return;
+			boundNameInputs.add(nameInput);
+
+			jquery.fn.autoKana(jquery(nameInput), jquery(kanaInput), { katakana });
+
+			let lastNonEmptyKana = kanaInput.value || '';
+			let isComposing = false;
+			let compositionPending = false;
+			let compositionTimer = null;
+			let restoringKana = false;
+			const setKanaValues = (kana) => {
+				formBridgeCustomLib.setFieldValue(kanaInputFieldCode, kana);
+				formBridgeCustomLib.setFieldValue(kanaSavedFieldCode, kana);
+			};
+			// IME確定直後の一時的な空値だけを直近の有効なふりがなで復元する
+			const restoreKana = () => {
+				if (!lastNonEmptyKana || !nameInput.value) return;
+				restoringKana = true;
+				try {
+					setKanaValues(lastNonEmptyKana);
+					kanaInput.value = lastNonEmptyKana;
+					kanaInput.dispatchEvent(new Event('input', { bubbles: true }));
+				} finally {
+					restoringKana = false;
+				}
+			};
+			// autoKanaの補完・利用者の手修正はいずれもchangeとして通知され、保存値へ反映する
+			jquery(kanaInput).on('change', () => {
+				if (restoringKana) return;
+				const kana = kanaInput.value || '';
+				if (kana) {
+					lastNonEmptyKana = kana;
+					setKanaValues(kana);
+				} else if (compositionPending && nameInput.value && lastNonEmptyKana) {
+					restoreKana();
+				} else if (!isComposing) {
+					lastNonEmptyKana = '';
+					setKanaValues('');
+				}
+			});
+			nameInput.addEventListener('compositionstart', () => {
+				isComposing = true;
+				compositionPending = false;
+				if (compositionTimer !== null) window.clearTimeout(compositionTimer);
+			});
+			nameInput.addEventListener('compositionend', () => {
+				isComposing = false;
+				compositionPending = true;
+				if (compositionTimer !== null) window.clearTimeout(compositionTimer);
+				compositionTimer = window.setTimeout(() => {
+					compositionPending = false;
+					compositionTimer = null;
+				}, _TS_AUTO_KANA_COMPOSITION_PENDING_MS);
+				if (!kanaInput.value && lastNonEmptyKana) restoreKana();
+				if (!nameInput.value) {
+					// 氏名が空になった場合は、以前のふりがなを復元せず表示・保存とも消去する
+					lastNonEmptyKana = '';
+					setKanaValues('');
+					kanaInput.value = '';
+					kanaInput.dispatchEvent(new Event('input', { bubbles: true }));
+				}
+			});
+		} catch (error) {
+			console.error('registerFormBridgeAutoKanaHandler:', error);
+		}
+	});
+};
+
+/**
  * メールアドレスハンドラのオプション
  * @typedef {object} _TS_EMAIL_ADDRESS_HANDLER_OPTIONS
  * @property {'desktop'|'mobile'|'both'} [devices='desktop'] 登録対象のデバイス
@@ -1327,6 +1480,7 @@ if (typeof window !== 'undefined') {
 	window.registerFormBridgeFullWidthHiraganaHandler = registerFormBridgeFullWidthHiraganaHandler;
 	window.registerFormBridgeTableFullWidthHiraganaHandler =
 		registerFormBridgeTableFullWidthHiraganaHandler;
+	window.registerFormBridgeAutoKanaHandler = registerFormBridgeAutoKanaHandler;
 	window.registerTableFullWidthHandler = registerTableFullWidthHandler;
 	window.registerTableFullWidthHiraganaHandler = registerTableFullWidthHiraganaHandler;
 	window.registerEmailAddressHandler = registerEmailAddressHandler;
