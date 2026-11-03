@@ -58,40 +58,40 @@ FormBridge向け中継APIは Bank Teraren API 互換のパス・応答形式を�
 
 ### 銀行・支店検索と口座変換
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `getBank(bankCodeOrName, options?, callback)` | 銀行コードまたは銀行名から銀行情報を検索する。 | [参照](#getBank) |
-| `getBranch(bankCode, branchCodeOrName, options?, callback)` | 銀行コードと支店コードまたは支店名から支店情報を検索する。 | [参照](#getBranch) |
-| `convertYucho(kigou, bangou, callback)` | ゆうちょ記号・番号を振込用の口座情報に変換する。 | [参照](#convertYucho) |
+| 関数名                                                      | 機能                                                       | リファレンス          |
+| ----------------------------------------------------------- | ---------------------------------------------------------- | --------------------- |
+| `getBank(bankCodeOrName, options?, callback)`               | 銀行コードまたは銀行名から銀行情報を検索する。             | [参照](#getBank)      |
+| `getBranch(bankCode, branchCodeOrName, options?, callback)` | 銀行コードと支店コードまたは支店名から支店情報を検索する。 | [参照](#getBranch)    |
+| `convertYucho(kigou, bangou, callback)`                     | ゆうちょ記号・番号を振込用の口座情報に変換する。           | [参照](#convertYucho) |
 
 ### 全銀ファイルの読み込み・生成
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `parseZenginFile(options)` | 全銀ファイルを読み込み、レコードを解析する。 | [参照](#parseZenginFile) |
-| `encodeSjis(input)` | Unicode文字列をShift_JISのバイト列に変換する。 | [参照](#api-encodesjis) |
-| `generateHeader(headerData, callback)` | 全銀ファイルのヘッダレコードを生成する。 | [参照](#api-generateheader) |
+| 関数名                                                         | 機能                                                   | リファレンス                     |
+| -------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------- |
+| `parseZenginFile(options)`                                     | 全銀ファイルを読み込み、レコードを解析する。           | [参照](#parseZenginFile)         |
+| `encodeSjis(input)`                                            | Unicode文字列をShift_JISのバイト列に変換する。         | [参照](#api-encodesjis)          |
+| `generateHeader(headerData, callback)`                         | 全銀ファイルのヘッダレコードを生成する。               | [参照](#api-generateheader)      |
 | `generateDataRecords(records, fromBankNo, options?, callback)` | 振込データから全銀ファイルのデータレコードを生成する。 | [参照](#api-generatedatarecords) |
-| `generateTrailer(summaryData, callback)` | 全銀ファイルのトレーラレコードを生成する。 | [参照](#api-generatetrailer) |
-| `generateEndRecord(callback)` | 全銀ファイルのエンドレコードを生成する。 | [参照](#api-generateendrecord) |
-| `generateZenginData(headerData, records, callback)` | ヘッダと振込データから全銀データを生成する。 | [参照](#generateZenginData) |
-| `generateZenginDataAsync(headerData, records)` | ヘッダと振込データから全銀データを非同期に生成する。 | [参照](#generateZenginDataAsync) |
+| `generateTrailer(summaryData, callback)`                       | 全銀ファイルのトレーラレコードを生成する。             | [参照](#api-generatetrailer)     |
+| `generateEndRecord(callback)`                                  | 全銀ファイルのエンドレコードを生成する。               | [参照](#api-generateendrecord)   |
+| `generateZenginData(headerData, records, callback)`            | ヘッダと振込データから全銀データを生成する。           | [参照](#generateZenginData)      |
+| `generateZenginDataAsync(headerData, records)`                 | ヘッダと振込データから全銀データを非同期に生成する。   | [参照](#generateZenginDataAsync) |
 
 ### 入力の正規化
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `normalizeEdiInfo(input, options)` | EDI情報を全銀データ向けに正規化する。 | [参照](#normalizeEdiInfo) |
-| `normalizePayeeName(name, options)` | 受取人名を全銀データ向けに正規化する。 | [参照](#normalizePayeeName) |
-| `normalizeAccountNumber(input)` | 口座番号の入力を正規化する。 | [参照](#normalizeAccountNumber) |
+| 関数名                              | 機能                                   | リファレンス                    |
+| ----------------------------------- | -------------------------------------- | ------------------------------- |
+| `normalizeEdiInfo(input, options)`  | EDI情報を全銀データ向けに正規化する。  | [参照](#normalizeEdiInfo)       |
+| `normalizePayeeName(name, options)` | 受取人名を全銀データ向けに正規化する。 | [参照](#normalizePayeeName)     |
+| `normalizeAccountNumber(input)`     | 口座番号の入力を正規化する。           | [参照](#normalizeAccountNumber) |
 
 ### 銀行営業日
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `nextBankBusinessDay(baseDate, cutoffHour)` | 基準日時と締め時刻から次の銀行営業日を算出する。 | [参照](#nextBankBusinessDay) |
+| 関数名                                                            | 機能                                                       | リファレンス                     |
+| ----------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------- |
+| `nextBankBusinessDay(baseDate, cutoffHour)`                       | 基準日時と締め時刻から次の銀行営業日を算出する。           | [参照](#nextBankBusinessDay)     |
 | `nextPayrollTransferDate(baseDate, cutoffHour, leadBusinessDays)` | 基準日時から必要な営業日数を考慮した給与振込日を算出する。 | [参照](#nextPayrollTransferDate) |
-| `isBankBusinessDay(targetDate)` | 指定日が銀行営業日かどうかを判定する。 | [参照](#isBankBusinessDay) |
+| `isBankBusinessDay(targetDate)`                                   | 指定日が銀行営業日かどうかを判定する。                     | [参照](#isBankBusinessDay)       |
 
 ## 関数リファレンス
 
@@ -884,14 +884,14 @@ window.BANK.generateZenginData(headerData, records, (res) => {
 
 2026-10-24に、`e9d0fee` のソース（1.0.1）と通常配布URLの内容が完全一致することを確認しました。対象コミットのCI・本番デプロイ・配布パッケージ作成も成功しています。確認日であり、初版の公開日を示すものではありません。1.0.0を含む過去の証跡と詳細は [通常配布確認記録](verification/library-distribution.md) を参照してください。
 
-| バージョン | 記録日     | 主な変更                                                                                                                | 記録・配布確認                                                                                                                      |
-| ---------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| 1.0.1      | 2026-10-24 | EDI正規化失敗時の生値フォールバックを廃止し、既存エラー契約で全銀生成全体を中止 | PR #25、`e9d0fee`。通常配布URLとの完全一致を確認（2026-10-24）。[配布証跡](verification/library-distribution.md)、[自動テスト・確認範囲](verification/bank-transfer.md) |
-| 1.0.0      | 2026-10-12 | 現行ソースを基準版として記録し、先頭JSDocにバージョンを明記。機能変更なし                                               | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12）                                                                              |
-| 未設定     | 2025-11-03 | 現ファイルのGit履歴で確認できる最古の登録。callback方式の単一ファイルライブラリを復元                                   | `a87a4c4`。初版作成日・配布日は未確認                                                                                               |
-| 未設定     | 2026-09-22 | 給与振込・賞与振込（typeCode 11/12）に対応                                                                              | `893d2f3`。配布確認は未確認                                                                                                         |
-| 未設定     | 2026-09-22 | `generateZenginData` / `generateZenginDataAsync` の振込種別二重解決を修正。給与・賞与でも総合振込様式になる不具合を解消 | 修正 `15cd80a`、実機検証記録 `9eb1c81`。金融機関システムへのアップロードで給与振込として正常処理を確認済み。配布URLとの一致は未確認 |
-| 未設定     | 2026-09-22 | 銀行営業日判定 `isBankBusinessDay` を追加                                                                               | `e72fd3b`。配布確認は未確認                                                                                                         |
-| 未設定     | 2026-09-26 | 依存チェックに関する説明を更新                                                                                          | `f75e4a7`（本仕様書の変更）。配布内容の変更確認とは区別                                                                             |
+| バージョン | 記録日     | 主な変更                                                                                                                | 記録・配布確認                                                                                                                                                          |
+| ---------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.1      | 2026-10-24 | EDI正規化失敗時の生値フォールバックを廃止し、既存エラー契約で全銀生成全体を中止                                         | PR #25、`e9d0fee`。通常配布URLとの完全一致を確認（2026-10-24）。[配布証跡](verification/library-distribution.md)、[自動テスト・確認範囲](verification/bank-transfer.md) |
+| 1.0.0      | 2026-10-12 | 現行ソースを基準版として記録し、先頭JSDocにバージョンを明記。機能変更なし                                               | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12）                                                                                                                  |
+| 未設定     | 2025-11-03 | 現ファイルのGit履歴で確認できる最古の登録。callback方式の単一ファイルライブラリを復元                                   | `a87a4c4`。初版作成日・配布日は未確認                                                                                                                                   |
+| 未設定     | 2026-09-22 | 給与振込・賞与振込（typeCode 11/12）に対応                                                                              | `893d2f3`。配布確認は未確認                                                                                                                                             |
+| 未設定     | 2026-09-22 | `generateZenginData` / `generateZenginDataAsync` の振込種別二重解決を修正。給与・賞与でも総合振込様式になる不具合を解消 | 修正 `15cd80a`、実機検証記録 `9eb1c81`。金融機関システムへのアップロードで給与振込として正常処理を確認済み。配布URLとの一致は未確認                                     |
+| 未設定     | 2026-09-22 | 銀行営業日判定 `isBankBusinessDay` を追加                                                                               | `e72fd3b`。配布確認は未確認                                                                                                                                             |
+| 未設定     | 2026-09-26 | 依存チェックに関する説明を更新                                                                                          | `f75e4a7`（本仕様書の変更）。配布内容の変更確認とは区別                                                                                                                 |
 
 過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。過去の各コミット時点の配布URLの内容・CI・デプロイは未確認です。過去のバージョンは推測で割り当てていません。

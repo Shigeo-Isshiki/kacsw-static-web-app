@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.3.0** です。FormBridge住所ハンドラーの戻り値に `invalidate()` を追加しました。2026-11-02に対象コミットのCI・本番デプロイ・パッケージ作成成功と通常配布URLの内容一致を確認しました。[配布証跡](verification/library-distribution.md#zip-130-distribution)を参照してください。同日、1.3.0について19アプリ・21ファイル、住所30登録への適用と実FormBridgeでの動作確認が完了したとの[利用者報告](verification/library-distribution.md#zip-130-consumer-verification-2026-11-02)を受領しました。利用側の自動検証1,028件の成功も報告されています。操作別の実画面確認内訳は未記録であり、全入力パターン・全競合条件の実画面での網羅確認ではありません。過去版の確認範囲は[1.2.0の利用側確認報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)と[1.2.1の利用者実画面確認報告](verification/library-distribution.md#zip-121-consumer-verification-2026-11-01)を参照してください。
+現行ソース・確認済み通常配布版は **1.3.0** です。FormBridge住所ハンドラーの戻り値に `invalidate()` を追加しました。2026-11-02に対象コミットのCI・本番デプロイ・パッケージ作成成功と通常配布URLの内容一致を確認しました。[配布証跡](verification/library-distribution.md#zip-130-distribution)を参照してください。同日、1.3.0について19アプリ・21ファイル、住所30登録への適用と実FormBridgeでの動作確認が完了したとの[利用者報告](verification/library-distribution.md#zip-130-consumer-verification-2026-11-02)を受領しました。2026-11-03にも、郵便番号・デジタルアドレス検索、手入力、郵便番号変更時の置換、業務条件変更時の検索結果無効化を含む共通化対象の確認完了報告を受領しています。いずれも操作別の網羅検証ではなく、詳細は[FormBridge共通化対応の利用者完了報告](verification/library-distribution.md#formbridge-rollout-completion-2026-11-03)を参照してください。
 
 このドキュメントは `src/zip-code-address-utils.js` が公開する郵便番号／デジタルアドレス関連ユーティリティ関数の使い方と引数・戻り値の契約を整理したリファレンスです。テストや Node 環境でも `require('../src/zip-code-address-utils.js')` で利用できます（CommonJS エクスポートあり）。
 
@@ -55,40 +55,40 @@ FormBridge専用ハンドラーは次の順で読み込みます。
 
 ### kintone の住所設定・表示制御
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
+| 関数名                                   | 機能                                                             | リファレンス                           |
+| ---------------------------------------- | ---------------------------------------------------------------- | -------------------------------------- |
 | `registerZipCodeAddressHandler(options)` | 郵便番号変更時の住所割り当て・置換とボタン・案内表示を登録する。 | [参照](#registerZipCodeAddressHandler) |
 
 `registerZipCodeAddressHandler` の登録対象は `devices` で指定します。実際に使用する PC/モバイルの record API は Kintone のイベント種別から選択するため、ランタイム初期化、`KACSW_RUNTIME`、URL による画面判定は不要です。
 
 ### FormBridge の住所設定
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
+| 関数名                                             | 機能                                                                 | リファレンス                                     |
+| -------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------ |
 | `registerFormBridgeZipCodeAddressHandler(options)` | 郵便番号変更後の非同期住所補完・置換と入力／保存欄の同期を登録する。 | [参照](#registerFormBridgeZipCodeAddressHandler) |
 
 ### 共通（kintone・FormBridge・Node）
 
 #### 郵便番号の存在確認・整形・正規化
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `checkZipCodeExists(zipCode, callback)` | 郵便番号の存在を確認して結果をコールバックに返す。 | [参照](#checkZipCodeExists) |
-| `formatZipCode(zipCode, callback)` | 郵便番号を表示用に整形して結果をコールバックに返す。 | [参照](#formatZipCode) |
-| `normalizeZipCode(zipCode, callback)` | 郵便番号を7文字の半角英数字に正規化して結果を返す。 | [参照](#normalizeZipCode) |
+| 関数名                                  | 機能                                                 | リファレンス                |
+| --------------------------------------- | ---------------------------------------------------- | --------------------------- |
+| `checkZipCodeExists(zipCode, callback)` | 郵便番号の存在を確認して結果をコールバックに返す。   | [参照](#checkZipCodeExists) |
+| `formatZipCode(zipCode, callback)`      | 郵便番号を表示用に整形して結果をコールバックに返す。 | [参照](#formatZipCode)      |
+| `normalizeZipCode(zipCode, callback)`   | 郵便番号を7文字の半角英数字に正規化して結果を返す。  | [参照](#normalizeZipCode)   |
 
 #### 住所・市区町村・都道府県の検索
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
-| `getAddressByZipCode(zipCode, callback)` | 郵便番号から詳細な住所情報を検索する。 | [参照](#getAddressByZipCode) |
-| `getCityByZipCode(zipCode, callback)` | 郵便番号から市区町村名を検索する。 | [参照](#getCityByZipCode) |
-| `getPrefectureByZipCode(zipCode, callback)` | 郵便番号から都道府県名を検索する。 | [参照](#getPrefectureByZipCode) |
+| 関数名                                      | 機能                                   | リファレンス                    |
+| ------------------------------------------- | -------------------------------------- | ------------------------------- |
+| `getAddressByZipCode(zipCode, callback)`    | 郵便番号から詳細な住所情報を検索する。 | [参照](#getAddressByZipCode)    |
+| `getCityByZipCode(zipCode, callback)`       | 郵便番号から市区町村名を検索する。     | [参照](#getCityByZipCode)       |
+| `getPrefectureByZipCode(zipCode, callback)` | 郵便番号から都道府県名を検索する。     | [参照](#getPrefectureByZipCode) |
 
 #### 住所文字列の検証
 
-| 関数名 | 機能 | リファレンス |
-| --- | --- | --- |
+| 関数名                       | 機能                                           | リファレンス               |
+| ---------------------------- | ---------------------------------------------- | -------------------------- |
 | `hasPrefectureName(address)` | 住所が都道府県の正式名称で始まるかを判定する。 | [参照](#hasPrefectureName) |
 
 ---
@@ -470,17 +470,17 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 
 ##### 設定
 
-| キー | 型・既定値 | 契約 |
-| --- | --- | --- |
-| `zipCodeInputField` | string、必須 | 郵便番号の入力フィールド |
-| `zipCodeSavedField` | string、必須 | 郵便番号の保存フィールド。同一コードも可 |
-| `mainAddressField` | string、必須 | 補完の可否を判定する住所入力欄。`addressFields` の割り当て先に含める |
-| `addressFields` | object、必須 | `{ 検索結果プロパティ: 住所入力コード }`。割り当て先は一意 |
-| `fieldMappings` | object、`{}` | `{ 住所入力コード: 保存コード }`。検索時と手入力変更時に保存欄も設定 |
-| `clearFields` | string[]、`[]` | 置換時にクリアする追加の入力欄／関連欄。その保存欄も自動でクリア |
+| キー                     | 型・既定値                    | 契約                                                                                                        |
+| ------------------------ | ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `zipCodeInputField`      | string、必須                  | 郵便番号の入力フィールド                                                                                    |
+| `zipCodeSavedField`      | string、必須                  | 郵便番号の保存フィールド。同一コードも可                                                                    |
+| `mainAddressField`       | string、必須                  | 補完の可否を判定する住所入力欄。`addressFields` の割り当て先に含める                                        |
+| `addressFields`          | object、必須                  | `{ 検索結果プロパティ: 住所入力コード }`。割り当て先は一意                                                  |
+| `fieldMappings`          | object、`{}`                  | `{ 住所入力コード: 保存コード }`。検索時と手入力変更時に保存欄も設定                                        |
+| `clearFields`            | string[]、`[]`                | 置換時にクリアする追加の入力欄／関連欄。その保存欄も自動でクリア                                            |
 | `replaceOnZipCodeChange` | boolean、`false`（1.2.0追加） | `true` の場合、空でない保存済み郵便番号が検索結果の郵便番号と異なると住所を置換。真偽値以外は登録時にエラー |
-| `transformAddress` | function、値をそのまま返す | `(value, { fieldCode, property, result? }) => string`。同期・副作用なしの変換 |
-| `afterApply` | function、省略可 | `({ result, record, isCurrent }) => void`。住所反映後のみ実行する同期コールバック |
+| `transformAddress`       | function、値をそのまま返す    | `(value, { fieldCode, property, result? }) => string`。同期・副作用なしの変換                               |
+| `afterApply`             | function、省略可              | `({ result, record, isCurrent }) => void`。住所反映後のみ実行する同期コールバック                           |
 
 `addressFields` のキーは `address` / `prefName` / `cityName` / `townName` / `blockName` / `otherName` / `bizName` / `businessName` です。メイン住所に対応する検索結果は空でない文字列が必須です。汎用の割り当て設定はできますが、ライブラリが会社名のフィールドや `bizName` / `businessName` の優先順位を推測することはありません。
 
@@ -492,16 +492,16 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 
 ##### 反映とエラー
 
-| 操作 | 郵便番号入力・保存欄 | 住所 |
-| --- | --- | --- |
-| `form.show` | 検索・整形しない | 変更しない。前画面の検索を無効化 |
-| 通常郵便番号の変更（設定省略／`false`） | 成功後に両欄を整形 | 応答時点でメイン住所が空の場合のみ補完。既存住所なら全住所・関連欄を保持 |
-| 通常郵便番号の変更（`true`、保存済み番号が空でなく異なる） | 成功後に両欄を整形 | デジタルアドレスと同じ処理で住所・関連欄・保存欄を置換 |
-| 通常郵便番号の変更（`true`、保存済み番号が同じ／空） | 成功後に両欄を整形 | メイン住所が空の場合のみ補完。既存住所・関連欄は保持 |
-| デジタルアドレスの変更 | 成功後にAPI郵便番号へ置換 | 全割り当て先・`clearFields` と対応する保存欄をクリアする計画を作り、存在する検索結果で置換 |
-| 空の郵便番号への変更 | 保存欄だけ空にする | 検索せず住所保持。先行検索を無効化 |
-| 入力途中・形式不正（正規化後7文字の英数字でない） | 変更しない | 検索せず住所保持。入力欄に検証エラーを表示し、先行検索を無効化。コンソールログなし |
-| 検索・変換・必須項目の検証失敗 | 値を変更しない | 値を変更しない。エラーを表示 |
+| 操作                                                       | 郵便番号入力・保存欄      | 住所                                                                                       |
+| ---------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------ |
+| `form.show`                                                | 検索・整形しない          | 変更しない。前画面の検索を無効化                                                           |
+| 通常郵便番号の変更（設定省略／`false`）                    | 成功後に両欄を整形        | 応答時点でメイン住所が空の場合のみ補完。既存住所なら全住所・関連欄を保持                   |
+| 通常郵便番号の変更（`true`、保存済み番号が空でなく異なる） | 成功後に両欄を整形        | デジタルアドレスと同じ処理で住所・関連欄・保存欄を置換                                     |
+| 通常郵便番号の変更（`true`、保存済み番号が同じ／空）       | 成功後に両欄を整形        | メイン住所が空の場合のみ補完。既存住所・関連欄は保持                                       |
+| デジタルアドレスの変更                                     | 成功後にAPI郵便番号へ置換 | 全割り当て先・`clearFields` と対応する保存欄をクリアする計画を作り、存在する検索結果で置換 |
+| 空の郵便番号への変更                                       | 保存欄だけ空にする        | 検索せず住所保持。先行検索を無効化                                                         |
+| 入力途中・形式不正（正規化後7文字の英数字でない）          | 変更しない                | 検索せず住所保持。入力欄に検証エラーを表示し、先行検索を無効化。コンソールログなし         |
+| 検索・変換・必須項目の検証失敗                             | 値を変更しない            | 値を変更しない。エラーを表示                                                               |
 
 デジタル判定はkintone同様 **`normalizedZipCode !== apiZipCode`** であり、英字の有無ではありません。任意結果の欠落・nullは通常補完では既存欄を保持し、置換では空になります。正規化後に空となる記号・空白だけの郵便番号も空入力とします。
 
@@ -527,11 +527,11 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 - 戻り値は `{ invalidate, whenIdle, dispose }`。各メソッドの契約は下表のとおりです。イベントの再登録・公式にないイベント解除APIには依存しません。
 - `Outcome` は `{ status: 'applied' | 'formatted', result }`、`{ status: 'skipped' | 'stale' }`、または `{ status: 'error', error: string }`。`afterApply` の `isCurrent()` でその検索世代が現在も有効か確認できます。
 
-| メソッド | 戻り値・契約 |
-| --- | --- |
-| `invalidate()`（1.3.0追加） | 同期、`undefined`。呼び出し時点までに開始・予約された検索を無効化し、以後の値・エラー表示・検索用 `transformAddress`・`afterApply` への反映を止めます。古い成功・失敗とも `stale` です。値・既存エラーには触れず、反映済み値・実行済み副作用は巻き戻しません。何度でも呼べ、他の登録には影響しません。次回の郵便番号検索・手入力住所の保存欄同期は引き続き有効です |
-| `whenIdle()` | 呼び出し時点の最新処理の `Promise<Outcome>`。`invalidate()`・画面遷移・`dispose()` だけでは待機対象を差し替えません。無効化前に取得したPromiseと、無効化後（次の郵便番号変更前）に取得したPromiseは同一です。予約だけなら通信せず `stale`、通信中なら応答／失敗による処理終了を待って `stale`。通信が終わらなければ解決時期は保証しません。次の郵便番号変更後は新しい処理だけを観測し、古い通信を一括待機しません。検索前の初期値は `skipped`、既に完了した処理の結果は無効化しても変わりません |
-| `dispose()` | 同期、`undefined`。先行検索を無効化し、その登録の検索・手入力同期を永久停止します。`invalidate()` や再表示で復帰しません |
+| メソッド                    | 戻り値・契約                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `invalidate()`（1.3.0追加） | 同期、`undefined`。呼び出し時点までに開始・予約された検索を無効化し、以後の値・エラー表示・検索用 `transformAddress`・`afterApply` への反映を止めます。古い成功・失敗とも `stale` です。値・既存エラーには触れず、反映済み値・実行済み副作用は巻き戻しません。何度でも呼べ、他の登録には影響しません。次回の郵便番号検索・手入力住所の保存欄同期は引き続き有効です                                                                                                                              |
+| `whenIdle()`                | 呼び出し時点の最新処理の `Promise<Outcome>`。`invalidate()`・画面遷移・`dispose()` だけでは待機対象を差し替えません。無効化前に取得したPromiseと、無効化後（次の郵便番号変更前）に取得したPromiseは同一です。予約だけなら通信せず `stale`、通信中なら応答／失敗による処理終了を待って `stale`。通信が終わらなければ解決時期は保証しません。次の郵便番号変更後は新しい処理だけを観測し、古い通信を一括待機しません。検索前の初期値は `skipped`、既に完了した処理の結果は無効化しても変わりません |
+| `dispose()`                 | 同期、`undefined`。先行検索を無効化し、その登録の検索・手入力同期を永久停止します。`invalidate()` や再表示で復帰しません                                                                                                                                                                                                                                                                                                                                                                        |
 
 `invalidate()` は業務操作から常時有効の保護へ通知するAPIであり、保護のオン・オフではありません。通信中断、反映済み値の巻き戻し、送信待機・キャンセル・再送信は保証しません。無効化時点で既に実行中の同期コールバックは中断できませんが、それ以降の変換・設定・後続コールバックは実行しません。
 
@@ -562,7 +562,7 @@ const primaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
 		Primary_line_1_entry: 'Primary_line_1_value',
 		Primary_line_2_entry: 'Primary_line_2_value',
 	},
-	transformAddress: (value) => value === '' ? '' : toFullWidth(value, false),
+	transformAddress: (value) => (value === '' ? '' : toFullWidth(value, false)),
 });
 
 const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
@@ -580,7 +580,7 @@ const secondaryAddressHandler = registerFormBridgeZipCodeAddressHandler({
 	},
 	clearFields: ['Secondary_line_3_entry'],
 	replaceOnZipCodeChange: true,
-	transformAddress: (value) => value === '' ? '' : toFullWidth(value, false),
+	transformAddress: (value) => (value === '' ? '' : toFullWidth(value, false)),
 });
 ```
 
@@ -638,16 +638,16 @@ function clearPrimaryAddress() {
 
 2026-10-12に、`4acf76f` のソースと通常配布URLの内容が完全一致することを確認しました。CI・デプロイ・配布パッケージ作成も成功しています。確認日であり、初版の公開日を示すものではありません。詳細は [通常配布確認記録](verification/library-distribution.md) を参照してください。
 
-| バージョン | 記録日     | 主な変更                                                    | 記録・配布確認                                         |
-| ---------- | ---------- | ----------------------------------------------------------- | ------------------------------------------------------ |
+| バージョン | 記録日     | 主な変更                                                                                                          | 記録・配布確認                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------- | ---------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1.3.0      | 2026-11-02 | FormBridgeに `invalidate()` を追加。常時有効の世代保護を業務操作から通知可能にし、`whenIdle()` の観測契約を明文化 | `5cfb3dd`。2026-11-02に通常URLとの完全一致・CI・本番デプロイ・パッケージ作成成功を確認。[配布証跡](verification/library-distribution.md#zip-130-distribution)・[自動検証](verification/zip-code-address-utils.md#formbridge-invalidate-verification)。同日に[利用側適用・実画面確認完了報告](verification/library-distribution.md#zip-130-consumer-verification-2026-11-02)を受領 |
-| 1.2.1      | 2026-11-01 | FormBridgeの入力検証エラーはフィールド表示を維持し、コンソールログだけ抑制。追加設定なし・kintone版は維持 | `6b0717e`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-121)。入力途中のログ抑制・正しい出力・存在しない番号のログについて[実画面確認報告](verification/library-distribution.md#zip-121-consumer-verification-2026-11-01)を受領 |
-| 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持 | `9cfdc21`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)。導入機能の[実画面確認完了報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を利用者から受領 |
-| 1.1.0      | 2026-10-31 | FormBridge専用住所ハンドラー・入力／保存欄同期・世代管理を追加。kintone版は維持 | `cbdfc88`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)。実FormBridgeは未検証 |
-| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
-| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                | `651dead`。初版作成日・配布日は未確認                  |
-| 未設定     | 2026-10-05 | 住所検索時の不要なZIP API再リクエストを回避                 | `7b1da89`。配布確認は未確認                            |
-| 未設定     | 2026-10-11 | 移行済みの旧kintone郵便番号ボタン・案内APIを削除            | `1d2a27b`。配布確認は未確認                            |
-| 未設定     | 2026-10-11 | 未使用のZIP実行時APIを削除し、API仕様書を整理               | `502864f`。配布確認は未確認                            |
+| 1.2.1      | 2026-11-01 | FormBridgeの入力検証エラーはフィールド表示を維持し、コンソールログだけ抑制。追加設定なし・kintone版は維持         | `6b0717e`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-121)。入力途中のログ抑制・正しい出力・存在しない番号のログについて[実画面確認報告](verification/library-distribution.md#zip-121-consumer-verification-2026-11-01)を受領                                  |
+| 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持                                              | `9cfdc21`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)。導入機能の[実画面確認完了報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を利用者から受領                                                                   |
+| 1.1.0      | 2026-10-31 | FormBridge専用住所ハンドラー・入力／保存欄同期・世代管理を追加。kintone版は維持                                   | `cbdfc88`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-110)。実FormBridgeは未検証                                                                                                                                                                               |
+| 1.0.0      | 2026-10-12 | ソース先頭JSDocのバージョンを現行版として記録。機能変更なし                                                       | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12）                                                                                                                                                                                                                                                                                                                            |
+| 未設定     | 2025-10-29 | 現ファイル名での最古の登録（ファイル名変更）                                                                      | `651dead`。初版作成日・配布日は未確認                                                                                                                                                                                                                                                                                                                                             |
+| 未設定     | 2026-10-05 | 住所検索時の不要なZIP API再リクエストを回避                                                                       | `7b1da89`。配布確認は未確認                                                                                                                                                                                                                                                                                                                                                       |
+| 未設定     | 2026-10-11 | 移行済みの旧kintone郵便番号ボタン・案内APIを削除                                                                  | `1d2a27b`。配布確認は未確認                                                                                                                                                                                                                                                                                                                                                       |
+| 未設定     | 2026-10-11 | 未使用のZIP実行時APIを削除し、API仕様書を整理                                                                     | `502864f`。配布確認は未確認                                                                                                                                                                                                                                                                                                                                                       |
 
 過去の未設定行はGitの主要変更の抜粋です。記録日はコミット日で、初版作成日・配布日とは限りません。過去の各コミット時点の配布URLの内容・CI・デプロイは未確認です。過去のバージョンは推測で割り当てていません。
