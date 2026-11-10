@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.0.0** です。
+現行ソースは **1.0.1**、確認済み通常配布版は **1.0.0** です。
 
 このドキュメントは [src/csv-parser.js](../src/csv-parser.js) が公開する関数の使い方と、引数（schema/options）および返り値の仕様を整理したリファレンスです。
 
@@ -141,7 +141,8 @@ parseCSV(schema, (options = {}));
 
 - `format` (string)
   - 主に `type: 'date'` / `type: 'datetime'` の入力形式ヒント。
-  - 例: `YYYY-MM-DD` | `YYYY/MM/DD` | `YYYYMMDD` | `YYMMDD` | `YMMDD` | `UNIX` | `UNIX_MS`。
+  - 例: `YYYY-MM-DD` | `YYYY/MM/DD` | `YYYYMMDD` | `YYMMDD` | `YMMDD` | `MM/DD` | `M-D` | `MM.DD` | `M月D日` | `UNIX` | `UNIX_MS`。
+  - 年のない月日は `M/D`・`MM/DD`、`M-D`・`MM-DD`、`M.D`・`MM.DD`、`M月D日`・`MM月DD日` を指定できます。月日それぞれの入力は1桁または2桁で、年は読み込み時の日付に最も近いものを補います。
 
 - `required` (boolean)
   - 必須チェック。
@@ -243,6 +244,7 @@ parseCSV(schema, (options = {}));
 - `type: 'date'` は最終的に `YYYY-MM-DD`（kintone 日付形式）へ正規化されます。
 - `type: 'datetime'` は最終的に `YYYY-MM-DDTHH:MM:SSZ`（ミリ秒なし）へ正規化されます。
 - `format` 未指定時でも、代表的な日付文字列/数値は自動判定で変換を試みます。
+- 年のない月日は、入力形式に合わせて `format: 'MM/DD'`、`'MM-DD'`、`'MM.DD'`、`'M月D日'` などを指定すると、読み込み時の日付に最も近い年の日付として変換されます。
 
 ---
 
@@ -303,6 +305,12 @@ console.log('meta', result.meta);
 
 - `type: 'date'` は最終的に `YYYY-MM-DD` へ正規化されます。
 - `type: 'datetime'` は最終的に `YYYY-MM-DDTHH:MM:SSZ` へ正規化されます。
+- 年のない月日を読む場合は、schema に入力形式に合う `format`（例: `'MM/DD'`、`'MM-DD'`、`'M月D日'`）を指定します。年は読み込み時の日付に最も近くなるよう補われます。
+
+```js
+{ column: '日付', fieldCode: 'date', type: 'date', format: 'MM/DD' }
+```
+
 - ユーザーがファイル選択をキャンセルした場合は `result.meta.cancelled` で判定します。
 - 反映先アプリへの追加/更新/Upsert 判定は、`result.records` を使って kintone 側ロジックで実行してください。
 
@@ -324,6 +332,7 @@ console.log('meta', result.meta);
 
 | バージョン | 記録日     | 主な変更                                                                  | 記録・配布確認                                         |
 | ---------- | ---------- | ------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 1.0.1      | 2026-11-10 | 年なし月日（`M/D`、ハイフン・ピリオド・日本語区切り）の読み込みに対応     | 現行ソース。通常配布版への反映は未確認                 |
 | 1.0.0      | 2026-10-12 | 現行ソースを基準版として記録し、先頭JSDocにバージョンを明記。機能変更なし | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
 | 未設定     | 2026-06-13 | Shift_JIS入力に対応したCSVパーサーを追加                                  | `141db34`。配布確認は未確認                            |
 | 未設定     | 2026-06-13 | ファイル種類を絞るacceptオプションを追加                                  | `5a47d3f`。配布確認は未確認                            |
