@@ -43,7 +43,8 @@ const createFixture = (
 			},
 		};
 	}
-	const emit = (eventName) => (registrations.get(eventName) || []).forEach((handler) => handler());
+	const emit = (eventName, event) =>
+		(registrations.get(eventName) || []).forEach((handler) => handler(event));
 
 	const values = [];
 	if (withCustomLib) {
@@ -51,6 +52,7 @@ const createFixture = (
 			setFieldValue(fieldCode, value) {
 				values.push([fieldCode, value]);
 			},
+			setFieldError() {},
 		};
 	}
 
@@ -161,6 +163,60 @@ test('katakana option is passed through to autoKana', (t) => {
 	f.register('Name_input', 'Name_kana_input', 'Name_kana', { katakana: true });
 	f.emit('form.show');
 	assert.equal(f.autoKanaCalls[0].options.katakana, true);
+});
+
+test('saved kana is normalized to hiragana by default and when katakana is false', (t) => {
+	for (const options of [{}, { katakana: false }]) {
+		const f = createFixture(t);
+		f.register('Name_input', 'Name_kana_input', 'Name_kana', options);
+		f.emit('form.show');
+		const kanaInput = f.input('Name_kana_input');
+
+		kanaInput.value = 'ｶﾀｶﾅ';
+		f.triggerChange(kanaInput);
+		assert.deepEqual(f.values, [
+			['Name_kana_input', 'ｶﾀｶﾅ'],
+			['Name_kana', 'かたかな'],
+		]);
+	}
+});
+
+test('saved kana is normalized to katakana when katakana is true', (t) => {
+	const f = createFixture(t);
+	f.register('Name_input', 'Name_kana_input', 'Name_kana', { katakana: true });
+	f.emit('form.show');
+	const kanaInput = f.input('Name_kana_input');
+
+	kanaInput.value = 'ひらがな';
+	f.triggerChange(kanaInput);
+	assert.deepEqual(f.values, [
+		['Name_kana_input', 'ひらがな'],
+		['Name_kana', 'ヒラガナ'],
+	]);
+});
+
+test('hiragana handlers persist the same normalized value in either event order', (t) => {
+	for (const formBridgeFirst of [true, false]) {
+		const f = createFixture(t);
+		f.window.registerFormBridgeFullWidthHiraganaHandler('Name_kana_input', 'Name_kana');
+		f.register('Name_input', 'Name_kana_input', 'Name_kana');
+		f.emit('form.show');
+		const kanaInput = f.input('Name_kana_input');
+		kanaInput.value = 'カタカナ';
+
+		if (formBridgeFirst) {
+			f.emit('form.field.change.Name_kana_input', { value: kanaInput.value });
+			f.triggerChange(kanaInput);
+		} else {
+			f.triggerChange(kanaInput);
+			f.emit('form.field.change.Name_kana_input', { value: kanaInput.value });
+		}
+
+		assert.equal(
+			f.values.filter(([fieldCode]) => fieldCode === 'Name_kana').at(-1)[1],
+			'かたかな'
+		);
+	}
 });
 
 test('kana completion updates the display field and the saved field', (t) => {
