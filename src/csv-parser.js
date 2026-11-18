@@ -1,5 +1,5 @@
 /**
- * @version 1.0.0
+ * @version 1.0.1
  * CSV パーサーモジュール — 簡易ドキュメント
  *
  * 詳細なオプション仕様、schema の挙動や利用例は
@@ -580,6 +580,28 @@ const _cp_makeValidDate = (y, m, d) => {
 	return date;
 };
 
+const _cp_makeClosestMonthDay = (month, day) => {
+	const today = new Date();
+	const currentYear = today.getFullYear();
+	const todayOrdinal = Date.UTC(currentYear, today.getMonth(), today.getDate());
+	let closestDate = null;
+	let closestDistance = Infinity;
+
+	for (let year = currentYear - 4; year <= currentYear + 4; year++) {
+		const date = _cp_makeValidDate(year, month, day);
+		if (!date) continue;
+
+		const dateOrdinal = Date.UTC(year, month - 1, day);
+		const distance = Math.abs(dateOrdinal - todayOrdinal);
+		if (distance < closestDistance) {
+			closestDate = date;
+			closestDistance = distance;
+		}
+	}
+
+	return closestDate;
+};
+
 const _cp_inferYearFromYMMDD = (y1) => {
 	const now = new Date();
 	const currentYear = now.getFullYear();
@@ -608,6 +630,16 @@ const _cp_parseDateFromFormat = (raw, format) => {
 		if (!Number.isFinite(n)) return null;
 		const d = new Date(n);
 		return Number.isNaN(d.getTime()) ? null : d;
+	}
+
+	const monthDayFormat = normalizedFormat.match(/^M{1,2}([/.-]|月)D{1,2}(日)?$/);
+	if (monthDayFormat) {
+		const separator = monthDayFormat[1];
+		const daySuffix = monthDayFormat[2] || '';
+		if ((separator === '月') !== (daySuffix === '日')) return null;
+		const escapedSeparator = separator === '.' ? '\\.' : separator;
+		const mMonthDay = s.match(new RegExp(`^(\\d{1,2})${escapedSeparator}(\\d{1,2})${daySuffix}$`));
+		return mMonthDay ? _cp_makeClosestMonthDay(Number(mMonthDay[1]), Number(mMonthDay[2])) : null;
 	}
 
 	const mYmd = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);

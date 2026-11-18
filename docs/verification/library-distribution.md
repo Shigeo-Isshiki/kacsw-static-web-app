@@ -554,6 +554,35 @@
   - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/41655785527)：配布パッケージ作成成功。
 - この記録は通常配布URLの内容一致を示すものであり、202フォームを含む利用先でのブラウザーキャッシュ更新や実画面動作の確認ではありません。
 
+<a id="csv-parser-1-0-1-distribution-2026-11-10"></a>
+
+## csv-parser 1.0.1 通常配布・ブラウザー動作確認
+
+- 確認日：2026-11-10（日本時間、UTC+09:00）。
+- 対象ソース：[PR #60のマージコミット `7de4f7f280e5cd5a0e12c49fefabdb334afbe1e1`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/7de4f7f280e5cd5a0e12c49fefabdb334afbe1e1) の `src/csv-parser.js`。
+- 通常配布URL：[https://js.kacsw.or.jp/csv-parser.js](https://js.kacsw.or.jp/csv-parser.js)。`Cache-Control: no-cache` を指定してGETし、HTTP 200、JSDocバージョン `1.0.1`、ソースとのバイト単位の完全一致（27,663 bytes）を確認しました。
+- SHA-256：`23a6c2c0b7a67b7f5b4810bf8c5893067608d601b285d6aee6369f3567cf8936`（ソース・配布ファイル共通）。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test #404](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/42736317262)：成功。
+  - [Azure Static Web Apps CI/CD #532](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/42736317031)：本番デプロイ成功。
+  - [Prepare dist and package #481](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/42736317059)：配布パッケージ作成成功。
+- ブラウザー動作確認：通常配布URLから取得した同一コードをブラウザー内で実行し、`parseCSV` からCSVファイルを読み込んで以下8形式すべての変換成功を確認しました。`10/01` (`MM/DD`) → `2026-10-01`、`2/1` (`M/D`) → `2027-02-01`、`02-01` (`MM-DD`) → `2027-02-01`、`3-1` (`M-D`) → `2027-03-01`、`02.01` (`MM.DD`) → `2027-02-01`、`3.1` (`M.D`) → `2027-03-01`、`02月01日` (`MM月DD日`) → `2027-02-01`、`3月1日` (`M月D日`) → `2027-03-01`。各ケースで行エラー・致命的エラーはありませんでした。
+- 確認範囲：これは本番配布ライブラリを使ったブラウザー上のCSV読み込み確認です。実利用者のkintoneアプリ画面、アプリ設定、利用環境固有のキャッシュや業務処理までは確認していません。
+
+<a id="text-suite-1-4-0-distribution-2026-11-12"></a>
+
+## text-suite 1.4.0 通常配布確認
+
+- 確認日：2026-11-12（日本時間、UTC+09:00）。
+- 対象ソース：[PR #62のマージコミット `1c6d909ef2bdeb2ac090cc73c810758fcc1619a6`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/1c6d909ef2bdeb2ac090cc73c810758fcc1619a6) の `src/text-suite.js`。
+- 通常配布URL：[https://js.kacsw.or.jp/text-suite.js](https://js.kacsw.or.jp/text-suite.js)。`Cache-Control: no-cache` を指定してGETし、HTTP 200、JSDocバージョン `1.4.0`、ソースとのバイト単位の完全一致（59,348 bytes）を確認しました。
+- SHA-256：`d03e9dbda745f1258e0bde1b4ece2a5581577f2642b82a3420e13af3da626002`（ソース・配布ファイル共通）。
+- マージコミットで実行されたワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/43163199378)：lint・全テスト成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/43163199400)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/43163199277)：配布パッケージ作成成功。
+- この記録は通常配布URLの内容一致を示すものであり、利用先のブラウザーキャッシュ更新や実画面での機能・業務条件の確認ではありません。
+
 ## text-suite 1.5.0の配布確認（未実施）
 
 - 記録日：2026-11-18（日本時間、UTC+09:00）。

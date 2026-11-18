@@ -1030,7 +1030,7 @@ const _ts_getFormBridgeInputElement = (fieldCode) =>
  * FormBridgeの氏名入力欄に、入力中のかなをふりがな欄へ補完するハンドラを登録する関数
  * 漢字から読みを推測する機能ではなく、jquery.autoKana.jsによる入力中のかなの補完です。
  * 補完・復元・消去の結果は、表示用のかな入力フィールドとkintone保存先フィールドの両方へ
- * formbridge-custom-libの値管理APIを通じて反映します。
+ * formbridge-custom-libの値管理APIを通じて反映します。保存値はkatakanaオプションに応じて正規化します。
  * @param {string} nameInputFieldCode 氏名の入力フィールドコード
  * @param {string} kanaInputFieldCode ふりがなの表示用入力フィールドコード
  * @param {string} kanaSavedFieldCode ふりがなのkintone保存先フィールドコード
@@ -1105,7 +1105,12 @@ const registerFormBridgeAutoKanaHandler = (
 			let restoringKana = false;
 			const setKanaValues = (kana) => {
 				formBridgeCustomLib.setFieldValue(kanaInputFieldCode, kana);
-				formBridgeCustomLib.setFieldValue(kanaSavedFieldCode, kana);
+				const savedKana = kana
+					? katakana
+						? toFullWidthKatakana(kana, false)
+						: toFullWidthHiragana(kana, false)
+					: '';
+				formBridgeCustomLib.setFieldValue(kanaSavedFieldCode, savedKana);
 			};
 			// IME確定直後の一時的な空値だけを直近の有効なふりがなで復元する
 			const restoreKana = () => {
