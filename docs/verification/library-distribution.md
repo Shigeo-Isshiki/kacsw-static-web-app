@@ -583,10 +583,24 @@
   - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/43163199277)：配布パッケージ作成成功。
 - この記録は通常配布URLの内容一致を示すものであり、利用先のブラウザーキャッシュ更新や実画面での機能・業務条件の確認ではありません。
 
-## text-suite 1.5.0の配布確認（未実施）
+## text-suite 1.5.0の配布前記録（確認当時未実施）
 
 - 記録日：2026-11-18（日本時間、UTC+09:00）。
 - 対象：[text-suite](../text-suite.md) 1.5.0。対象コミットは未確定です。
 - ローカル検証：`node -r ./test/setup-tests.js test/test-text-suite.js` は成功。`for file in test/test-text-suite-formbridge.js test/test-text-suite-formbridge-autokana.js test/test-email-domain-handler.js test/test-bank-transfer-edi.js test/test-bank-transfer.js; do echo "RUN $file"; node -r ./test/setup-tests.js "$file" || exit 1; done` は全件成功。
 - 静的検証：`./node_modules/.bin/eslint src/text-suite.js src/all-window-exports.js`、`./node_modules/.bin/prettier --check src/text-suite.js src/all-window-exports.js test/test-text-suite.js`、`git diff --check` は成功。
 - 対象コミットのワークフロー、通常配布URLの取得・内容一致、SHA-256は未確認です。変更後の実画面動作も未確認であり、配布確認とは別に実施する必要があります。
+
+<a id="text-suite-1-5-0-distribution-2026-11-18"></a>
+
+## text-suite 1.5.0 通常配布確認
+
+- 確認日：2026-11-18 20:05（日本時間、UTC+09:00）。
+- 対象コミット：[PR #64のマージコミット `78c81518adb8f8377caa9b8d2ecbbb6399fc3802`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/78c81518adb8f8377caa9b8d2ecbbb6399fc3802)。
+- [text-suite.js](https://js.kacsw.or.jp/text-suite.js)：`Cache-Control: no-cache` を指定してGETし、HTTP 200、JSDocバージョン `1.5.0`、対象コミットのソースとのバイト単位の完全一致（60,961 bytes）を確認しました。SHA-256は `22bc4c0eaedd3d6647073914cf73bf5482f9aecefba8341b2530d5fe848c5cc1` です。
+- [all-window-exports.js](https://js.kacsw.or.jp/all-window-exports.js)：同じ方法でHTTP 200と対象コミットのソースとのバイト単位の完全一致（3,285 bytes）を確認しました。バージョン番号の定義はありません。SHA-256は `b4227b30a10748b2f563393c86b51d57acac32d39c2ea7cce63873c473ed5a51` です。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/44291166870)：成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/44291166943)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/44291166918)：配布パッケージ作成成功。
+- この確認は通常配布URLの内容一致を示すものです。利用先のブラウザーキャッシュ更新やkintone実画面での機能・業務条件は未確認です。
