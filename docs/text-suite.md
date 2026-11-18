@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.3.0** です。1.3.0ではFormBridge新バージョンのフォームで氏名入力中のかなをふりがな欄へ補完するイベントハンドラを追加しました。2026-11-03の対象コミットと通常配布URLの一致確認は[1.3.0配布確認記録](verification/library-distribution.md#text-suite-1-3-0-distribution-2026-11-03)を参照してください。1.2.0ではFormBridge用通常フィールド・サブテーブルの文字変換ハンドラを追加しました。2026-11-01の確認に加え、2026-11-03にもFormBridge共通化の導入対象で通常フィールド・テーブル内の文字変換を確認したとの利用者報告を受領しました。報告範囲と未確認事項は[利用者による確認記録](verification/library-distribution.md#formbridge-rollout-completion-2026-11-03)を参照してください。
+現行ソースは **1.5.0** です。1.5.0の通常配布・実画面動作は未確認です。確認済み通常配布版は **1.3.0** で、FormBridge新バージョンのフォームで氏名入力中のかなをふりがな欄へ補完するイベントハンドラを追加しました。2026-11-03の対象コミットと通常配布URLの一致確認は[1.3.0配布確認記録](verification/library-distribution.md#text-suite-1-3-0-distribution-2026-11-03)を参照してください。1.2.0ではFormBridge用通常フィールド・サブテーブルの文字変換ハンドラを追加しました。2026-11-01の確認に加え、2026-11-03にもFormBridge共通化の導入対象で通常フィールド・テーブル内の文字変換を確認したとの利用者報告を受領しました。報告範囲と未確認事項は[利用者による確認記録](verification/library-distribution.md#formbridge-rollout-completion-2026-11-03)を参照してください。
 
 `src/text-suite.js` は文字列変換・正規化に関するユーティリティ群を提供します。主に日本語の全角⇄半角変換、かなの相互変換（ひらがな⇄カタカナ、全角⇄半角カナ）、メールアドレスの簡易検証など、kintone カスタマイズやフォーム入力の正規化に便利な関数を収録しています。
 
@@ -47,6 +47,7 @@
 | `toHalfWidthKana(str, throwOnError = true)`     | カナを半角カタカナに変換する。                   | [参照](#api-tohalfwidthkana)       |
 | `toFullWidth(str, throwOnError = true)`         | 半角英数字・記号などを全角に変換する。           | [参照](#api-tofullwidth)           |
 | `toHalfWidth(str, throwOnError = true)`         | 全角英数字・記号などを半角に変換する。           | [参照](#api-tohalfwidth)           |
+| `toInternetBankingHalfWidth(str, throwOnError = true)` | 特定形式のインターネットバンキング向け文字列に変換する。 | [参照](#api-tointernetbankinghalfwidth) |
 | `assertEmailAddress(emailAddress)`              | メールアドレスを半角に正規化して形式を検証する。 | [参照](#api-assertemailaddress)    |
 
 入力・例外の扱いは各関数と共通契約を参照してください。`isSingleByteAlnumOnly` は判定値を返し、文字変換関数には変換不能文字に対する例外を制御する `throwOnError` があります。
@@ -80,9 +81,9 @@
 
 ### 変換・検証関数の詳細
 
-#### 文字変換5関数の共通契約
+#### 文字変換6関数の共通契約
 
-`toFullWidthKatakana`、`toFullWidthHiragana`、`toHalfWidthKana`、`toFullWidth`、`toHalfWidth` に共通します。
+`toFullWidthKatakana`、`toFullWidthHiragana`、`toHalfWidthKana`、`toFullWidth`、`toHalfWidth`、`toInternetBankingHalfWidth` に共通します。
 
 - `str` (string)：変換対象。省略時は空文字列ですが、空文字列は `Error` になります。
 - `throwOnError` (boolean)：既定true。falseの場合は変換不能文字を残します。
@@ -126,6 +127,22 @@
 #### `toFullWidth` / `toHalfWidth`
 
 - 概要: 英数字・記号・スペースの全角／半角変換を行います。チルダやバックスラッシュ・円記号等、一部の記号は例外的に対応します（例: `\\` -> `￥`、`~` -> `～`）。
+
+<a id="api-tointernetbankinghalfwidth"></a>
+
+#### `toInternetBankingHalfWidth(str, throwOnError = true)`
+
+- 特定のインターネットバンキング向けデータ形式の文字規則に変換します。すべての金融機関・データ形式に共通する規則ではありません。利用先の仕様を確認してください。
+- 半角長音 `ｰ` を `-` に変換してから `toHalfWidth` で半角化し、半角英小文字を大文字、小書きカナ `ｧｨｩｪｫｬｭｮｯ` を `ｱｲｳｴｵﾔﾕﾖﾂ` に変換します。全角長音 `ー` なども `toHalfWidth` の規則で `-` になります。
+- 許容文字は半角数字、半角英大文字、通常の半角カナ `ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ`、および `\ , . ( ) - / ﾞ ﾟ ｢ ｣` と半角スペースです。末尾の半角スペースも保持します。
+- 既定の `true` では変換後に許容外文字が残ると `Error` を投げます。`false` では変換可能な部分を変換し、許容外文字を残して返します。書き込み用の値を確定する際は `true` で検証してください。
+- 文字数制限、必須チェック、空白除去、画面イベント登録は行いません。漢字から読み仮名を生成しません。例えば24文字以内の制限が必要な場合は呼び出し元で変換後に確認してください。`ｶﾞ` は2文字です。既存の処理に適用すると、文字数超過と許容外文字のエラー優先順が変わる場合があります。
+
+```js
+toInternetBankingHalfWidth('ガッツ'); // -> 'ｶﾞﾂﾂ'
+toInternetBankingHalfWidth('Ａｂ１２ '); // -> 'AB12 '
+toInternetBankingHalfWidth('漢字', false); // -> '漢字'（書き込み前にtrueで検証）
+```
 
 <a id="api-assertemailaddress"></a>
 
@@ -524,6 +541,7 @@ registerFormBridgeFullWidthHandler('Company_name_input', 'Company_name_saved', {
 
 | バージョン | 記録日     | 主な変更                                                                 | 記録・配布確認                                         |
 | ---------- | ---------- | ------------------------------------------------------------------------ | ------------------------------------------------------ |
+| 1.5.0      | 2026-11-18 | 特定形式のインターネットバンキング向け文字変換関数を追加 | 対象コミット未確定。[検証記録](verification/library-distribution.md#text-suite-150の配布確認未実施)。通常配布・実画面確認は未実施 |
 | 1.3.0      | 2026-11-03 | FormBridge用のふりがな自動補完イベントハンドラを追加                     | 通常配布URLとの完全一致を確認（2026-11-03）            |
 | 1.2.0      | 2026-10-31 | FormBridgeサブテーブルの全角・全角ひらがな変換イベントハンドラを追加     | `ec932c0`。通常配布URLとの完全一致を確認（2026-10-31） |
 | 1.1.0      | 2026-10-31 | FormBridge通常フィールド用の全角・全角ひらがな変換イベントハンドラを追加 | 1.2.0に含めて配布。実画面の確認範囲は上記報告を参照    |
