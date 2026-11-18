@@ -1,9 +1,9 @@
 /** 文字列処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.4.0
+ * @version 1.5.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_ts_)で始める
-/* exported isSingleByteAlnumOnly, toFullWidthKatakana, toFullWidth, toFullWidthHiragana, toHalfWidthKana, toHalfWidth, assertEmailAddress, registerFullWidthHandler, registerFullWidthHiraganaHandler, registerFormBridgeFullWidthHandler, registerFormBridgeTableFullWidthHandler, registerFormBridgeFullWidthHiraganaHandler, registerFormBridgeTableFullWidthHiraganaHandler, registerFormBridgeAutoKanaHandler, registerTableFullWidthHandler, registerTableFullWidthHiraganaHandler, registerEmailAddressHandler, registerTableEmailAddressHandler */
+/* exported isSingleByteAlnumOnly, toFullWidthKatakana, toFullWidth, toFullWidthHiragana, toHalfWidthKana, toHalfWidth, toInternetBankingHalfWidth, assertEmailAddress, registerFullWidthHandler, registerFullWidthHiraganaHandler, registerFormBridgeFullWidthHandler, registerFormBridgeTableFullWidthHandler, registerFormBridgeFullWidthHiraganaHandler, registerFormBridgeTableFullWidthHiraganaHandler, registerFormBridgeAutoKanaHandler, registerTableFullWidthHandler, registerTableFullWidthHiraganaHandler, registerEmailAddressHandler, registerTableEmailAddressHandler */
 /* global formBridge, kintone */
 'use strict';
 //　ライブラリ内の共通定数・変換テーブル定義部
@@ -484,6 +484,38 @@ const toHalfWidth = (str = '', throwOnError = true) => {
 	} catch (error) {
 		throw error;
 	}
+};
+
+/**
+ * 特定のインターネットバンキング向け形式に文字列を変換する関数
+ * @param {string} str 変換対象の文字列
+ * @param {boolean} [throwOnError=true] 許容外文字が残る場合にエラーを投げるかどうか
+ * @returns {string} 変換後の文字列
+ * @throws {Error} 不正な引数、空文字列、または許容外文字が含まれる場合（throwOnError=true時）
+ */
+const toInternetBankingHalfWidth = (str = '', throwOnError = true) => {
+	if (!_ts_checkString(str)) throw new Error('変換対象は文字列である必要があります');
+	if (!_ts_checkBoolean(throwOnError))
+		throw new Error('throwOnErrorはboolean型である必要があります');
+	if (!str) throw new Error('変換対象の文字列が空です');
+
+	const smallKana = 'ｧｨｩｪｫｬｭｮｯ';
+	const normalKana = 'ｱｲｳｴｵﾔﾕﾖﾂ';
+	const result = toHalfWidth(str.replace(/ｰ/g, '-'), false)
+		.replace(/[a-z]/g, (char) => char.toUpperCase())
+		.replace(/[ｧｨｩｪｫｬｭｮｯ]/g, (char) => normalKana[smallKana.indexOf(char)]);
+	if (throwOnError) {
+		const allowed =
+			'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
+			'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ' +
+			'\\,.()-/ﾞﾟ｢｣ ';
+		for (const char of result) {
+			if (!allowed.includes(char)) {
+				throw new Error(`許容外の文字が含まれています: ${char}`);
+			}
+		}
+	}
+	return result;
 };
 
 /**
@@ -1477,6 +1509,7 @@ if (typeof window !== 'undefined') {
 	window.toFullWidthHiragana = toFullWidthHiragana;
 	window.toHalfWidthKana = toHalfWidthKana;
 	window.toHalfWidth = toHalfWidth;
+	window.toInternetBankingHalfWidth = toInternetBankingHalfWidth;
 	window.assertEmailAddress = assertEmailAddress;
 	window.registerFullWidthHandler = registerFullWidthHandler;
 	window.registerFullWidthHiraganaHandler = registerFullWidthHiraganaHandler;

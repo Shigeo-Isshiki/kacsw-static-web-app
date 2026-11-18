@@ -582,3 +582,11 @@
   - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/43163199400)：本番デプロイ成功。
   - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/43163199277)：配布パッケージ作成成功。
 - この記録は通常配布URLの内容一致を示すものであり、利用先のブラウザーキャッシュ更新や実画面での機能・業務条件の確認ではありません。
+
+## text-suite 1.5.0の配布確認（未実施）
+
+- 記録日：2026-11-18（日本時間、UTC+09:00）。
+- 対象：[text-suite](../text-suite.md) 1.5.0。対象コミットは未確定です。
+- ローカル検証：`node -r ./test/setup-tests.js test/test-text-suite.js` は成功。`for file in test/test-text-suite-formbridge.js test/test-text-suite-formbridge-autokana.js test/test-email-domain-handler.js test/test-bank-transfer-edi.js test/test-bank-transfer.js; do echo "RUN $file"; node -r ./test/setup-tests.js "$file" || exit 1; done` は全件成功。
+- 静的検証：`./node_modules/.bin/eslint src/text-suite.js src/all-window-exports.js`、`./node_modules/.bin/prettier --check src/text-suite.js src/all-window-exports.js test/test-text-suite.js`、`git diff --check` は成功。
+- 対象コミットのワークフロー、通常配布URLの取得・内容一致、SHA-256は未確認です。変更後の実画面動作も未確認であり、配布確認とは別に実施する必要があります。
