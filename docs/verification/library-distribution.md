@@ -604,3 +604,16 @@
   - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/44291166943)：本番デプロイ成功。
   - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/44291166918)：配布パッケージ作成成功。
 - この確認は通常配布URLの内容一致を示すものです。利用先のブラウザーキャッシュ更新やkintone実画面での機能・業務条件は未確認です。
+
+<a id="phone-utils-1-1-0-distribution-2026-11-22"></a>
+
+## phone-utils 1.1.0 通常配布確認（2026-11-22）
+
+- 確認日：2026-11-22（日本時間、UTC+09:00）。
+- 対象コミット：[PR #66のマージコミット `0f483f5bd6ed488e4260624b024bda5c38d4e35f`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/0f483f5bd6ed488e4260624b024bda5c38d4e35f)。
+- [phone-utils.js](https://js.kacsw.or.jp/phone-utils.js)：`Cache-Control: no-cache` を指定してGETし、HTTP 200、JSDocバージョン `1.1.0`、対象コミットのソースとのバイト単位の完全一致（42,853 bytes）を確認しました。SHA-256は `1ce83f72afd10b2793b93414f3b37c48c18ad1d1f188724ba09c2bf02184bf24` です。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/44924462100)：成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/44924462158)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/44924462150)：配布パッケージ作成成功。
+- この確認は通常配布URLの内容一致を示すものです。利用先のブラウザーキャッシュ更新や実画面での機能・業務条件は未確認です。
