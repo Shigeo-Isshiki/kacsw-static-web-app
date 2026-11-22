@@ -617,3 +617,11 @@
   - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/44924462158)：本番デプロイ成功。
   - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/44924462150)：配布パッケージ作成成功。
 - この確認は通常配布URLの内容一致を示すものです。利用先のブラウザーキャッシュ更新や実画面での機能・業務条件は未確認です。
+
+<a id="zip-140-pending"></a>
+
+## zip-code-address-utils 1.4.0 配布前の確認状況
+
+- 記録日：2026-11-22（日本時間、UTC+09:00）。対象ライブラリ：`zip-code-address-utils.js` と `all-window-exports.js`。
+- 対象変更は未コミットのため配布対象コミットは未確定です。対象コミットのワークフローは未実行、通常配布URLの内容一致・対象配布物のSHA-256は未確認です。
+- 実画面動作は未確認です。配布確認とは別に実施する必要があります。
