@@ -207,6 +207,115 @@ const makeFetchStub = (status, jsonBody) => {
 		});
 		console.log('PASS: formatZipCode invalid input');
 
+		// getAddressByZipCode: API応答の追加項目は改名のみで未加工のまま返す。
+		const detailedAddress = {
+			zip_code: '1234567',
+			dgacode: 'A1B2C3D',
+			pref_code: '13',
+			pref_name: '東京都',
+			pref_kana: 'トウキョウト',
+			pref_roma: 'TOKYO',
+			city_code: '13101',
+			city_name: '千代田区',
+			city_kana: 'チヨダク',
+			city_roma: 'CHIYODA-KU',
+			town_name: '千代田',
+			town_kana: 'チヨダ',
+			town_roma: 'CHIYODA 1',
+			biz_name: null,
+			biz_kana: null,
+			biz_roma: null,
+			block_name: '1-1',
+			other_name: null,
+			address: '東京都千代田区千代田１−１',
+			corporate_number: '0000000000000',
+			business_name: null,
+			business_name_kana: 'カナ',
+			tel_number: '03-0000-0000',
+			url: 'https://example.com/',
+			longitude: 139.75,
+			latitude: 35.68,
+			locations: [{ floor: '1F' }],
+			usage: { type: 'office' },
+		};
+		global.fetch = makeFetchStub(200, { addresses: [detailedAddress] });
+		await new Promise((resolve, reject) => {
+			zc.getAddressByZipCode('1234567', (res) => {
+				try {
+					assert.ok(!res.error);
+					// 既存キーは従来どおり（apiAddressと結合addressは別キー）
+					assert.strictEqual(res.address, '東京都千代田区千代田1-1');
+					assert.strictEqual(res.prefName, '東京都');
+					// 追加キーはAPIの値を未加工で保持（空白・型を変換しない）
+					assert.strictEqual(res.dgaCode, 'A1B2C3D');
+					assert.strictEqual(res.prefCode, '13');
+					assert.strictEqual(res.prefKana, 'トウキョウト');
+					assert.strictEqual(res.prefRoma, 'TOKYO');
+					assert.strictEqual(res.cityCode, '13101');
+					assert.strictEqual(res.cityKana, 'チヨダク');
+					assert.strictEqual(res.cityRoma, 'CHIYODA-KU');
+					assert.strictEqual(res.townKana, 'チヨダ');
+					assert.strictEqual(res.townRoma, 'CHIYODA 1');
+					assert.strictEqual(res.bizKana, null);
+					assert.strictEqual(res.bizRoma, null);
+					assert.strictEqual(res.apiAddress, '東京都千代田区千代田１−１');
+					assert.strictEqual(res.corporateNumber, '0000000000000');
+					assert.strictEqual(res.businessNameKana, 'カナ');
+					assert.strictEqual(res.telNumber, '03-0000-0000');
+					assert.strictEqual(res.url, 'https://example.com/');
+					assert.strictEqual(res.longitude, 139.75);
+					assert.strictEqual(res.latitude, 35.68);
+					assert.deepStrictEqual(res.locations, [{ floor: '1F' }]);
+					assert.deepStrictEqual(res.usage, { type: 'office' });
+					resolve();
+				} catch (e) {
+					reject(e);
+				}
+			});
+		});
+		console.log('PASS: getAddressByZipCode returns raw API extras');
+
+		// 追加項目のキー欠落（undefined）はnullに揃え、既存の検証は変えない
+		global.fetch = makeFetchStub(200, {
+			addresses: [
+				{ zip_code: '1234567', pref_name: '東京都', city_name: '千代田区', town_name: '千代田' },
+			],
+		});
+		await new Promise((resolve, reject) => {
+			zc.getAddressByZipCode('1234567', (res) => {
+				try {
+					assert.ok(!res.error);
+					for (const key of [
+						'dgaCode',
+						'prefCode',
+						'prefKana',
+						'prefRoma',
+						'cityCode',
+						'cityKana',
+						'cityRoma',
+						'townKana',
+						'townRoma',
+						'bizKana',
+						'bizRoma',
+						'apiAddress',
+						'corporateNumber',
+						'businessNameKana',
+						'telNumber',
+						'url',
+						'longitude',
+						'latitude',
+						'locations',
+						'usage',
+					])
+						assert.strictEqual(res[key], null, key);
+					resolve();
+				} catch (e) {
+					reject(e);
+				}
+			});
+		});
+		console.log('PASS: getAddressByZipCode missing API extras become null');
+
 		console.log('ALL ZIP-CODE-ADDRESS-UTILS TESTS INVOKED');
 	} finally {
 		// restore
