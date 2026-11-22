@@ -622,6 +622,19 @@
 
 ## zip-code-address-utils 1.4.0 配布前の確認状況
 
-- 記録日：2026-11-22（日本時間、UTC+09:00）。対象ライブラリ：`zip-code-address-utils.js` と `all-window-exports.js`。
-- 対象変更は未コミットのため配布対象コミットは未確定です。対象コミットのワークフローは未実行、通常配布URLの内容一致・対象配布物のSHA-256は未確認です。
+- 記録日：2026-11-22（日本時間、UTC+09:00）。対象ライブラリ：`zip-code-address-utils.js`（最終実装では `all-window-exports.js` に変更はありません）。
+- 記録時点では対象変更は未コミットのため配布対象コミットは未確定でした。対象コミットのワークフローは未実行、通常配布URLの内容一致・対象配布物のSHA-256は未確認でした。
 - 実画面動作は未確認です。配布確認とは別に実施する必要があります。
+
+<a id="zip-140-distribution"></a>
+
+## zip-code-address-utils 1.4.0 通常配布確認
+
+- 確認日：2026-11-22（日本時間、UTC+09:00）。
+- 対象コミット：[PR #68のマージコミット `7190e03f835e296f2027d9fd1d97da57bf1ed406`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/7190e03f835e296f2027d9fd1d97da57bf1ed406)。
+- [zip-code-address-utils.js](https://js.kacsw.or.jp/zip-code-address-utils.js)：`Cache-Control: no-cache` を指定してGETし、HTTP 200、JSDocバージョン `1.4.0`、対象コミットのソースとのバイト単位の完全一致（47,253 bytes）を確認しました。SHA-256は `0b32d2a9dddf7f35e766e1686d956423b09356f454bc6c55d4b1de24f8d1e395` です。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/45023200473)：成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/45023200549)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/45023200504)：配布パッケージ作成成功。
+- この確認は通常配布URLの内容一致を示すものです。利用先のブラウザーキャッシュ更新や、kintone・FormBridge実画面での機能・業務条件は未確認です。
