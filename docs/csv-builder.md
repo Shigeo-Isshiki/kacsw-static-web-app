@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.0.0** です。
+現行ソースは **1.1.0** です。確認済み通常配布版は **1.0.0** です。1.1.0 の配布確認は未実施です。
 
 このドキュメントは `src/csv-builder.js` が公開する関数の使い方と、公開関数に与える引数（意味と指定方法）を整理したリファレンスです。
 
@@ -27,7 +27,7 @@
 | 関数名                                 | 機能                                                                           | リファレンス          |
 | -------------------------------------- | ------------------------------------------------------------------------------ | --------------------- |
 | `buildRow(schema, data, options)`      | 単一レコードから CSV の 1 行を生成する。                                       | [参照](#api-buildrow) |
-| `buildCSV(schema, dataArray, options)` | レコード配列から CSV 全体を生成する。必要に応じてヘッダーを含み、改行は `\n`。 | [参照](#api-buildcsv) |
+| `buildCSV(schema, dataArray, options)` | レコード配列から CSV 全体を生成する。必要に応じてヘッダーと行区切りを指定する。 | [参照](#api-buildcsv) |
 
 ## 関数リファレンス
 
@@ -87,10 +87,12 @@ buildCSV(schema, dataArray, (options = {}));
 - `options` (Object)
   - `delimiter` (string) — フィールド区切り（デフォルト `,`）
   - `header` (boolean) — `true`（デフォルト）でヘッダ行を出力。ヘッダは各スキーマ要素の `label`（未指定なら `key`）を使用します。
+  - `lineEnding` (`'LF' | 'CRLF'`) — レコード行の区切り。デフォルトは `'LF'`（`\n`）。`'CRLF'` を指定すると `\r\n` になります。
+  - `finalNewline` (boolean) — `true` の場合、出力の最終行の後にも `lineEnding` と同じ改行を付けます。デフォルトは `false` です。
 
 **戻り値**:
 
-- CSV 全体の文字列（複数行）。行区切りは `\n`。
+- CSV 全体の文字列（複数行）。行区切りは `lineEnding` で指定します。項目内の改行はそのまま保持されます。ヘッダーもデータ行もない場合は空文字列を返します。
 
 **例**:
 
@@ -101,6 +103,9 @@ const rows = [
 ];
 console.log(buildCSV(schema, rows, { header: true }));
 // "id,name\n1,山田\n2,鈴木"
+
+console.log(buildCSV(schema, rows, { header: true, lineEnding: 'CRLF', finalNewline: true }));
+// "id,name\r\n1,山田\r\n2,鈴木\r\n"
 ```
 
 ---
@@ -328,7 +333,7 @@ console.log(buildCSV(schemaPadding, [rec], { header: true }));
 ### 契約（Contract）
 
 - 入力: `schema`（配列/オブジェクト）、`data`（オブジェクト）または `dataArray`（配列）
-- 出力: CSV 文字列（改行は `\n`、区切りは `options.delimiter`）
+- 出力: CSV 文字列（行区切りは `options.lineEnding`、最終行の改行は `options.finalNewline`、項目区切りは `options.delimiter`）
 - エラー: 型エラーや致命的な例外はスローされますが、個々のフィールドは `default` / `mapDefault` で安全にフォールバックします。
 
 ---
@@ -343,6 +348,7 @@ console.log(buildCSV(schemaPadding, [rec], { header: true }));
 - UNIX 出力は `UNIX`（秒）と `UNIX_MS`（ミリ秒）をサポートします。数値入力は閾値で秒/ミリ秒判定されます。
 - 和暦出力は `ERA_*` 形式で指定できます。`date-utils.js` と同じ元号定義（令和/平成/昭和/大正/明治）を使用します。
 - 区切り文字を JIS 寄りにしたい場合は `ERA_INITIAL_JIS_YM` / `ERA_INITIAL_JIS_YMD` を使ってください。
+- `lineEnding` は `'LF'` または `'CRLF'` を指定します。それ以外の値、および boolean 以外の `finalNewline` は `TypeError` になります。セル内に含まれる改行は変換しません。
 
 文書の構成は [文書作成標準](README.md) に従います。保守・テストの手順は [保守・開発手順](maintenance/library-maintenance.md) を参照してください。
 
@@ -352,6 +358,7 @@ console.log(buildCSV(schemaPadding, [rec], { header: true }));
 
 | バージョン | 記録日     | 主な変更                                                                        | 記録・配布確認                                         |
 | ---------- | ---------- | ------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 1.1.0      | 2026-11-27 | `buildCSV` に行区切り（LF/CRLF）と最終行改行の指定を追加                         | PR・main反映待ち。通常配布確認は未実施                 |
 | 1.0.0      | 2026-10-12 | 現行ソースを基準版として記録し、先頭JSDocにバージョンを明記。機能変更なし       | `4acf76f`。通常配布URLとの完全一致を確認（2026-10-12） |
 | 未設定     | 2025-11-09 | 現ファイルのGit履歴で確認できる最古の登録。ソース・仕様書・サンプルテストを追加 | `3c0b8b5`。初版作成日・配布日は未確認                  |
 | 未設定     | 2026-04-26 | 和暦の日付書式と元号更新の説明を追加                                            | `fa68c15`。配布確認は未確認                            |

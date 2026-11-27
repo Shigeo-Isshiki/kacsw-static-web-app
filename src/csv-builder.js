@@ -1,5 +1,5 @@
 /**
- * @version 1.0.0
+ * @version 1.1.0
  * CSV ビルダーモジュール — 簡易ドキュメント
  *
  * 詳細なスキーマ仕様、format/map の挙動や利用例は
@@ -7,7 +7,7 @@
  *
  * - 公開 API:
  *   - buildRow(schema, data, options) -> CSV の一行（改行なし）
- *   - buildCSV(schema, dataArray, options) -> CSV 全体（ヘッダ行を含めるかは options.header）
+ *   - buildCSV(schema, dataArray, options) -> CSV 全体（ヘッダ・行区切りは options で指定）
  *
  * ドキュメントの更新・追加例:
  * - map, mapMode, mapDefault, mapFinal の具体例
@@ -367,6 +367,14 @@ const buildRow = (schema, data, options = {}) => {
 const buildCSV = (schema, dataArray, options = {}) => {
 	const delimiter = options.delimiter || ',';
 	const includeHeader = options.header !== undefined ? options.header : true;
+	const lineEnding = options.lineEnding === undefined ? 'LF' : options.lineEnding;
+	if (lineEnding !== 'LF' && lineEnding !== 'CRLF') {
+		throw new TypeError('options.lineEnding must be "LF" or "CRLF"');
+	}
+	if (options.finalNewline !== undefined && typeof options.finalNewline !== 'boolean') {
+		throw new TypeError('options.finalNewline must be a boolean');
+	}
+	const lineSeparator = lineEnding === 'CRLF' ? '\r\n' : '\n';
 	const norm = _cb_normalizeSchema(schema);
 
 	const lines = [];
@@ -413,7 +421,8 @@ const buildCSV = (schema, dataArray, options = {}) => {
 		);
 	}
 
-	return lines.join('\n');
+	if (lines.length === 0) return '';
+	return lines.join(lineSeparator) + (options.finalNewline ? lineSeparator : '');
 };
 
 // 公開: 統一ネームスペース window.CSV
