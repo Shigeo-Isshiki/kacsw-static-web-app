@@ -33,6 +33,65 @@ try {
 	process.exitCode = 2;
 }
 
+// ----- buildCSV line ending options -----
+try {
+	const schema = [
+		{ key: 'id', label: 'ID' },
+		{ key: 'note', label: 'Note' },
+	];
+	const rows = [
+		{ id: 1, note: 'line 1\nline, 2\r\nline 3' },
+		{ id: 2, note: 'plain' },
+	];
+
+	eq(
+		buildCSV(schema, rows.slice(0, 1), { lineEnding: 'CRLF', finalNewline: true }),
+		'ID,Note\r\n1,"line 1\nline, 2\r\nline 3"\r\n',
+		'one record with header, CRLF, and final newline'
+	);
+	eq(
+		buildCSV(schema, rows.slice(0, 1), {
+			header: false,
+			lineEnding: 'CRLF',
+			finalNewline: true,
+		}),
+		'1,"line 1\nline, 2\r\nline 3"\r\n',
+		'one record without header, CRLF, and final newline'
+	);
+	eq(
+		buildCSV(schema, rows, { lineEnding: 'CRLF' }),
+		'ID,Note\r\n1,"line 1\nline, 2\r\nline 3"\r\n2,plain',
+		'multiple records with header, CRLF, no final newline'
+	);
+	eq(
+		buildCSV(schema, rows, { header: false, finalNewline: true }),
+		'1,"line 1\nline, 2\r\nline 3"\n2,plain\n',
+		'multiple records without header, LF, and final newline'
+	);
+	eq(
+		buildCSV(schema, [], { header: false, lineEnding: 'CRLF', finalNewline: true }),
+		'',
+		'empty data without header should not produce a newline'
+	);
+	eq(
+		buildCSV(schema, [], { lineEnding: 'CRLF', finalNewline: true }),
+		'ID,Note\r\n',
+		'empty data with header should only terminate the header row'
+	);
+	assert.throws(
+		() => buildCSV(schema, [], { lineEnding: 'CR' }),
+		/options\.lineEnding must be "LF" or "CRLF"/
+	);
+	assert.throws(
+		() => buildCSV(schema, [], { finalNewline: 'yes' }),
+		/options\.finalNewline must be a boolean/
+	);
+	console.log('PASS: buildCSV line ending options');
+} catch (e) {
+	console.error('FAIL: buildCSV line ending options', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
 // ----- test-csv-format.js (formatting/buildRow tests) -----
 try {
 	// 1) date formats
