@@ -638,3 +638,16 @@
   - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/45023200549)：本番デプロイ成功。
   - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/45023200504)：配布パッケージ作成成功。
 - この確認は通常配布URLの内容一致を示すものです。利用先のブラウザーキャッシュ更新や、kintone・FormBridge実画面での機能・業務条件は未確認です。
+
+<a id="csv-builder-1-1-0-distribution-2026-11-27"></a>
+
+## csv-builder 1.1.0 通常配布確認（2026-11-27）
+
+- 確認日：2026-11-27（日本時間、UTC+09:00）。
+- 対象コミット：[PR #70のマージコミット `be48492981570b4f10d180116b048e0c4bd2ebe9`](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/commit/be48492981570b4f10d180116b048e0c4bd2ebe9)。
+- [csv-builder.js](https://js.kacsw.or.jp/csv-builder.js)：`Cache-Control: no-cache` を指定してGETし、HTTP 200、JSDocバージョン `1.1.0`、対象コミットのソースとのバイト単位の完全一致（15,336 bytes）を確認しました。SHA-256は `b4fd19d68c7a3d9bda0fd2830b9e5f8adb5fcc0af1bb04846192c1a76aeec458` です。
+- 対象コミットのワークフローはすべて成功しました。
+  - [CI - Lint & Test](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/45962025076)：成功。
+  - [Azure Static Web Apps CI/CD](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/45962025359)：本番デプロイ成功。
+  - [Prepare dist and package](https://github.com/Shigeo-Isshiki/kacsw-static-web-app/actions/runs/45962025080)：配布パッケージ作成成功。
+- この確認は通常配布URLの内容一致を示すものです。利用先のブラウザーキャッシュ更新や実画面での機能・業務条件は未確認です。
