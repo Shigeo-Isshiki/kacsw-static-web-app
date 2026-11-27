@@ -139,3 +139,19 @@ FormBridge専用は既存33件に5件を追加して38件。各テスト内で�
 - 利用側では公開v1.3.0による自動検証1,028件と変更21ファイルのlint・整形・構文確認が成功し、同日に全対象をFormBridgeへ適用して問題なく実画面で動作確認を完了、各アプリの更新履歴へ記録したとの報告です。
 - AIによる直接検証・再実行ではありません。操作別の実画面確認内訳は未記録であり、全入力パターン・全競合条件の実画面網羅確認へ一般化しません。詳細は[利用側適用・動作確認完了報告](library-distribution.md#zip-130-consumer-verification-2026-11-02)を参照してください。
 - 上記の未実施記録は各時点の履歴として保持し、今回の報告を後続の確認結果として追記します。ソース・版数・個別フォームは変更せず、通信中断・送信待機／キャンセル／再送信を保証しない方針も維持します。
+
+## 1.4.0：API応答の追加項目返却
+
+- 1.4.0の最終実装は、`getAddressByZipCode` の成功時結果へAPI応答の未加工項目を追加するものです。検討途中では応答をそのまま返す別関数を追加しましたが、利用者の意図に合わせて取り消し、公開APIは従来の関数構成のままです。以下の実検索は、同一の中継API・同一URLに対する確認として有効です。
+
+- 2026-11-22（日本時間、UTC+09:00）に中継APIへ公開郵便番号 `1000001` でGETし、HTTP 200と `page`、`limit`、`count`、`searchtype`、`addresses` を確認しました。住所候補には、日本郵便V2のサンプルにあるコード、カナ、ローマ字、事業所、法人、座標、`locations`、`usage` 等のキーがあり、値には `null` も含まれていました。
+- 存在しない番号 `0000000` ではHTTP 404でした。
+- 同日、利用者提供の候補49件をNodeから中継APIへ実検索しました。全件で成功し、各住所候補は日本郵便V2仕様の28項目（`zip_code`、`dgacode`、都道府県・市区町村・町域の名称／コード／カナ／ローマ字、`biz_name`／`biz_kana`／`biz_roma`、`block_name`、`other_name`、`address`、`corporate_number`、`business_name`、`business_name_kana`、`tel_number`、`url`、`longitude`、`latitude`、`locations`、`usage`）のキーをすべて持ち、値がない項目は `null`（`locations` は空配列）、`count` と候補数は一致しました。
+  - 通常の郵便番号45件（`1600004`、`0600002`、`0300822`、`0200816`、`9810935`、`0100922`、`9900021`、`9638045`、`3100851`、`3710843`、`3380003`、`2600026`、`1700005`、`2210825`、`9500994`、`3800836`、`4000064`、`9390341`、`9188011`、`4200856`、`5008385`、`4600001`、`5140003`、`5250072`、`6040874`、`5420012`、`6510062`、`6340061`、`6408319`、`6890201`、`6900011`、`7000807`、`7320816`、`7530072`、`7620083`、`7900802`、`7700943`、`7800870`、`8120011`、`8490935`、`8528104`、`8620910`、`8700907`、`8800007`、`9030804`）：`searchtype` は `zipcode`。名称・コード・カナ・ローマ字の非 `null` 値を確認。`9390341` は22候補、`6040874` は5候補を返しました（`getAddressByZipCode` では複数候補は従来どおりエラー扱いです）。
+  - 事業所個別郵便番号3件（`3208508`、`9208557`、`8908517`）：`searchtype` は `bizzipcode`。`biz_name`・`biz_kana`・`block_name` の非 `null` 値を確認。
+  - デジタルアドレス1件（利用者提供。解決先住所の記録を避けるため値は記載しません）：`searchtype` は `dgacode`。`dgacode`・`address`・`business_name`・`corporate_number`・`tel_number`・`url`・`locations`・`usage` の非 `null` 値を確認。
+- 上記は確認時点の応答です。全国の全番号・複数ページ・応答の継続的な互換性・中継APIによる変換の有無は未確認です。追加項目はAPIの値を加工せず返し、値がない場合は `null` です。
+- Nodeから `getAddressByZipCode` で `1000001` を実検索し、追加項目（コード・カナ・ローマ字）を含む結果を取得しました。ブラウザーやkintoneの実通信は未確認です。
+- 上記49件の実API動作テストを `scripts/test-zip-code-address-live.js` として恒久化しました（`node scripts/test-zip-code-address-live.js [デジタルアドレス...]` で手動実行。`npm test` には含めず、CIのスタブ方針を維持）。2026-11-22の実行で、通常43件・事業所3件の成功、複数候補2件の期待どおりのエラー、引数で渡したデジタルアドレス1件の成功（追加キーの存在検証を含む）を確認しました。デジタルアドレスは特定の場所につながるため、スクリプト・記録には値を残していません。
+- `node -r ./test/setup-tests.js test/test-zip-code-address-utils.js`、`node -r ./test/setup-tests.js test/test-zip-code-address-handler.js`、`node -r ./test/setup-tests.js test/test-zip-code-address-formbridge.js` はすべて成功しました。
+- `./node_modules/.bin/eslint src/zip-code-address-utils.js src/all-window-exports.js` と `./node_modules/.bin/prettier --check src/zip-code-address-utils.js src/all-window-exports.js test/test-zip-code-address-utils.js test/test-zip-code-address-handler.js` は成功しました。

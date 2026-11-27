@@ -1,6 +1,6 @@
 /** 郵便番号から住所などを出力する処理をまとめたJavaScriptの関数群です。
  * @author Shigeo Isshiki <issiki@kacsw.or.jp>
- * @version 1.3.0
+ * @version 1.4.0
  */
 // 関数命名ルール: 外部に見せる関数名はそのまま、内部で使用する関数名は(_zc_)で始める
 /* exported checkZipCodeExists, formatZipCode, getAddressByZipCode, getCityByZipCode, getPrefectureByZipCode, hasPrefectureName, registerZipCodeAddressHandler, registerFormBridgeZipCodeAddressHandler, normalizeZipCode */
@@ -186,6 +186,9 @@ const checkZipCodeExists = (zipCode, callback) => {
 const _zc_formatValidatedZipCode = (normalized) =>
 	/^\d{7}$/.test(normalized) ? normalized.slice(0, 3) + '-' + normalized.slice(3) : normalized;
 
+// API応答の値を加工せずに返す（未定義はnullに揃える）
+const _zc_rawApiValue = (value) => (value === undefined ? null : value);
+
 /**
  * 郵便番号をハイフン付き（123-4567）にフォーマットする関数（APIで存在確認、callback型）
  * @param {string|number} zipCode 郵便番号またはデジタルアドレス（7桁の半角英数字）。
@@ -246,6 +249,20 @@ const formatZipCode = (zipCode, callback) => {
  *   otherName: '○○マンション',          // その他住所（存在する場合）
  *   businessName: '株式会社○○'          // 企業名（存在する場合）
  *   address: '神奈川県横浜市西区みなとみらい', // 住所（都道府県＋市区町村＋町名＋番地等）
+ *   // 以下はAPI応答の未加工値。APIが値を持たない場合はnull
+ *   dgaCode: null,                     // デジタルアドレス
+ *   prefCode: '14', prefKana: 'カナガワケン', prefRoma: 'KANAGAWA',
+ *   cityCode: '14103', cityKana: 'ヨコハマシニシク', cityRoma: 'YOKOHAMA SHI NISHI KU',
+ *   townKana: 'ミナトミライ', townRoma: 'MINATOMIRAI',
+ *   bizKana: null, bizRoma: null,      // 事業所名カナ・ローマ字
+ *   apiAddress: null,                  // APIが返した住所文字列
+ *   corporateNumber: null,             // 法人番号
+ *   businessNameKana: null,            // 企業名カナ
+ *   telNumber: null,                   // 電話番号
+ *   url: null,                         // URL
+ *   longitude: null, latitude: null,   // 経度・緯度
+ *   locations: [],                     // 位置情報一覧
+ *   usage: null,                       // 用途情報
  * }
  *
  * エラー時の例：
@@ -409,6 +426,27 @@ const getAddressByZipCode = (zipCode, callback) => {
 					businessName: addressObj.business_name
 						? addressObj.business_name.replace(/[\u3000\u0020]/g, '')
 						: null,
+					// 以下はAPI応答の未加工値（改名のみ。値がない場合はnull）
+					dgaCode: _zc_rawApiValue(addressObj.dgacode),
+					prefCode: _zc_rawApiValue(addressObj.pref_code),
+					prefKana: _zc_rawApiValue(addressObj.pref_kana),
+					prefRoma: _zc_rawApiValue(addressObj.pref_roma),
+					cityCode: _zc_rawApiValue(addressObj.city_code),
+					cityKana: _zc_rawApiValue(addressObj.city_kana),
+					cityRoma: _zc_rawApiValue(addressObj.city_roma),
+					townKana: _zc_rawApiValue(addressObj.town_kana),
+					townRoma: _zc_rawApiValue(addressObj.town_roma),
+					bizKana: _zc_rawApiValue(addressObj.biz_kana),
+					bizRoma: _zc_rawApiValue(addressObj.biz_roma),
+					apiAddress: _zc_rawApiValue(addressObj.address),
+					corporateNumber: _zc_rawApiValue(addressObj.corporate_number),
+					businessNameKana: _zc_rawApiValue(addressObj.business_name_kana),
+					telNumber: _zc_rawApiValue(addressObj.tel_number),
+					url: _zc_rawApiValue(addressObj.url),
+					longitude: _zc_rawApiValue(addressObj.longitude),
+					latitude: _zc_rawApiValue(addressObj.latitude),
+					locations: _zc_rawApiValue(addressObj.locations),
+					usage: _zc_rawApiValue(addressObj.usage),
 				});
 			} else {
 				_zc_invokeCallback(callback, {

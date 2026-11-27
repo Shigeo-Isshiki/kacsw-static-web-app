@@ -2,7 +2,7 @@
 
 ## 概要・バージョン
 
-現行ソース・確認済み通常配布版は **1.3.0** です。FormBridge住所ハンドラーの戻り値に `invalidate()` を追加しました。2026-11-02に対象コミットのCI・本番デプロイ・パッケージ作成成功と通常配布URLの内容一致を確認しました。[配布証跡](verification/library-distribution.md#zip-130-distribution)を参照してください。同日、1.3.0について19アプリ・21ファイル、住所30登録への適用と実FormBridgeでの動作確認が完了したとの[利用者報告](verification/library-distribution.md#zip-130-consumer-verification-2026-11-02)を受領しました。2026-11-03にも、郵便番号・デジタルアドレス検索、手入力、郵便番号変更時の置換、業務条件変更時の検索結果無効化を含む共通化対象の確認完了報告を受領しています。いずれも操作別の網羅検証ではなく、詳細は[FormBridge共通化対応の利用者完了報告](verification/library-distribution.md#formbridge-rollout-completion-2026-11-03)を参照してください。
+現行ソース・確認済み通常配布版は **1.4.0** です。`getAddressByZipCode` の成功時結果に、API取得済みで未返却だった項目（カナ・ローマ字・各種コード・法人番号・電話番号・URL・座標など）を追加しました。既存キーは変更していません。2026-11-22に対象コミットのCI・本番デプロイ・パッケージ作成成功と通常配布URLの内容一致を確認しました（[配布証跡](verification/library-distribution.md#zip-140-distribution)）。1.4.0の実画面動作は未確認です。1.3.0については、2026-11-02に19アプリ・21ファイル、住所30登録への適用と実FormBridgeでの動作確認が完了したとの[利用者報告](verification/library-distribution.md#zip-130-consumer-verification-2026-11-02)を受領しました。2026-11-03にも、郵便番号・デジタルアドレス検索、手入力、郵便番号変更時の置換、業務条件変更時の検索結果無効化を含む共通化対象の確認完了報告を受領しています。いずれも操作別の網羅検証ではなく、詳細は[FormBridge共通化対応の利用者完了報告](verification/library-distribution.md#formbridge-rollout-completion-2026-11-03)を参照してください。
 
 このドキュメントは `src/zip-code-address-utils.js` が公開する郵便番号／デジタルアドレス関連ユーティリティ関数の使い方と引数・戻り値の契約を整理したリファレンスです。テストや Node 環境でも `require('../src/zip-code-address-utils.js')` で利用できます（CommonJS エクスポートあり）。
 
@@ -160,30 +160,59 @@ formatZipCode('１２３－４５６７', (res) => {
   - API レスポンスの構造が想定外の場合は `error` を返します。
 
 - 成功時に返す `result` の形（必ず明記）:
+  - 以下の2表のキーをすべて持つオブジェクトです。値の扱いは次の3種類です。
+    - **そのまま**：日本郵便APIの値を加工せず保持します（型・空白を維持。APIが値を持たない場合は `null`。`locations` はAPIの空配列をそのまま返すことがあります）。
+    - **空白除去**：APIの文字列から全角・半角空白を除去して返します。値がない場合は `null` です。
+    - **生成**：入力値やAPIの値からライブラリが作る値です。
 
-```js
-{
-  originalZipCode: '１２３－４５６７',   // 入力値（記号・全角含む）
-  normalizedZipCode: '1234567',         // 正規化済み（半角・大文字変換済み）
-  apiZipCode: '1234567',                // API が返した zip_code
-  zipCode: '123-4567',                  // 表示用（ハイフン付き）または正規化済み値
-  zipCode1: '1',                        // 各桁を分割した値（1～7）
-  zipCode2: '2',
-  zipCode3: '3',
-  zipCode4: '4',
-  zipCode5: '5',
-  zipCode6: '6',
-  zipCode7: '7',
-  prefName: '神奈川県',                 // 都道府県名
-  cityName: '横浜市西区',               // 市区町村名
-  townName: 'みなとみらい',             // 町域
-  bizName: '株式会社○○',               // 事業所名（存在する場合）
-  blockName: '1-1',                     // 番地等（存在する場合）
-  otherName: '○○マンション',            // その他住所（存在する場合）
-  businessName: '株式会社○○',           // 企業名（ビジネスデジタルアドレス、存在する場合）
-  address: '神奈川県横浜市西区みなとみらい1-1', // 結合された住所文字列（不要な空白を除去）
-}
-```
+- 日本郵便APIの項目に対応するキー（[日本郵便V2リファレンス](https://ent-api.biz.da.pf.japanpost.jp/apireference/digiadd-swagger-biz.html)の項目順）:
+
+| 日本郵便APIの項目    | `result` のキー       | 値の扱い | 説明                                                                 |
+| -------------------- | --------------------- | -------- | -------------------------------------------------------------------- |
+| `dgacode`            | `dgaCode`             | そのまま | デジタルアドレス（1.4.0追加）                                        |
+| `zip_code`           | `apiZipCode`          | そのまま | APIが返した7文字の郵便番号                                           |
+| `zip_code`           | `zipCode`             | 生成     | 数字7桁はハイフン付き（`123-4567`）、英字を含む場合は7文字のまま     |
+| `zip_code`           | `zipCode1`〜`zipCode7` | 生成     | 各桁を1文字ずつ分割                                                  |
+| `pref_code`          | `prefCode`            | そのまま | 都道府県コード（1.4.0追加）                                          |
+| `pref_name`          | `prefName`            | 空白除去 | 都道府県名                                                           |
+| `pref_kana`          | `prefKana`            | そのまま | 都道府県名カナ（1.4.0追加）                                          |
+| `pref_roma`          | `prefRoma`            | そのまま | 都道府県名ローマ字（1.4.0追加）                                      |
+| `city_code`          | `cityCode`            | そのまま | 市区町村コード（1.4.0追加）                                          |
+| `city_name`          | `cityName`            | 空白除去 | 市区町村名                                                           |
+| `city_kana`          | `cityKana`            | そのまま | 市区町村名カナ（1.4.0追加）                                          |
+| `city_roma`          | `cityRoma`            | そのまま | 市区町村名ローマ字（1.4.0追加）                                      |
+| `town_name`          | `townName`            | 空白除去 | 町域                                                                 |
+| `town_kana`          | `townKana`            | そのまま | 町域カナ（1.4.0追加）                                                |
+| `town_roma`          | `townRoma`            | そのまま | 町域ローマ字（1.4.0追加）                                            |
+| `biz_name`           | `bizName`             | 空白除去 | 事業所名                                                             |
+| `biz_kana`           | `bizKana`             | そのまま | 事業所名カナ（1.4.0追加）                                            |
+| `biz_roma`           | `bizRoma`             | そのまま | 事業所名ローマ字（1.4.0追加）                                        |
+| `block_name`         | `blockName`           | 空白除去 | 番地等                                                               |
+| `other_name`         | `otherName`           | 空白除去 | その他住所                                                           |
+| `corporate_number`   | `corporateNumber`     | そのまま | 法人番号（1.4.0追加）                                                |
+| `business_name`      | `businessName`        | 空白除去 | 企業名（ビジネスデジタルアドレス）                                   |
+| `business_name_kana` | `businessNameKana`    | そのまま | 企業名カナ（1.4.0追加）                                              |
+| `tel_number`         | `telNumber`           | そのまま | 電話番号（1.4.0追加）                                                |
+| `url`                | `url`                 | そのまま | URL（1.4.0追加）                                                     |
+| `address`            | `apiAddress`          | そのまま | APIが返した住所文字列（1.4.0追加。下表の結合 `address` とは別のキー） |
+| `longitude`          | `longitude`           | そのまま | 経度（1.4.0追加）                                                    |
+| `latitude`           | `latitude`            | そのまま | 緯度（1.4.0追加）                                                    |
+| `usage`              | `usage`               | そのまま | 用途情報（1.4.0追加）                                                |
+| `locations`          | `locations`           | そのまま | 位置情報一覧（1.4.0追加。APIの配列を保持）                           |
+
+- APIの項目に直接対応しない生成キー:
+
+| `result` のキー     | 値の扱い | 説明                                                                               |
+| ------------------- | -------- | ---------------------------------------------------------------------------------- |
+| `originalZipCode`   | 生成     | 入力値をそのまま保持（記号・全角を含む）                                           |
+| `normalizedZipCode` | 生成     | 入力値の正規化結果（半角化・記号除去・大文字化した7文字）                          |
+| `address`           | 生成     | `pref_name`＋`city_name`＋`town_name`＋`block_name` を結合し、全角・半角空白を除去 |
+
+- 追加キーの注意（必ず確認）:
+  - 1.3.0以前からあるキーの名前・値は従来と同じです。1.4.0追加のキーは上表のとおり「そのまま」保持し、空白除去・型変換をしません（ローマ字の空白などを保持）。
+  - kintone・FormBridgeの住所ハンドラの動作は変わりません。`addressFields` に指定できるプロパティは従来の一覧のままで、追加キーは指定できません（未加工値には文字列以外が含まれるため）。一方、`afterApply` やkintone版の観測結果に渡る `result` には追加キーが含まれます。利用側で `result` 全体を保存・記録している場合は、電話番号などの混入に注意してください。
+  - 2026-11-22の確認では、通常の郵便番号45件・事業所個別郵便番号3件・デジタルアドレス1件のすべてで、住所候補が[日本郵便のV2仕様](https://ent-api.biz.da.pf.japanpost.jp/apireference/digiadd-swagger-biz.html)の28項目のキーを持ち、値がない項目は `null`（`locations` は空配列）でした。詳細は[検証記録](verification/zip-code-address-utils.md#140api応答の追加項目返却)を参照してください。取得できる値はAPIに依存し、将来の応答や未確認の値までは保証しません。
+  - 電話番号などが含まれる可能性があるため、記録・共有時は適切に取り扱ってください。
 
 - 失敗時は必ず次の形のオブジェクトを返す:
 
@@ -517,7 +546,7 @@ if (!zc.hasPrefectureName('東京都千代田区千代田1-1')) {
 
 ログ抑制は利用者の郵便番号文字列入力の検証だけに適用します。非文字列のイベント値、必須フィールド欠落、API・変換・後続処理の例外は従来どおり異常として扱い、ログを抑制しません。入力途中でも必要なAPI・フィールドは検証し、検証メッセージの表示／解除APIが失敗した場合もログに残します。
 
-`afterApply` は住所補完・置換後のみ呼びます（通常郵便番号で住所保持した場合は呼びません）。`result` には `bizName` / `businessName` を含む検索結果全体、`record` には反映後のレコードを渡します。検索結果を使った追加転記はこのコールバック内で利用側がコード・優先順位を明示し、共通基盤の `setFieldValue` で入力／保存欄を両方設定できます。戻り値のPromiseはエラーです。同期コールバックでも実行済みの副作用は取り消せません。
+`afterApply` は住所補完・置換後のみ呼びます（通常郵便番号で住所保持した場合は呼びません）。`result` には `bizName` / `businessName` を含む検索結果全体（1.4.0以降は[APIの未加工追加キー](#getAddressByZipCode)も含む）、`record` には反映後のレコードを渡します。検索結果を使った追加転記はこのコールバック内で利用側がコード・優先順位を明示し、共通基盤の `setFieldValue` で入力／保存欄を両方設定できます。戻り値のPromiseはエラーです。同期コールバックでも実行済みの副作用は取り消せません。
 
 ##### 非同期・戻り値
 
@@ -640,6 +669,7 @@ function clearPrimaryAddress() {
 
 | バージョン | 記録日     | 主な変更                                                                                                          | 記録・配布確認                                                                                                                                                                                                                                                                                                                                                                    |
 | ---------- | ---------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.4.0      | 2026-11-22 | `getAddressByZipCode` の成功時結果にAPI応答の未加工項目（カナ・ローマ字・コード・法人番号・電話番号・URL・座標など）を追加。既存キー・自動入力は維持 | `7190e03`。2026-11-22に通常配布URLとの完全一致・対象コミットのCI・本番デプロイ・パッケージ作成成功を確認。[配布証跡](verification/library-distribution.md#zip-140-distribution)・[検証記録](verification/zip-code-address-utils.md#140api応答の追加項目返却)。実画面は未確認 |
 | 1.3.0      | 2026-11-02 | FormBridgeに `invalidate()` を追加。常時有効の世代保護を業務操作から通知可能にし、`whenIdle()` の観測契約を明文化 | `5cfb3dd`。2026-11-02に通常URLとの完全一致・CI・本番デプロイ・パッケージ作成成功を確認。[配布証跡](verification/library-distribution.md#zip-130-distribution)・[自動検証](verification/zip-code-address-utils.md#formbridge-invalidate-verification)。同日に[利用側適用・実画面確認完了報告](verification/library-distribution.md#zip-130-consumer-verification-2026-11-02)を受領 |
 | 1.2.1      | 2026-11-01 | FormBridgeの入力検証エラーはフィールド表示を維持し、コンソールログだけ抑制。追加設定なし・kintone版は維持         | `6b0717e`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-121)。入力途中のログ抑制・正しい出力・存在しない番号のログについて[実画面確認報告](verification/library-distribution.md#zip-121-consumer-verification-2026-11-01)を受領                                  |
 | 1.2.0      | 2026-11-01 | `replaceOnZipCodeChange` を追加。既定の住所保持動作とkintone版は維持                                              | `9cfdc21`。通常配布URLとの完全一致・対象コミットのCI・デプロイ・パッケージ作成成功を確認。[配布記録](verification/library-distribution.md#追加確認zip-code-address-utils-120)。導入機能の[実画面確認完了報告](verification/library-distribution.md#formbridge-consumer-verification-2026-11-01)を利用者から受領                                                                   |

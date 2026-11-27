@@ -12,6 +12,7 @@ const toFullWidthHiragana = global.toFullWidthHiragana || (window && window.toFu
 const toHalfWidthKana = global.toHalfWidthKana || (window && window.toHalfWidthKana);
 const toFullWidth = global.toFullWidth || (window && window.toFullWidth);
 const toHalfWidth = global.toHalfWidth || (window && window.toHalfWidth);
+const toInternetBankingHalfWidth = window.toInternetBankingHalfWidth;
 const assertEmailAddress = global.assertEmailAddress || (window && window.assertEmailAddress);
 const registerEmailAddressHandler =
 	global.registerEmailAddressHandler || (window && window.registerEmailAddressHandler);
@@ -32,6 +33,7 @@ if (
 	!toHalfWidthKana ||
 	!toFullWidth ||
 	!toHalfWidth ||
+	!toInternetBankingHalfWidth ||
 	!assertEmailAddress ||
 	!registerEmailAddressHandler ||
 	!registerTableEmailAddressHandler ||
@@ -109,6 +111,46 @@ try {
 	console.log('PASS: toHalfWidth fullwidth space and letters');
 } catch (e) {
 	console.error('FAIL: toHalfWidth fullwidth space and letters', e && e.message ? e.message : e);
+	process.exitCode = 2;
+}
+
+try {
+	const cases = [
+		['さとう', 'ｻﾄｳ'],
+		['Ａｂ１２', 'AB12'],
+		['ガッツ', 'ｶﾞﾂﾂ'],
+		['ラリルレロ', 'ﾗﾘﾙﾚﾛ'],
+		['ハート', 'ﾊ-ﾄ'],
+		['ﾊｰﾄ', 'ﾊ-ﾄ'],
+		['ｧｨｩｪｫｬｭｮｯ', 'ｱｲｳｴｵﾔﾕﾖﾂ'],
+		['ぁぃぅぇぉゃゅょっ', 'ｱｲｳｴｵﾔﾕﾖﾂ'],
+		['　 さ とう　', '  ｻ ﾄｳ '],
+		['￥\\,.()-/ﾞﾟ｢｣ ', '\\\\,.()-/ﾞﾟ｢｣ '],
+		['ｶﾞ'.repeat(13), 'ｶﾞ'.repeat(13)],
+	];
+	for (const [input, expected] of cases) {
+		assert.strictEqual(toInternetBankingHalfWidth(input), expected);
+		assert.strictEqual(toInternetBankingHalfWidth(input, false), expected);
+	}
+	const allowed =
+		'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
+		'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ' +
+		'\\,.()-/ﾞﾟ｢｣ ';
+	assert.strictEqual(toInternetBankingHalfWidth(allowed), allowed);
+	for (const char of ['漢', '!', '_', '･', '\t', '\n', '😀']) {
+		assert.throws(() => toInternetBankingHalfWidth(char), /許容外/);
+		assert.strictEqual(toInternetBankingHalfWidth(`ａ${char}っ`, false), `A${char}ﾂ`);
+	}
+	for (const input of ['', undefined, null, 0, {}, []]) {
+		assert.throws(() => toInternetBankingHalfWidth(input, false));
+	}
+	for (const flag of [null, 0, 'false', {}]) {
+		assert.throws(() => toInternetBankingHalfWidth('ｱ', flag), /boolean/);
+	}
+	assert.strictEqual(toHalfWidth('ｧｰa'), 'ｧｰa');
+	console.log('PASS: toInternetBankingHalfWidth conversion and validation');
+} catch (e) {
+	console.error('FAIL: toInternetBankingHalfWidth', e && e.message ? e.message : e);
 	process.exitCode = 2;
 }
 

@@ -54,6 +54,7 @@
 		'toFullWidthHiragana',
 		'toHalfWidthKana',
 		'toHalfWidth',
+		'toInternetBankingHalfWidth',
 		'assertEmailAddress',
 		'registerFullWidthHandler',
 		'registerFullWidthHiraganaHandler',
